@@ -113,9 +113,18 @@ class InternalSegment(models.Model):
 
 class KnowledgeBase(models.Model):
     """
-    Base de Conhecimento FEMME - Singleton
+    Base de Conhecimento - Multi-tenant
     Contém 7 blocos temáticos que definem o DNA da marca
+    Cada organização tem sua própria base de conhecimento
     """
+    organization = models.OneToOneField(
+        'core.Organization',
+        on_delete=models.CASCADE,
+        related_name='knowledge_base',
+        verbose_name='Organização',
+        help_text='Organização à qual esta base de conhecimento pertence'
+    )
+    
     # BLOCO 1: IDENTIDADE INSTITUCIONAL
     nome_empresa = models.CharField(max_length=200, verbose_name='Nome da Empresa')
     missao = models.TextField(verbose_name='Missão')
@@ -231,7 +240,7 @@ class KnowledgeBase(models.Model):
         verbose_name_plural = 'Bases de Conhecimento'
     
     def __str__(self):
-        return f"Base FEMME - {self.nome_empresa}"
+        return f"Base {self.organization.name} - {self.nome_empresa}"
     
     def save(self, *args, **kwargs):
         """Calcula completude antes de salvar"""
@@ -288,23 +297,6 @@ class KnowledgeBase(models.Model):
             score += 1
         
         return int((score / total_blocks) * 100)
-    
-    @classmethod
-    def get_instance(cls):
-        """Retorna a instância única (singleton)"""
-        instance, created = cls.objects.get_or_create(
-            id=1,
-            defaults={
-                'nome_empresa': 'FEMME',
-                'missao': '',
-                'valores': '',
-                'publico_externo': '',
-                'posicionamento': '',
-                'diferenciais': '',
-                'tom_voz_externo': '',
-            }
-        )
-        return instance
 
 
 class ReferenceImage(models.Model):
