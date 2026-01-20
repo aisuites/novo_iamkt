@@ -1,0 +1,68 @@
+<!-- Sidebar VibeMKT -->
+<aside class="sidebar">
+  
+  <!-- Navegação -->
+  <div>
+    <div class="sidebar-section-title">Navegação</div>
+    <nav class="sidebar-nav">
+      <a href="{% url 'core:dashboard' %}" class="sidebar-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <span class="icon">🏠</span>
+        <span>Dashboard</span>
+      </a>
+      <a href="{% url 'knowledge:view' %}" class="sidebar-link {% if 'knowledge' in request.resolver_match.namespace %}active{% endif %}">
+        <span class="icon">🧠</span>
+        <span>Base IAMKT</span>
+      </a>
+    </nav>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <!-- Ferramentas -->
+  <div>
+    <div class="sidebar-section-title">Ferramentas</div>
+    <nav class="sidebar-nav">
+      <a href="{% url 'content:pautas' %}" class="sidebar-link">
+        <span class="icon">📝</span>
+        <span>Pautas</span>
+      </a>
+      <a href="{% url 'content:posts' %}" class="sidebar-link">
+        <span class="icon">🎨</span>
+        <span>Posts</span>
+      </a>
+      <a href="{% url 'content:trends' %}" class="sidebar-link">
+        <span class="icon">📈</span>
+        <span>Trends</span>
+      </a>
+    </nav>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <!-- Gestão -->
+  <div>
+    <div class="sidebar-section-title">Gestão</div>
+    <nav class="sidebar-nav">
+      <a href="{% url 'campaigns:projects' %}" class="sidebar-link">
+        <span class="icon">🚀</span>
+        <span>Projetos</span>
+      </a>
+    </nav>
+  </div>
+
+  {% if user.is_staff %}
+  <div class="sidebar-divider"></div>
+
+  <!-- Administração -->
+  <div>
+    <div class="sidebar-section-title">Administração</div>
+    <nav class="sidebar-nav">
+      <a href="/admin/" class="sidebar-link" target="_blank">
+        <span class="icon">⚙️</span>
+        <span>Admin Django</span>
+      </a>
+    </nav>
+  </div>
+  {% endif %}
+
+</aside>

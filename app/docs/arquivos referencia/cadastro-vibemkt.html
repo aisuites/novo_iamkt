@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>FEMME – Base de Conhecimento</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Fonte Quicksand -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --femme-purple: #7a3d8a;
+      --femme-purple-soft: #f4e9f8;
+      --femme-green: #00bca4;
+      --femme-rose-soft: #ffb7c9;
+
+      --femme-white: #ffffff;
+      --femme-gray-light: #f5f5f7;
+      --femme-gray: #77767c;
+      --femme-gray-dark: #34343a;
+
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --shadow-soft: 0 18px 40px rgba(20, 5, 36, 0.08);
+      --shadow-subtle: 0 10px 24px rgba(20, 5, 36, 0.05);
+
+      --max-width: 1280px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Quicksand", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(122, 61, 138, 0.08), transparent 55%),
+        radial-gradient(circle at bottom right, rgba(0, 188, 164, 0.06), transparent 55%);
+      color: var(--femme-gray-dark);
+      line-height: 1.5;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button {
+      font-family: inherit;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HEADER */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 1px solid rgba(244, 233, 248, 0.9);
+    }
+
+    .header-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 20%, #ffb7c9 0, #7a3d8a 45%, #4c1f63 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--femme-white);
+      font-weight: 700;
+      font-size: 18px;
+      box-shadow: var(--shadow-subtle);
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .brand-text .name {
+      font-weight: 700;
+      color: var(--femme-purple);
+      letter-spacing: 0.03em;
+      font-size: 15px;
+      text-transform: uppercase;
+    }
+
+    .brand-text .tagline {
+      font-size: 11px;
+      color: var(--femme-gray);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 12px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(244, 233, 248, 0.9);
+      color: var(--femme-purple);
+      font-weight: 500;
+    }
+
+    .user-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #7a3d8a, #00bca4);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .header-badge-env {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(0, 188, 164, 0.08);
+      color: var(--femme-green);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* LAYOUT PRINCIPAL */
+    .shell {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 18px 20px 32px;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-subtle);
+      padding: 16px 14px;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .sidebar-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--femme-gray);
+      margin-bottom: 4px;
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 9px;
+      border-radius: 999px;
+      color: var(--femme-gray-dark);
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .sidebar-link span.icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      background: rgba(122, 61, 138, 0.04);
+      color: var(--femme-purple);
+    }
+
+    .sidebar-link:hover {
+      background: rgba(244, 233, 248, 0.9);
+      transform: translateY(-1px);
+    }
+
+    .sidebar-link.active {
+      background: linear-gradient(90deg, rgba(122, 61, 138, 0.12), rgba(0, 188, 164, 0.12));
+      font-weight: 600;
+      color: var(--femme-purple);
+    }
+
+    .sidebar-divider {
+      height: 1px;
+      background: rgba(230, 224, 238, 0.85);
+      margin-block: 6px;
+    }
+
+    /* BOTÕES */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--femme-green);
+      color: var(--femme-white);
+      box-shadow: 0 10px 22px rgba(0, 188, 164, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: #00a08c;
+      transform: translateY(-1px);
+      box-shadow: 0 14px 26px rgba(0, 188, 164, 0.4);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--femme-purple);
+      border: 1px solid rgba(122, 61, 138, 0.45);
+    }
+
+    .btn-outline:hover {
+      background: rgba(244, 233, 248, 0.9);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--femme-gray);
+      border: none;
+      padding-inline: 10px;
+    }
+
+    .btn-ghost:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    /* CONTEÚDO PRINCIPAL */
+    .main {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* HERO DA PÁGINA BASE FEMME */
+    .hero-base {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-lg);
+      padding: 18px 18px 14px;
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.1fr);
+      gap: 18px;
+    }
+
+    .hero-base-left {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(244, 233, 248, 0.95);
+      color: var(--femme-purple);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .hero-kicker-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--femme-green);
+      box-shadow: 0 0 0 4px rgba(0, 188, 164, 0.25);
+    }
+
+    .hero-title {
+      font-size: 22px;
+      color: var(--femme-purple);
+    }
+
+    .hero-title span.highlight {
+      background: linear-gradient(120deg, #7a3d8a, #00bca4);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-text {
+      font-size: 13px;
+      color: var(--femme-gray);
+      max-width: 560px;
+    }
+
+    .hero-tags {
+      margin-top: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 10px;
+    }
+
+    .hero-tag {
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(122, 61, 138, 0.06);
+      color: var(--femme-purple);
+      font-weight: 500;
+    }
+
+    .hero-base-right {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .hero-base-status {
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      background: var(--femme-gray-light);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .hero-base-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .status-pill {
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-pill span.dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+    }
+
+    .status-pill--yellow {
+      background: rgba(255, 191, 59, 0.12);
+      color: #c58900;
+    }
+
+    .status-pill--yellow span.dot {
+      background: #ffbf3b;
+    }
+
+    .status-pill--green {
+      background: rgba(0, 188, 164, 0.08);
+      color: var(--femme-green);
+    }
+
+    .status-pill--green span.dot {
+      background: var(--femme-green);
+    }
+
+    /* FORM WRAPPER */
+    .form-wrapper {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-subtle);
+      padding: 18px 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .form-header-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .section-kicker {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--femme-gray);
+    }
+
+    .section-title {
+      font-size: 16px;
+      color: var(--femme-purple);
+      font-weight: 600;
+    }
+
+    .section-subtitle {
+      font-size: 12px;
+      color: var(--femme-gray);
+    }
+
+    .form-steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    .form-step-pill {
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: var(--femme-gray-light);
+      color: var(--femme-gray);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .form-step-pill.active {
+      background: rgba(122, 61, 138, 0.12);
+      color: var(--femme-purple);
+      font-weight: 600;
+    }
+
+    .form-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* BLOCO DO FORM */
+    .form-block {
+      border-radius: var(--radius-md);
+      background: var(--femme-gray-light);
+      padding: 12px 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .form-block-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .form-block-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--femme-gray-dark);
+    }
+
+    .form-block-kicker {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--femme-gray);
+    }
+
+    .form-block-body {
+      display: grid;
+      /*grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr);*/
+      gap: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .form-block-body {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .form-block-description {
+      font-size: 11px;
+      color: var(--femme-gray);
+    }
+
+    .form-fields {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+    }
+
+    /* INPUTS */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 12px;
+    }
+
+    .field-label-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    label {
+      font-weight: 500;
+      color: var(--femme-gray-dark);
+      font-size: 12px;
+    }
+
+    .field-hint {
+      font-size: 10px;
+      color: var(--femme-gray);
+    }
+
+    .field-required {
+      color: #c1123a;
+      font-size: 11px;
+      margin-left: 3px;
+    }
+
+    input[type="text"],
+    input[type="url"],
+    input[type="email"],
+    textarea {
+      border-radius: 999px;
+      border: 1px solid rgba(122, 61, 138, 0.18);
+      background: #ffffff;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      color: var(--femme-gray-dark);
+      outline: none;
+      transition: border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    textarea {
+      border-radius: var(--radius-md);
+      min-height: 70px;
+      resize: vertical;
+      line-height: 1.4;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: var(--femme-purple);
+      box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
+    }
+
+    .field-row-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .field-taglist-hint {
+      font-size: 10px;
+      color: var(--femme-gray);
+    }
+
+    .pill-helper {
+      margin-top: 4px;
+      display: inline-flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      font-size: 10px;
+    }
+
+    .pill-helper span {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(122, 61, 138, 0.08);
+      color: var(--femme-purple);
+    }
+
+    /* IDENTIDADE VISUAL – CORES */
+    .color-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    @media (max-width: 900px) {
+      .color-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .color-preview {
+      width: 100%;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 0, 0, 0.04);
+      margin-top: 3px;
+    }
+
+    /* FOOTER DO FORM */
+    .form-footer {
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 11px;
+    }
+
+    .form-footer-left {
+      color: var(--femme-gray);
+    }
+
+    .form-footer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* RESPONSIVO */
+    @media (max-width: 1024px) {
+      .shell {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .sidebar {
+        order: -1;
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+
+      .sidebar-section-title {
+        flex-basis: 100%;
+      }
+
+      .hero-base {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 720px) {
+      .header-inner {
+        padding-inline: 14px;
+      }
+
+      .shell {
+        padding-inline: 14px;
+      }
+
+      .hero-title {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-logo">F</div>
+        <div class="brand-text">
+          <div class="name">FEMME</div>
+          <div class="tagline">Base de Conhecimento · Marketing</div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <span class="header-badge-env">Ambiente interno</span>
+        <div class="user-info">
+          <div class="user-avatar">L</div>
+          <div>
+            <div style="font-weight:600;">Luciana</div>
+            <div style="font-size:11px; color:var(--femme-gray);">Marketing FEMME</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- LAYOUT PRINCIPAL -->
+  <div class="shell">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div>
+        <div class="sidebar-section-title">Navegação</div>
+        <nav class="sidebar-nav">
+          <div class="sidebar-link">
+            <span class="icon">🏠</span>
+            <span>Dashboard</span>
+          </div>
+          <div class="sidebar-link active">
+            <span class="icon">💜</span>
+            <span>Base FEMME</span>
+          </div>
+          <div class="sidebar-link">
+            <span class="icon">🧰</span>
+            <span>Ferramentas</span>
+          </div>
+          <div class="sidebar-link">
+            <span class="icon">📄</span>
+            <span>Conteúdos gerados</span>
+          </div>
+          <div class="sidebar-link">
+            <span class="icon">📊</span>
+            <span>Dados & relatórios</span>
+          </div>
+        </nav>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div>
+        <div class="sidebar-section-title">Administração</div>
+        <nav class="sidebar-nav">
+          <div class="sidebar-link">
+            <span class="icon">👥</span>
+            <span>Usuários & permissões</span>
+          </div>
+          <div class="sidebar-link">
+            <span class="icon">⚙</span>
+            <span>Configurações</span>
+          </div>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="main">
+
+      <!-- HERO BASE FEMME -->
+      <section class="hero-base">
+        <div class="hero-base-left">
+          <div class="hero-kicker">
+            <span class="hero-kicker-dot"></span>
+            Coração da inteligência de marketing
+          </div>
+          <h1 class="hero-title">
+            Configure a <span class="highlight">Base FEMME</span> usada por todas as ferramentas de IA.
+          </h1>
+          <p class="hero-text">
+            As informações cadastradas aqui serão o ponto de partida para geração de posts, insights,
+            apresentações e comunicações internas alinhadas à marca. Pense nesta base como o “manual vivo”
+            de identidade do FEMME.
+          </p>
+          <div class="hero-tags">
+            <span class="hero-tag">Identidade institucional</span>
+            <span class="hero-tag">Públicos & segmentos</span>
+            <span class="hero-tag">Tom de voz</span>
+            <span class="hero-tag">Identidade visual</span>
+            <span class="hero-tag">Dados & insights</span>
+          </div>
+        </div>
+
+        <div class="hero-base-right">
+          <div class="hero-base-status">
+            <div class="hero-base-status-row">
+              <span style="font-size:12px; font-weight:600;">Status atual da Base FEMME</span>
+              <!-- Troque para status-pill--green quando estiver completa -->
+              <div class="status-pill status-pill--yellow">
+                <span class="dot"></span>
+                Parcialmente preenchida
+              </div>
+            </div>
+            <div class="hero-base-status-row">
+              <span>Última atualização: <strong>04/12/2025 · 19h10</strong></span>
+              <span>Responsável: <strong>Marketing FEMME</strong></span>
+            </div>
+            <div style="font-size:11px; color:var(--femme-gray);">
+              Dica: você pode salvar como rascunho e voltar depois para aprofundar blocos específicos.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FORMULÁRIO BASE FEMME -->
+      <section class="form-wrapper">
+        <div class="form-header">
+          <div class="form-header-main">
+            <div class="section-kicker">Formulário</div>
+            <div class="section-title">Cadastro / edição da Base FEMME</div>
+            <div class="section-subtitle">
+              Preencha os blocos abaixo. Estes dados serão usados tanto por humanos quanto por agentes de IA.
+            </div>
+          </div>
+          <div class="form-steps">
+            <span class="form-step-pill active">1. Institucional</span>
+            <span class="form-step-pill">2. Públicos & segmentos</span>
+            <span class="form-step-pill">3. Posicionamento & diferenciais</span>
+            <span class="form-step-pill">4. Tom de voz</span>
+            <span class="form-step-pill">5. Identidade visual</span>
+            <span class="form-step-pill">6. Dados & insights</span>
+          </div>
+        </div>
+
+        <form action="#" method="post" class="form-grid">
+          <!-- BLOCO 1 – INSTITUCIONAL -->
+          <section class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 1</div>
+                <div class="form-block-title">Identidade institucional</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Descreva o FEMME de forma clara e estratégica. Essas informações serão usadas como base
+                  para qualquer texto institucional, apresentação ou resumo gerado pela plataforma.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="nome_marca">Nome da marca</label>
+                    <span class="field-required">*</span>
+                  </div>
+                  <input type="text" id="nome_marca" name="nome_marca" placeholder="Ex.: FEMME – Laboratório da Mulher" />
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="descricao_resumida">Descrição resumida</label>
+                    <span class="field-required">*</span>
+                  </div>
+                  <textarea id="descricao_resumida" name="descricao_resumida" placeholder="Em poucas linhas, explique quem é o FEMME, o que faz e para quem existe."></textarea>
+                  <div class="field-hint">Use 2–4 frases objetivas. Essa descrição aparecerá em várias comunicações.</div>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="missao">Missão</label>
+                  </div>
+                  <textarea id="missao" name="missao" placeholder="Qual o propósito central do FEMME?"></textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="visao">Visão</label>
+                  </div>
+                  <textarea id="visao" name="visao" placeholder="Onde o FEMME quer chegar nos próximos anos?"></textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="valores">Valores & princípios</label>
+                  </div>
+                  <textarea id="valores" name="valores" placeholder="Liste valores, princípios e compromissos que orientam a atuação do FEMME."></textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BLOCO 2 – PÚBLICOS & SEGMENTOS -->
+          <section class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 2</div>
+                <div class="form-block-title">Públicos & segmentos</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Indique os principais públicos externos e internos com os quais o FEMME se comunica.
+                  Esses dados serão usados para personalizar tom, exemplos e chamadas em textos e campanhas.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="publico_principal">Público-alvo principal (externo)</label>
+                    <span class="field-required">*</span>
+                  </div>
+                  <textarea id="publico_principal" name="publico_principal" placeholder="Descreva faixas etárias, localização, perfil socioeconômico, comportamento, etc."></textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="publicos_secundarios">Públicos secundários</label>
+                  </div>
+                  <textarea id="publicos_secundarios" name="publicos_secundarios" placeholder="Ex.: médicas(os) parceiros, planos de saúde, familiares, gestantes, etc."></textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="segmentos_internos">Segmentos internos</label>
+                  </div>
+                  <textarea id="segmentos_internos" name="segmentos_internos" placeholder="Ex.: colaboradoras de atendimento, equipe técnica, coordenações, diretoria."></textarea>
+                  <div class="field-hint">
+                    Esses segmentos serão usados para separar tom de voz e foco de conteúdos internos.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BLOCO 3 – POSICIONAMENTO & DIFERENCIAIS -->
+          <section class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 3</div>
+                <div class="form-block-title">Posicionamento & diferenciais</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Reforce como o FEMME quer ser percebido e quais vantagens oferece em relação ao mercado.
+                  Isso direciona mensagens-chave de campanhas, posts e apresentações.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="posicionamento">Posicionamento de marca</label>
+                    <span class="field-required">*</span>
+                  </div>
+                  <textarea id="posicionamento" name="posicionamento" placeholder="Como o FEMME quer ser reconhecido? Ex.: referência em saúde da mulher, acolhimento, precisão diagnóstica, etc."></textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="diferenciais">Principais diferenciais</label>
+                  </div>
+                  <textarea id="diferenciais" name="diferenciais" placeholder="Liste diferenciais competitivos, benefícios exclusivos, estrutura, tecnologia, acolhimento, etc."></textarea>
+                  <div class="field-hint">Você pode listar em forma de tópicos separados por ponto e vírgula.</div>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="concorrencia">Concorrência relevante</label>
+                  </div>
+                  <textarea id="concorrencia" name="concorrencia" placeholder="Ex.: clínicas, laboratórios e marcas que disputam atenção com o FEMME."></textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BLOCO 4 – TOM DE VOZ -->
+          <section class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 4</div>
+                <div class="form-block-title">Tom de voz & linguagem</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Descreva como o FEMME fala com o mundo (externo) e com quem está dentro (interno).
+                  Isso será utilizado pela IA para ajustar o estilo de textos em diferentes contextos.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="tom_externo">Tom de voz externo</label>
+                    <span class="field-required">*</span>
+                  </div>
+                  <textarea id="tom_externo" name="tom_externo" placeholder="Ex.: acolhedor, técnico acessível, responsável, educativo, sem alarmismo, etc."></textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="palavras_chave_externo">Palavras e expressões recomendadas (externo)</label>
+                  </div>
+                  <textarea id="palavras_chave_externo" name="palavras_chave_externo" placeholder="Liste palavras, expressões e frases que devem aparecer com frequência."></textarea>
+                  <div class="pill-helper">
+                    <span>acolhimento</span>
+                    <span>cuidado</span>
+                    <span>segurança</span>
+                    <span>saúde da mulher</span>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="tom_interno">Tom de voz para comunicação interna</label>
+                  </div>
+                  <textarea id="tom_interno" name="tom_interno" placeholder="Ex.: colaborativo, transparente, motivador, educativo, sem infantilizar."></textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="evitar_linguagem">Palavras / abordagens a evitar</label>
+                  </div>
+                  <textarea id="evitar_linguagem" name="evitar_linguagem" placeholder="Ex.: termos sensacionalistas, promessas de resultados garantidos, linguagem agressiva, etc."></textarea>
+                  <div class="field-hint">
+                    Tudo que for listado aqui será usado pela IA como “zona proibida” na construção de textos.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BLOCO 5 – IDENTIDADE VISUAL -->
+          <section class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 5</div>
+                <div class="form-block-title">Identidade visual</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Informe as cores principais, logos e referências visuais. Essas informações serão usadas
+                  para orientar briefings de imagem e materiais visuais gerados pela plataforma.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label>Cores principais (HEX)</label>
+                  </div>
+                  <div class="color-row">
+                    <div class="field">
+                      <input type="text" name="cor_1" placeholder="#7A3D8A" />
+                      <div class="color-preview" style="background:#7A3D8A;"></div>
+                    </div>
+                    <div class="field">
+                      <input type="text" name="cor_2" placeholder="#00BCA4" />
+                      <div class="color-preview" style="background:#00BCA4;"></div>
+                    </div>
+                    <div class="field">
+                      <input type="text" name="cor_3" placeholder="#FFB7C9" />
+                      <div class="color-preview" style="background:#FFB7C9;"></div>
+                    </div>
+                    <div class="field">
+                      <input type="text" name="cor_4" placeholder="#F4E9F8" />
+                      <div class="color-preview" style="background:#F4E9F8;"></div>
+                    </div>
+                  </div>
+                  <div class="field-hint">Use códigos HEX. Você pode ajustar e ampliar essa paleta depois.</div>
+                </div>
+
+                <div class="field field-row-2">
+                  <div>
+                    <div class="field-label-row">
+                      <label for="tipografia">Tipografia recomendada</label>
+                    </div>
+                    <input type="text" id="tipografia" name="tipografia" placeholder="Ex.: Quicksand para títulos, Open Sans para textos corridos." />
+                  </div>
+                  <div>
+                    <div class="field-label-row">
+                      <label for="logo_url">URL do logotipo principal</label>
+                    </div>
+                    <input type="url" id="logo_url" name="logo_url" placeholder="https://.../logo-femme.png" />
+                    <div class="field-hint">Use a URL final onde o logo estará hospedado (CDN, mídia do site, etc.).</div>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="refs_visuais">Referências visuais</label>
+                  </div>
+                  <textarea id="refs_visuais" name="refs_visuais" placeholder="Cole aqui links de posts, imagens de referência, moodboards ou descrições de estilo visual."></textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BLOCO 6 – DADOS & INSIGHTS -->
+          <section class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 6</div>
+                <div class="form-block-title">Dados & insights (camada de negócio)</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Este bloco descreve, em linguagem humana, como os dados de exames, unidades e contatos
+                  devem ser interpretados em marketing. Ele complementa os snapshots automáticos.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="fontes_dados">Fontes de dados principais</label>
+                  </div>
+                  <textarea id="fontes_dados" name="fontes_dados" placeholder="Ex.: sistema interno X, Salesforce, BI corporativo, etc. (apenas descrição, não precisa de detalhes técnicos)."></textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="regras_interpretacao">Regras de interpretação</label>
+                  </div>
+                  <textarea id="regras_interpretacao" name="regras_interpretacao" placeholder="Ex.: como tratar sazonalidade, campanhas específicas, metas mínimas, desvios que exigem alerta, etc."></textarea>
+                  <div class="field-hint">
+                    Essas orientações serão usadas para a IA propor insights mais condizentes com a realidade do FEMME.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- FOOTER DO FORM -->
+          <div class="form-footer">
+            <div class="form-footer-left">
+              Campos marcados com <span class="field-required">*</span> são obrigatórios.  
+              Você pode atualizar a Base FEMME a qualquer momento.
+            </div>
+            <div class="form-footer-actions">
+              <button type="button" class="btn btn-ghost">Cancelar</button>
+              <button type="submit" class="btn btn-outline">💾 Salvar como rascunho</button>
+              <button type="submit" class="btn btn-primary">✅ Salvar Base FEMME</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+    </main>
+  </div>
+</div>
+</body>
+</html>

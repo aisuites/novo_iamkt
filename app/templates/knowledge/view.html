@@ -1,0 +1,646 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load knowledge_filters %}
+
+{% block title %}Base IAMKT - Edição{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/knowledge.css' %}">
+{% endblock %}
+
+{% block content %}
+<!-- HERO BASE IAMKT -->
+<section class="hero-base">
+  <div class="hero-base-top">
+    <div class="hero-base-left">
+      <div class="hero-kicker">
+        <span class="hero-kicker-dot"></span>
+        Coração da inteligência de marketing
+      </div>
+      <h1 class="hero-title">
+        Configure a <span class="highlight">Base IAMKT</span> usada por todas as ferramentas de IA.
+      </h1>
+      <p class="hero-text">
+        As informações cadastradas aqui serão o ponto de partida para geração de posts, insights,
+        apresentações e comunicações internas alinhadas à marca. Pense nesta base como o "manual vivo"
+        de identidade do FEMME.
+      </p>
+    </div>
+
+    <div class="hero-base-right">
+      <div class="hero-base-status">
+        <div class="hero-base-status-row">
+          <span class="hero-status-label">Status atual da Base IAMKT</span>
+          <div class="status-pill {% if kb.is_complete %}status-pill--green{% else %}status-pill--yellow{% endif %}">
+            <span class="dot"></span>
+            {% if kb.is_complete %}Completa{% else %}Parcialmente preenchida{% endif %}
+          </div>
+        </div>
+        <div class="hero-base-status-row">
+          <span>Completude: <strong>{{ kb.completude_percentual }}%</strong></span>
+          <span>Última atualização: <strong>{{ kb.updated_at|date:"d/m/Y · H:i" }}</strong></span>
+        </div>
+        <div class="hero-base-status-row">
+          <span>Responsável: <strong>IAMKT</strong></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="hero-tags">
+    <a href="#bloco1" class="hero-tag">Identidade institucional</a>
+    <a href="#bloco2" class="hero-tag">Públicos & segmentos</a>
+    <a href="#bloco3" class="hero-tag">Posicionamento & diferenciais</a>
+    <a href="#bloco4" class="hero-tag">Tom de voz</a>
+    <a href="#bloco5" class="hero-tag">Identidade visual</a>
+    <a href="#bloco6" class="hero-tag">Redes</a>
+    <a href="#bloco7" class="hero-tag">Dados & insights</a>
+  </div>
+</section>
+
+<!-- FORMULÁRIO -->
+<section class="form-wrapper">
+  <div class="form-header">
+    <div class="form-header-main">
+      <div class="section-kicker">Formulário</div>
+      <div class="section-title">Cadastro / edição da Base IAMKT</div>
+      <div class="section-subtitle">
+        Preencha os blocos abaixo. Estes dados serão usados tanto por humanos quanto por agentes de IA.
+      </div>
+    </div>
+  </div>
+  
+  <form method="post" action="{% url 'knowledge:save_all' %}" class="form-grid" enctype="multipart/form-data">
+    {% csrf_token %}
+    
+    <!-- BLOCO 1: IDENTIDADE INSTITUCIONAL -->
+    <section class="form-block" id="bloco1">
+      <div class="form-block-header">
+        <div>
+          <div class="form-block-kicker">Bloco 1</div>
+          <div class="form-block-title">Identidade institucional</div>
+        </div>
+        <div class="form-block-header-right">
+          <span class="completude-badge">{{ completude_blocos.bloco1 }}%</span>
+        </div>
+      </div>
+      
+      <div class="form-block-body">
+        <div class="form-fields">
+          <div class="field">
+            <label for="nome_empresa">Nome da empresa *</label>
+            <input type="text" id="nome_empresa" name="nome_empresa" value="{{ kb.nome_empresa }}" required>
+          </div>
+          
+          <div class="field">
+            <label for="missao">Missão *</label>
+            <textarea id="missao" name="missao" required>{{ kb.missao }}</textarea>
+          </div>
+          
+          <div class="field">
+            <label for="visao">Visão</label>
+            <textarea id="visao" name="visao">{{ kb.visao }}</textarea>
+          </div>
+          
+          <div class="field">
+            <label for="valores">Valores & princípios *</label>
+            <textarea id="valores" name="valores" required>{{ kb.valores }}</textarea>
+          </div>
+          
+          <div class="field">
+            <label for="historia">História</label>
+            <textarea id="historia" name="historia">{{ kb.historia }}</textarea>
+            <div class="field-hint">Conte a história da empresa, marcos importantes, evolução.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- BLOCO 2: PÚBLICOS & SEGMENTOS -->
+    <section class="form-block" id="bloco2">
+      <div class="form-block-header">
+        <div>
+          <div class="form-block-kicker">Bloco 2</div>
+          <div class="form-block-title">Públicos & segmentos</div>
+        </div>
+        <div class="form-block-header-right">
+          <span class="completude-badge">{{ completude_blocos.bloco2 }}%</span>
+        </div>
+      </div>
+      
+      <div class="form-block-body">
+        <div class="form-fields">
+          <div class="field">
+            <label for="publico_externo">Público externo *</label>
+            <textarea id="publico_externo" name="publico_externo" required>{{ kb.publico_externo }}</textarea>
+          </div>
+          
+          <div class="field">
+            <label for="publico_interno">Público interno</label>
+            <textarea id="publico_interno" name="publico_interno">{{ kb.publico_interno }}</textarea>
+          </div>
+          
+          <div class="field">
+            <div class="field-label-row">
+              <label>Segmentos internos</label>
+              <button type="button" class="btn btn-sm btn-primary" data-action="new-segment">+ Novo Segmento</button>
+            </div>
+            <div class="segments-list">
+              {% for segment in internal_segments %}
+              <div class="segment-item {% if not segment.is_active %}segment-inactive{% endif %}" data-segment-id="{{ segment.id }}" data-is-active="{{ segment.is_active|yesno:'true,false' }}">
+                <div class="segment-info">
+                  <strong>{{ segment.get_full_path }}</strong>
+                  {% if segment.description %}
+                  <span class="segment-description">{{ segment.description }}</span>
+                  {% endif %}
+                </div>
+                <div class="segment-actions">
+                  <span class="segment-status-text">{{ segment.is_active|yesno:'Ativo,Inativo' }}</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" 
+                           {% if segment.is_active %}checked{% endif %}
+                           data-action="toggle-segment"
+                           data-segment-id="{{ segment.id }}">
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <button type="button" class="btn-icon" data-action="edit-segment" data-segment-id="{{ segment.id }}" title="Editar">✏️</button>
+                </div>
+              </div>
+              {% empty %}
+              <p class="field-hint">Nenhum segmento cadastrado. Clique em "+ Novo Segmento" para adicionar.</p>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- BLOCO 3: POSICIONAMENTO & DIFERENCIAIS -->
+    <section class="form-block" id="bloco3">
+      <div class="form-block-header">
+        <div>
+          <div class="form-block-kicker">Bloco 3</div>
+          <div class="form-block-title">Posicionamento & diferenciais</div>
+        </div>
+        <div class="form-block-header-right">
+          <span class="completude-badge">{{ completude_blocos.bloco3 }}%</span>
+        </div>
+      </div>
+      
+      <div class="form-block-body">
+        <div class="form-fields">
+          <div class="field">
+            <label for="posicionamento">Posicionamento de mercado *</label>
+            <textarea id="posicionamento" name="posicionamento" required>{{ kb.posicionamento }}</textarea>
+          </div>
+          
+          <div class="field">
+            <label for="diferenciais">Diferenciais competitivos *</label>
+            <textarea id="diferenciais" name="diferenciais" required>{{ kb.diferenciais }}</textarea>
+          </div>
+          
+          <div class="field">
+            <label for="proposta_valor">Proposta de valor</label>
+            <textarea id="proposta_valor" name="proposta_valor">{{ kb.proposta_valor }}</textarea>
+            <div class="field-hint">O que você entrega de único para o cliente?</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- BLOCO 4: TOM DE VOZ & LINGUAGEM -->
+    <section class="form-block" id="bloco4">
+      <div class="form-block-header">
+        <div>
+          <div class="form-block-kicker">Bloco 4</div>
+          <div class="form-block-title">Tom de voz & linguagem</div>
+        </div>
+        <div class="form-block-header-right">
+          <span class="completude-badge">{{ completude_blocos.bloco4 }}%</span>
+        </div>
+      </div>
+      
+      <div class="form-block-body">
+        <div class="form-fields">
+          <div class="field">
+            <label for="tom_voz_externo">Tom de voz externo *</label>
+            <textarea id="tom_voz_externo" name="tom_voz_externo" required>{{ kb.tom_voz_externo }}</textarea>
+          </div>
+          
+          <div class="field">
+            <label for="tom_voz_interno">Tom de voz interno</label>
+            <textarea id="tom_voz_interno" name="tom_voz_interno">{{ kb.tom_voz_interno }}</textarea>
+          </div>
+          
+          <div class="field">
+            <label for="palavras_recomendadas">Palavras recomendadas</label>
+            <div class="tags-input-wrapper" data-field="palavras_recomendadas">
+              <div class="tags-list" id="tags-recomendadas" data-tags='{{ kb.palavras_recomendadas|to_json }}'>
+                <!-- Tags serão inseridas aqui via JavaScript -->
+              </div>
+              <input type="text" class="tag-input" placeholder="Digite e pressione Enter para adicionar" data-target="tags-recomendadas">
+            </div>
+            <div class="field-hint">Palavras-chave da marca que devem ser usadas</div>
+          </div>
+          
+          <div class="field">
+            <label for="palavras_evitar">Palavras a evitar</label>
+            <div class="tags-input-wrapper" data-field="palavras_evitar">
+              <div class="tags-list" id="tags-evitar" data-tags='{{ kb.palavras_evitar|to_json }}'>
+                <!-- Tags serão inseridas aqui via JavaScript -->
+              </div>
+              <input type="text" class="tag-input" placeholder="Digite e pressione Enter para adicionar" data-target="tags-evitar">
+            </div>
+            <div class="field-hint">Palavras que não devem ser usadas na comunicação</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- BLOCO 5: IDENTIDADE VISUAL -->
+    <section class="form-block" id="bloco5">
+      <div class="form-block-header">
+        <div>
+          <div class="form-block-kicker">Bloco 5</div>
+          <div class="form-block-title">Identidade visual</div>
+        </div>
+        <div class="form-block-header-right">
+          <span class="completude-badge">{{ completude_blocos.bloco5 }}%</span>
+        </div>
+      </div>
+      
+      <div class="form-block-body">
+        <div class="form-block-description">
+          <p>Informe as cores principais, tipografia, logos e referências visuais. Essas informações serão usadas para orientar briefings de imagem e materiais visuais gerados pela plataforma.</p>
+        </div>
+        
+        <div class="form-fields">
+          <!-- PALETA DE CORES -->
+          <div class="field">
+            <div class="field-label-row">
+              <label>Cores da identidade visual</label>
+            </div>
+            <div id="color-list" class="color-list">
+              <!-- Cores serão adicionadas dinamicamente via JavaScript -->
+            </div>
+            <button type="button" class="btn-add-color" data-action="add-color">
+              <span>+</span> Adicionar cor
+            </button>
+            <div class="field-hint">Use o color picker para escolher as cores da marca. Você pode adicionar quantas cores precisar.</div>
+          </div>
+
+          <!-- TIPOGRAFIA -->
+          <div class="field">
+            <div class="field-label-row">
+              <label>Tipografia da marca</label>
+            </div>
+            <div class="field-hint field-hint-spaced">
+              Defina as fontes para cada uso. Você pode escolher do Google Fonts ou fazer upload de arquivos .ttf
+            </div>
+            
+            <div id="fontes-list" class="fontes-list">
+              <!-- Fontes serão adicionadas dinamicamente via JavaScript -->
+            </div>
+            
+            <button type="button" class="btn-add-fonte" data-action="add-fonte">
+              + Adicionar fonte
+            </button>
+          </div>
+
+          <!-- LOGOTIPOS -->
+          <div class="field">
+            <div class="field-label-row">
+              <label>Logotipos</label>
+            </div>
+            <div class="field-hint field-hint-spaced-sm">
+              Faça upload dos logos da marca. Formatos aceitos: PNG, JPG, SVG
+            </div>
+            
+            <div id="logos-gallery" class="logos-gallery">
+              {% for logo in logos %}
+              <div class="logo-preview-item" data-logo-id="{{ logo.id }}">
+                <img src="{{ logo.s3_url }}" alt="{{ logo.name }}">
+                <div class="logo-preview-info">
+                  <span class="logo-preview-name">{{ logo.name }}</span>
+                  <span class="logo-preview-type">{{ logo.get_logo_type_display }}</span>
+                </div>
+                <button type="button" class="btn-remove-logo" data-action="remove-logo" data-logo-id="{{ logo.id }}" title="Remover">
+                  ×
+                </button>
+              </div>
+              {% endfor %}
+            </div>
+            
+            <div class="upload-area" id="logo-upload-area">
+              <input type="file" id="logo-upload-input" accept="image/png,image/jpeg,image/svg+xml" multiple class="hidden-field" data-upload-type="logo">
+              <button type="button" class="btn-upload" data-action="trigger-logo-upload">
+                📁 Selecionar arquivos
+              </button>
+              <p class="upload-hint">ou arraste arquivos aqui</p>
+            </div>
+          </div>
+
+          <!-- IMAGENS DE REFERÊNCIA -->
+          <div class="field">
+            <div class="field-label-row">
+              <label>Imagens de referência</label>
+            </div>
+            <div class="field-hint field-hint-spaced-sm">
+              Adicione imagens que representam o estilo visual desejado (moodboard, posts, materiais)
+            </div>
+            
+            <div id="references-gallery" class="references-gallery">
+              {% for img in reference_images %}
+              <div class="reference-preview-item" data-ref-id="{{ img.id }}">
+                <img src="{{ img.s3_url }}" alt="{{ img.title }}">
+                <div class="reference-preview-overlay">
+                  <span class="reference-preview-title">{{ img.title }}</span>
+                  <button type="button" class="btn-remove-reference" data-action="remove-reference" data-ref-id="{{ img.id }}" title="Remover">
+                    ×
+                  </button>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            
+            <div class="upload-area" id="reference-upload-area">
+              <input type="file" id="reference-upload-input" accept="image/*" multiple class="hidden-field" data-upload-type="reference">
+              <button type="button" class="btn-upload" data-action="trigger-reference-upload">
+                📁 Selecionar imagens
+              </button>
+              <p class="upload-hint">ou arraste imagens aqui</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- BLOCO 6: SITES E REDES SOCIAIS -->
+    <section class="form-block" id="bloco6">
+      <div class="form-block-header">
+        <div>
+          <div class="form-block-kicker">Bloco 6</div>
+          <div class="form-block-title">Sites e redes sociais</div>
+        </div>
+        <div class="form-block-header-right">
+          <span class="completude-badge">{{ completude_blocos.bloco6 }}%</span>
+        </div>
+      </div>
+      
+      <div class="form-block-body">
+        <div class="form-block-description">
+          <p>Informe o site institucional e as URLs das redes sociais da marca. Essas informações serão usadas para geração de conteúdo e integrações.</p>
+        </div>
+        
+        <div class="form-fields">
+          <div class="field">
+            <div class="field-label-row">
+              <label for="site_institucional">Site institucional</label>
+            </div>
+            <input type="url" id="site_institucional" name="site_institucional" value="{{ kb.site_institucional }}" placeholder="https://femme.com.br">
+            <div class="field-hint">URL completa do site oficial da empresa</div>
+          </div>
+          
+          <!-- REDES SOCIAIS -->
+          <div class="field">
+            <div class="field-label-row">
+              <label>Redes sociais</label>
+            </div>
+            <div class="field-hint field-hint-spaced-sm">
+              Informe as URLs dos perfis da marca nas redes sociais
+            </div>
+            
+            <div class="social-networks-manager">
+              <!-- Instagram -->
+              <div class="social-network-field">
+                <div class="social-network-icon instagram">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                  </svg>
+                </div>
+                <input type="url" name="social_instagram" id="social_instagram" placeholder="https://instagram.com/femme" value="">
+              </div>
+              
+              <!-- Facebook -->
+              <div class="social-network-field">
+                <div class="social-network-icon facebook">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                </div>
+                <input type="url" name="social_facebook" id="social_facebook" placeholder="https://facebook.com/femme" value="">
+              </div>
+              
+              <!-- LinkedIn -->
+              <div class="social-network-field">
+                <div class="social-network-icon linkedin">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                </div>
+                <input type="url" name="social_linkedin" id="social_linkedin" placeholder="https://linkedin.com/company/femme" value="">
+              </div>
+              
+              <!-- YouTube -->
+              <div class="social-network-field">
+                <div class="social-network-icon youtube">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                  </svg>
+                </div>
+                <input type="url" name="social_youtube" id="social_youtube" placeholder="https://youtube.com/@femme" value="">
+              </div>
+            </div>
+          </div>
+          
+          <!-- TEMPLATES DE REDES SOCIAIS -->
+          <div class="field">
+            <div class="field-label-row">
+              <label>Templates de redes sociais</label>
+            </div>
+            <div class="field-hint field-hint-spaced-sm">
+              Gerencie os templates e formatos de conteúdo para cada rede social
+            </div>
+            <a href="#" class="btn-templates-link" data-action="open-templates">
+              🎨 Acessar Templates de Redes Sociais
+            </a>
+            <div class="field-hint field-hint-spaced-top">
+              Esta funcionalidade será desenvolvida em breve
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- BLOCO 7: DADOS E INSIGHTS -->
+    <section class="form-block" id="bloco7">
+      <div class="form-block-header">
+        <div>
+          <div class="form-block-kicker">Bloco 7</div>
+          <div class="form-block-title">Dados & insights</div>
+        </div>
+        <div class="form-block-header-right">
+          <span class="completude-badge">{{ completude_blocos.bloco7 }}%</span>
+        </div>
+      </div>
+      
+      <div class="form-block-body">
+        <div class="form-block-description">
+          <p>Configure as fontes de dados confiáveis e os canais para monitoramento de tendências. Essas informações ajudam a IA a gerar conteúdo relevante e atualizado.</p>
+        </div>
+        
+        <div class="form-fields">
+          <!-- FONTES CONFIÁVEIS -->
+          <div class="field">
+            <div class="field-label-row">
+              <label for="fontes_confiaveis">Fontes confiáveis</label>
+            </div>
+            <div class="tags-input-wrapper" data-field="fontes_confiaveis">
+              <div class="tags-list" id="tags-fontes" data-tags='{{ kb.fontes_confiaveis|to_json }}'>
+                <!-- Tags serão inseridas aqui via JavaScript -->
+              </div>
+              <input type="text" class="tag-input" placeholder="Digite a URL e pressione Enter" data-target="tags-fontes">
+            </div>
+            <div class="field-hint">URLs de sites confiáveis para referência (ex: https://saude.gov.br)</div>
+          </div>
+          
+          <!-- CANAIS DE TRENDS -->
+          <div class="field">
+            <div class="field-label-row">
+              <label for="canais_trends">Canais de trends</label>
+            </div>
+            <div class="tags-input-wrapper" data-field="canais_trends">
+              <div class="tags-list" id="tags-canais" data-tags='{{ kb.canais_trends|to_json }}'>
+                <!-- Tags serão inseridas aqui via JavaScript -->
+              </div>
+              <input type="text" class="tag-input" placeholder="Digite o canal e pressione Enter" data-target="tags-canais">
+            </div>
+            <div class="field-hint">Canais customizados para monitoramento de tendências (ex: Google Trends, Twitter, etc.)</div>
+          </div>
+          
+          <!-- PALAVRAS-CHAVE TRENDS -->
+          <div class="field">
+            <div class="field-label-row">
+              <label for="palavras_chave_trends">Palavras-chave para trends</label>
+            </div>
+            <div class="tags-input-wrapper" data-field="palavras_chave_trends">
+              <div class="tags-list" id="tags-palavras-trends" data-tags='{{ kb.palavras_chave_trends|to_json }}'>
+                <!-- Tags serão inseridas aqui via JavaScript -->
+              </div>
+              <input type="text" class="tag-input" placeholder="Digite a palavra-chave e pressione Enter" data-target="tags-palavras-trends">
+            </div>
+            <div class="field-hint">Palavras-chave para monitorar tendências (ex: saúde, medicina preventiva, bem-estar)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- FOOTER DO FORMULÁRIO -->
+    <div class="form-footer">
+      <div class="form-footer-left">
+        Campos marcados com <span class="field-required">*</span> são obrigatórios.
+      </div>
+      <div class="form-footer-actions">
+        <a href="{% url 'core:dashboard' %}" class="btn btn-ghost">Cancelar</a>
+        <button type="submit" class="btn btn-primary">✅ Salvar Base IAMKT</button>
+      </div>
+    </div>
+  </form>
+</section>
+
+<!-- MODAL: CRIAR/EDITAR SEGMENTO INTERNO -->
+<div id="segmentModal" class="modal modal-hidden">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="segmentModalTitle">Novo Segmento Interno</h3>
+      <button type="button" class="modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="segmentForm">
+        <input type="hidden" id="segment_id" name="segment_id">
+        
+        <div class="field">
+          <label for="segment_name">Nome *</label>
+          <input type="text" id="segment_name" name="name" required placeholder="Ex: Marketing, Operacional, Médicos">
+        </div>
+        
+        <div class="field">
+          <label for="segment_description">Descrição</label>
+          <textarea id="segment_description" name="description" rows="3" placeholder="Descrição detalhada do segmento"></textarea>
+        </div>
+        
+        <div class="field">
+          <label for="segment_parent">Segmento Pai (Hierarquia)</label>
+          <select id="segment_parent" name="parent">
+            <option value="">-- Nenhum (Segmento raiz) --</option>
+            {% for segment in internal_segments %}
+            <option value="{{ segment.id }}">{{ segment.get_full_path }}</option>
+            {% endfor %}
+          </select>
+          <div class="field-hint">Para criar hierarquia, ex: Marketing > Digital</div>
+        </div>
+        
+        <div class="field">
+          <label for="segment_order">Ordem</label>
+          <input type="number" id="segment_order" name="order" value="0" min="0">
+          <div class="field-hint">Ordem de exibição (menor número aparece primeiro)</div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" data-action="cancel-segment">Cancelar</button>
+      <button type="button" class="btn btn-primary" data-action="save-segment">Salvar Segmento</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Dados do backend para JavaScript
+window.KNOWLEDGE_COLORS = {{ colors|colors_to_json|safe }};
+window.KNOWLEDGE_FONTS = {{ fonts|fonts_to_json|safe }};
+window.KNOWLEDGE_SOCIAL_NETWORKS = {
+  instagram: '{% for sn in social_networks %}{% if sn.network_type == "instagram" %}{{ sn.url }}{% endif %}{% endfor %}',
+  facebook: '{% for sn in social_networks %}{% if sn.network_type == "facebook" %}{{ sn.url }}{% endif %}{% endfor %}',
+  linkedin: '{% for sn in social_networks %}{% if sn.network_type == "linkedin" %}{{ sn.url }}{% endif %}{% endfor %}',
+  youtube: '{% for sn in social_networks %}{% if sn.network_type == "youtube" %}{{ sn.url }}{% endif %}{% endfor %}'
+};
+</script>
+<script src="{% static 'js/toaster.js' %}"></script>
+<script src="{% static 'js/knowledge.js' %}"></script>
+<script src="{% static 'js/segments.js' %}"></script>
+<script src="{% static 'js/tags.js' %}"></script>
+<script src="{% static 'js/colors.js' %}"></script>
+<script src="{% static 'js/fonts.js' %}"></script>
+<script src="{% static 'js/uploads.js' %}"></script>
+<script src="{% static 'js/knowledge-events.js' %}"></script>
+<script>
+// Carregar redes sociais existentes
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.KNOWLEDGE_SOCIAL_NETWORKS) {
+    document.getElementById('social_instagram').value = window.KNOWLEDGE_SOCIAL_NETWORKS.instagram || '';
+    document.getElementById('social_facebook').value = window.KNOWLEDGE_SOCIAL_NETWORKS.facebook || '';
+    document.getElementById('social_linkedin').value = window.KNOWLEDGE_SOCIAL_NETWORKS.linkedin || '';
+    document.getElementById('social_youtube').value = window.KNOWLEDGE_SOCIAL_NETWORKS.youtube || '';
+  }
+  
+  // Exibir mensagens do Django como toaster
+  {% if messages %}
+    {% for message in messages %}
+      {% if message.tags == 'success' %}
+        toaster.success('{{ message|escapejs }}');
+      {% elif message.tags == 'error' %}
+        toaster.error('{{ message|escapejs }}');
+      {% elif message.tags == 'warning' %}
+        toaster.warning('{{ message|escapejs }}');
+      {% else %}
+        toaster.info('{{ message|escapejs }}');
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+});
+</script>
+{% endblock %}

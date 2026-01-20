@@ -1,0 +1,29 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Posts - VibeMKT{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-3xl font-bold text-purple mb-2">🎨 Posts</h1>
+  <p class="text-lg text-muted">Crie posts completos com imagem e legenda</p>
+</div>
+
+<div class="card mb-6">
+  <div class="alert alert-info">Interface de geração de posts em desenvolvimento.</div>
+  <a href="{% url 'core:dashboard' %}" class="btn btn-secondary">Voltar ao Dashboard</a>
+</div>
+
+{% if posts %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {% for post in posts %}
+  <div class="card">
+    <h3 class="font-semibold">Post para {{ post.get_social_network_display }}</h3>
+    <p class="text-sm text-muted">{{ post.created_at|date:"d/m/Y H:i" }}</p>
+    <span class="badge badge-soft">{{ post.status }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><p class="text-center text-muted">Nenhum post criado ainda.</p></div>
+{% endif %}
+{% endblock %}

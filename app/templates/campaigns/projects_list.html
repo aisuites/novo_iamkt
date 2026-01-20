@@ -1,0 +1,33 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Projetos - VibeMKT{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-3xl font-bold text-purple mb-2">🚀 Projetos</h1>
+  <p class="text-lg text-muted">Organize seus conteúdos em projetos e campanhas</p>
+</div>
+
+{% if projects %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for project in projects %}
+  <div class="card">
+    <div class="flex items-start justify-between mb-2">
+      <h3 class="font-semibold">{{ project.name }}</h3>
+      <span class="badge badge-{% if project.status == 'active' %}success{% elif project.status == 'planning' %}warning{% else %}soft{% endif %}">
+        {{ project.get_status_display }}
+      </span>
+    </div>
+    <p class="text-sm text-muted mb-2">{{ project.area.name }}</p>
+    {% if project.description %}
+    <p class="text-sm">{{ project.description|truncatewords:20 }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <p class="text-center text-muted">Nenhum projeto criado ainda.</p>
+</div>
+{% endif %}
+{% endblock %}

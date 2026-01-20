@@ -1,0 +1,30 @@
+{% load static %}
+<!-- Header VibeMKT -->
+<header class="header">
+  <div class="header-inner">
+    
+    <!-- Brand / Logo -->
+    <img src="{% static 'img/logo.png' %}" alt="Logo IAMKT">
+    <!--<a href="{% url 'core:dashboard' %}" class="brand">
+      <img src="{% static 'img/logo.png' %}" alt="Logo IAMKT">
+      <div class="brand-logo">IA</div>
+      <div class="brand-text">
+        <div class="brand-name">IAMKT</div>
+        <div class="brand-tagline">Marketing com IA</div>
+      </div>
+    </a> -->
+    
+    <!-- Header Right -->
+    <div class="header-right">
+      <span class="header-badge-env">Ambiente Interno</span>
+      <div class="user-info">
+        <div class="user-avatar">{{ user.first_name|default:"U"|slice:":1"|upper }}</div>
+        <div>
+          <div style="font-weight:600;">{{ user.first_name|default:user.username }}</div>
+          <div style="font-size:11px; color:var(--femme-gray);">Marketing IAMKT</div>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+</header>

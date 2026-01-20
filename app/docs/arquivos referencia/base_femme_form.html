@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>FEMME – Base de Conhecimento</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Fonte Quicksand -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --femme-purple: #7a3d8a;
+      --femme-purple-soft: #f4e9f8;
+      --femme-green: #00bca4;
+      --femme-rose-soft: #ffb7c9;
+
+      --femme-white: #ffffff;
+      --femme-gray-light: #f5f5f7;
+      --femme-gray: #77767c;
+      --femme-gray-dark: #34343a;
+
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --shadow-soft: 0 18px 40px rgba(20, 5, 36, 0.08);
+      --shadow-subtle: 0 10px 24px rgba(20, 5, 36, 0.05);
+
+      --max-width: 1280px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: "Quicksand", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(122, 61, 138, 0.08), transparent 55%),
+        radial-gradient(circle at bottom right, rgba(0, 188, 164, 0.06), transparent 55%);
+      color: var(--femme-gray-dark);
+      line-height: 1.5;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button {
+      font-family: inherit;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HEADER */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 1px solid rgba(244, 233, 248, 0.9);
+    }
+
+    .header-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 20%, #ffb7c9 0, #7a3d8a 45%, #4c1f63 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--femme-white);
+      font-weight: 700;
+      font-size: 18px;
+      box-shadow: var(--shadow-subtle);
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .brand-text .name {
+      font-weight: 700;
+      color: var(--femme-purple);
+      letter-spacing: 0.03em;
+      font-size: 15px;
+      text-transform: uppercase;
+    }
+
+    .brand-text .tagline {
+      font-size: 11px;
+      color: var(--femme-gray);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 12px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(244, 233, 248, 0.9);
+      color: var(--femme-purple);
+      font-weight: 500;
+    }
+
+    .user-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #7a3d8a, #00bca4);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .header-badge-env {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(0, 188, 164, 0.08);
+      color: var(--femme-green);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* LAYOUT PRINCIPAL */
+    .shell {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 18px 20px 32px;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-subtle);
+      padding: 16px 14px;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .sidebar-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--femme-gray);
+      margin-bottom: 4px;
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 9px;
+      border-radius: 999px;
+      color: var(--femme-gray-dark);
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .sidebar-link span.icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      background: rgba(122, 61, 138, 0.04);
+      color: var(--femme-purple);
+    }
+
+    .sidebar-link:hover {
+      background: rgba(244, 233, 248, 0.9);
+      transform: translateY(-1px);
+    }
+
+    .sidebar-link.active {
+      background: linear-gradient(90deg, rgba(122, 61, 138, 0.12), rgba(0, 188, 164, 0.12));
+      font-weight: 600;
+      color: var(--femme-purple);
+    }
+
+    .sidebar-divider {
+      height: 1px;
+      background: rgba(230, 224, 238, 0.85);
+      margin-block: 6px;
+    }
+
+    /* BOTÕES */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--femme-green);
+      color: var(--femme-white);
+      box-shadow: 0 10px 22px rgba(0, 188, 164, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: #00a08c;
+      transform: translateY(-1px);
+      box-shadow: 0 14px 26px rgba(0, 188, 164, 0.4);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--femme-purple);
+      border: 1px solid rgba(122, 61, 138, 0.45);
+    }
+
+    .btn-outline:hover {
+      background: rgba(244, 233, 248, 0.9);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--femme-gray);
+      border: none;
+      padding-inline: 10px;
+    }
+
+    .btn-ghost:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    /* CONTEÚDO PRINCIPAL */
+    .main {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* HERO DA PÁGINA BASE FEMME */
+    .hero-base {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-lg);
+      padding: 18px 18px 14px;
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.1fr);
+      gap: 18px;
+    }
+
+    .hero-base-left {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(244, 233, 248, 0.95);
+      color: var(--femme-purple);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .hero-kicker-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--femme-green);
+      box-shadow: 0 0 0 4px rgba(0, 188, 164, 0.25);
+    }
+
+    .hero-title {
+      font-size: 22px;
+      color: var(--femme-purple);
+    }
+
+    .hero-title span.highlight {
+      background: linear-gradient(120deg, #7a3d8a, #00bca4);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-text {
+      font-size: 13px;
+      color: var(--femme-gray);
+      max-width: 560px;
+    }
+
+    .hero-tags {
+      margin-top: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 10px;
+    }
+
+    .hero-tag {
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(122, 61, 138, 0.06);
+      color: var(--femme-purple);
+      font-weight: 500;
+    }
+
+    .hero-base-right {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .hero-base-status {
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      background: var(--femme-gray-light);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .hero-base-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .status-pill {
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-pill span.dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+    }
+
+    .status-pill--yellow {
+      background: rgba(255, 191, 59, 0.12);
+      color: #c58900;
+    }
+
+    .status-pill--yellow span.dot {
+      background: #ffbf3b;
+    }
+
+    .status-pill--green {
+      background: rgba(0, 188, 164, 0.08);
+      color: var(--femme-green);
+    }
+
+    .status-pill--green span.dot {
+      background: var(--femme-green);
+    }
+
+    /* FORM WRAPPER */
+    .form-wrapper {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-subtle);
+      padding: 18px 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+
+    .form-header-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .section-kicker {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--femme-gray);
+    }
+
+    .section-title {
+      font-size: 16px;
+      color: var(--femme-purple);
+      font-weight: 600;
+    }
+
+    .section-subtitle {
+      font-size: 12px;
+      color: var(--femme-gray);
+      margin-bottom: 8px;
+    }
+
+    .form-steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 11px;
+      padding: 10px 12px;
+      /*background: var(--femme-gray-light);*/
+      border-radius: var(--radius-md);
+    }
+
+    .form-step-pill {
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: var(--femme-gray-light);
+      color: var(--femme-gray);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+      text-decoration: none;
+    }
+
+    .form-step-pill:hover {
+      background: rgba(122, 61, 138, 0.08);
+      color: var(--femme-purple);
+      transform: translateY(-1px);
+    }
+
+    .form-step-pill.active {
+      background: rgba(122, 61, 138, 0.12);
+      color: var(--femme-purple);
+      font-weight: 600;
+    }
+
+    .form-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* BLOCO DO FORM */
+    .form-block {
+      border-radius: var(--radius-md);
+      background: var(--femme-gray-light);
+      padding: 12px 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scroll-margin-top: 80px;
+    }
+
+    .form-block-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    /* === ACCORDION STYLES (para reverter, remova daqui até o comentário de fim) === */
+    .accordion-block .form-block-header {
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s ease;
+      padding: 8px;
+      margin: -8px;
+      border-radius: var(--radius-sm);
+    }
+
+    .accordion-block .form-block-header:hover {
+      background: rgba(122, 61, 138, 0.04);
+    }
+
+    .accordion-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: rgba(122, 61, 138, 0.08);
+      color: var(--femme-purple);
+      font-size: 10px;
+      transition: transform 0.3s ease, background 0.2s ease;
+    }
+
+    .accordion-open .accordion-toggle {
+      transform: rotate(180deg);
+      background: rgba(122, 61, 138, 0.12);
+    }
+
+    .accordion-closed .form-block-body {
+      display: none;
+    }
+
+    .accordion-open .form-block-body {
+      display: block;
+      animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    /* === FIM ACCORDION STYLES === */
+
+    .form-block-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--femme-gray-dark);
+    }
+
+    .form-block-kicker {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--femme-gray);
+    }
+
+    .form-block-body {
+      display: grid;
+      /*grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr);*/
+      gap: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .form-block-body {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .form-block-description {
+      font-size: 11px;
+      color: var(--femme-gray);
+    }
+
+    .form-fields {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+    }
+
+    /* INPUTS */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 12px;
+    }
+
+    .field-label-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    label {
+      font-weight: 500;
+      color: var(--femme-gray-dark);
+      font-size: 12px;
+    }
+
+    .field-hint {
+      font-size: 10px;
+      color: var(--femme-gray);
+    }
+
+    .field-required {
+      color: #c1123a;
+      font-size: 11px;
+      margin-left: 3px;
+    }
+
+    input[type="text"],
+    input[type="url"],
+    input[type="email"],
+    textarea {
+      /*border-radius: 999px;*/
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+      border-bottom-right-radius: 12px;
+      border-bottom-left-radius: 12px;
+      border: 1px solid rgba(122, 61, 138, 0.18);
+      background: #ffffff;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      color: var(--femme-gray-dark);
+      outline: none;
+      transition: border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    textarea {
+      border-radius: var(--radius-md);
+      min-height: 70px;
+      resize: vertical;
+      line-height: 1.4;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: var(--femme-purple);
+      box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
+    }
+
+    .field-row-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .field-taglist-hint {
+      font-size: 10px;
+      color: var(--femme-gray);
+    }
+
+    .pill-helper {
+      margin-top: 4px;
+      display: inline-flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      font-size: 10px;
+    }
+
+    .pill-helper span {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(122, 61, 138, 0.08);
+      color: var(--femme-purple);
+    }
+
+    /* IDENTIDADE VISUAL – CORES */
+    .color-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .color-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: white;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(122, 61, 138, 0.12);
+    }
+
+    .color-picker-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .color-picker-input {
+      width: 50px;
+      height: 40px;
+      border: 1px solid rgba(122, 61, 138, 0.18);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      padding: 2px;
+    }
+
+    .color-picker-input::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .color-picker-input::-webkit-color-swatch {
+      border: none;
+      border-radius: 6px;
+    }
+
+    .color-hex-input {
+      flex: 1;
+      max-width: 120px;
+    }
+
+    .color-name-input {
+      flex: 1;
+    }
+
+    .btn-remove-color {
+      padding: 6px 10px;
+      background: rgba(193, 18, 58, 0.08);
+      color: #c1123a;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      font-family: inherit;
+      font-weight: 600;
+    }
+
+    .btn-remove-color:hover {
+      background: rgba(193, 18, 58, 0.15);
+    }
+
+    .btn-add-color {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      background: rgba(122, 61, 138, 0.08);
+      color: var(--femme-purple);
+      border: 1px dashed rgba(122, 61, 138, 0.3);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    .btn-add-color:hover {
+      background: rgba(122, 61, 138, 0.12);
+      border-color: var(--femme-purple);
+    }
+
+    /* === FONTES === */
+    .fontes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .fonte-item {
+      background: #fff;
+      border: 1px solid #E5E7EB;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .fonte-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+    }
+
+    .fonte-item-header:hover {
+      background: rgba(122, 61, 138, 0.05);
+    }
+
+    .fonte-item-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--femme-purple);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .fonte-item-title .toggle-icon {
+      font-size: 16px;
+      transition: transform 0.3s;
+    }
+
+    .fonte-item.collapsed .toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    .fonte-item-body {
+      padding: 0 16px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 1000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s ease;
+    }
+
+    .fonte-item.collapsed .fonte-item-body {
+      max-height: 0;
+      padding: 0 16px;
+    }
+
+    .fonte-item-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-remove-fonte,
+    .btn-remove-color {
+      background: none;
+      border: none;
+      color: #DC2626;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      line-height: 1;
+      border-radius: 6px;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-remove-fonte:hover,
+    .btn-remove-color:hover {
+      background: rgba(220, 38, 38, 0.1);
+      color: #B91C1C;
+    }
+
+    .fonte-tipo-selector {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .fonte-tipo-option {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid #E5E7EB;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .fonte-tipo-option:hover {
+      border-color: var(--femme-purple);
+      background: rgba(122, 61, 138, 0.05);
+    }
+
+    .fonte-tipo-option.active {
+      border-color: var(--femme-purple);
+      background: rgba(122, 61, 138, 0.1);
+      color: var(--femme-purple);
+    }
+
+    .fonte-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .fonte-field-full {
+      grid-column: 1 / -1;
+    }
+
+    .fonte-preview {
+      grid-column: 1 / -1;
+      padding: 20px;
+      background: #F9FAFB;
+      border-radius: 8px;
+      text-align: center;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fonte-preview-text {
+      margin: 0;
+      color: #1F2937;
+    }
+
+    .fonte-preview-text.titulo {
+      font-size: 32px;
+      font-weight: 700;
+    }
+
+    .fonte-preview-text.subtitulo {
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .fonte-preview-text.texto {
+      font-size: 16px;
+      font-weight: 400;
+    }
+
+    .fonte-preview-text.botao {
+      font-size: 14px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .fonte-preview-text.legenda {
+      font-size: 12px;
+      font-weight: 400;
+    }
+
+    .btn-add-fonte,
+    .btn-add-color {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      background: #fff;
+      border: 2px dashed #D1D5DB;
+      border-radius: 8px;
+      color: #6B7280;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 4px;
+      font-family: inherit;
+    }
+
+    .btn-add-fonte:hover,
+    .btn-add-color:hover {
+      background: rgba(122, 61, 138, 0.05);
+      border-color: var(--femme-purple);
+      color: var(--femme-purple);
+    }
+
+    /* FOOTER DO FORM */
+    .form-footer {
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 11px;
+    }
+
+    .form-footer-left {
+      color: var(--femme-gray);
+    }
+
+    .form-footer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* RESPONSIVO */
+    @media (max-width: 1024px) {
+      .shell {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .sidebar {
+        order: -1;
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+
+      .sidebar-section-title {
+        flex-basis: 100%;
+      }
+
+      .hero-base {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 720px) {
+      .header-inner {
+        padding-inline: 14px;
+      }
+
+      .shell {
+        padding-inline: 14px;
+      }
+
+      .hero-title {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-logo">F</div>
+        <div class="brand-text">
+          <div class="name">FEMME</div>
+          <div class="tagline">Base de Conhecimento · Marketing</div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <span class="header-badge-env">Ambiente interno</span>
+        <div class="user-info">
+          <div class="user-avatar">{{ user_initial }}</div>
+          <div>
+            <div style="font-weight:600;">{{ user_name }}</div>
+            <div style="font-size:11px; color:var(--femme-gray);">Marketing FEMME</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- LAYOUT PRINCIPAL -->
+  <div class="shell">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div>
+        <div class="sidebar-section-title">Navegação</div>
+        <nav class="sidebar-nav">
+          <a href="{% url 'core:dashboard' %}" class="sidebar-link">
+            <span class="icon">🏠</span>
+            <span>Dashboard</span>
+          </a>
+          <a href="{% url 'core:base_femme_new' %}" class="sidebar-link active">
+            <span class="icon">💜</span>
+            <span>Base FEMME</span>
+          </a>
+          <a href="#" class="sidebar-link">
+            <span class="icon">🧰</span>
+            <span>Ferramentas</span>
+          </a>
+          <a href="#" class="sidebar-link">
+            <span class="icon">📄</span>
+            <span>Conteúdos gerados</span>
+          </a>
+          <a href="#" class="sidebar-link">
+            <span class="icon">📊</span>
+            <span>Dados & relatórios</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div>
+        <div class="sidebar-section-title">Administração</div>
+        <nav class="sidebar-nav">
+          <a href="{% url 'admin:auth_user_changelist' %}" class="sidebar-link">
+            <span class="icon">👥</span>
+            <span>Usuários & permissões</span>
+          </a>
+          <a href="{% url 'admin:index' %}" class="sidebar-link">
+            <span class="icon">⚙</span>
+            <span>Configurações</span>
+          </a>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="main">
+
+      <!-- HERO BASE FEMME -->
+      <section class="hero-base">
+        <div class="hero-base-left">
+          <div class="hero-kicker">
+            <span class="hero-kicker-dot"></span>
+            Coração da inteligência de marketing
+          </div>
+          <h1 class="hero-title">
+            Configure a <span class="highlight">Base FEMME</span> usada por todas as ferramentas de IA.
+          </h1>
+          <p class="hero-text">
+            As informações cadastradas aqui serão o ponto de partida para geração de posts, insights,
+            apresentações e comunicações internas alinhadas à marca. Pense nesta base como o "manual vivo"
+            de identidade do FEMME.
+          </p>
+          <div class="hero-tags">
+            <span class="hero-tag">Identidade institucional</span>
+            <span class="hero-tag">Públicos & segmentos</span>
+            <span class="hero-tag">Tom de voz</span>
+            <span class="hero-tag">Identidade visual</span>
+            <span class="hero-tag">Dados & insights</span>
+          </div>
+        </div>
+
+        <div class="hero-base-right">
+          <div class="hero-base-status">
+            <div class="hero-base-status-row">
+              <span style="font-size:12px; font-weight:600;">Status atual da Base FEMME</span>
+              <!-- Troque para status-pill--green quando estiver completa -->
+              <div class="status-pill status-pill--yellow">
+                <span class="dot"></span>
+                Parcialmente preenchida
+              </div>
+            </div>
+            <div class="hero-base-status-row">
+              <span>Última atualização: <strong>04/12/2025 · 19h10</strong></span>
+            </div>
+            <div class="hero-base-status-row">
+              <span>Responsável: <strong>Marketing FEMME</strong></span>
+            </div>
+            <div style="font-size:11px; color:var(--femme-gray); margin-top:6px;">
+              Dica: você pode salvar como rascunho e voltar depois para aprofundar blocos específicos.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MENSAGENS DE FEEDBACK -->
+      {% if messages %}
+        <div style="margin-bottom: 16px;">
+          {% for message in messages %}
+            <div style="padding: 12px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; 
+                        {% if message.tags == 'success' %}background: rgba(0, 188, 164, 0.1); color: #00BCA4; border: 1px solid rgba(0, 188, 164, 0.3);{% endif %}
+                        {% if message.tags == 'error' %}background: rgba(193, 18, 58, 0.1); color: #c1123a; border: 1px solid rgba(193, 18, 58, 0.3);{% endif %}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <!-- FORMULÁRIO BASE FEMME -->
+      <section class="form-wrapper">
+        <div class="form-header">
+          <div class="form-header-main">
+            <div class="section-kicker">Formulário</div>
+            <div class="section-title">Cadastro / edição da Base FEMME</div>
+            <div class="section-subtitle">
+              Preencha os blocos abaixo. Estes dados serão usados tanto por humanos quanto por agentes de IA.
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-steps">
+          <a href="#bloco-institucional" class="form-step-pill">1. Institucional</a>
+          <a href="#bloco-publicos" class="form-step-pill">2. Públicos & segmentos</a>
+          <a href="#bloco-posicionamento" class="form-step-pill">3. Posicionamento & diferenciais</a>
+          <a href="#bloco-tom-voz" class="form-step-pill">4. Tom de voz</a>
+          <a href="#bloco-identidade-visual" class="form-step-pill">5. Identidade visual</a>
+          <a href="#bloco-dados-insights" class="form-step-pill">6. Dados & insights</a>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" class="form-grid">
+          {% csrf_token %}
+          <!-- BLOCO 1 – INSTITUCIONAL -->
+          <section id="bloco-institucional" class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 1</div>
+                <div class="form-block-title">Identidade institucional</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Descreva o FEMME de forma clara e estratégica. Essas informações serão usadas como base
+                  para qualquer texto institucional, apresentação ou resumo gerado pela plataforma.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="nome_marca">Nome da marca</label>
+                    <span class="field-required">*</span>
+                  </div>
+                  <input type="text" id="nome_marca" name="nome_marca" 
+                         value="{{ brand_core.nome|default:'' }}"
+                         placeholder="Ex.: FEMME – Laboratório da Mulher" />
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="descricao_resumida">Descrição resumida</label>
+                    <span class="field-required">*</span>
+                  </div>
+                  <textarea id="descricao_resumida" name="descricao_resumida" 
+                            placeholder="Em poucas linhas, explique quem é o FEMME, o que faz e para quem existe.">{{ brand_core.descricao_resumida|default:'' }}</textarea>
+                  <div class="field-hint">Use 2–4 frases objetivas. Essa descrição aparecerá em várias comunicações.</div>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="missao">Missão</label>
+                  </div>
+                  <textarea id="missao" name="missao" 
+                            placeholder="Qual o propósito central do FEMME?">{{ brand_core.missao|default:'' }}</textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="visao">Visão</label>
+                  </div>
+                  <textarea id="visao" name="visao" 
+                            placeholder="Onde o FEMME quer chegar nos próximos anos?">{{ brand_core.visao|default:'' }}</textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="valores">Valores & princípios</label>
+                  </div>
+                  <textarea id="valores" name="valores" 
+                            placeholder="Liste valores, princípios e compromissos que orientam a atuação do FEMME.">{{ brand_core.proposito|default:'' }}</textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BLOCO 2 – PÚBLICOS & SEGMENTOS -->
+          <section id="bloco-publicos" class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 2</div>
+                <div class="form-block-title">Públicos & segmentos</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Indique os principais públicos externos e internos com os quais o FEMME se comunica.
+                  Esses dados serão usados para personalizar tom, exemplos e chamadas em textos e campanhas.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="publico_principal">Público-alvo principal (externo)</label>
+                    <span class="field-required">*</span>
+                  </div>
+                  <textarea id="publico_principal" name="publico_principal" 
+                            placeholder="Ex.: mulheres de 25-45 anos, gestantes, casais planejando gravidez.">{{ publico_principal.descricao_segmento|default:'' }}</textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="publicos_secundarios">Públicos secundários</label>
+                  </div>
+                  <textarea id="publicos_secundarios" name="publicos_secundarios" 
+                            placeholder="Ex.: médicas(os) parceiros, planos de saúde, familiares, gestantes, etc.">{{ publicos_secundarios.descricao_segmento|default:'Médicas(os) parceiros, planos de saúde, familiares, gestantes.' }}</textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="segmentos_internos">Segmentos internos</label>
+                  </div>
+                  <textarea id="segmentos_internos" name="segmentos_internos" 
+                            placeholder="Ex.: colaboradoras de atendimento, equipe técnica, coordenações, diretoria.">{{ segmentos_internos.descricao_segmento|default:'' }}</textarea>
+                  <div class="field-hint">
+                    Esses segmentos serão usados para separar tom de voz e foco de conteúdos internos.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BLOCO 3 – POSICIONAMENTO & DIFERENCIAIS -->
+          <section id="bloco-posicionamento" class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 3</div>
+                <div class="form-block-title">Posicionamento & diferenciais</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Reforce como o FEMME quer ser percebido e quais vantagens oferece em relação ao mercado.
+                  Isso direciona mensagens-chave de campanhas, posts e apresentações.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="posicionamento">Posicionamento de marca</label>
+                    <span class="field-required">*</span>
+                  </div>
+                  <textarea id="posicionamento" name="posicionamento" 
+                            placeholder="Ex.: laboratório especializado em saúde feminina, com atendimento humanizado e tecnologia de ponta.">{{ brand_core.historia_resumida|default:'' }}</textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="diferenciais">Principais diferenciais</label>
+                  </div>
+                  <textarea id="diferenciais" name="diferenciais" 
+                            placeholder="Liste diferenciais competitivos, benefícios exclusivos, estrutura, tecnologia, acolhimento, etc.">{% for dif in diferenciais %}{{ dif.descricao }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+                  <div class="field-hint">Você pode listar em forma de tópicos separados por ponto e vírgula.</div>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="concorrencia">Concorrência relevante</label>
+                  </div>
+                  <textarea id="concorrencia" name="concorrencia" 
+                            placeholder="Ex.: clínicas, laboratórios e marcas que disputam atenção com o FEMME.">{{ concorrencia.descricao|default:'' }}</textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BLOCO 4 – TOM DE VOZ -->
+          <section id="bloco-tom-voz" class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 4</div>
+                <div class="form-block-title">Tom de voz & linguagem</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Descreva como o FEMME fala com o mundo (externo) e com quem está dentro (interno).
+                  Isso será utilizado pela IA para ajustar o estilo de textos em diferentes contextos.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="tom_externo">Tom de voz externo</label>
+                    <span class="field-required">*</span>
+                  </div>
+                  <textarea id="tom_voz_externo" name="tom_voz_externo" 
+                            placeholder="Ex.: acolhedor, informativo, empático, técnico quando necessário.">{{ tom_externo.descricao|default:'' }}</textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="palavras_chave_externo">Palavras e expressões recomendadas (externo)</label>
+                  </div>
+                  <textarea id="palavras_chave_externo" name="palavras_chave_externo" 
+                            placeholder="Liste palavras, expressões e frases que devem aparecer com frequência.">{% if tom_externo %}{% for frase in tom_externo.frases_ancora.all %}{{ frase.texto }}{% if not forloop.last %}
+{% endif %}{% endfor %}{% endif %}</textarea>
+                  <div class="pill-helper">
+                    <span>acolhimento</span>
+                    <span>cuidado</span>
+                    <span>segurança</span>
+                    <span>saúde da mulher</span>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="tom_interno">Tom de voz para comunicação interna</label>
+                  </div>
+                  <textarea id="tom_voz_interno" name="tom_voz_interno" 
+                            placeholder="Ex.: colaborativo, direto, motivador, transparente.">{{ tom_interno.descricao|default:'' }}</textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="evitar_linguagem">Palavras / abordagens a evitar</label>
+                  </div>
+                  <textarea id="evitar_linguagem" name="evitar_linguagem" 
+                            placeholder="Ex.: termos sensacionalistas, promessas de resultados garantidos, linguagem agressiva, etc.">{% if tom_interno %}{% for palavra in tom_interno.nao_usar.all %}{{ palavra.texto }}{% if not forloop.last %}
+{% endif %}{% endfor %}{% endif %}</textarea>
+                  <div class="field-hint">
+                    Tudo que for listado aqui será usado pela IA como “zona proibida” na construção de textos.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BLOCO 5 – IDENTIDADE VISUAL -->
+          <section id="bloco-identidade-visual" class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 5</div>
+                <div class="form-block-title">Identidade visual</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Informe as cores principais, logos e referências visuais. Essas informações serão usadas
+                  para orientar briefings de imagem e materiais visuais gerados pela plataforma.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label>Cores da identidade visual</label>
+                  </div>
+                  <div id="color-list" class="color-list">
+                    <!-- Cores serão adicionadas dinamicamente aqui -->
+                  </div>
+                  <button type="button" class="btn-add-color" onclick="addColor()">
+                    <span>+</span> Adicionar cor
+                  </button>
+                  <div class="field-hint">
+                    Use o color picker para escolher as cores da marca. Você pode adicionar quantas cores precisar.
+                  </div>
+                </div>
+
+                <!-- GERENCIAMENTO DE FONTES -->
+                <div class="field">
+                  <div class="field-label-row">
+                    <label>Tipografia da marca</label>
+                  </div>
+                  <div class="field-hint" style="margin-bottom: 16px;">
+                    Defina as fontes para cada uso. Você pode escolher do Google Fonts ou fazer upload de arquivos .ttf
+                  </div>
+                  
+                  <div id="fontes-list" class="fontes-list"></div>
+                  
+                  <button type="button" onclick="addFonte()" class="btn-add-fonte">
+                    + Adicionar fonte
+                  </button>
+                </div>
+
+                <div class="field field-row-2">
+                  <div>
+                    <div class="field-label-row">
+                      <label for="logo_url">URL do logotipo principal</label>
+                    </div>
+                    <input type="url" id="logo_url" name="logo_url" 
+                           value="{{ logo.url|default:'' }}"
+                           placeholder="https://.../logo-femme.png" />
+                    <div class="field-hint">Use a URL final onde o logo estará hospedado (CDN, mídia do site, etc.).</div>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="refs_visuais">Referências visuais</label>
+                  </div>
+                  <textarea id="refs_visuais" name="refs_visuais" 
+                            placeholder="Cole aqui links de posts, imagens de referência, moodboards ou descrições de estilo visual.">{{ refs_visuais_obj.descricao|default:'' }}</textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BLOCO 6 – DADOS & INSIGHTS -->
+          <section id="bloco-dados-insights" class="form-block">
+            <div class="form-block-header">
+              <div>
+                <div class="form-block-kicker">Bloco 6</div>
+                <div class="form-block-title">Dados & insights (camada de negócio)</div>
+              </div>
+            </div>
+            <div class="form-block-body">
+              <div class="form-block-description">
+                <p>
+                  Este bloco descreve, em linguagem humana, como os dados de exames, unidades e contatos
+                  devem ser interpretados em marketing. Ele complementa os snapshots automáticos.
+                </p>
+              </div>
+              <div class="form-fields">
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="fontes_dados">Fontes de dados principais</label>
+                  </div>
+                  <textarea id="fontes_dados" name="fontes_dados" 
+                            placeholder="Ex.: sistema interno X, Salesforce, BI corporativo, etc. (apenas descrição, não precisa de detalhes técnicos).">{{ fontes_dados_obj.descricao|default:'' }}</textarea>
+                </div>
+
+                <div class="field">
+                  <div class="field-label-row">
+                    <label for="regras_interpretacao">Regras de interpretação</label>
+                  </div>
+                  <textarea id="regras_interpretacao" name="regras_interpretacao" 
+                            placeholder="Ex.: como tratar sazonalidade, campanhas específicas, metas mínimas, desvios que exigem alerta, etc.">{{ regras_interpretacao_obj.descricao|default:'' }}</textarea>
+                  <div class="field-hint">
+                    Essas orientações serão usadas para a IA propor insights mais condizentes com a realidade do FEMME.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- FOOTER DO FORM -->
+          <div class="form-footer">
+            <div class="form-footer-left">
+              Campos marcados com <span class="field-required">*</span> são obrigatórios.  
+              Você pode atualizar a Base FEMME a qualquer momento.
+            </div>
+            <div class="form-footer-actions">
+              <a href="{% url 'core:dashboard' %}" class="btn btn-ghost">Cancelar</a>
+              <button type="submit" name="action" value="draft" class="btn btn-outline">💾 Salvar como rascunho</button>
+              <button type="submit" name="action" value="save" class="btn btn-primary">✅ Salvar Base FEMME</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- === ACCORDION SCRIPT (para reverter, remova este script) === -->
+<script>
+// === COLOR PICKER MANAGEMENT ===
+let colorIndex = 0;
+
+// Adicionar uma nova cor
+function addColor(hexValue = '#7A3D8A', colorName = '') {
+    const colorList = document.getElementById('color-list');
+    const colorItem = document.createElement('div');
+    colorItem.className = 'color-item';
+    colorItem.dataset.index = colorIndex;
+    
+    colorItem.innerHTML = `
+        <div class="color-picker-wrapper">
+            <input type="color" 
+                   class="color-picker-input" 
+                   value="${hexValue}"
+                   onchange="updateHexInput(${colorIndex}, this.value)">
+            <input type="text" 
+                   class="color-hex-input" 
+                   name="cores[${colorIndex}][hex]"
+                   value="${hexValue}"
+                   placeholder="#7A3D8A"
+                   maxlength="7"
+                   oninput="updateColorPicker(${colorIndex}, this.value)">
+            <input type="text" 
+                   class="color-name-input" 
+                   name="cores[${colorIndex}][nome]"
+                   value="${colorName}"
+                   placeholder="Nome da cor (ex: Roxo FEMME, Verde água)">
+        </div>
+        <button type="button" class="btn-remove-color" onclick="removeColor(${colorIndex})">
+            Remover
+        </button>
+    `;
+    
+    colorList.appendChild(colorItem);
+    colorIndex++;
+}
+
+// Atualizar input HEX quando color picker mudar
+function updateHexInput(index, hexValue) {
+    const colorItem = document.querySelector(`.color-item[data-index="${index}"]`);
+    if (colorItem) {
+        const hexInput = colorItem.querySelector('.color-hex-input');
+        hexInput.value = hexValue.toUpperCase();
+    }
+}
+
+// Atualizar color picker quando input HEX mudar
+function updateColorPicker(index, hexValue) {
+    const colorItem = document.querySelector(`.color-item[data-index="${index}"]`);
+    if (colorItem && /^#[0-9A-F]{6}$/i.test(hexValue)) {
+        const colorPicker = colorItem.querySelector('.color-picker-input');
+        colorPicker.value = hexValue;
+    }
+}
+
+// Remover uma cor
+function removeColor(index) {
+    const colorItem = document.querySelector(`.color-item[data-index="${index}"]`);
+    if (colorItem) {
+        colorItem.remove();
+    }
+}
+
+// Inicializar cores (existentes ou padrão)
+document.addEventListener('DOMContentLoaded', function() {
+    // Carregar cores existentes do backend
+    {% if identidade_visual.cores.all %}
+        {% for cor in identidade_visual.cores.all %}
+            addColor('{{ cor.hex }}', '{{ cor.nome_uso }}');
+        {% endfor %}
+    {% else %}
+        // Adicionar cores padrão se não houver cores salvas
+        addColor('#7A3D8A', 'Roxo FEMME');
+        addColor('#00BCA4', 'Verde água');
+        addColor('#FFB7C9', 'Rosa claro');
+        addColor('#F4E9F8', 'Lilás suave');
+    {% endif %}
+});
+
+// === FONTES FUNCTIONALITY ===
+// Lista de Google Fonts populares
+const googleFonts = [
+    'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Oswald',
+    'Source Sans Pro', 'Raleway', 'PT Sans', 'Merriweather', 'Ubuntu',
+    'Playfair Display', 'Poppins', 'Nunito', 'Quicksand', 'Inter',
+    'Work Sans', 'Rubik', 'Mulish', 'Karla', 'DM Sans'
+];
+
+let fonteIndex = 0;
+const loadedGoogleFonts = new Set();
+const usosOcupados = new Set();
+
+// Carregar fonte do Google Fonts
+function loadGoogleFont(fontName) {
+    if (loadedGoogleFonts.has(fontName)) return;
+    
+    const link = document.createElement('link');
+    link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(' ', '+')}:wght@300;400;500;600;700&display=swap`;
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+    loadedGoogleFonts.add(fontName);
+}
+
+// Obter usos disponíveis
+function getUsosDisponiveis(usoAtual = '') {
+    const usoLabels = {
+        'TITULO': 'Títulos (H1)',
+        'SUBTITULO': 'Subtítulos (H2)',
+        'TEXTO': 'Texto corrido',
+        'BOTAO': 'Botões',
+        'LEGENDA': 'Legendas'
+    };
+    
+    return Object.entries(usoLabels).filter(([value]) => 
+        !usosOcupados.has(value) || value === usoAtual
+    );
+}
+
+// Adicionar uma nova fonte
+function addFonte(tipo = 'GOOGLE', nomeFonte = '', variante = '', uso = '', arquivoUrl = '') {
+    const fontesList = document.getElementById('fontes-list');
+    const fonteItem = document.createElement('div');
+    fonteItem.className = 'fonte-item collapsed';
+    fonteItem.setAttribute('data-index', fonteIndex);
+    
+    // Obter usos disponíveis ANTES de marcar como ocupado
+    const usosDisponiveis = getUsosDisponiveis();
+    
+    // Se não foi passado um uso ou o uso já está ocupado, pegar o primeiro disponível
+    if (!uso || (usosOcupados.has(uso) && !arquivoUrl)) {
+        uso = usosDisponiveis.length > 0 ? usosDisponiveis[0][0] : 'TITULO';
+    }
+    
+    fonteItem.setAttribute('data-uso-atual', uso);
+    
+    // Marcar uso como ocupado
+    usosOcupados.add(uso);
+    
+    const usoLabel = usosDisponiveis.find(([value]) => value === uso)?.[1] || 'Selecione...';
+    
+    fonteItem.innerHTML = `
+        <div class="fonte-item-header" onclick="toggleFonteItem(${fonteIndex})">
+            <div class="fonte-item-title">
+                <span class="toggle-icon">▼</span>
+                <span>Fonte #${fonteIndex + 1} - ${usoLabel}</span>
+            </div>
+            <div class="fonte-item-actions" onclick="event.stopPropagation()">
+                <button type="button" class="btn-remove-fonte" onclick="removeFonte(${fonteIndex}, '${uso}')">Remover</button>
+            </div>
+        </div>
+        <div class="fonte-item-body">
+        
+        <div class="fonte-tipo-selector">
+            <div class="fonte-tipo-option ${tipo === 'GOOGLE' ? 'active' : ''}" 
+                 onclick="selectFonteTipo(${fonteIndex}, 'GOOGLE')">
+                🌐 Google Fonts
+            </div>
+            <div class="fonte-tipo-option ${tipo === 'UPLOAD' ? 'active' : ''}" 
+                 onclick="selectFonteTipo(${fonteIndex}, 'UPLOAD')">
+                📁 Upload TTF
+            </div>
+        </div>
+        
+        <div class="fonte-fields">
+            <div class="fonte-field-full">
+                <label style="font-size: 12px; font-weight: 600; color: #6B7280; margin-bottom: 4px; display: block;">
+                    Uso da fonte
+                </label>
+                <select name="fontes[${fonteIndex}][uso]" class="fonte-uso-select" 
+                        onchange="updateFonteUso(${fonteIndex})" 
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 8px; font-size: 13px;">
+                    ${usosDisponiveis.map(([value, label]) => 
+                        `<option value="${value}" ${uso === value ? 'selected' : ''}>${label}</option>`
+                    ).join('')}
+                </select>
+            </div>
+            
+            <div class="fonte-google-fields" style="display: ${tipo === 'GOOGLE' ? 'contents' : 'none'};">
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: #6B7280; margin-bottom: 4px; display: block;">
+                        Fonte
+                    </label>
+                    <select name="fontes[${fonteIndex}][nome_fonte]" class="fonte-nome-select" 
+                            onchange="updateFontePreview(${fonteIndex})"
+                            style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 8px; font-size: 13px;">
+                        <option value="">Selecione...</option>
+                        ${googleFonts.map(font => 
+                            `<option value="${font}" ${nomeFonte === font ? 'selected' : ''}>${font}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: #6B7280; margin-bottom: 4px; display: block;">
+                        Peso
+                    </label>
+                    <select name="fontes[${fonteIndex}][variante]" class="fonte-variante-select" 
+                            onchange="updateFontePreview(${fonteIndex})"
+                            style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 8px; font-size: 13px;">
+                        <option value="300" ${variante === '300' ? 'selected' : ''}>Light</option>
+                        <option value="400" ${variante === '400' || !variante ? 'selected' : ''}>Regular</option>
+                        <option value="500" ${variante === '500' ? 'selected' : ''}>Medium</option>
+                        <option value="600" ${variante === '600' ? 'selected' : ''}>SemiBold</option>
+                        <option value="700" ${variante === '700' ? 'selected' : ''}>Bold</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="fonte-upload-fields fonte-field-full" style="display: ${tipo === 'UPLOAD' ? 'block' : 'none'};">
+                <label style="font-size: 12px; font-weight: 600; color: #6B7280; margin-bottom: 4px; display: block;">
+                    Arquivo TTF
+                </label>
+                <input type="file" name="fontes[${fonteIndex}][arquivo]" accept=".ttf" 
+                       onchange="handleFonteUpload(${fonteIndex}, this)"
+                       style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 8px; font-size: 13px;">
+                <input type="hidden" name="fontes[${fonteIndex}][nome_fonte_upload]" value="${nomeFonte}">
+                ${arquivoUrl ? `<div style="margin-top: 8px; padding: 8px 12px; background: #F3F4F6; border-radius: 6px; font-size: 12px; color: #6B7280;">
+                    📎 Arquivo atual: <strong>${nomeFonte}.ttf</strong>
+                </div>` : ''}
+            </div>
+            
+            <input type="hidden" name="fontes[${fonteIndex}][tipo]" value="${tipo}" class="fonte-tipo-input">
+            
+            <div class="fonte-preview">
+                <p class="fonte-preview-text ${uso.toLowerCase()}" id="fonte-preview-${fonteIndex}">
+                    Aa Bb Cc 123
+                </p>
+            </div>
+        </div>
+    `;
+    
+    fontesList.appendChild(fonteItem);
+    const currentIndex = fonteIndex;
+    fonteIndex++;
+    
+    // Carregar fonte e atualizar preview
+    if (tipo === 'GOOGLE' && nomeFonte) {
+        loadGoogleFont(nomeFonte);
+        setTimeout(() => updateFontePreview(currentIndex), 200);
+    } else if (tipo === 'UPLOAD' && arquivoUrl && nomeFonte) {
+        // Para fontes já salvas com arquivo TTF, carregar do servidor
+        const fontFace = new FontFace(nomeFonte, `url(${arquivoUrl})`);
+        fontFace.load().then(function(loadedFont) {
+            document.fonts.add(loadedFont);
+            const preview = document.getElementById(`fonte-preview-${currentIndex}`);
+            if (preview) {
+                preview.style.fontFamily = `'${nomeFonte}', sans-serif`;
+            }
+        }).catch(function(error) {
+            console.error('Erro ao carregar fonte:', error);
+        });
+    }
+}
+
+// Selecionar tipo de fonte
+function selectFonteTipo(index, tipo) {
+    const fonteItem = document.querySelector(`.fonte-item[data-index="${index}"]`);
+    if (!fonteItem) return;
+    
+    // Atualizar botões ativos
+    fonteItem.querySelectorAll('.fonte-tipo-option').forEach(opt => opt.classList.remove('active'));
+    fonteItem.querySelector(`.fonte-tipo-option:nth-child(${tipo === 'GOOGLE' ? '1' : '2'})`).classList.add('active');
+    
+    // Mostrar/ocultar campos
+    const googleFields = fonteItem.querySelector('.fonte-google-fields');
+    const uploadFields = fonteItem.querySelector('.fonte-upload-fields');
+    
+    if (tipo === 'GOOGLE') {
+        googleFields.style.display = 'contents';
+        uploadFields.style.display = 'none';
+    } else {
+        googleFields.style.display = 'none';
+        uploadFields.style.display = 'block';
+    }
+    
+    // Atualizar input hidden
+    fonteItem.querySelector('.fonte-tipo-input').value = tipo;
+}
+
+// Atualizar preview da fonte
+function updateFontePreview(index) {
+    const fonteItem = document.querySelector(`.fonte-item[data-index="${index}"]`);
+    if (!fonteItem) return;
+    
+    const tipo = fonteItem.querySelector('.fonte-tipo-input').value;
+    const preview = document.getElementById(`fonte-preview-${index}`);
+    const uso = fonteItem.querySelector('.fonte-uso-select').value;
+    
+    // Atualizar classe do preview baseado no uso
+    preview.className = `fonte-preview-text ${uso.toLowerCase()}`;
+    
+    if (tipo === 'GOOGLE') {
+        const nomeFonte = fonteItem.querySelector('.fonte-nome-select').value;
+        const variante = fonteItem.querySelector('.fonte-variante-select').value;
+        
+        if (nomeFonte) {
+            loadGoogleFont(nomeFonte);
+            preview.style.fontFamily = `'${nomeFonte}', sans-serif`;
+            preview.style.fontWeight = variante || '400';
+        }
+    }
+}
+
+// Handle upload de fonte TTF
+function handleFonteUpload(index, input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    const fonteItem = document.querySelector(`.fonte-item[data-index="${index}"]`);
+    const nomeInput = fonteItem.querySelector('input[name*="[nome_fonte_upload]"]');
+    
+    // Extrair nome do arquivo sem extensão
+    const fileName = file.name.replace('.ttf', '');
+    nomeInput.value = fileName;
+    
+    // Carregar fonte para preview
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const fontFace = new FontFace(fileName, `url(${e.target.result})`);
+        fontFace.load().then(function(loadedFont) {
+            document.fonts.add(loadedFont);
+            const preview = document.getElementById(`fonte-preview-${index}`);
+            preview.style.fontFamily = `'${fileName}', sans-serif`;
+        });
+    };
+    reader.readAsDataURL(file);
+}
+
+// Toggle accordion da fonte
+function toggleFonteItem(index) {
+    const fonteItem = document.querySelector(`.fonte-item[data-index="${index}"]`);
+    if (fonteItem) {
+        fonteItem.classList.toggle('collapsed');
+    }
+}
+
+// Atualizar uso da fonte e título
+function updateFonteUso(index) {
+    const fonteItem = document.querySelector(`.fonte-item[data-index="${index}"]`);
+    if (!fonteItem) return;
+    
+    const usoSelect = fonteItem.querySelector('.fonte-uso-select');
+    const usoAnterior = fonteItem.getAttribute('data-uso-atual');
+    const novoUso = usoSelect.value;
+    const usoLabel = usoSelect.options[usoSelect.selectedIndex].text;
+    
+    // Liberar uso anterior
+    if (usoAnterior && usoAnterior !== novoUso) {
+        usosOcupados.delete(usoAnterior);
+    }
+    
+    // Marcar novo uso como ocupado
+    usosOcupados.add(novoUso);
+    fonteItem.setAttribute('data-uso-atual', novoUso);
+    
+    // Atualizar título
+    const titleSpan = fonteItem.querySelector('.fonte-item-title span:last-child');
+    titleSpan.textContent = `Fonte #${parseInt(index) + 1} - ${usoLabel}`;
+    
+    // Atualizar preview
+    updateFontePreview(index);
+    
+    // Atualizar botão de remover com novo uso
+    const removeBtn = fonteItem.querySelector('.btn-remove-fonte');
+    removeBtn.setAttribute('onclick', `removeFonte(${index}, '${novoUso}')`);
+}
+
+// Remover fonte
+function removeFonte(index, uso) {
+    const fonteItem = document.querySelector(`.fonte-item[data-index="${index}"]`);
+    if (fonteItem) {
+        // Liberar uso
+        if (uso) {
+            usosOcupados.delete(uso);
+        }
+        fonteItem.remove();
+    }
+}
+
+// Inicializar fontes existentes
+document.addEventListener('DOMContentLoaded', function() {
+    {% if identidade_visual.fontes.all %}
+        {% for fonte in identidade_visual.fontes.all %}
+            addFonte(
+                '{{ fonte.tipo }}',
+                '{{ fonte.nome_fonte }}',
+                '{{ fonte.variante }}',
+                '{{ fonte.uso }}',
+                '{% if fonte.arquivo_ttf %}{{ fonte.arquivo_ttf.url }}{% endif %}'
+            );
+        {% endfor %}
+    {% endif %}
+});
+
+// === ACCORDION FUNCTIONALITY ===
+// Accordion functionality for form blocks
+document.addEventListener('DOMContentLoaded', function() {
+    const formBlocks = document.querySelectorAll('.form-block');
+    
+    formBlocks.forEach(function(block) {
+        const header = block.querySelector('.form-block-header');
+        const body = block.querySelector('.form-block-body');
+        
+        if (!header || !body) return;
+        
+        // Adicionar classe de controle
+        block.classList.add('accordion-block');
+        
+        // Primeiro bloco aberto por padrão
+        if (block.id === 'bloco-institucional') {
+            block.classList.add('accordion-open');
+        } else {
+            block.classList.add('accordion-closed');
+        }
+        
+        // Adicionar ícone de toggle
+        const toggleIcon = document.createElement('span');
+        toggleIcon.className = 'accordion-toggle';
+        toggleIcon.innerHTML = '▼';
+        header.appendChild(toggleIcon);
+        
+        // Tornar header clicável
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', function() {
+            const isOpen = block.classList.contains('accordion-open');
+            
+            if (isOpen) {
+                block.classList.remove('accordion-open');
+                block.classList.add('accordion-closed');
+            } else {
+                block.classList.remove('accordion-closed');
+                block.classList.add('accordion-open');
+                
+                // Scroll suave até o bloco
+                setTimeout(function() {
+                    block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 300);
+            }
+        });
+    });
+    
+    // Permitir que os pills abram o bloco correspondente
+    const pills = document.querySelectorAll('.form-step-pill');
+    pills.forEach(function(pill) {
+        pill.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            const targetBlock = document.getElementById(targetId);
+            
+            if (targetBlock) {
+                // Abrir o bloco
+                targetBlock.classList.remove('accordion-closed');
+                targetBlock.classList.add('accordion-open');
+                
+                // Scroll até o bloco
+                setTimeout(function() {
+                    targetBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+        });
+    });
+});
+</script>
+<!-- === FIM ACCORDION SCRIPT === -->
+
+</body>
+</html>

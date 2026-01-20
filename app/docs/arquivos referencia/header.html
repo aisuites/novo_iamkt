@@ -1,0 +1,149 @@
+<!-- Header FEMME - Versão A Melhorada -->
+<header class="header sticky top-0 bg-white" style="border-bottom: 1px solid var(--femme-border); z-index: var(--z-sticky);">
+  <div class="header-inner container flex items-center justify-between gap-4" style="padding-top: 14px; padding-bottom: 14px;">
+    
+    <!-- Brand / Logo (clicável para voltar ao dashboard) -->
+    <a href="{% url 'core:home' %}" class="brand flex items-center gap-3 transition-fast" style="text-decoration: none;">
+      <div class="brand-logo flex items-center justify-center text-white font-bold" 
+           style="width: 36px; 
+                  height: 36px; 
+                  font-size: 18px; 
+                  border-radius: 50%; 
+                  background: radial-gradient(circle at 30% 20%, rgb(255, 183, 201) 0px, rgb(122, 61, 138) 45%, rgb(76, 31, 99) 100%);
+                  box-shadow: var(--shadow-sm);">
+        F
+      </div>
+      <div>
+        <div class="brand-name font-bold text-xl text-purple" style="letter-spacing: 0.06em; text-transform: uppercase;">
+          FEMME Integra
+        </div>
+        <div class="brand-subtitle text-sm" style="color: #7a7a7a;">
+          Laboratório da Mulher · Amor por ela
+        </div>
+      </div>
+    </a>
+    
+    <!-- Navigation Menu (Dropdown) -->
+    <nav class="header-menu flex items-center justify-end flex-1" aria-label="Navegação principal">
+      <div class="dropdown">
+        <button type="button" class="dropdown-toggle" id="menuFemmeInova" aria-haspopup="true" aria-expanded="false">
+          Informações Operacionais
+        </button>
+        <div class="dropdown-menu" aria-labelledby="menuFemmeInova" role="menu">
+          <ul>
+            {% block nav_items %}
+              <!-- Items dinâmicos - apenas páginas ativas aparecem -->
+              <li role="none">
+                <a href="{% url 'core:planos-ativos' %}" role="menuitem" class="{% if request.resolver_match.url_name == 'planos-ativos' %}active{% endif %}">
+                  Planos Ativos
+                </a>
+              </li>
+              <li role="none">
+                <a href="{% url 'core:campanhas' %}" role="menuitem" class="{% if request.resolver_match.url_name == 'campanhas' %}active{% endif %}">
+                  Campanhas Ativas
+                </a>
+              </li>
+              <li role="none">
+                <a href="{% url 'core:videos' %}" role="menuitem" class="{% if request.resolver_match.url_name == 'videos' %}active{% endif %}">
+                  Vídeos Treinamento
+                </a>
+              </li>
+              <li role="none">
+                <a href="{% url 'core:tabela-exames' %}" role="menuitem" class="{% if request.resolver_match.url_name == 'tabela-exames' %}active{% endif %}">
+                  Tabela Exames Ginecológicos
+                </a>
+              </li>
+              {% if user.is_superuser %}
+              <li role="none">
+                <a href="{% url 'metricas' %}" role="menuitem" class="{% if request.resolver_match.url_name == 'metricas' %}active{% endif %}">
+                  📊 Métricas de Uso
+                </a>
+              </li>
+              <li role="none">
+                <a href="{% url 'convenios' %}" role="menuitem" class="{% if request.resolver_match.url_name == 'convenios' %}active{% endif %}">
+                  🏥 Gestão de Convênios
+                </a>
+              </li>
+              {% else %}
+                {% for group in user.groups.all %}
+                  {% if group.name == 'Gestores' %}
+                    <li role="none">
+                      <a href="{% url 'metricas' %}" role="menuitem" class="{% if request.resolver_match.url_name == 'metricas' %}active{% endif %}">
+                        📊 Métricas de Uso
+                      </a>
+                    </li>
+                    <li role="none">
+                      <a href="{% url 'convenios' %}" role="menuitem" class="{% if request.resolver_match.url_name == 'convenios' %}active{% endif %}">
+                        🏥 Gestão de Convênios
+                      </a>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+            {% endblock %}
+          </ul>
+        </div>
+      </div>
+    </nav>
+    
+    <!-- User Menu -->
+    <div class="user-menu flex items-center gap-3">
+      
+      <!-- User Greeting -->
+      <div class="user-greeting hidden md:block text-right">
+        <div class="user-name font-semibold text-sm">
+          Olá, {{ request.user.first_name|default:"Colaborador" }}
+        </div>
+        <div class="text-xs" style="color: #7a7a7a;">
+          Central de dúvidas interna
+        </div>
+      </div>
+      
+      <!-- User Avatar -->
+      <div class="user-avatar flex items-center justify-center text-white font-semibold" 
+           style="width: 36px; 
+                  height: 36px; 
+                  border-radius: 50%; 
+                  background: linear-gradient(135deg, var(--femme-purple-soft), var(--femme-purple));
+                  box-shadow: var(--shadow-sm);
+                  font-size: 0.9rem;"
+           aria-hidden="true">
+        {{ request.user.first_name|default:"C"|slice:":1"|upper }}
+      </div>
+      
+      <!-- Logout Button -->
+      <a href="{% url 'core:logout' %}" 
+         class="btn btn-secondary btn-sm" 
+         title="Sair do sistema"
+         aria-label="Sair do sistema">
+        Sair
+      </a>
+      
+      <!-- Placeholder para Notificações (futuro) -->
+      {% comment %}
+      <div class="notif-bell-wrapper relative cursor-pointer" 
+           id="btn-notificacoes" 
+           title="Notificações" 
+           aria-label="Abrir notificações"
+           style="display: none;"> <!-- Oculto por enquanto -->
+        <div class="notif-bell-circle flex items-center justify-center transition"
+             style="width: 28px;
+                    height: 28px;
+                    border-radius: 50%;
+                    background: rgba(122,61,138,0.08);
+                    font-size: 15px;
+                    color: #7a3d8a;">
+          🔔
+        </div>
+        <span class="notif-badge absolute -top-1 -right-1 bg-danger text-white text-xs font-bold rounded-full"
+              id="notificacoes-badge" 
+              style="display: none; width: 18px; height: 18px; line-height: 18px; text-align: center;">
+          0
+        </span>
+      </div>
+      {% endcomment %}
+      
+    </div>
+    
+  </div>
+</header>

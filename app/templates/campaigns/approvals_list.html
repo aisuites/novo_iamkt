@@ -1,0 +1,39 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Aprovações - VibeMKT{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-3xl font-bold text-purple mb-2">⏳ Aprovações</h1>
+  <p class="text-lg text-muted">Gerencie aprovações de conteúdo</p>
+</div>
+
+{% if approvals %}
+<div class="grid grid-cols-1 gap-4">
+  {% for approval in approvals %}
+  <div class="card">
+    <div class="flex items-start justify-between mb-2">
+      <div>
+        <h3 class="font-semibold">{{ approval.content }}</h3>
+        <p class="text-sm text-muted">Solicitado por {{ approval.requested_by.first_name }} em {{ approval.requested_at|date:"d/m/Y H:i" }}</p>
+      </div>
+      <span class="badge badge-{% if approval.decision == 'pending' %}warning{% elif approval.decision == 'approved' %}success{% else %}danger{% endif %}">
+        {{ approval.get_decision_display }}
+      </span>
+    </div>
+    {% if approval.decision == 'pending' and user == approval.approver %}
+    <div class="flex gap-2 mt-3">
+      <button class="btn btn-primary btn-sm">Aprovar</button>
+      <button class="btn btn-secondary btn-sm">Solicitar Ajustes</button>
+      <button class="btn btn-outline btn-sm">Reprovar</button>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <p class="text-center text-muted">Nenhuma aprovação pendente.</p>
+</div>
+{% endif %}
+{% endblock %}

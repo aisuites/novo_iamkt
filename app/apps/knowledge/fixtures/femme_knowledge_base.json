@@ -1,0 +1,69 @@
+[
+  {
+    "model": "knowledge.knowledgebase",
+    "pk": 1,
+    "fields": {
+      "nome_empresa": "FEMME",
+      "missao": "Empoderar mulheres através da tecnologia e inovação, criando soluções que transformam vidas e negócios.",
+      "visao": "Ser referência em soluções tecnológicas voltadas para o público feminino, promovendo inclusão digital e desenvolvimento profissional.",
+      "valores": "Inovação, Empoderamento, Diversidade, Excelência, Colaboração",
+      "historia": "A FEMME nasceu da visão de criar um ecossistema tecnológico inclusivo e inovador, focado em atender as necessidades específicas do público feminino no mercado de trabalho e empreendedorismo.",
+      "publico_externo": "Mulheres empreendedoras, profissionais de tecnologia, gestoras e líderes empresariais que buscam inovação e desenvolvimento.",
+      "publico_interno": "Equipe multidisciplinar composta por desenvolvedores, designers, gestores de produto e especialistas em marketing.",
+      "segmentos_internos": {
+        "tecnologia": "Desenvolvimento de software e infraestrutura",
+        "marketing": "Comunicação e branding",
+        "produto": "Gestão e inovação",
+        "comercial": "Vendas e relacionamento"
+      },
+      "posicionamento": "Plataforma de inteligência de marketing que utiliza IA para criar conteúdo autêntico e estratégico, alinhado com a identidade da marca.",
+      "diferenciais": "IA especializada em marketing, Base de Conhecimento personalizada, Geração de conteúdo alinhado com brand voice, Análise de tendências em tempo real",
+      "proposta_valor": "Transformar a criação de conteúdo de marketing através de inteligência artificial, mantendo autenticidade e alinhamento com a identidade da marca.",
+      "tom_voz_externo": "Profissional, inspirador, empoderador, acessível e autêntico. Usamos linguagem inclusiva e positiva.",
+      "tom_voz_interno": "Colaborativo, direto, técnico quando necessário, mas sempre acolhedor e respeitoso.",
+      "palavras_recomendadas": ["empoderamento", "inovação", "transformação", "autenticidade", "estratégia", "inteligência", "criatividade", "impacto"],
+      "palavras_evitar": ["impossível", "limitado", "complicado", "difícil", "problema"],
+      "paleta_cores": {
+        "primaria": "#6B46C1",
+        "secundaria": "#F687B3",
+        "terciaria": "#4FD1C5",
+        "neutra_escura": "#2D3748",
+        "neutra_clara": "#F7FAFC"
+      },
+      "tipografia": {
+        "principal": "Inter",
+        "secundaria": "Poppins",
+        "fonte_google": "https://fonts.google.com/specimen/Inter"
+      },
+      "site_institucional": "https://femme.tech",
+      "redes_sociais": {
+        "instagram": "@femme.tech",
+        "linkedin": "company/femme-tech",
+        "twitter": "@femmetech"
+      },
+      "templates_redes": {
+        "instagram": {
+          "feed": "1080x1080",
+          "stories": "1080x1920",
+          "reels": "1080x1920"
+        },
+        "linkedin": {
+          "post": "1200x627"
+        }
+      },
+      "fontes_confiaveis": [
+        "https://www.mckinsey.com/",
+        "https://hbr.org/",
+        "https://www.gartner.com/",
+        "https://www.forrester.com/"
+      ],
+      "canais_trends": ["Google Trends", "Twitter Trends", "LinkedIn Pulse"],
+      "palavras_chave_trends": ["inteligência artificial", "marketing digital", "empreendedorismo feminino", "tecnologia", "inovação"],
+      "completude_percentual": 85.0,
+      "is_complete": false,
+      "last_updated_by": 1,
+      "created_at": "2026-01-12T00:00:00Z",
+      "updated_at": "2026-01-12T00:00:00Z"
+    }
+  }
+]

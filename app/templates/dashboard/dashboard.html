@@ -1,0 +1,232 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - VibeMKT{% endblock %}
+
+{% block content %}
+<!-- Welcome Section -->
+  <div class="mb-6">
+    <h1 class="text-3xl font-bold text-purple mb-2">
+      Bem-vindo, {{ user_name }}! 👋
+    </h1>
+    <p class="text-lg text-muted">
+      Aqui está o resumo das suas atividades de marketing com IA
+    </p>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    
+    <!-- Base de Conhecimento -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">📚 Base de Conhecimento</h3>
+      </div>
+      <div class="flex items-center justify-between">
+        <div>
+          {% if kb_exists %}
+            <div class="text-2xl font-bold text-purple">{{ kb_completude|floatformat:0 }}%</div>
+            <div class="text-sm text-muted">Completude</div>
+          {% else %}
+            <div class="text-sm text-muted">Não configurada</div>
+          {% endif %}
+        </div>
+        <a href="{% url 'knowledge:view' %}" class="btn btn-secondary btn-sm">
+          {% if kb_exists %}Ver{% else %}Configurar{% endif %}
+        </a>
+      </div>
+    </div>
+
+    <!-- Pautas -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">📝 Pautas</h3>
+      </div>
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-2xl font-bold text-purple">{{ pautas_total }}</div>
+          <div class="text-sm text-muted">
+            {{ pautas_pendentes }} pendente{{ pautas_pendentes|pluralize }}
+          </div>
+        </div>
+        <a href="{% url 'content:pautas' %}" class="btn btn-primary btn-sm">
+          Nova Pauta
+        </a>
+      </div>
+    </div>
+
+    <!-- Posts -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">🎨 Posts</h3>
+      </div>
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-2xl font-bold text-purple">{{ posts_total }}</div>
+          <div class="text-sm text-muted">
+            {{ posts_draft }} rascunho{{ posts_draft|pluralize }}, {{ posts_aprovados }} aprovado{{ posts_aprovados|pluralize }}
+          </div>
+        </div>
+        <a href="{% url 'content:posts' %}" class="btn btn-primary btn-sm">
+          Novo Post
+        </a>
+      </div>
+    </div>
+
+    <!-- Email MKT -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">📨 Email MKT</h3>
+      </div>
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-2xl font-bold text-purple">{{ projetos_ativos }}</div>
+          <div class="text-sm text-muted">Ativo{{ projetos_ativos|pluralize }}</div>
+        </div>
+        <a href="{% url 'campaigns:projects' %}" class="btn btn-primary btn-sm">
+          Novo Email
+        </a>
+      </div>
+    </div>
+
+    <!-- Projetos -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">🧑🎬 Vídeos Avatar</h3>
+      </div>
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-2xl font-bold text-purple">{{ projetos_ativos }}</div>
+          <div class="text-sm text-muted">Ativo{{ projetos_ativos|pluralize }}</div>
+        </div>
+        <a href="{% url 'campaigns:projects' %}" class="btn btn-primary btn-sm">
+          Novo Vídeo
+        </a>
+      </div>
+    </div>
+
+    <!-- Aprovações -->
+    {% if aprovacoes_pendentes > 0 %}
+    <div class="card" style="border-color: var(--femme-warning);">
+      <div class="card-header">
+        <h3 class="card-title">⏳ Aprovações Pendentes</h3>
+      </div>
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-2xl font-bold" style="color: var(--femme-warning);">{{ aprovacoes_pendentes }}</div>
+          <div class="text-sm text-muted">Aguardando sua aprovação</div>
+        </div>
+        <a href="{% url 'campaigns:approvals' %}" class="btn btn-outline btn-sm">
+          Revisar
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Limites de Uso -->
+    {% if limite_info %}
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">📊 Uso Mensal</h3>
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm text-muted">Gerações</span>
+          <span class="text-sm font-semibold">{{ limite_info.current }} / {{ limite_info.max }}</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-2">
+          <div class="bg-purple h-2 rounded-full" style="width: {{ limite_info.percentual }}%;"></div>
+        </div>
+        <div class="text-xs text-muted mt-2">
+          Custo: ${{ limite_info.cost_current|floatformat:2 }} / ${{ limite_info.cost_max|floatformat:2 }}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Two Column Layout -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    
+    <!-- Atividades Recentes -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">🕐 Atividades Recentes</h3>
+      </div>
+      
+      {% if atividades_recentes %}
+        <div class="flex flex-col gap-3">
+          {% for atividade in atividades_recentes %}
+            <div class="flex items-start gap-3 p-3 rounded-lg" style="background: var(--femme-bg-alt);">
+              <div class="flex-1">
+                <div class="font-medium">{{ atividade.titulo }}</div>
+                <div class="text-xs text-muted">
+                  {{ atividade.tipo|title }} • {{ atividade.data|date:"d/m/Y H:i" }}
+                </div>
+              </div>
+              <span class="badge badge-soft">{{ atividade.status }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-center text-muted py-8">
+          Nenhuma atividade recente
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Trends Recentes -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">📈 Trends em Alta</h3>
+        <a href="{% url 'content:trends' %}" class="link text-sm">Ver todas</a>
+      </div>
+      
+      {% if trends_recentes %}
+        <div class="flex flex-col gap-3">
+          {% for trend in trends_recentes %}
+            <div class="flex items-start gap-3 p-3 rounded-lg" style="background: var(--femme-bg-alt);">
+              <div class="flex-1">
+                <div class="font-medium">{{ trend.keyword }}</div>
+                <div class="text-xs text-muted">
+                  Score: {{ trend.trend_score }} • {{ trend.created_at|date:"d/m/Y" }}
+                </div>
+              </div>
+              <span class="badge badge-{% if trend.relevance == 'high' %}success{% elif trend.relevance == 'medium' %}warning{% else %}soft{% endif %}">
+                {{ trend.get_relevance_display }}
+              </span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-center text-muted py-8">
+          Nenhuma trend monitorada ainda
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="card mt-6">
+    <div class="card-header">
+      <h3 class="card-title">⚡ Ações Rápidas</h3>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <a href="{% url 'content:pautas' %}" class="btn btn-outline w-full">
+        📝 Nova Pauta
+      </a>
+      <a href="{% url 'content:posts' %}" class="btn btn-outline w-full">
+        🎨 Novo Post
+      </a>
+      <a href="{% url 'campaigns:projects' %}" class="btn btn-outline w-full">
+        🚀 Novo Projeto
+      </a>
+      <a href="{% url 'knowledge:view' %}" class="btn btn-outline w-full">
+        📚 Base de Conhecimento
+      </a>
+    </div>
+  </div>
+
+{% endblock %}

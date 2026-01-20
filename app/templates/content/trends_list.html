@@ -1,0 +1,33 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Trends - VibeMKT{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-3xl font-bold text-purple mb-2">📈 Monitoramento de Trends</h1>
+  <p class="text-lg text-muted">Acompanhe tendências relevantes para o seu nicho</p>
+</div>
+
+{% if trends %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {% for trend in trends %}
+  <div class="card">
+    <div class="flex items-start justify-between mb-2">
+      <h3 class="font-semibold">{{ trend.keyword }}</h3>
+      <span class="badge badge-{% if trend.relevance == 'high' %}success{% elif trend.relevance == 'medium' %}warning{% else %}soft{% endif %}">
+        {{ trend.get_relevance_display }}
+      </span>
+    </div>
+    <p class="text-sm text-muted mb-2">Score: {{ trend.trend_score }} • {{ trend.created_at|date:"d/m/Y" }}</p>
+    {% if trend.ia_analysis %}
+    <p class="text-sm">{{ trend.ia_analysis|truncatewords:30 }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <p class="text-center text-muted">Nenhuma trend monitorada ainda.</p>
+</div>
+{% endif %}
+{% endblock %}

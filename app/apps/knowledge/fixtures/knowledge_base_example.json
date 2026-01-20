@@ -1,0 +1,283 @@
+[
+  {
+    "model": "knowledge.knowledgebase",
+    "pk": 1,
+    "fields": {
+      "nome_empresa": "FEMME - Diagnóstico e Medicina Preventiva",
+      "missao": "Promover saúde e bem-estar através de diagnósticos precisos e atendimento acolhedor, contribuindo para a prevenção de doenças e qualidade de vida.",
+      "visao": "Ser referência regional em medicina diagnóstica, reconhecida pela excelência técnica e atendimento humanizado.",
+      "valores": "Excelência técnica\nAtendimento humanizado\nÉtica e transparência\nInovação e tecnologia\nCompromisso com a prevenção",
+      "historia": "Fundada em 2010, a FEMME nasceu do sonho de oferecer diagnósticos de qualidade com atendimento diferenciado. Ao longo dos anos, consolidou-se como referência em São Gonçalo do Amarante e região.",
+      "publico_externo": "Homens e mulheres de 25 a 65 anos, classes B e C, residentes em São Gonçalo do Amarante e região. Preocupados com saúde preventiva, buscam qualidade e agilidade nos exames. Valorizam atendimento humanizado e resultados confiáveis.",
+      "publico_interno": "Equipe multidisciplinar composta por médicos, enfermeiros, técnicos de laboratório e atendentes. Profissionais comprometidos com excelência técnica e atendimento acolhedor.",
+      "segmentos_internos": [
+        "Médicos Solicitantes",
+        "Pacientes de Check-up Executivo",
+        "Pacientes de Exames de Rotina",
+        "Empresas (Medicina do Trabalho)",
+        "Idosos (60+)",
+        "Gestantes"
+      ],
+      "posicionamento": "FEMME é o centro de diagnóstico que une tecnologia de ponta com atendimento humanizado. Somos a escolha de quem busca exames precisos sem abrir mão do acolhimento e da agilidade.",
+      "diferenciais": "Equipamentos de última geração\nResultados em até 24 horas\nAtendimento humanizado e acolhedor\nEquipe técnica altamente qualificada\nAmbiente confortável e moderno\nLocalização de fácil acesso\nParceria com principais convênios",
+      "proposta_valor": "Cuidar da sua saúde com precisão, tecnologia e acolhimento. Exames confiáveis, resultados rápidos, atendimento que faz a diferença.",
+      "tom_voz_externo": "Acolhedor, confiável e acessível. Usamos linguagem clara e direta, sem jargões médicos excessivos. Transmitimos segurança técnica sem perder a empatia. Tom positivo e encorajador sobre prevenção.",
+      "tom_voz_interno": "Motivacional, respeitoso e colaborativo. Valorizamos o trabalho em equipe e o desenvolvimento profissional. Linguagem técnica quando necessário, mas sempre clara.",
+      "palavras_recomendadas": [
+        "cuidar",
+        "prevenir",
+        "saúde",
+        "bem-estar",
+        "acolhimento",
+        "precisão",
+        "confiança",
+        "qualidade de vida",
+        "excelência",
+        "humanizado"
+      ],
+      "palavras_evitar": [
+        "barato",
+        "promoção",
+        "desconto imperdível",
+        "milagre",
+        "garantido",
+        "revolucionário"
+      ],
+      "paleta_cores": {
+        "primaria": "#6B2C91",
+        "secundaria": "#E91E63",
+        "acento": "#2196F3",
+        "neutro": "#F5F5F5"
+      },
+      "tipografia": {
+        "titulo": "Montserrat",
+        "corpo": "Open Sans",
+        "destaque": "Playfair Display"
+      },
+      "site_institucional": "https://femme.com.br",
+      "redes_sociais": {
+        "instagram": {
+          "url": "https://instagram.com/femmediagnostico",
+          "username": "@femmediagnostico",
+          "ativa": true
+        },
+        "linkedin": {
+          "url": "https://linkedin.com/company/femme",
+          "username": "FEMME Diagnóstico",
+          "ativa": true
+        }
+      },
+      "templates_redes": {},
+      "fontes_confiaveis": [
+        "https://www.saude.gov.br",
+        "https://portal.fiocruz.br",
+        "https://www.who.int/pt",
+        "https://drauziovarella.uol.com.br",
+        "https://www.sbpc.org.br"
+      ],
+      "canais_trends": [
+        {
+          "nome": "Blog Saúde em Foco",
+          "tipo": "rss",
+          "url": "https://saudeemfoco.com.br/feed",
+          "ativo": true
+        }
+      ],
+      "palavras_chave_trends": [
+        "saúde preventiva",
+        "exames laboratoriais",
+        "medicina diagnóstica",
+        "check-up",
+        "bem-estar"
+      ],
+      "completude_percentual": 0,
+      "is_complete": false,
+      "last_updated_by": null,
+      "created_at": "2026-01-13T10:00:00Z",
+      "updated_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.colorpalette",
+    "pk": 1,
+    "fields": {
+      "knowledge_base": 1,
+      "name": "Roxo FEMME",
+      "hex_code": "#6B2C91",
+      "color_type": "primary",
+      "order": 1,
+      "created_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.colorpalette",
+    "pk": 2,
+    "fields": {
+      "knowledge_base": 1,
+      "name": "Rosa Vibrante",
+      "hex_code": "#E91E63",
+      "color_type": "accent",
+      "order": 2,
+      "created_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.colorpalette",
+    "pk": 3,
+    "fields": {
+      "knowledge_base": 1,
+      "name": "Azul Confiança",
+      "hex_code": "#2196F3",
+      "color_type": "secondary",
+      "order": 3,
+      "created_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.colorpalette",
+    "pk": 4,
+    "fields": {
+      "knowledge_base": 1,
+      "name": "Cinza Neutro",
+      "hex_code": "#F5F5F5",
+      "color_type": "secondary",
+      "order": 4,
+      "created_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.socialnetwork",
+    "pk": 1,
+    "fields": {
+      "knowledge_base": 1,
+      "name": "Instagram FEMME",
+      "network_type": "instagram",
+      "url": "https://instagram.com/femmediagnostico",
+      "username": "@femmediagnostico",
+      "is_active": true,
+      "order": 1,
+      "created_at": "2026-01-13T10:00:00Z",
+      "updated_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.socialnetwork",
+    "pk": 2,
+    "fields": {
+      "knowledge_base": 1,
+      "name": "LinkedIn FEMME",
+      "network_type": "linkedin",
+      "url": "https://linkedin.com/company/femme",
+      "username": "FEMME Diagnóstico",
+      "is_active": true,
+      "order": 2,
+      "created_at": "2026-01-13T10:00:00Z",
+      "updated_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.socialnetwork",
+    "pk": 3,
+    "fields": {
+      "knowledge_base": 1,
+      "name": "Facebook FEMME",
+      "network_type": "facebook",
+      "url": "https://facebook.com/femmediagnostico",
+      "username": "FEMME Diagnóstico",
+      "is_active": false,
+      "order": 3,
+      "created_at": "2026-01-13T10:00:00Z",
+      "updated_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.socialnetworktemplate",
+    "pk": 1,
+    "fields": {
+      "social_network": 1,
+      "name": "Feed 1:1",
+      "width": 1080,
+      "height": 1080,
+      "aspect_ratio": "1:1",
+      "character_limit": 2200,
+      "hashtag_limit": 30,
+      "is_active": true,
+      "created_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.socialnetworktemplate",
+    "pk": 2,
+    "fields": {
+      "social_network": 1,
+      "name": "Stories",
+      "width": 1080,
+      "height": 1920,
+      "aspect_ratio": "9:16",
+      "character_limit": 2200,
+      "hashtag_limit": 10,
+      "is_active": true,
+      "created_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.socialnetworktemplate",
+    "pk": 3,
+    "fields": {
+      "social_network": 1,
+      "name": "Reels",
+      "width": 1080,
+      "height": 1920,
+      "aspect_ratio": "9:16",
+      "character_limit": 2200,
+      "hashtag_limit": 30,
+      "is_active": true,
+      "created_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.socialnetworktemplate",
+    "pk": 4,
+    "fields": {
+      "social_network": 1,
+      "name": "Carrossel",
+      "width": 1080,
+      "height": 1080,
+      "aspect_ratio": "1:1",
+      "character_limit": 2200,
+      "hashtag_limit": 30,
+      "is_active": true,
+      "created_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.socialnetworktemplate",
+    "pk": 5,
+    "fields": {
+      "social_network": 2,
+      "name": "Post LinkedIn",
+      "width": 1200,
+      "height": 627,
+      "aspect_ratio": "1.91:1",
+      "character_limit": 3000,
+      "hashtag_limit": 5,
+      "is_active": true,
+      "created_at": "2026-01-13T10:00:00Z"
+    }
+  },
+  {
+    "model": "knowledge.socialnetworktemplate",
+    "pk": 6,
+    "fields": {
+      "social_network": 2,
+      "name": "Artigo LinkedIn",
+      "width": 1200,
+      "height": 627,
+      "aspect_ratio": "1.91:1",
+      "character_limit": 125000,
+      "hashtag_limit": 3,
+      "is_active": true,
+      "created_at": "2026-01-13T10:00:00Z"
+    }
+  }
+]

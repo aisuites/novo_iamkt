@@ -1,0 +1,164 @@
+/**
+ * BASE.CSS - Sistema de Design FEMME
+ * Baseado em base_femme_form.html (referência)
+ */
+
+/* ========================================
+   1. VARIÁVEIS CSS (Design Tokens)
+   ======================================== */
+
+:root {
+  /* Cores FEMME (CORRETAS da referência) */
+  --femme-purple: #7a3d8a;
+  --femme-purple-soft: #b6e1f3;
+  --femme-green: #7ab2ca;
+  --femme-rose-soft: #b6e1f3;
+
+  --femme-white: #ffffff;
+  --femme-gray-light: #f5f5f7;
+  --femme-gray: #77767c;
+  --femme-gray-dark: #34343a;
+
+  /* Sombras */
+  --shadow-soft: 0 18px 40px rgba(20, 5, 36, 0.08);
+  --shadow-subtle: 0 10px 24px rgba(20, 5, 36, 0.05);
+
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* Espaçamentos */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+
+  /* Tipografia */
+  --font-family: "Quicksand", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-size-xs: 0.625rem;   /* 10px */
+  --font-size-sm: 0.6875rem;  /* 11px */
+  --font-size-base: 0.75rem;  /* 12px */
+  --font-size-md: 0.8125rem;  /* 13px */
+  --font-size-lg: 0.875rem;   /* 14px */
+  --font-size-xl: 0.9375rem;  /* 15px */
+  --font-size-2xl: 1rem;      /* 16px */
+  --font-size-3xl: 1.375rem;  /* 22px */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --max-width: 1280px;
+  --transition-base: 0.15s ease;
+}
+
+/* ========================================
+   2. RESET CSS
+   ======================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-family);
+  background:
+    radial-gradient(circle at top left, rgba(122, 61, 138, 0.08), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(0, 188, 164, 0.06), transparent 55%);
+  color: var(--femme-gray-dark);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+img {
+  max-width: 10%;
+  display: block;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ========================================
+   3. CLASSES UTILITÁRIAS
+   ======================================== */
+
+/* Flexbox */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.gap-2 { gap: var(--spacing-2); }
+.gap-3 { gap: var(--spacing-3); }
+.gap-4 { gap: var(--spacing-4); }
+.gap-6 { gap: var(--spacing-6); }
+
+/* Grid */
+.grid { display: grid; }
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* Spacing */
+.mb-2 { margin-bottom: var(--spacing-2); }
+.mb-3 { margin-bottom: var(--spacing-3); }
+.mb-4 { margin-bottom: var(--spacing-4); }
+.mb-6 { margin-bottom: var(--spacing-6); }
+.mb-8 { margin-bottom: var(--spacing-8); }
+.mt-2 { margin-top: var(--spacing-2); }
+.mt-3 { margin-top: var(--spacing-3); }
+.mt-4 { margin-top: var(--spacing-4); }
+.mt-6 { margin-top: var(--spacing-6); }
+
+/* Typography */
+.text-xs { font-size: var(--font-size-xs); }
+.text-sm { font-size: var(--font-size-sm); }
+.text-base { font-size: var(--font-size-base); }
+.text-lg { font-size: var(--font-size-lg); }
+.text-xl { font-size: var(--font-size-xl); }
+.text-2xl { font-size: var(--font-size-2xl); }
+.text-3xl { font-size: var(--font-size-3xl); }
+
+.font-medium { font-weight: var(--font-weight-medium); }
+.font-semibold { font-weight: var(--font-weight-semibold); }
+.font-bold { font-weight: var(--font-weight-bold); }
+
+.text-purple { color: var(--femme-purple); }
+.text-muted { color: var(--femme-gray); }
+.text-center { text-align: center; }
+
+/* Outros */
+.w-full { width: 100%; }
+.transition-fast { transition: all var(--transition-base); }
+
+/* Responsivo */
+@media (min-width: 768px) {
+  .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .lg\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

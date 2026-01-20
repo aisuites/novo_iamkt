@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>FEMME – Painel de Marketing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Fonte Quicksand -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      /* Cores principais */
+      --femme-purple: #7a3d8a;
+      --femme-purple-soft: #f4e9f8;
+      --femme-green: #00bca4;
+      --femme-rose-soft: #ffb7c9;
+
+      /* Neutras */
+      --femme-white: #ffffff;
+      --femme-gray-light: #f5f5f7;
+      --femme-gray: #77767c;
+      --femme-gray-dark: #34343a;
+
+      /* Layout */
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --shadow-soft: 0 18px 40px rgba(20, 5, 36, 0.08);
+      --shadow-subtle: 0 10px 24px rgba(20, 5, 36, 0.05);
+
+      --max-width: 1280px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Quicksand", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(122, 61, 138, 0.08), transparent 55%),
+        radial-gradient(circle at bottom right, rgba(0, 188, 164, 0.06), transparent 55%);
+      color: var(--femme-gray-dark);
+      line-height: 1.5;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button {
+      font-family: inherit;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HEADER */
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 1px solid rgba(244, 233, 248, 0.9);
+    }
+
+    .header-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 20%, #ffb7c9 0, #7a3d8a 45%, #4c1f63 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--femme-white);
+      font-weight: 700;
+      font-size: 18px;
+      box-shadow: var(--shadow-subtle);
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .brand-text .name {
+      font-weight: 700;
+      color: var(--femme-purple);
+      letter-spacing: 0.03em;
+      font-size: 15px;
+      text-transform: uppercase;
+    }
+
+    .brand-text .tagline {
+      font-size: 11px;
+      color: var(--femme-gray);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 12px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(244, 233, 248, 0.9);
+      color: var(--femme-purple);
+      font-weight: 500;
+    }
+
+    .user-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #7a3d8a, #00bca4);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .header-badge-env {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(0, 188, 164, 0.08);
+      color: var(--femme-green);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* LAYOUT PRINCIPAL */
+
+    .shell {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 18px 20px 32px;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    /* SIDEBAR */
+
+    .sidebar {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-subtle);
+      padding: 16px 14px;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .sidebar-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--femme-gray);
+      margin-bottom: 4px;
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 9px;
+      border-radius: 999px;
+      color: var(--femme-gray-dark);
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .sidebar-link span.icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      background: rgba(122, 61, 138, 0.04);
+      color: var(--femme-purple);
+    }
+
+    .sidebar-link:hover {
+      background: rgba(244, 233, 248, 0.9);
+      transform: translateY(-1px);
+    }
+
+    .sidebar-link.active {
+      background: linear-gradient(90deg, rgba(122, 61, 138, 0.12), rgba(0, 188, 164, 0.12));
+      font-weight: 600;
+      color: var(--femme-purple);
+    }
+
+    .sidebar-divider {
+      height: 1px;
+      background: rgba(230, 224, 238, 0.85);
+      margin-block: 6px;
+    }
+
+    /* BOTÃO GENÉRICO */
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--femme-green);
+      color: var(--femme-white);
+      box-shadow: 0 10px 22px rgba(0, 188, 164, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: #00a08c;
+      transform: translateY(-1px);
+      box-shadow: 0 14px 26px rgba(0, 188, 164, 0.4);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--femme-purple);
+      border: 1px solid rgba(122, 61, 138, 0.45);
+    }
+
+    .btn-outline:hover {
+      background: rgba(244, 233, 248, 0.9);
+    }
+
+    /* CONTEÚDO PRINCIPAL */
+
+    .main {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* HERO DASHBOARD */
+
+    .dash-hero {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: var(--radius-lg);
+      padding: 18px 18px 16px;
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.2fr);
+      gap: 18px;
+      align-items: center;
+    }
+
+    .dash-hero-left {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .dash-hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(244, 233, 248, 0.95);
+      color: var(--femme-purple);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .dash-hero-kicker-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--femme-green);
+      box-shadow: 0 0 0 4px rgba(0, 188, 164, 0.25);
+    }
+
+    .dash-hero-title {
+      font-size: 22px;
+      color: var(--femme-purple);
+    }
+
+    .dash-hero-title span.highlight {
+      background: linear-gradient(120deg, #7a3d8a, #00bca4);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .dash-hero-text {
+      font-size: 13px;
+      color: var(--femme-gray);
+      max-width: 560px;
+    }
+
+    .dash-hero-actions {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .dash-hero-hint {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--femme-gray);
+    }
+
+    .dash-hero-right {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .dash-hero-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .metric-pill {
+      border-radius: 14px;
+      background: var(--femme-gray-light);
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .metric-pill strong {
+      color: var(--femme-purple);
+      font-size: 14px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--femme-gray);
+    }
+
+    .dash-hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(0, 188, 164, 0.06);
+      color: var(--femme-green);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .dash-hero-badge span.dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--femme-green);
+    }
+
+    /* SEÇÕES / TÍTULOS */
+
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .section-header-main {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .section-kicker {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--femme-gray);
+    }
+
+    .section-title {
+      font-size: 16px;
+      color: var(--femme-purple);
+      font-weight: 600;
+    }
+
+    .section-subtitle {
+      font-size: 12px;
+      color: var(--femme-gray);
+    }
+
+    .section-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    /* GRADE PRINCIPAL DO DASHBOARD */
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr);
+      gap: 18px;
+      align-items: flex-start;
+    }
+
+    /* CARD GENÉRICO */
+
+    .card {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-subtle);
+      padding: 14px 14px 12px;
+      font-size: 13px;
+    }
+
+    /* CARD – STATUS DA BASE */
+
+    .base-status-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .status-pill {
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-pill span.dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+    }
+
+    .status-pill--green {
+      background: rgba(0, 188, 164, 0.08);
+      color: var(--femme-green);
+    }
+
+    .status-pill--green span.dot {
+      background: var(--femme-green);
+    }
+
+    .status-pill--yellow {
+      background: rgba(255, 191, 59, 0.12);
+      color: #c58900;
+    }
+
+    .status-pill--yellow span.dot {
+      background: #ffbf3b;
+    }
+
+    .status-pill--red {
+      background: rgba(220, 20, 60, 0.12);
+      color: #c1123a;
+    }
+
+    .status-pill--red span.dot {
+      background: #c1123a;
+    }
+
+    .base-status-message {
+      font-size: 12px;
+      color: var(--femme-gray);
+    }
+
+    .base-checklist {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    .base-check-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: var(--femme-gray-light);
+    }
+
+    .base-check-item.ok {
+      background: rgba(0, 188, 164, 0.06);
+      color: var(--femme-green);
+    }
+
+    .base-check-item.missing {
+      background: rgba(255, 215, 0, 0.08);
+      color: #c58900;
+    }
+
+    .base-check-item span.bullet {
+      font-size: 13px;
+    }
+
+    .base-status-footer {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .base-status-footer span {
+      color: var(--femme-gray);
+    }
+
+    /* CARD – FERRAMENTAS RÁPIDAS */
+
+    .tools-grid {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .tool-card {
+      border-radius: 16px;
+      background: var(--femme-gray-light);
+      padding: 10px 10px 9px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    .tool-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 32px rgba(20, 5, 36, 0.09);
+      background: #ffffff;
+    }
+
+    .tool-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .tool-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(122, 61, 138, 0.06);
+      color: var(--femme-purple);
+      font-size: 18px;
+    }
+
+    .tool-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--femme-gray-dark);
+    }
+
+    .tool-text {
+      font-size: 11px;
+      color: var(--femme-gray);
+    }
+
+    .tool-cta {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--femme-purple);
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* CARD – FILA DE APROVAÇÃO */
+
+    .approvals-table-wrapper {
+      margin-top: 6px;
+      border-radius: 12px;
+      background: var(--femme-gray-light);
+      padding: 8px;
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    thead {
+      position: sticky;
+      top: 0;
+      background: var(--femme-gray-light);
+      z-index: 1;
+    }
+
+    th,
+    td {
+      padding: 6px 6px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      font-weight: 600;
+      color: var(--femme-gray);
+      border-bottom: 1px solid rgba(200, 200, 210, 0.8);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    tbody tr:nth-child(odd) {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .badge-status {
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .badge-status--in-review {
+      background: rgba(255, 191, 59, 0.16);
+      color: #c58900;
+    }
+
+    .badge-status--approved {
+      background: rgba(0, 188, 164, 0.12);
+      color: var(--femme-green);
+    }
+
+    .badge-status--draft {
+      background: rgba(122, 61, 138, 0.1);
+      color: var(--femme-purple);
+    }
+
+    .approval-actions {
+      display: inline-flex;
+      gap: 4px;
+    }
+
+    .link-inline {
+      font-size: 11px;
+      color: var(--femme-purple);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* CARD – SNAPSHOT DE DESEMPENHO */
+
+    .snapshot-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .snapshot-period {
+      font-size: 12px;
+      color: var(--femme-gray);
+    }
+
+    .snapshot-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      font-size: 10px;
+    }
+
+    .snapshot-tag {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(122, 61, 138, 0.06);
+      color: var(--femme-purple);
+      font-weight: 500;
+    }
+
+    .snapshot-content {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--femme-gray-dark);
+    }
+
+    .snapshot-list {
+      margin-top: 6px;
+      padding-left: 14px;
+      font-size: 11px;
+      color: var(--femme-gray);
+    }
+
+    .snapshot-footer {
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    /* CARD – ATIVIDADE RECENTE */
+
+    .activity-list {
+      margin-top: 6px;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 210px;
+      overflow: auto;
+    }
+
+    .activity-item {
+      padding: 6px 8px;
+      border-radius: 999px;
+      background: var(--femme-gray-light);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .activity-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .activity-title {
+      font-weight: 600;
+      color: var(--femme-gray-dark);
+    }
+
+    .activity-meta {
+      font-size: 10px;
+      color: var(--femme-gray);
+    }
+
+    .activity-label {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    .activity-label--approved {
+      background: rgba(0, 188, 164, 0.12);
+      color: var(--femme-green);
+    }
+
+    .activity-label--created {
+      background: rgba(122, 61, 138, 0.1);
+      color: var(--femme-purple);
+    }
+
+    .activity-label--sent {
+      background: rgba(255, 191, 59, 0.16);
+      color: #c58900;
+    }
+
+    /* RESPONSIVO */
+
+    @media (max-width: 1024px) {
+      .shell {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .sidebar {
+        order: -1;
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+
+      .sidebar-section-title {
+        flex-basis: 100%;
+      }
+
+      .dash-hero {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .main-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .base-checklist {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .header-inner {
+        padding-inline: 14px;
+      }
+
+      .shell {
+        padding-inline: 14px;
+      }
+
+      .dash-hero-title {
+        font-size: 18px;
+      }
+
+      .tools-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .base-checklist {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-logo">F</div>
+        <div class="brand-text">
+          <div class="name">FEMME</div>
+          <div class="tagline">Painel de Marketing & Insights</div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <span class="header-badge-env">Ambiente interno</span>
+        <div class="user-info">
+          <div class="user-avatar">{{ user_initial }}</div>
+          <div>
+            <div style="font-weight:600;">{{ user_name }}</div>
+            <div style="font-size:11px; color:var(--femme-gray);">Marketing FEMME</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- LAYOUT PRINCIPAL -->
+  <div class="shell">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div>
+        <div class="sidebar-section-title">Navegação</div>
+        <nav class="sidebar-nav">
+          <a href="{% url 'core:dashboard' %}" class="sidebar-link active">
+            <span class="icon">🏠</span>
+            <span>Dashboard</span>
+          </a>
+          <a href="{% url 'core:base_femme_new' %}" class="sidebar-link">
+            <span class="icon">💜</span>
+            <span>Base FEMME</span>
+          </a>
+          <a href="#" class="sidebar-link">
+            <span class="icon">🧰</span>
+            <span>Ferramentas</span>
+          </a>
+          <a href="#" class="sidebar-link">
+            <span class="icon">📄</span>
+            <span>Conteúdos gerados</span>
+          </a>
+          <a href="#" class="sidebar-link">
+            <span class="icon">📊</span>
+            <span>Dados & relatórios</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div>
+        <div class="sidebar-section-title">Administração</div>
+        <nav class="sidebar-nav">
+          <a href="{% url 'admin:auth_user_changelist' %}" class="sidebar-link">
+            <span class="icon">👥</span>
+            <span>Usuários & permissões</span>
+          </a>
+          <a href="{% url 'admin:index' %}" class="sidebar-link">
+            <span class="icon">⚙</span>
+            <span>Configurações</span>
+          </a>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="main">
+      <!-- HERO DASHBOARD -->
+      <section class="dash-hero">
+        <div class="dash-hero-left">
+          <div class="dash-hero-kicker">
+            <span class="dash-hero-kicker-dot"></span>
+            FEMME – Coração do Marketing
+          </div>
+          <h1 class="dash-hero-title">
+            Bem-vinda ao painel de <span class="highlight">Inteligência de Marca & Dados</span>.
+          </h1>
+          <p class="dash-hero-text">
+            Aqui você conecta a base de conhecimento da marca, dados de desempenho e ferramentas de IA
+            para criar campanhas, conteúdos e decisões alinhadas ao FEMME.
+          </p>
+          <div class="dash-hero-actions">
+            <button class="btn btn-primary">
+              ✏ Gerar post para redes sociais
+            </button>
+            <button class="btn btn-outline">
+              📈 Gerar insight de desempenho
+            </button>
+          </div>
+          <p class="dash-hero-hint">
+            Tudo o que você cria aqui fica registrado com histórico, status de aprovação e relação direta
+            com a Base FEMME.
+          </p>
+        </div>
+
+        <div class="dash-hero-right">
+          <div class="dash-hero-metrics">
+            <div class="metric-pill">
+              <strong>24</strong>
+              <span class="metric-label">Conteúdos em revisão</span>
+            </div>
+            <div class="metric-pill">
+              <strong>128</strong>
+              <span class="metric-label">Conteúdos aprovados · últimos 90 dias</span>
+            </div>
+            <div class="metric-pill">
+              <strong>Nov/2025</strong>
+              <span class="metric-label">Snapshot de desempenho ativo</span>
+            </div>
+          </div>
+          <div class="dash-hero-badge">
+            <span class="dot"></span>
+            IA conectada à Base FEMME e dados de negócio
+          </div>
+        </div>
+      </section>
+
+      <!-- GRID PRINCIPAL -->
+      <div class="main-grid">
+        <!-- COLUNA ESQUERDA -->
+        <div class="section">
+          <!-- STATUS DA BASE -->
+          <section class="card">
+            <div class="section-header">
+              <div class="section-header-main">
+                <div class="section-kicker">Base de conhecimento</div>
+                <div class="section-title">Status da Base FEMME</div>
+              </div>
+              <div class="section-actions">
+                <a href="{% url 'core:base_femme_new' %}" class="btn btn-outline" style="padding:5px 10px;">
+                  ✏ Editar Base FEMME
+                </a>
+              </div>
+            </div>
+
+            <div class="base-status-header">
+              <!-- Trocar a classe conforme cálculo real: status-pill--green / --yellow / --red -->
+              <div class="status-pill status-pill--yellow">
+                <span class="dot"></span>
+                Base parcialmente preenchida
+              </div>
+              <p class="base-status-message">
+                Alguns blocos ainda podem ser aprofundados para melhorar a qualidade dos conteúdos gerados.
+              </p>
+            </div>
+
+            <div class="base-checklist">
+              <div class="base-check-item ok">
+                <span class="bullet">✔</span>
+                Institucional & posicionamento
+              </div>
+              <div class="base-check-item missing">
+                <span class="bullet">•</span>
+                Públicos & segmentos internos
+              </div>
+              <div class="base-check-item ok">
+                <span class="bullet">✔</span>
+                Tom de voz externo
+              </div>
+              <div class="base-check-item missing">
+                <span class="bullet">•</span>
+                Tom de voz para comunicação interna
+              </div>
+              <div class="base-check-item ok">
+                <span class="bullet">✔</span>
+                Identidade visual (cores, logos, referências)
+              </div>
+              <div class="base-check-item ok">
+                <span class="bullet">✔</span>
+                Bloco de dados & insights (snapshot ativo)
+              </div>
+            </div>
+
+            <div class="base-status-footer">
+              <span>
+                Atualizado em: <strong>04/12/2025</strong> · Responsável: <strong>Marketing FEMME</strong>
+              </span>
+              <a href="#" class="link-inline">Ver detalhes da Base →</a>
+            </div>
+          </section>
+
+          <!-- FERRAMENTAS RÁPIDAS -->
+          <section class="card">
+            <div class="section-header">
+              <div class="section-header-main">
+                <div class="section-kicker">Ferramentas</div>
+                <div class="section-title">O que você quer fazer agora?</div>
+                <div class="section-subtitle">
+                  Comece um fluxo de criação ou análise já conectado à Base FEMME e aos dados do período.
+                </div>
+              </div>
+            </div>
+
+            <div class="tools-grid">
+              <!-- Gerar post -->
+              <article class="tool-card">
+                <div class="tool-title-row">
+                  <div class="tool-icon">✏</div>
+                  <div class="tool-title">Gerar post redes sociais</div>
+                </div>
+                <p class="tool-text">
+                  Crie textos e briefs visuais alinhados à identidade FEMME para Instagram, Facebook e LinkedIn.
+                </p>
+                <div class="tool-cta">
+                  Abrir ferramenta →
+                </div>
+              </article>
+
+              <!-- Gerar insight -->
+              <article class="tool-card">
+                <div class="tool-title-row">
+                  <div class="tool-icon">📈</div>
+                  <div class="tool-title">Gerar insight de desempenho</div>
+                </div>
+                <p class="tool-text">
+                  Transforme o snapshot de exames, unidades e contatos em análises e oportunidades de campanha.
+                </p>
+                <div class="tool-cta">
+                  Gerar insight →
+                </div>
+              </article>
+
+              <!-- Ver conteúdos -->
+              <article class="tool-card">
+                <div class="tool-title-row">
+                  <div class="tool-icon">📄</div>
+                  <div class="tool-title">Ver conteúdos gerados</div>
+                </div>
+                <p class="tool-text">
+                  Acompanhe tudo que já foi criado pela IA, com status de aprovação e histórico de revisões.
+                </p>
+                <div class="tool-cta">
+                  Abrir lista →
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- FILA DE APROVAÇÃO -->
+          <section class="card">
+            <div class="section-header">
+              <div class="section-header-main">
+                <div class="section-kicker">Workflow</div>
+                <div class="section-title">Conteúdos em revisão</div>
+                <div class="section-subtitle">
+                  Itens que aguardam aprovação para serem usados em campanhas, canais ou comunicação interna.
+                </div>
+              </div>
+              <div class="section-actions">
+                <span>Em revisão: <strong>7</strong></span>
+              </div>
+            </div>
+
+            <div class="approvals-table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Título</th>
+                    <th>Tipo</th>
+                    <th>Canal</th>
+                    <th>Status</th>
+                    <th>Criado por</th>
+                    <th>Data</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Outubro Rosa – ultrassom e mamografia</td>
+                    <td>Post social</td>
+                    <td>Instagram feed</td>
+                    <td>
+                      <span class="badge-status badge-status--in-review">Em revisão</span>
+                    </td>
+                    <td>Ana Souza</td>
+                    <td>03/12 · 18h20</td>
+                    <td>
+                      <div class="approval-actions">
+                        <span class="link-inline">Ver</span>
+                        <span class="link-inline">Aprovar</span>
+                        <span class="link-inline">Reprovar</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Insight desempenho – Nov/2025</td>
+                    <td>Relatório</td>
+                    <td>Resumo diretoria</td>
+                    <td>
+                      <span class="badge-status badge-status--in-review">Em revisão</span>
+                    </td>
+                    <td>Luciana</td>
+                    <td>03/12 · 09h10</td>
+                    <td>
+                      <div class="approval-actions">
+                        <span class="link-inline">Ver</span>
+                        <span class="link-inline">Aprovar</span>
+                        <span class="link-inline">Reprovar</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Comunicado interno – nova jornada portal</td>
+                    <td>Comunicado interno</td>
+                    <td>E-mail colaboradores</td>
+                    <td>
+                      <span class="badge-status badge-status--draft">Rascunho</span>
+                    </td>
+                    <td>Equipe Treinamento</td>
+                    <td>02/12 · 15h40</td>
+                    <td>
+                      <div class="approval-actions">
+                        <span class="link-inline">Ver</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <!-- Linhas adicionais entrariam aqui dinamicamente -->
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <!-- COLUNA DIREITA -->
+        <div class="section">
+          <!-- SNAPSHOT DE DESEMPENHO -->
+          <section class="card">
+            <div class="section-header">
+              <div class="section-header-main">
+                <div class="section-kicker">Dados & insights</div>
+                <div class="section-title">Desempenho recente – FEMME</div>
+              </div>
+            </div>
+
+            <div class="snapshot-header-row">
+              <div class="snapshot-period">
+                Snapshot ativo: <strong>Nov/2025 · Mensal</strong>
+              </div>
+              <div class="snapshot-tags">
+                <span class="snapshot-tag">Top exames preventivos</span>
+                <span class="snapshot-tag">Unidades em crescimento</span>
+              </div>
+            </div>
+
+            <div class="snapshot-content">
+              <p>
+                O período de <strong>Novembro/2025</strong> apresentou crescimento relevante em exames
+                preventivos (papanicolau e mamografia), especialmente nas unidades
+                <strong>Paulista</strong> e <strong>Moema</strong>. Houve aumento na procura por
+                agendamentos digitais e crescimento nos contatos relacionados a preparo de exame.
+              </p>
+
+              <ul class="snapshot-list">
+                <li><strong>Papanicolau</strong> – exame com maior volume no período.</li>
+                <li><strong>Mamografia</strong> – crescimento consistente nas campanhas de rastreamento.</li>
+                <li>Unidade <strong>Paulista</strong> com maior taxa de crescimento entre todas as unidades.</li>
+              </ul>
+            </div>
+
+            <div class="snapshot-footer">
+              <span>Última atualização do snapshot: <strong>02/12/2025</strong></span>
+              <button class="btn btn-outline" style="padding:6px 10px; font-size:11px;">
+                📈 Gerar insight detalhado
+              </button>
+            </div>
+          </section>
+
+          <!-- ATIVIDADE RECENTE -->
+          <section class="card">
+            <div class="section-header">
+              <div class="section-header-main">
+                <div class="section-kicker">Histórico</div>
+                <div class="section-title">Atividade recente</div>
+                <div class="section-subtitle">
+                  Últimas ações de criação, envio para revisão e aprovação feitas pela equipe.
+                </div>
+              </div>
+            </div>
+
+            <div class="activity-list">
+              <div class="activity-item">
+                <div class="activity-main">
+                  <div class="activity-title">
+                    [Aprovado] Post – Outubro Rosa · ultrassom e mamografia
+                  </div>
+                  <div class="activity-meta">
+                    Aprovado por <strong>Ana Souza</strong> · 04/12/2025 · 18h10
+                  </div>
+                </div>
+                <span class="activity-label activity-label--approved">
+                  Aprovado
+                </span>
+              </div>
+
+              <div class="activity-item">
+                <div class="activity-main">
+                  <div class="activity-title">
+                    [Enviado para revisão] Insight – Nov/2025 (diretoria)
+                  </div>
+                  <div class="activity-meta">
+                    Gerado por <strong>Luciana</strong> · 03/12/2025 · 09h10
+                  </div>
+                </div>
+                <span class="activity-label activity-label--sent">
+                  Enviado
+                </span>
+              </div>
+
+              <div class="activity-item">
+                <div class="activity-main">
+                  <div class="activity-title">
+                    [Criado] Comunicando nova jornada do portal de resultados
+                  </div>
+                  <div class="activity-meta">
+                    Equipe Treinamento · 02/12/2025 · 15h40
+                  </div>
+                </div>
+                <span class="activity-label activity-label--created">
+                  Criado
+                </span>
+              </div>
+
+              <div class="activity-item">
+                <div class="activity-main">
+                  <div class="activity-title">
+                    [Aprovado] Post – Vacinação HPV para adolescentes
+                  </div>
+                  <div class="activity-meta">
+                    Aprovado por <strong>Qualidade FEMME</strong> · 01/12/2025 · 11h05
+                  </div>
+                </div>
+                <span class="activity-label activity-label--approved">
+                  Aprovado
+                </span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+</div>
+</body>
+</html>

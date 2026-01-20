@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  iamkt_web:
+    environment:
+      - DOCKER_PROFILE=solo
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    ports:
+      - "8004:8000"
+
+  iamkt_postgres:
+    command: postgres -c 'log_statement=all'
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    ports:
+      - "127.0.0.1:5436:5432"
+
+  iamkt_redis:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
