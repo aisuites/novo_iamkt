@@ -12,8 +12,8 @@
   top: 0;
   z-index: 20;
   backdrop-filter: blur(16px);
-  background: rgba(255, 255, 255, 0.9);
-  border-bottom: 1px solid rgba(244, 233, 248, 0.9);
+  background: var(--white-90);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-primary-light) 90%, transparent);
 }
 
 .header-inner {
@@ -78,7 +78,7 @@
   gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(244, 233, 248, 0.9);
+  background: color-mix(in srgb, var(--color-primary-light) 90%, transparent);
   color: var(--color-primary);
   font-weight: 500;
 }
@@ -130,7 +130,7 @@
    ======================================== */
 
 .sidebar {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--white-90);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-subtle);
   padding: 16px 14px;
@@ -178,7 +178,7 @@
 }
 
 .sidebar-link:hover {
-  background: rgba(244, 233, 248, 0.9);
+  background: color-mix(in srgb, var(--color-primary-light) 90%, transparent);
   transform: translateY(-1px);
 }
 
@@ -190,7 +190,7 @@
 
 .sidebar-divider {
   height: 1px;
-  background: rgba(230, 224, 238, 0.85);
+  background: color-mix(in srgb, var(--color-primary-light) 85%, transparent);
   margin-block: 6px;
 }
 
@@ -209,7 +209,7 @@
    ======================================== */
 
 .card {
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--white-90);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-subtle);
   padding: 18px;
@@ -281,7 +281,7 @@
 }
 
 .btn-outline:hover {
-  background: rgba(244, 233, 248, 0.9);
+  background: color-mix(in srgb, var(--color-primary-light) 90%, transparent);
 }
 
 .btn-sm {
@@ -314,13 +314,13 @@
 }
 
 .badge-warning {
-  background: rgba(255, 191, 59, 0.12);
-  color: #c58900;
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  color: var(--color-warning);
 }
 
 .badge-danger {
-  background: rgba(193, 18, 58, 0.12);
-  color: #c1123a;
+  background: color-mix(in srgb, var(--color-error) 12%, transparent);
+  color: var(--color-error);
 }
 
 /* ========================================
@@ -341,15 +341,15 @@
 }
 
 .alert-warning {
-  background: rgba(255, 191, 59, 0.12);
-  color: #c58900;
-  border: 1px solid rgba(255, 191, 59, 0.3);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  color: var(--color-warning);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
 
 .alert-danger {
-  background: rgba(193, 18, 58, 0.1);
-  color: #c1123a;
-  border: 1px solid rgba(193, 18, 58, 0.3);
+  background: color-mix(in srgb, var(--color-error) 10%, transparent);
+  color: var(--color-error);
+  border: 1px solid color-mix(in srgb, var(--color-error) 30%, transparent);
 }
 
 /* ========================================
@@ -411,7 +411,7 @@ textarea:focus {
 }
 
 .field-required {
-  color: #c1123a;
+  color: var(--color-error);
   font-size: 11px;
   margin-left: 3px;
 }
@@ -504,7 +504,7 @@ textarea:focus {
   width: 100%;
   max-width: 420px;
   padding: var(--spacing-10);
-  background: rgba(52, 52, 58, 0.95);
+  background: color-mix(in srgb, var(--color-surface-dark) 95%, transparent);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
 }
@@ -518,7 +518,7 @@ textarea:focus {
 
 .auth-card-subtitle {
   font-size: var(--font-size-base);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--white-50);
   margin-bottom: var(--spacing-8);
 }
 
@@ -547,8 +547,8 @@ textarea:focus {
 .form-input {
   width: 100%;
   padding: var(--spacing-4);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white-05);
+  border: 1px solid var(--white-10);
   border-radius: var(--radius-sm);
   color: var(--color-white);
   font-size: var(--font-size-base);
@@ -556,13 +556,14 @@ textarea:focus {
 }
 
 .form-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--white-50);
 }
 
 .form-input:focus {
   outline: none;
   border-color: var(--color-primary);
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--color-surface) 8%, transparent);
+  color: var(--color-white);
 }
 
 .btn-toggle-password {
@@ -572,7 +573,7 @@ textarea:focus {
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--white-50);
   cursor: pointer;
   padding: var(--spacing-2);
   display: flex;
@@ -618,7 +619,7 @@ textarea:focus {
   padding: var(--spacing-4) var(--spacing-6);
   background: transparent;
   color: var(--color-white);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--white-20);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-medium);
@@ -630,15 +631,15 @@ textarea:focus {
 }
 
 .auth-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--white-05);
+  border-color: var(--white-20);
 }
 
 .auth-link {
   display: block;
   text-align: center;
   font-size: var(--font-size-sm);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--white-50);
   margin-top: var(--spacing-3);
   transition: color var(--transition-base);
 }
@@ -652,7 +653,7 @@ textarea:focus {
   align-items: center;
   text-align: center;
   margin: var(--spacing-6) 0;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--white-50);
   font-size: var(--font-size-sm);
 }
 
@@ -660,7 +661,7 @@ textarea:focus {
 .auth-divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--white-10);
 }
 
 .auth-divider span {
@@ -675,21 +676,21 @@ textarea:focus {
 }
 
 .alert-error {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--color-error) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-error) 30%, transparent);
+  color: var(--color-error);
 }
 
 .alert-success {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  color: #86efac;
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent);
+  color: var(--color-success);
 }
 
 .alert-info {
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  color: #93c5fd;
+  background: color-mix(in srgb, var(--color-info) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
+  color: var(--color-info);
 }
 
 /* Responsive Auth */
