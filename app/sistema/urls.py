@@ -24,5 +24,11 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
+    # Rotas de teste para visualizar páginas de erro em desenvolvimento
+    from apps.core.views_test_errors import test_404
+    urlpatterns += [
+        path('test-404/', test_404, name='test_404'),
+    ]
+    
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
