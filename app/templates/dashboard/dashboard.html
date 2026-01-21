@@ -123,22 +123,52 @@
     </div>
     {% endif %}
 
-    <!-- Limites de Uso -->
-    {% if limite_info %}
+    <!-- Quotas de Uso -->
+    {% if quota_info %}
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title">📊 Uso Mensal</h3>
+        <h3 class="card-title">📊 Quotas de Uso</h3>
       </div>
-      <div>
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-sm text-muted">Gerações</span>
-          <span class="text-sm font-semibold">{{ limite_info.current }} / {{ limite_info.max }}</span>
+      <div class="space-y-3">
+        <!-- Pautas Hoje -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs text-muted">Pautas Hoje</span>
+            <span class="text-xs font-semibold">{{ quota_info.pautas_hoje }} / {{ quota_info.pautas_dia_max }}</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-1.5">
+            <div class="h-1.5 rounded-full {% if quota_info.pautas_dia_percentual >= 100 %}bg-red-500{% elif quota_info.pautas_dia_percentual >= 80 %}bg-yellow-500{% else %}bg-purple{% endif %}" style="width: {{ quota_info.pautas_dia_percentual|floatformat:0 }}%;"></div>
+          </div>
         </div>
-        <div class="w-full bg-gray-200 rounded-full h-2">
-          <div class="bg-purple h-2 rounded-full" style="width: {{ limite_info.percentual }}%;"></div>
+        
+        <!-- Posts Hoje -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs text-muted">Posts Hoje</span>
+            <span class="text-xs font-semibold">{{ quota_info.posts_hoje }} / {{ quota_info.posts_dia_max }}</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-1.5">
+            <div class="h-1.5 rounded-full {% if quota_info.posts_dia_percentual >= 100 %}bg-red-500{% elif quota_info.posts_dia_percentual >= 80 %}bg-yellow-500{% else %}bg-purple{% endif %}" style="width: {{ quota_info.posts_dia_percentual|floatformat:0 }}%;"></div>
+          </div>
         </div>
-        <div class="text-xs text-muted mt-2">
-          Custo: ${{ limite_info.cost_current|floatformat:2 }} / ${{ limite_info.cost_max|floatformat:2 }}
+        
+        <!-- Posts Mês -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs text-muted">Posts Mês</span>
+            <span class="text-xs font-semibold">{{ quota_info.posts_mes }} / {{ quota_info.posts_mes_max }}</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-1.5">
+            <div class="h-1.5 rounded-full {% if quota_info.posts_mes_percentual >= 100 %}bg-red-500{% elif quota_info.posts_mes_percentual >= 80 %}bg-yellow-500{% else %}bg-purple{% endif %}" style="width: {{ quota_info.posts_mes_percentual|floatformat:0 }}%;"></div>
+          </div>
+        </div>
+        
+        <!-- Custo Mês -->
+        <div class="pt-2 border-t border-gray-200">
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-muted">Custo Mês</span>
+            <span class="text-xs font-semibold">${{ quota_info.cost_mes|floatformat:2 }} / ${{ quota_info.cost_mes_max|floatformat:2 }}</span>
+          </div>
         </div>
       </div>
     </div>

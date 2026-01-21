@@ -5,7 +5,7 @@ from django.db.models import Count, Sum
 from django.utils import timezone
 from datetime import timedelta
 
-from apps.core.models import UsageLimit
+from apps.core.models import Organization, QuotaUsageDaily
 from apps.core.decorators import require_organization
 from apps.knowledge.models import KnowledgeBase
 from apps.content.models import Pauta, Post, TrendMonitor
@@ -62,21 +62,59 @@ def dashboard(request):
         is_active=True
     ).order_by('-created_at')[:5]
     
-    # Limites de uso (se existir área)
-    limite_info = None
-    if user_area:
+    # Quotas da organization
+    quota_info = None
+    if hasattr(request, 'organization') and request.organization:
+        org = request.organization
+        today = timezone.now().date()
+        
+        # Buscar uso de hoje
         try:
-            current_month = timezone.now().date().replace(day=1)
-            limite = UsageLimit.objects.get(area=user_area, month=current_month)
-            limite_info = {
-                'current': limite.current_generations,
-                'max': limite.max_generations,
-                'percentual': (limite.current_generations / limite.max_generations * 100) if limite.max_generations > 0 else 0,
-                'cost_current': limite.current_cost_usd,
-                'cost_max': limite.max_cost_usd
-            }
-        except UsageLimit.DoesNotExist:
-            pass
+            usage_today = QuotaUsageDaily.objects.get(
+                organization=org,
+                date=today
+            )
+        except QuotaUsageDaily.DoesNotExist:
+            usage_today = None
+        
+        # Calcular uso do mês
+        first_day_month = today.replace(day=1)
+        usage_month = QuotaUsageDaily.objects.filter(
+            organization=org,
+            date__gte=first_day_month,
+            date__lte=today
+        ).aggregate(
+            total_pautas=Sum('pautas_count'),
+            total_posts=Sum('posts_count'),
+            total_cost=Sum('cost_usd')
+        )
+        
+        pautas_hoje = usage_today.pautas_count if usage_today else 0
+        posts_hoje = usage_today.posts_count if usage_today else 0
+        pautas_mes = usage_month['total_pautas'] or 0
+        posts_mes = usage_month['total_posts'] or 0
+        cost_mes = float(usage_month['total_cost'] or 0)
+        
+        quota_info = {
+            # Quotas diárias
+            'pautas_hoje': pautas_hoje,
+            'pautas_dia_max': org.quota_pautas_dia,
+            'pautas_dia_percentual': (pautas_hoje / org.quota_pautas_dia * 100) if org.quota_pautas_dia > 0 else 0,
+            
+            'posts_hoje': posts_hoje,
+            'posts_dia_max': org.quota_posts_dia,
+            'posts_dia_percentual': (posts_hoje / org.quota_posts_dia * 100) if org.quota_posts_dia > 0 else 0,
+            
+            # Quotas mensais
+            'posts_mes': pautas_mes,
+            'posts_mes_max': org.quota_posts_mes,
+            'posts_mes_percentual': (posts_mes / org.quota_posts_mes * 100) if org.quota_posts_mes > 0 else 0,
+            
+            # Custos
+            'cost_mes': cost_mes,
+            'cost_mes_max': float(org.quota_cost_mes_usd) if org.quota_cost_mes_usd else 0,
+            'cost_mes_percentual': (cost_mes / float(org.quota_cost_mes_usd) * 100) if org.quota_cost_mes_usd and org.quota_cost_mes_usd > 0 else 0,
+        }
     
     # Atividades recentes
     atividades_recentes = []
@@ -118,7 +156,7 @@ def dashboard(request):
         'projetos_ativos': projetos_ativos,
         'aprovacoes_pendentes': aprovacoes_pendentes,
         'trends_recentes': trends_recentes,
-        'limite_info': limite_info,
+        'quota_info': quota_info,
         'atividades_recentes': atividades_recentes,
     }
     
