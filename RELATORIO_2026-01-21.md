@@ -373,6 +373,78 @@ def save_model(self, request, obj, form, change):
 
 ---
 
+### **8. Correção do Erro KnowledgeBase (11:35 - 11:45)**
+
+**Problema reportado:**
+- Erro ao acessar `/knowledge/`: `'KnowledgeBase' instance needs to have a primary key value before this relationship can be used`
+- View não carregava para usuários sem KnowledgeBase
+
+**Investigação:**
+```python
+# Problema 1: View tentava usar KB sem pk
+internal_segments = InternalSegment.objects.filter(
+    knowledge_base=kb  # kb sem pk → ERRO
+)
+
+# Problema 2: save() calculava completude antes de ter pk
+def save(self):
+    self.completude_percentual = self.calculate_completude()  # Acessa self.colors.exists() → ERRO
+    super().save()
+```
+
+**Causa raiz:**
+1. View criava KB mas não salvava antes de usar em queries
+2. `save()` chamava `calculate_completude()` que acessava relacionamentos
+3. Relacionamentos precisam de pk para funcionar
+
+**Solução implementada:**
+
+**1. knowledge/views.py (linhas 67-96):**
+```python
+# Buscar dados relacionados apenas se kb existir e tiver pk
+if kb and kb.pk:
+    internal_segments = InternalSegment.objects.filter(knowledge_base=kb)
+    colors = ColorPalette.objects.filter(knowledge_base=kb)
+    # etc
+else:
+    # KB não existe ou não tem pk, inicializar vazios
+    internal_segments = []
+    colors = []
+    # etc
+```
+
+**2. knowledge/models.py (linhas 250-267):**
+```python
+def save(self, *args, **kwargs):
+    # Se já tem pk, calcular completude antes de salvar
+    if self.pk:
+        self.completude_percentual = self.calculate_completude()
+    
+    # Salvar
+    super().save(*args, **kwargs)
+    
+    # Se é novo, calcular completude após salvar (usando update)
+    if not self.completude_percentual and self.pk:
+        self.completude_percentual = self.calculate_completude()
+        KnowledgeBase.objects.filter(pk=self.pk).update(...)
+```
+
+**Teste realizado:**
+```bash
+# User ACME acessa /knowledge/
+✅ View retorna 200 OK
+✅ KB criada automaticamente (ID: 2, Nome: ACME Corp)
+✅ Completude calculada: 0%
+✅ Multi-tenant funcionando
+```
+
+**Resultado:**
+- ✅ Erro corrigido completamente
+- ✅ KnowledgeBase funcionando para todas organizations
+- ✅ Criação automática de KB ao acessar pela primeira vez
+
+---
+
 ## 🐛 Problemas Encontrados e Soluções
 
 ### **Problema 1: Signal não disparava via Admin**
@@ -452,9 +524,13 @@ def save_model(self, request, obj, form, change):
 7. `docs: Adicionar ITEM #004 - Modo configurável multi-tenant vs single-tenant`
 8. `docs: Atualizar ITEM #003 - Etapa 4 será feita após Etapa 3`
 9. `feat: Implementar validação de quotas no Admin (OPÇÃO A - Etapa 3)`
+10. `docs: Atualizar relatório com Etapa 3 - Validação de quotas`
+11. `docs: Adicionar análise profunda corrigida do planejamento vs realizado`
+12. `fix: Corrigir erro 'needs primary key' no KnowledgeBase`
 
 ---
 
-**Relatório gerado em:** 21/01/2026 11:10
-**Desenvolvedor:** Cascade AI
+**Relatório gerado em:** 21/01/2026 11:10  
+**Última atualização:** 21/01/2026 11:45  
+**Desenvolvedor:** Cascade AI  
 **Revisão:** Pendente
