@@ -22,7 +22,8 @@ class TenantMiddleware(MiddlewareMixin):
     
     # URLs que não precisam de tenant (login, logout, etc)
     PUBLIC_URLS = [
-        '/admin/',
+        '/admin/login/',
+        '/admin/logout/',
         '/login/',
         '/logout/',
         '/static/',
@@ -109,7 +110,8 @@ class TenantIsolationMiddleware(MiddlewareMixin):
         Verifica se URL é pública.
         """
         public_urls = [
-            '/admin/',
+            '/admin/login/',
+            '/admin/logout/',
             '/login/',
             '/logout/',
             '/static/',
