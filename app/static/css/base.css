@@ -8,16 +8,61 @@
    ======================================== */
 
 :root {
-  /* Cores IAMKT */
-  --iamkt-purple: #7a3d8a;
-  --iamkt-purple-soft: #b6e1f3;
-  --iamkt-green: #7ab2ca;
-  --iamkt-rose-soft: #b6e1f3;
-
-  --iamkt-white: #ffffff;
-  --iamkt-gray-light: #f5f5f7;
-  --iamkt-gray: #77767c;
-  --iamkt-gray-dark: #34343a;
+  /* ========================================
+     PALETA BASE (Raw Colors)
+     Cores brutas para referência interna
+     ======================================== */
+  --color-purple-600: #7a3d8a;
+  --color-purple-500: #9b59b6;
+  --color-purple-100: #b6e1f3;
+  
+  --color-teal-500: #7ab2ca;
+  --color-teal-600: #00bca4;
+  
+  --color-gray-50: #f5f5f7;
+  --color-gray-500: #77767c;
+  --color-gray-900: #34343a;
+  
+  --color-white: #ffffff;
+  --color-black: #000000;
+  
+  /* ========================================
+     CORES SEMÂNTICAS (Design Tokens)
+     Use estas variáveis nos componentes
+     ======================================== */
+  --color-primary: var(--color-purple-600);
+  --color-primary-hover: var(--color-purple-500);
+  --color-primary-light: var(--color-purple-100);
+  
+  --color-secondary: var(--color-teal-500);
+  --color-accent: var(--color-teal-600);
+  
+  --color-text: var(--color-gray-900);
+  --color-text-muted: var(--color-gray-500);
+  --color-text-inverse: var(--color-white);
+  
+  --color-background: var(--color-white);
+  --color-surface: var(--color-gray-50);
+  --color-surface-dark: var(--color-gray-900);
+  
+  /* Estados */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+  
+  /* ========================================
+     COMPATIBILIDADE (Deprecated - remover gradualmente)
+     Mantido temporariamente para não quebrar código existente
+     ======================================== */
+  --iamkt-purple: var(--color-primary);
+  --iamkt-purple-soft: var(--color-primary-light);
+  --iamkt-green: var(--color-secondary);
+  --iamkt-rose-soft: var(--color-primary-light);
+  --iamkt-white: var(--color-white);
+  --iamkt-gray-light: var(--color-surface);
+  --iamkt-gray: var(--color-text-muted);
+  --iamkt-gray-dark: var(--color-text);
 
   /* Sombras */
   --shadow-soft: 0 18px 40px rgba(20, 5, 36, 0.08);
@@ -77,9 +122,9 @@ html {
 body {
   font-family: var(--font-family);
   background:
-    radial-gradient(circle at top left, rgba(122, 61, 138, 0.08), transparent 55%),
-    radial-gradient(circle at bottom right, rgba(0, 188, 164, 0.06), transparent 55%);
-  color: var(--iamkt-gray-dark);
+    radial-gradient(circle at top left, color-mix(in srgb, var(--color-primary) 8%, transparent), transparent 55%),
+    radial-gradient(circle at bottom right, color-mix(in srgb, var(--color-accent) 6%, transparent), transparent 55%);
+  color: var(--color-text);
   line-height: 1.5;
   min-height: 100vh;
 }
@@ -144,9 +189,13 @@ button {
 .font-semibold { font-weight: var(--font-weight-semibold); }
 .font-bold { font-weight: var(--font-weight-bold); }
 
-.text-purple { color: var(--iamkt-purple); }
-.text-muted { color: var(--iamkt-gray); }
+.text-primary { color: var(--color-primary); }
+.text-secondary { color: var(--color-secondary); }
+.text-muted { color: var(--color-text-muted); }
 .text-center { text-align: center; }
+
+/* Deprecated - usar .text-primary */
+.text-purple { color: var(--color-primary); }
 
 /* Outros */
 .w-full { width: 100%; }

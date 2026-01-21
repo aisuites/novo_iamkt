@@ -36,7 +36,7 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 20%, #ffb7c9 0, #7a3d8a 45%, #4c1f63 100%);
+  background: radial-gradient(circle at 30% 20%, #ffb7c9 0, var(--color-primary) 45%, #4c1f63 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -87,8 +87,8 @@
   width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #7a3d8a, #00bca4);
-  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  color: var(--color-white);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -169,8 +169,8 @@
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  background: rgba(122, 61, 138, 0.04);
-  color: var(--iamkt-purple);
+  background: color-mix(in srgb, var(--color-primary) 4%, transparent);
+  color: var(--color-primary);
 }
 
 .sidebar-link:hover {
@@ -179,9 +179,9 @@
 }
 
 .sidebar-link.active {
-  background: linear-gradient(90deg, rgba(122, 61, 138, 0.12), rgba(0, 188, 164, 0.12));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary) 12%, transparent), color-mix(in srgb, var(--color-accent) 12%, transparent));
   font-weight: 600;
-  color: var(--iamkt-purple);
+  color: var(--color-primary);
 }
 
 .sidebar-divider {
@@ -254,26 +254,26 @@
 }
 
 .btn-primary:hover {
-  background: #00a08c;
+  background: color-mix(in srgb, var(--color-accent) 90%, transparent);
   transform: translateY(-1px);
-  box-shadow: 0 14px 26px rgba(0, 188, 164, 0.4);
+  box-shadow: 0 14px 26px color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 
 .btn-secondary {
-  background: rgba(122, 61, 138, 0.08);
-  color: var(--iamkt-purple);
-  border: 1px solid rgba(122, 61, 138, 0.2);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .btn-secondary:hover {
-  background: rgba(122, 61, 138, 0.12);
-  border-color: var(--iamkt-purple);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  border-color: var(--color-primary);
 }
 
 .btn-outline {
   background: transparent;
-  color: var(--iamkt-purple);
-  border: 1px solid rgba(122, 61, 138, 0.45);
+  color: var(--color-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
 }
 
 .btn-outline:hover {
@@ -300,8 +300,8 @@
 }
 
 .badge-soft {
-  background: rgba(122, 61, 138, 0.08);
-  color: var(--iamkt-purple);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-primary);
 }
 
 .badge-success {
@@ -331,9 +331,9 @@
 }
 
 .alert-info {
-  background: rgba(0, 188, 164, 0.1);
-  color: #00BCA4;
-  border: 1px solid rgba(0, 188, 164, 0.3);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--color-accent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 .alert-warning {
@@ -371,8 +371,8 @@ input[type="email"],
 input[type="password"],
 textarea {
   border-radius: var(--radius-md);
-  border: 1px solid rgba(122, 61, 138, 0.18);
-  background: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+  background: var(--color-white);
   padding: 8px 10px;
   font-size: 12px;
   font-family: inherit;
@@ -389,8 +389,8 @@ textarea {
 
 input:focus,
 textarea:focus {
-  border-color: var(--iamkt-purple);
-  box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .field-label-row {
@@ -459,8 +459,8 @@ textarea:focus {
   justify-content: center;
   padding: var(--spacing-12);
   background: 
-    radial-gradient(circle at top left, rgba(122, 61, 138, 0.08), transparent 55%),
-    radial-gradient(circle at bottom right, rgba(0, 188, 164, 0.06), transparent 55%);
+    radial-gradient(circle at top left, color-mix(in srgb, var(--color-primary) 8%, transparent), transparent 55%),
+    radial-gradient(circle at bottom right, color-mix(in srgb, var(--color-accent) 6%, transparent), transparent 55%);
 }
 
 .auth-brand {
@@ -587,20 +587,20 @@ textarea:focus {
 
 .btn-primary {
   padding: var(--spacing-4) var(--spacing-6);
-  background: linear-gradient(135deg, #7a3d8a, #9b59b6);
-  color: var(--iamkt-white);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: var(--color-text-inverse);
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
   transition: all var(--transition-base);
-  box-shadow: 0 4px 12px rgba(122, 61, 138, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(122, 61, 138, 0.4);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--color-primary) 40%, transparent);
 }
 
 .btn-primary:active {

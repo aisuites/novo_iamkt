@@ -49,7 +49,7 @@
   height: 7px;
   border-radius: 999px;
   background: var(--iamkt-green);
-  box-shadow: 0 0 0 4px rgba(0, 188, 164, 0.25);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
 
 .hero-title {
@@ -58,7 +58,7 @@
 }
 
 .hero-title span.highlight {
-  background: linear-gradient(120deg, #7a3d8a, #00bca4);
+  background: linear-gradient(120deg, var(--color-primary), var(--color-accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -81,7 +81,7 @@
 .hero-tag {
   padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(122, 61, 138, 0.06);
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
   color: var(--iamkt-purple);
   font-weight: 500;
   text-decoration: none;
@@ -90,7 +90,7 @@
 }
 
 .hero-tag:hover {
-  background: rgba(122, 61, 138, 0.12);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
   transform: translateY(-1px);
 }
 
@@ -144,7 +144,7 @@
 }
 
 .status-pill--green {
-  background: rgba(0, 188, 164, 0.08);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
   color: var(--iamkt-green);
 }
 
@@ -219,13 +219,13 @@
 }
 
 .form-step-pill:hover {
-  background: rgba(122, 61, 138, 0.08);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
   color: var(--iamkt-purple);
   transform: translateY(-1px);
 }
 
 .form-step-pill.active {
-  background: rgba(122, 61, 138, 0.12);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
   color: var(--iamkt-purple);
   font-weight: 600;
 }
@@ -306,7 +306,7 @@
 }
 
 .accordion-block .form-block-header:hover {
-  background: rgba(122, 61, 138, 0.04);
+  background: color-mix(in srgb, var(--color-primary) 4%, transparent);
 }
 
 .accordion-toggle {
@@ -316,7 +316,7 @@
   width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: rgba(122, 61, 138, 0.08);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
   color: var(--iamkt-purple);
   font-size: 10px;
   transition: transform 0.3s ease, background 0.2s ease;
@@ -324,7 +324,7 @@
 
 .accordion-open .accordion-toggle {
   transform: rotate(180deg);
-  background: rgba(122, 61, 138, 0.12);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
 .accordion-closed .form-block-body {
@@ -366,7 +366,7 @@
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(122, 61, 138, 0.08);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
   color: var(--iamkt-purple);
 }
 
@@ -580,7 +580,7 @@
 }
 
 .toggle-switch input:focus + .toggle-slider {
-  box-shadow: 0 0 0 2px rgba(122, 61, 138, 0.2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .segment-actions {
@@ -686,7 +686,7 @@
 }
 
 .modal-close:hover {
-  background: rgba(122, 61, 138, 0.08);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
 }
 
 .modal-body {
@@ -726,7 +726,7 @@ select {
 
 select:focus {
   border-color: var(--iamkt-purple);
-  box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 input[type="number"] {
@@ -743,7 +743,7 @@ input[type="number"] {
 
 input[type="number"]:focus {
   border-color: var(--iamkt-purple);
-  box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 /* ========================================
@@ -761,7 +761,7 @@ input[type="number"]:focus {
 
 .tags-input-wrapper:focus-within {
   border-color: var(--iamkt-purple);
-  box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .tags-list {
@@ -777,7 +777,7 @@ input[type="number"]:focus {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background: linear-gradient(135deg, #7a3d8a, #9b59b6);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
   color: white;
   border-radius: 999px;
   font-size: 11px;
@@ -843,7 +843,7 @@ input[type="number"]:focus {
   padding: 8px;
   background: white;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(122, 61, 138, 0.12);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, transparent);
   transition: border-color 0.15s ease;
 }
 
@@ -918,9 +918,9 @@ input[type="number"]:focus {
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: rgba(122, 61, 138, 0.08);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
   color: var(--iamkt-purple);
-  border: 1px dashed rgba(122, 61, 138, 0.3);
+  border: 1px dashed color-mix(in srgb, var(--color-primary) 30%, transparent);
   border-radius: var(--radius-sm);
   font-size: 12px;
   cursor: pointer;
@@ -931,7 +931,7 @@ input[type="number"]:focus {
 }
 
 .btn-add-color:hover {
-  background: rgba(122, 61, 138, 0.12);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
   border-color: var(--iamkt-purple);
 }
 
@@ -955,7 +955,7 @@ input[type="number"]:focus {
 }
 
 .fonte-item:hover {
-  border-color: rgba(122, 61, 138, 0.3);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .fonte-item-header {
@@ -1048,7 +1048,7 @@ input[type="number"]:focus {
 }
 
 .fonte-tipo-option:hover {
-  background: rgba(122, 61, 138, 0.08);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
 }
 
 .fonte-tipo-option.active {
@@ -1087,9 +1087,9 @@ input[type="number"]:focus {
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: rgba(122, 61, 138, 0.08);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
   color: var(--iamkt-purple);
-  border: 1px dashed rgba(122, 61, 138, 0.3);
+  border: 1px dashed color-mix(in srgb, var(--color-primary) 30%, transparent);
   border-radius: var(--radius-sm);
   font-size: 12px;
   cursor: pointer;
@@ -1099,7 +1099,7 @@ input[type="number"]:focus {
 }
 
 .btn-add-fonte:hover {
-  background: rgba(122, 61, 138, 0.12);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
   border-color: var(--iamkt-purple);
 }
 
@@ -1117,7 +1117,7 @@ input[type="number"]:focus {
 .logo-preview-item {
   position: relative;
   background: white;
-  border: 1px solid rgba(122, 61, 138, 0.12);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, transparent);
   border-radius: var(--radius-md);
   padding: 16px;
   display: flex;
@@ -1200,7 +1200,7 @@ input[type="number"]:focus {
 .reference-preview-item {
   position: relative;
   background: white;
-  border: 1px solid rgba(122, 61, 138, 0.12);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, transparent);
   border-radius: var(--radius-md);
   overflow: hidden;
   aspect-ratio: 1;
@@ -1266,7 +1266,7 @@ input[type="number"]:focus {
    ======================================== */
 
 .upload-area {
-  border: 2px dashed rgba(122, 61, 138, 0.3);
+  border: 2px dashed color-mix(in srgb, var(--color-primary) 30%, transparent);
   border-radius: var(--radius-md);
   padding: 24px;
   text-align: center;
@@ -1324,7 +1324,7 @@ input[type="number"]:focus {
   gap: 12px;
   padding: 12px;
   background: white;
-  border: 1px solid rgba(122, 61, 138, 0.12);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, transparent);
   border-radius: var(--radius-sm);
   transition: border-color 0.15s ease;
 }
@@ -1374,7 +1374,7 @@ input[type="number"]:focus {
 .social-network-field input[type="url"]:focus {
   border-color: var(--iamkt-purple);
   outline: none;
-  box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .btn-templates-link {
@@ -1382,7 +1382,7 @@ input[type="number"]:focus {
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, var(--iamkt-purple), #9b59b6);
+  background: linear-gradient(135deg, var(--iamkt-purple), var(--color-primary-hover));
   color: white;
   border: none;
   border-radius: var(--radius-md);
