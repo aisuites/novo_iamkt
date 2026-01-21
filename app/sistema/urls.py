@@ -4,6 +4,9 @@ from django.conf import settings
 from django.conf.urls.static import static
 from apps.core.views_auth import login_view, logout_view, register_view
 
+# Handler para página 404
+handler404 = 'apps.core.views_errors.custom_404'
+
 urlpatterns = [
     # Auth
     path('login/', login_view, name='login'),

@@ -1,0 +1,229 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erro 404 - Página não encontrada | IAMKT</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/components.css' %}">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-4);
+            margin: 0;
+        }
+        
+        .error-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-8);
+            max-width: 1200px;
+            width: 100%;
+            align-items: center;
+        }
+        
+        .error-left {
+            color: var(--color-white);
+        }
+        
+        .error-badge {
+            color: var(--color-primary);
+            font-size: var(--font-sm);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: var(--spacing-4);
+        }
+        
+        .error-title {
+            font-size: 4rem;
+            font-weight: 700;
+            line-height: 1.1;
+            margin: 0 0 var(--spacing-4) 0;
+            color: var(--color-white);
+        }
+        
+        .error-description {
+            font-size: var(--font-base);
+            line-height: 1.6;
+            color: var(--white-90);
+            margin-bottom: var(--spacing-6);
+        }
+        
+        .error-tags {
+            display: flex;
+            gap: var(--spacing-3);
+            margin-bottom: var(--spacing-6);
+            flex-wrap: wrap;
+        }
+        
+        .error-tag {
+            background: var(--white-10);
+            color: var(--white-90);
+            padding: var(--spacing-2) var(--spacing-4);
+            border-radius: var(--radius-full);
+            font-size: var(--font-sm);
+        }
+        
+        .error-button {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--spacing-2);
+            background: var(--color-primary);
+            color: var(--color-white);
+            padding: var(--spacing-3) var(--spacing-6);
+            border-radius: var(--radius-full);
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .error-button:hover {
+            background: var(--color-primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+        
+        .error-right {
+            background: var(--white-05);
+            border: 1px solid var(--white-10);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-6);
+        }
+        
+        .error-right-title {
+            color: var(--color-white);
+            font-size: var(--font-lg);
+            font-weight: 600;
+            margin: 0 0 var(--spacing-4) 0;
+        }
+        
+        .error-right-subtitle {
+            color: var(--white-90);
+            font-size: var(--font-sm);
+            margin-bottom: var(--spacing-5);
+        }
+        
+        .error-reasons {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-4);
+        }
+        
+        .error-reason {
+            display: flex;
+            gap: var(--spacing-3);
+            align-items: flex-start;
+        }
+        
+        .error-reason-number {
+            background: var(--color-primary);
+            color: var(--color-white);
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: var(--font-sm);
+            flex-shrink: 0;
+        }
+        
+        .error-reason-text {
+            color: var(--white-90);
+            line-height: 1.6;
+            padding-top: 4px;
+        }
+        
+        .error-help {
+            margin-top: var(--spacing-5);
+            padding-top: var(--spacing-5);
+            border-top: 1px solid var(--white-10);
+            color: var(--white-50);
+            font-size: var(--font-sm);
+        }
+        
+        @media (max-width: 968px) {
+            .error-container {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-6);
+            }
+            
+            .error-title {
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-left">
+            <div class="error-badge">ERRO 404</div>
+            <h1 class="error-title">Página não encontrada.</h1>
+            <p class="error-description">
+                O recurso que você tentou abrir não está disponível, foi movido ou exige permissão. 
+                Volte para a página principal do IAMKT para continuar a navegação.
+            </p>
+            
+            <div class="error-tags">
+                <span class="error-tag">IAMKT • plataforma</span>
+                <span class="error-tag">diagnóstico</span>
+                <span class="error-tag">fluxo de marca</span>
+            </div>
+            
+            <a href="{% if user.is_authenticated %}{% url 'core:dashboard' %}{% else %}{% url 'login' %}{% endif %}" class="error-button">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Voltar para o IAMKT
+            </a>
+        </div>
+        
+        <div class="error-right">
+            <h2 class="error-right-title">POR QUE ESTOU VENDO ISSO?</h2>
+            <p class="error-right-subtitle">Alguns motivos comuns:</p>
+            
+            <div class="error-reasons">
+                <div class="error-reason">
+                    <div class="error-reason-number">01</div>
+                    <div class="error-reason-text">
+                        Link expirado após fluxo de aprovação.
+                    </div>
+                </div>
+                
+                <div class="error-reason">
+                    <div class="error-reason-number">02</div>
+                    <div class="error-reason-text">
+                        Conteúdo foi removido ou renomeado.
+                    </div>
+                </div>
+                
+                <div class="error-reason">
+                    <div class="error-reason-number">03</div>
+                    <div class="error-reason-text">
+                        Você não tem acesso a este CPT / empresa.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="error-help">
+                Precisa liberar acesso? Procure o admin IAMKT.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
