@@ -7,6 +7,14 @@ class Project(models.Model):
     """
     Projetos/Campanhas para organizar conteúdos
     """
+    organization = models.ForeignKey(
+        'core.Organization',
+        on_delete=models.CASCADE,
+        related_name='projects',
+        null=True,
+        blank=True,
+        verbose_name='Organização'
+    )
     name = models.CharField(max_length=200, verbose_name='Nome')
     description = models.TextField(blank=True, verbose_name='Descrição')
     area = models.ForeignKey(

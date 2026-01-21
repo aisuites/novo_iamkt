@@ -9,6 +9,15 @@ class Pauta(models.Model):
     """
     Pautas geradas por IA para criação de conteúdo
     """
+    organization = models.ForeignKey(
+        'core.Organization',
+        on_delete=models.CASCADE,
+        related_name='pautas',
+        null=True,
+        blank=True,
+        verbose_name='Organização',
+        help_text='Organização à qual esta pauta pertence'
+    )
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -326,6 +335,14 @@ class Asset(models.Model):
     """
     Biblioteca de assets (imagens, vídeos, etc)
     """
+    organization = models.ForeignKey(
+        'core.Organization',
+        on_delete=models.CASCADE,
+        related_name='assets',
+        null=True,
+        blank=True,
+        verbose_name='Organização'
+    )
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -388,6 +405,14 @@ class TrendMonitor(models.Model):
     """
     Monitoramento de trends (Google Trends, etc)
     """
+    organization = models.ForeignKey(
+        'core.Organization',
+        on_delete=models.CASCADE,
+        related_name='trend_monitors',
+        null=True,
+        blank=True,
+        verbose_name='Organização'
+    )
     keyword = models.CharField(max_length=200, verbose_name='Palavra-chave')
     source = models.CharField(
         max_length=50,
@@ -464,6 +489,14 @@ class WebInsight(models.Model):
     """
     Insights de pesquisa web (scraping + análise IA)
     """
+    organization = models.ForeignKey(
+        'core.Organization',
+        on_delete=models.CASCADE,
+        related_name='web_insights',
+        null=True,
+        blank=True,
+        verbose_name='Organização'
+    )
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -536,6 +569,14 @@ class IAModelUsage(models.Model):
     Tracking detalhado de uso de modelos IA
     Para cálculo de custos e métricas
     """
+    organization = models.ForeignKey(
+        'core.Organization',
+        on_delete=models.CASCADE,
+        related_name='ia_usages',
+        null=True,
+        blank=True,
+        verbose_name='Organização'
+    )
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -549,7 +590,7 @@ class IAModelUsage(models.Model):
         verbose_name='Área'
     )
     content = models.ForeignKey(
-        GeneratedContent,
+        Post,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -637,7 +678,7 @@ class ContentMetrics(models.Model):
     Para análise de performance e validação do MVP
     """
     content = models.OneToOneField(
-        GeneratedContent,
+        Post,
         on_delete=models.CASCADE,
         related_name='metrics',
         verbose_name='Conteúdo'
