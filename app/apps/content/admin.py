@@ -24,6 +24,21 @@ class PautaAdmin(admin.ModelAdmin):
             'fields': ('status', 'error_message', 'created_at', 'completed_at')
         }),
     )
+    
+    def save_model(self, request, obj, form, change):
+        """Auto-preencher organization ao salvar"""
+        if not obj.organization_id and hasattr(request, 'organization'):
+            obj.organization = request.organization
+        super().save_model(request, obj, form, change)
+    
+    def get_queryset(self, request):
+        """Filtrar por organization do usuário"""
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request, 'organization') and request.organization:
+            return qs.filter(organization=request.organization)
+        return qs.none()
 
 
 @admin.register(Post)
@@ -52,6 +67,21 @@ class PostAdmin(admin.ModelAdmin):
             'fields': ('status', 'created_at', 'updated_at')
         }),
     )
+    
+    def save_model(self, request, obj, form, change):
+        """Auto-preencher organization ao salvar"""
+        if not obj.organization_id and hasattr(request, 'organization'):
+            obj.organization = request.organization
+        super().save_model(request, obj, form, change)
+    
+    def get_queryset(self, request):
+        """Filtrar por organization do usuário"""
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request, 'organization') and request.organization:
+            return qs.filter(organization=request.organization)
+        return qs.none()
 
 
 @admin.register(Asset)
