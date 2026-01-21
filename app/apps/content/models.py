@@ -53,11 +53,13 @@ class Pauta(models.Model):
     description = models.TextField(verbose_name='Descrição')
     key_points = models.JSONField(
         default=list,
+        blank=True,
         verbose_name='Pontos-chave',
         help_text='Lista de pontos principais'
     )
     suggested_formats = models.JSONField(
         default=list,
+        blank=True,
         verbose_name='Formatos Sugeridos',
         help_text='["post", "carrossel", "video", etc]'
     )
