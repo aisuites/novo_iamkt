@@ -415,6 +415,23 @@ class Organization(TimeStampedModel):
         verbose_name='Notas Internas'
     )
     
+    # Sistema de Alertas (migrado de UsageLimit)
+    alert_80_enabled = models.BooleanField(
+        default=True,
+        help_text="Enviar alerta quando atingir 80% da quota",
+        verbose_name='Alertas 80% Habilitados'
+    )
+    alert_100_enabled = models.BooleanField(
+        default=True,
+        help_text="Enviar alerta quando atingir 100% da quota",
+        verbose_name='Alertas 100% Habilitados'
+    )
+    alert_email = models.EmailField(
+        blank=True,
+        help_text="Email para receber alertas (deixe vazio para usar email do owner)",
+        verbose_name='Email de Alertas'
+    )
+    
     class Meta:
         verbose_name = 'Organização'
         verbose_name_plural = 'Organizações'
@@ -724,6 +741,16 @@ class QuotaUsageDaily(TimeStampedModel):
         verbose_name='Ajustes de Vídeos'
     )
     
+    # Tracking de custos (migrado de UsageLimit)
+    cost_usd = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        default=Decimal('0.0000'),
+        validators=[MinValueValidator(Decimal('0.0000'))],
+        verbose_name='Custo USD',
+        help_text='Custo total em USD das operações deste dia'
+    )
+    
     class Meta:
         unique_together = [('organization', 'date')]
         ordering = ['-date']
@@ -829,6 +856,63 @@ class QuotaAdjustment(TimeStampedModel):
     def __str__(self):
         sign = '+' if self.amount > 0 else ''
         return f"{self.organization.name} · {self.get_resource_type_display()} · {sign}{self.amount}"
+
+
+class QuotaAlert(TimeStampedModel):
+    """
+    Registro de alertas de quota enviados (migrado de UsageLimit.alert_80_sent/alert_100_sent).
+    Evita envio duplicado de alertas no mesmo dia.
+    """
+    
+    class AlertType(models.TextChoices):
+        ALERT_80 = '80', '80% da Quota'
+        ALERT_100 = '100', '100% da Quota (Limite Atingido)'
+    
+    class ResourceType(models.TextChoices):
+        PAUTA_DAILY = 'pauta_daily', 'Pauta (Diária)'
+        POST_DAILY = 'post_daily', 'Post (Diária)'
+        POST_MONTHLY = 'post_monthly', 'Post (Mensal)'
+        VIDEO_DAILY = 'video_daily', 'Vídeo (Diária)'
+        VIDEO_MONTHLY = 'video_monthly', 'Vídeo (Mensal)'
+    
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='quota_alerts',
+        verbose_name='Organização'
+    )
+    alert_type = models.CharField(
+        max_length=3,
+        choices=AlertType.choices,
+        verbose_name='Tipo de Alerta'
+    )
+    resource_type = models.CharField(
+        max_length=20,
+        choices=ResourceType.choices,
+        verbose_name='Tipo de Recurso'
+    )
+    date = models.DateField(
+        db_index=True,
+        help_text="Data em que o alerta foi disparado",
+        verbose_name='Data'
+    )
+    sent_to = models.EmailField(
+        help_text="Email para onde o alerta foi enviado",
+        verbose_name='Enviado Para'
+    )
+    
+    class Meta:
+        ordering = ['-date', '-created_at']
+        verbose_name = 'Alerta de Quota'
+        verbose_name_plural = 'Alertas de Quotas'
+        unique_together = [['organization', 'alert_type', 'resource_type', 'date']]
+        indexes = [
+            models.Index(fields=['organization', '-date']),
+            models.Index(fields=['alert_type', '-date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.organization.name} · {self.get_alert_type_display()} · {self.get_resource_type_display()} · {self.date}"
 
 
 class PautaAuditLog(TimeStampedModel):
