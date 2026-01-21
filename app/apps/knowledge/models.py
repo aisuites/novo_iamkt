@@ -117,10 +117,12 @@ class KnowledgeBase(models.Model):
     Contém 7 blocos temáticos que definem o DNA da marca
     Cada organização tem sua própria base de conhecimento
     """
-    organization = models.OneToOneField(
+    organization = models.ForeignKey(
         'core.Organization',
         on_delete=models.CASCADE,
-        related_name='knowledge_base',
+        related_name='knowledge_bases',
+        null=True,
+        blank=True,
         verbose_name='Organização',
         help_text='Organização à qual esta base de conhecimento pertence'
     )

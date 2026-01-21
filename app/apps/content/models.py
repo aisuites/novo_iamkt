@@ -285,7 +285,6 @@ class Post(models.Model):
         verbose_name = 'Post'
         verbose_name_plural = 'Posts'
         ordering = ['-created_at']
-        db_table = 'content_generatedcontent'  # Manter nome da tabela existente
         indexes = [
             models.Index(fields=['-created_at']),
             models.Index(fields=['user', '-created_at']),
