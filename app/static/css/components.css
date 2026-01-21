@@ -589,7 +589,8 @@ textarea:focus {
   width: 100%;
 }
 
-.btn-primary {
+/* Botões específicos para página de autenticação */
+.auth-btn-primary {
   padding: var(--spacing-4) var(--spacing-6);
   background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
   color: var(--color-text-inverse);
@@ -600,18 +601,20 @@ textarea:focus {
   cursor: pointer;
   transition: all var(--transition-base);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  width: 100%;
+  display: block;
 }
 
-.btn-primary:hover {
+.auth-btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 16px color-mix(in srgb, var(--color-primary) 40%, transparent);
 }
 
-.btn-primary:active {
+.auth-btn-primary:active {
   transform: translateY(0);
 }
 
-.btn-secondary {
+.auth-btn-secondary {
   padding: var(--spacing-4) var(--spacing-6);
   background: transparent;
   color: var(--color-white);
@@ -623,9 +626,10 @@ textarea:focus {
   transition: all var(--transition-base);
   text-align: center;
   display: block;
+  width: 100%;
 }
 
-.btn-secondary:hover {
+.auth-btn-secondary:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.3);
 }
