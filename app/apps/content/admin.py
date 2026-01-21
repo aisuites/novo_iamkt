@@ -26,9 +26,20 @@ class PautaAdmin(admin.ModelAdmin):
     )
     
     def save_model(self, request, obj, form, change):
-        """Auto-preencher organization ao salvar"""
+        """Auto-preencher organization e validar quota ao salvar"""
+        # Auto-preencher organization
         if not obj.organization_id and hasattr(request, 'organization'):
             obj.organization = request.organization
+        
+        # Validar quota apenas ao criar (não ao editar)
+        if not change and obj.organization:
+            can_create, error_code, message = obj.organization.can_create_pauta()
+            if not can_create:
+                from django.contrib import messages
+                messages.error(request, f'❌ Não foi possível criar a pauta: {message}')
+                # Impedir salvamento retornando sem chamar super()
+                return
+        
         super().save_model(request, obj, form, change)
     
     def get_queryset(self, request):
@@ -69,9 +80,20 @@ class PostAdmin(admin.ModelAdmin):
     )
     
     def save_model(self, request, obj, form, change):
-        """Auto-preencher organization ao salvar"""
+        """Auto-preencher organization e validar quota ao salvar"""
+        # Auto-preencher organization
         if not obj.organization_id and hasattr(request, 'organization'):
             obj.organization = request.organization
+        
+        # Validar quota apenas ao criar (não ao editar)
+        if not change and obj.organization:
+            can_create, error_code, message = obj.organization.can_create_post()
+            if not can_create:
+                from django.contrib import messages
+                messages.error(request, f'❌ Não foi possível criar o post: {message}')
+                # Impedir salvamento retornando sem chamar super()
+                return
+        
         super().save_model(request, obj, form, change)
     
     def get_queryset(self, request):
