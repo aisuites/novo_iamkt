@@ -85,18 +85,8 @@ class OrganizationAdmin(admin.ModelAdmin):
                 'plan_type',
                 'quota_pautas_dia',
                 'quota_posts_dia',
-                'quota_posts_mes',
-                'quota_cost_mes_usd'
+                'quota_posts_mes'
             )
-        }),
-        ('Alertas', {
-            'fields': (
-                'alert_enabled',
-                'alert_email',
-                'alert_threshold_80',
-                'alert_threshold_100'
-            ),
-            'classes': ('collapse',)
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
