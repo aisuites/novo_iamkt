@@ -50,10 +50,9 @@ def login_view(request):
             # Login bem-sucedido - organização ativa
             auth_login(request, user)
             
-            # Verificar se é primeiro acesso (para mostrar modal de boas-vindas)
-            if not request.session.get('welcome_shown', False):
-                request.session['show_welcome_modal'] = True
-                request.session['welcome_shown'] = True
+            # Sempre mostrar modal de boas-vindas no primeiro login da sessão
+            # (a flag será setada no dashboard após exibir o modal)
+            request.session['show_welcome_modal'] = True
             
             # Redirecionar para página solicitada ou dashboard
             next_url = request.GET.get('next', 'core:dashboard')
