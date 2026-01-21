@@ -661,25 +661,12 @@ class Organization(TimeStampedModel):
     
     def get_videos_this_month(self):
         """Conta vídeos criados neste ciclo de billing"""
+        from apps.content.models import VideoAvatar
         start_date = self.get_billing_cycle_start()
         return VideoAvatar.objects.filter(
             organization=self,
             created_at__gte=start_date
         ).count()
-
-
-class VideoAvatarStatus(models.Model):
-    """Status possíveis para vídeos avatar"""
-    code = models.CharField(max_length=40, unique=True, verbose_name='Código')
-    label = models.CharField(max_length=120, verbose_name='Label')
-    
-    class Meta:
-        ordering = ["id"]
-        verbose_name = "Status de Vídeo Avatar"
-        verbose_name_plural = "Status de Vídeos Avatar"
-    
-    def __str__(self):
-        return self.label
 
 
 class QuotaUsageDaily(TimeStampedModel):

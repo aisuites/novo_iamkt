@@ -700,3 +700,188 @@ class ContentMetrics(models.Model):
             total += self.approval_duration_seconds
         total += self.total_adjustment_time_seconds
         return total
+
+
+class VideoAvatarStatus(models.Model):
+    """Status possíveis para vídeos avatar"""
+    code = models.CharField(max_length=40, unique=True, verbose_name='Código')
+    label = models.CharField(max_length=120, verbose_name='Label')
+    
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Status de Vídeo Avatar"
+        verbose_name_plural = "Status de Vídeos Avatar"
+    
+    def __str__(self):
+        return self.label
+
+
+class VideoAvatar(models.Model):
+    """
+    Vídeo Avatar gerado a partir de imagem + script.
+    
+    Workflow:
+    1. Cliente solicita (upload avatar + script)
+    2. Email enviado para equipe de produção
+    3. Equipe faz upload do vídeo no admin
+    4. Cliente é notificado automaticamente
+    """
+    from apps.core.storage import VideoAvatarStorage, VideoThumbnailStorage, AvatarImageStorage
+    from django.utils import timezone
+    
+    organization = models.ForeignKey(
+        'core.Organization',
+        on_delete=models.CASCADE,
+        related_name="videos_avatar",
+        verbose_name='Organização'
+    )
+    
+    # Entrada do cliente
+    avatar_image = models.ImageField(
+        upload_to='%Y/%m/%d/',
+        storage=AvatarImageStorage(),
+        help_text="Imagem do avatar/personagem (foto/ilustração)",
+        verbose_name='Imagem do Avatar'
+    )
+    script_text = models.TextField(
+        max_length=500,
+        help_text="Texto para locução/legenda do vídeo (máx 500 caracteres)",
+        verbose_name='Texto do Script'
+    )
+    avatar_action = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Ação desejada: 'acenar', 'sorrir', 'olhar para câmera', etc.",
+        verbose_name='Ação do Avatar'
+    )
+    
+    # Vídeo gerado (upload pela equipe)
+    video_file = models.FileField(
+        upload_to='%Y/%m/%d/',
+        storage=VideoAvatarStorage(),
+        blank=True,
+        null=True,
+        help_text="Vídeo final gerado (MP4)",
+        verbose_name='Arquivo de Vídeo'
+    )
+    video_duration = models.FloatField(
+        default=0,
+        help_text="Duração do vídeo em segundos",
+        verbose_name='Duração do Vídeo'
+    )
+    video_thumbnail = models.ImageField(
+        upload_to='%Y/%m/%d/',
+        storage=VideoThumbnailStorage(),
+        blank=True,
+        null=True,
+        help_text="Thumbnail do vídeo (gerado automaticamente)",
+        verbose_name='Thumbnail do Vídeo'
+    )
+    
+    # Status e controle
+    status = models.ForeignKey(
+        VideoAvatarStatus,
+        on_delete=models.PROTECT,
+        related_name="videos",
+        verbose_name='Status'
+    )
+    revisions_remaining = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Revisões restantes (padrão: 1)",
+        verbose_name='Revisões Restantes'
+    )
+    is_revision_of = models.ForeignKey(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='revisions',
+        help_text="Se for revisão, aponta para o vídeo original",
+        verbose_name='Revisão de'
+    )
+    
+    # Prazos e SLA
+    expected_delivery_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Prazo estimado de entrega (48h úteis)",
+        verbose_name='Entrega Esperada em'
+    )
+    delivered_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Data/hora em que vídeo foi entregue ao cliente",
+        verbose_name='Entregue em'
+    )
+    
+    # Metadados
+    thread_id = models.CharField(
+        max_length=160,
+        blank=True,
+        help_text="ID do job de processamento (se aplicável)",
+        verbose_name='Thread ID'
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Vídeo Avatar'
+        verbose_name_plural = 'Vídeos Avatar'
+    
+    def __str__(self):
+        return f"Vídeo #{self.pk} - {self.organization.name}"
+    
+    def save(self, *args, **kwargs):
+        # Calcular prazo de entrega na criação
+        if not self.pk and not self.expected_delivery_at:
+            from apps.core.utils import calculate_video_delivery_deadline
+            from django.conf import settings
+            from django.utils import timezone
+            
+            self.expected_delivery_at = calculate_video_delivery_deadline(
+                self.created_at or timezone.now(),
+                base_hours=getattr(settings, 'VIDEO_AVATAR_SLA_HOURS', 48),
+                include_weekends=getattr(settings, 'VIDEO_AVATAR_INCLUDE_WEEKENDS', False),
+                business_hours_only=getattr(settings, 'VIDEO_AVATAR_BUSINESS_HOURS_ONLY', True)
+            )
+        
+        # Marcar como entregue quando vídeo é adicionado pela primeira vez
+        if self.video_file and not self.delivered_at:
+            from django.utils import timezone
+            self.delivered_at = timezone.now()
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_overdue(self):
+        """Verifica se está atrasado"""
+        if not self.expected_delivery_at or self.delivered_at:
+            return False
+        from django.utils import timezone
+        return timezone.now() > self.expected_delivery_at
+    
+    @property
+    def delivery_status_display(self):
+        """Status de entrega amigável para display"""
+        from django.utils import timezone
+        
+        if self.delivered_at:
+            delta = self.delivered_at - self.created_at
+            hours = delta.total_seconds() / 3600
+            return f'✅ Entregue em {hours:.1f}h'
+        
+        if self.is_overdue:
+            return '⚠️ ATRASADO'
+        
+        if self.expected_delivery_at:
+            remaining = self.expected_delivery_at - timezone.now()
+            hours = remaining.total_seconds() / 3600
+            if hours > 0:
+                return f'⏳ Faltam {hours:.1f}h'
+            else:
+                return '⚠️ VENCIDO'
+        
+        return '—'
