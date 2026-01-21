@@ -91,7 +91,7 @@ class OrganizationAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Timestamps', {
-            'fields': ('created_at', 'updated_at', 'approved_at'),
+            'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
@@ -100,7 +100,7 @@ class OrganizationAdmin(admin.ModelAdmin):
 @admin.register(QuotaUsageDaily)
 class QuotaUsageDailyAdmin(admin.ModelAdmin):
     list_display = [
-        'organization', 'date', 'pautas_count', 'posts_count',
+        'organization', 'date', 'pautas_requested', 'posts_created',
         'cost_usd', 'get_total_items'
     ]
     list_filter = ['date', 'organization']
@@ -109,26 +109,26 @@ class QuotaUsageDailyAdmin(admin.ModelAdmin):
     date_hierarchy = 'date'
     
     def get_total_items(self, obj):
-        return obj.pautas_count + obj.posts_count
-    get_total_items.short_description = 'Total Itens'
+        return obj.pautas_used + obj.posts_used
+    get_total_items.short_description = 'Total Usado'
 
 
 @admin.register(QuotaAdjustment)
 class QuotaAdjustmentAdmin(admin.ModelAdmin):
     list_display = [
-        'organization', 'adjustment_type', 'quota_type',
-        'amount', 'reason', 'created_by', 'created_at'
+        'organization', 'adjustment_type', 'resource_type',
+        'amount', 'reason', 'created_at'
     ]
-    list_filter = ['adjustment_type', 'quota_type', 'created_at']
+    list_filter = ['adjustment_type', 'resource_type', 'created_at']
     search_fields = ['organization__name', 'reason']
     readonly_fields = ['created_at']
     
     fieldsets = (
         ('Ajuste', {
-            'fields': ('organization', 'adjustment_type', 'quota_type', 'amount')
+            'fields': ('organization', 'adjustment_type', 'resource_type', 'amount')
         }),
         ('Detalhes', {
-            'fields': ('reason', 'reference_pauta', 'reference_post', 'created_by')
+            'fields': ('reason', 'reference_pauta', 'reference_post')
         }),
         ('Timestamp', {
             'fields': ('created_at',),
@@ -140,13 +140,13 @@ class QuotaAdjustmentAdmin(admin.ModelAdmin):
 @admin.register(QuotaAlert)
 class QuotaAlertAdmin(admin.ModelAdmin):
     list_display = [
-        'organization', 'alert_type', 'threshold_percentage',
-        'current_usage', 'quota_limit', 'sent_at'
+        'organization', 'alert_type', 'resource_type',
+        'date', 'sent_to', 'created_at'
     ]
-    list_filter = ['alert_type', 'threshold_percentage', 'sent_at']
-    search_fields = ['organization__name']
-    readonly_fields = ['sent_at', 'email_sent_to']
-    date_hierarchy = 'sent_at'
+    list_filter = ['alert_type', 'resource_type', 'date']
+    search_fields = ['organization__name', 'sent_to']
+    readonly_fields = ['created_at']
+    date_hierarchy = 'date'
     
     def has_add_permission(self, request):
         return False
