@@ -76,19 +76,10 @@ class User(AbstractUser):
 
 class Area(models.Model):
     """
-    Áreas organizacionais (Marketing, RH, Diretoria, etc)
-    Base para permissões e limites de uso
+    Áreas/Departamentos globais (Marketing, Vendas, RH, etc)
+    Compartilhadas por todas as organizations
     """
-    organization = models.ForeignKey(
-        'Organization',
-        on_delete=models.CASCADE,
-        related_name='areas',
-        null=True,
-        blank=True,
-        verbose_name='Organização',
-        help_text='Organização à qual a área pertence'
-    )
-    name = models.CharField(max_length=100, verbose_name='Nome')
+    name = models.CharField(max_length=100, unique=True, verbose_name='Nome')
     description = models.TextField(blank=True, verbose_name='Descrição')
     parent = models.ForeignKey(
         'self',
@@ -106,7 +97,6 @@ class Area(models.Model):
         verbose_name = 'Área'
         verbose_name_plural = 'Áreas'
         ordering = ['name']
-        unique_together = [['organization', 'name']]
     
     def __str__(self):
         return self.name
