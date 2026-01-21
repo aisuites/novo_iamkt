@@ -8,14 +8,14 @@ from .models import (
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ['username', 'email', 'first_name', 'last_name', 'profile', 'is_active']
-    list_filter = ['profile', 'is_active', 'is_staff', 'areas']
+    list_display = ['username', 'email', 'first_name', 'last_name', 'organization', 'profile', 'is_active']
+    list_filter = ['organization', 'profile', 'is_active', 'is_staff', 'areas']
     search_fields = ['username', 'email', 'first_name', 'last_name']
     filter_horizontal = ['areas', 'groups', 'user_permissions']
     
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Informações Adicionais', {
-            'fields': ('profile', 'areas', 'phone')
+            'fields': ('organization', 'profile', 'areas', 'phone')
         }),
     )
 
