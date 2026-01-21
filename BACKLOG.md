@@ -207,14 +207,91 @@ Implementar sistema automatizado de envio de alertas quando organization atingir
 
 ---
 
+## 📌 ITEM #004 - Implementar modo configurável Multi-tenant vs Single-tenant
+**Data de Cadastro:** 2026-01-21 11:16:00  
+**Prioridade:** MÉDIA  
+**Fase:** FASE 7 - Melhorias e Otimizações (futuro)
+
+### O que será feito:
+Tornar a aplicação configurável para funcionar como multi-tenant (várias empresas) OU single-tenant (empresa única) via variável de ambiente no deploy.
+
+### Como fazer:
+1. **Adicionar variável de ambiente:**
+   ```python
+   # settings.py
+   MULTI_TENANT_MODE = env.bool('MULTI_TENANT_MODE', default=True)
+   ```
+
+2. **Middleware condicional:**
+   ```python
+   # settings.py
+   if MULTI_TENANT_MODE:
+       MIDDLEWARE.insert(3, 'apps.core.middleware.TenantMiddleware')
+       MIDDLEWARE.insert(4, 'apps.core.middleware.TenantIsolationMiddleware')
+   ```
+
+3. **Managers condicionais:**
+   ```python
+   # core/managers.py
+   class ConditionalTenantManager(models.Manager):
+       def get_queryset(self):
+           qs = super().get_queryset()
+           if settings.MULTI_TENANT_MODE and hasattr(self, '_organization'):
+               return qs.filter(organization=self._organization)
+           return qs
+   ```
+
+4. **Admin condicional:**
+   ```python
+   # admin.py
+   def get_queryset(self, request):
+       qs = super().get_queryset(request)
+       if settings.MULTI_TENANT_MODE and not request.user.is_superuser:
+           return qs.filter(organization=request.organization)
+       return qs
+   ```
+
+### Por que é importante:
+- **Multi-tenant:** Economia de infraestrutura, manutenção centralizada, escalável
+- **Single-tenant:** Isolamento total, customização por cliente, compliance facilitado
+- Flexibilidade comercial: vender SaaS (multi) ou licença dedicada (single)
+- Atender diferentes necessidades de clientes
+
+### Complexidade:
+- **Nível:** 🟢 BAIXA-MÉDIA
+- **Tempo estimado:** 2-4 horas desenvolvimento + 2 horas testes
+- **Viabilidade:** ✅ MUITO VIÁVEL
+
+### Dependências:
+- Aguarda conclusão de Etapa 3 (Validação de quotas)
+- Aguarda conclusão de Etapa 4 (Sistema de alertas)
+- Arquitetura atual já está preparada (middleware, managers, admin isolados)
+
+### Impacto se não for feito:
+- Aplicação funciona apenas em modo multi-tenant
+- Não atende clientes que exigem instância dedicada
+- Perde oportunidades comerciais de licenciamento single-tenant
+
+### Deploy:
+```bash
+# Multi-tenant (SaaS - várias empresas)
+MULTI_TENANT_MODE=True
+
+# Single-tenant (Cliente único - instância dedicada)
+MULTI_TENANT_MODE=False
+```
+
+---
+
 ## 📊 Estatísticas do Backlog
-- **Total de Itens:** 3
+- **Total de Itens:** 4
 - **Prioridade Alta:** 1
-- **Prioridade Média:** 1
+- **Prioridade Média:** 2
 - **Prioridade Baixa:** 1
 - **Fase 1:** 1 item
 - **Fase 5:** 1 item
 - **Fase 6:** 1 item
+- **Fase 7:** 1 item
 
 ---
 
