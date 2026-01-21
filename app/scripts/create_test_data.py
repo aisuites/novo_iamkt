@@ -120,7 +120,7 @@ def create_test_data():
             'organization': org1,
             'profile': 'editor',
             'is_active': True,
-            'is_staff': False,
+            'is_staff': True,
         }
     )
     if created:
@@ -155,7 +155,7 @@ def create_test_data():
             'organization': org2,
             'profile': 'editor',
             'is_active': True,
-            'is_staff': False,
+            'is_staff': True,
         }
     )
     if created:
