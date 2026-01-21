@@ -261,7 +261,8 @@
 
 {% endblock %}
 
-<!-- Modal de Boas-vindas (fora do main content) -->
+{% block modals %}
+<!-- Modal de Boas-vindas -->
 {% if show_welcome_modal %}
 <div id="welcomeModal" class="modal-overlay">
   <div class="modal-content">
@@ -330,3 +331,4 @@
   });
 </script>
 {% endif %}
+{% endblock modals %}
