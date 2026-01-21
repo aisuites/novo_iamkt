@@ -1,5 +1,5 @@
 /**
- * COMPONENTS.CSS - Componentes Reutilizáveis FEMME
+ * COMPONENTS.CSS - Componentes Reutilizáveis IAMKT
  * Baseado em base_femme_form.html (referência)
  */
 
@@ -40,7 +40,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--femme-white);
+  color: var(--iamkt-white);
   font-weight: 700;
   font-size: 18px;
   box-shadow: var(--shadow-subtle);
@@ -54,7 +54,7 @@
 
 .brand-name {
   font-weight: 700;
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   letter-spacing: 0.03em;
   font-size: 15px;
   text-transform: uppercase;
@@ -62,7 +62,7 @@
 
 .brand-tagline {
   font-size: 11px;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
 }
 
 .header-right {
@@ -79,7 +79,7 @@
   padding: 6px 12px;
   border-radius: 999px;
   background: rgba(244, 233, 248, 0.9);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   font-weight: 500;
 }
 
@@ -101,7 +101,7 @@
   padding: 3px 8px;
   border-radius: 999px;
   background: rgba(0, 188, 164, 0.08);
-  color: var(--femme-green);
+  color: var(--iamkt-green);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -140,7 +140,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
   margin-bottom: 4px;
 }
 
@@ -156,7 +156,7 @@
   gap: 8px;
   padding: 7px 9px;
   border-radius: 999px;
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
 }
@@ -170,7 +170,7 @@
   justify-content: center;
   font-size: 13px;
   background: rgba(122, 61, 138, 0.04);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
 }
 
 .sidebar-link:hover {
@@ -181,7 +181,7 @@
 .sidebar-link.active {
   background: linear-gradient(90deg, rgba(122, 61, 138, 0.12), rgba(0, 188, 164, 0.12));
   font-weight: 600;
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
 }
 
 .sidebar-divider {
@@ -225,7 +225,7 @@
 .card-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
 }
 
 /* ========================================
@@ -248,8 +248,8 @@
 }
 
 .btn-primary {
-  background: var(--femme-green);
-  color: var(--femme-white);
+  background: var(--iamkt-green);
+  color: var(--iamkt-white);
   box-shadow: 0 10px 22px rgba(0, 188, 164, 0.35);
 }
 
@@ -261,18 +261,18 @@
 
 .btn-secondary {
   background: rgba(122, 61, 138, 0.08);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   border: 1px solid rgba(122, 61, 138, 0.2);
 }
 
 .btn-secondary:hover {
   background: rgba(122, 61, 138, 0.12);
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
 }
 
 .btn-outline {
   background: transparent;
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   border: 1px solid rgba(122, 61, 138, 0.45);
 }
 
@@ -301,12 +301,12 @@
 
 .badge-soft {
   background: rgba(122, 61, 138, 0.08);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
 }
 
 .badge-success {
   background: rgba(0, 188, 164, 0.08);
-  color: var(--femme-green);
+  color: var(--iamkt-green);
 }
 
 .badge-warning {
@@ -361,7 +361,7 @@
 
 label {
   font-weight: 500;
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
   font-size: 12px;
 }
 
@@ -376,7 +376,7 @@ textarea {
   padding: 8px 10px;
   font-size: 12px;
   font-family: inherit;
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
   outline: none;
   transition: border 0.15s ease, box-shadow 0.15s ease;
 }
@@ -389,7 +389,7 @@ textarea {
 
 input:focus,
 textarea:focus {
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
   box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
 }
 
@@ -402,7 +402,7 @@ textarea:focus {
 
 .field-hint {
   font-size: 10px;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
   margin-top: 2px;
 }
 
@@ -450,7 +450,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: 1fr 1fr;
   min-height: 100vh;
-  background: var(--femme-white);
+  background: var(--iamkt-white);
 }
 
 .auth-left {
@@ -468,7 +468,8 @@ textarea:focus {
 }
 
 .auth-logo {
-  width: 120px;
+  width: 100%;
+  max-width: 180px;
   height: auto;
   margin-bottom: var(--spacing-8);
 }
@@ -476,14 +477,14 @@ textarea:focus {
 .auth-title {
   font-size: 2.5rem;
   font-weight: var(--font-weight-bold);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   margin-bottom: var(--spacing-4);
   line-height: 1.2;
 }
 
 .auth-description {
   font-size: var(--font-size-xl);
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
   line-height: 1.6;
 }
 
@@ -492,7 +493,7 @@ textarea:focus {
   align-items: center;
   justify-content: center;
   padding: var(--spacing-8);
-  background: var(--femme-gray-dark);
+  background: var(--iamkt-gray-dark);
 }
 
 .auth-card {
@@ -507,7 +508,7 @@ textarea:focus {
 .auth-card-title {
   font-size: 1.75rem;
   font-weight: var(--font-weight-bold);
-  color: var(--femme-white);
+  color: var(--iamkt-white);
   margin-bottom: var(--spacing-2);
 }
 
@@ -532,7 +533,7 @@ textarea:focus {
 .form-label {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
-  color: var(--femme-white);
+  color: var(--iamkt-white);
 }
 
 .form-input-wrapper {
@@ -545,7 +546,7 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-sm);
-  color: var(--femme-white);
+  color: var(--iamkt-white);
   font-size: var(--font-size-base);
   transition: all var(--transition-base);
 }
@@ -556,7 +557,7 @@ textarea:focus {
 
 .form-input:focus {
   outline: none;
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -577,7 +578,7 @@ textarea:focus {
 }
 
 .btn-toggle-password:hover {
-  color: var(--femme-white);
+  color: var(--iamkt-white);
 }
 
 .btn-block {
@@ -587,7 +588,7 @@ textarea:focus {
 .btn-primary {
   padding: var(--spacing-4) var(--spacing-6);
   background: linear-gradient(135deg, #7a3d8a, #9b59b6);
-  color: var(--femme-white);
+  color: var(--iamkt-white);
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-lg);
@@ -609,7 +610,7 @@ textarea:focus {
 .btn-secondary {
   padding: var(--spacing-4) var(--spacing-6);
   background: transparent;
-  color: var(--femme-white);
+  color: var(--iamkt-white);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-lg);
@@ -635,7 +636,7 @@ textarea:focus {
 }
 
 .auth-link:hover {
-  color: var(--femme-white);
+  color: var(--iamkt-white);
 }
 
 .auth-divider {
@@ -694,6 +695,6 @@ textarea:focus {
   }
   
   .auth-right {
-    background: var(--femme-gray-dark);
+    background: var(--iamkt-gray-dark);
   }
 }

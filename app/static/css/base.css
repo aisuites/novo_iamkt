@@ -1,6 +1,6 @@
 /**
- * BASE.CSS - Sistema de Design FEMME
- * Baseado em base_femme_form.html (referência)
+ * BASE.CSS - Sistema de Design IAMKT
+ * Design system base para a plataforma IAMKT
  */
 
 /* ========================================
@@ -8,16 +8,16 @@
    ======================================== */
 
 :root {
-  /* Cores FEMME (CORRETAS da referência) */
-  --femme-purple: #7a3d8a;
-  --femme-purple-soft: #b6e1f3;
-  --femme-green: #7ab2ca;
-  --femme-rose-soft: #b6e1f3;
+  /* Cores IAMKT */
+  --iamkt-purple: #7a3d8a;
+  --iamkt-purple-soft: #b6e1f3;
+  --iamkt-green: #7ab2ca;
+  --iamkt-rose-soft: #b6e1f3;
 
-  --femme-white: #ffffff;
-  --femme-gray-light: #f5f5f7;
-  --femme-gray: #77767c;
-  --femme-gray-dark: #34343a;
+  --iamkt-white: #ffffff;
+  --iamkt-gray-light: #f5f5f7;
+  --iamkt-gray: #77767c;
+  --iamkt-gray-dark: #34343a;
 
   /* Sombras */
   --shadow-soft: 0 18px 40px rgba(20, 5, 36, 0.08);
@@ -79,7 +79,7 @@ body {
   background:
     radial-gradient(circle at top left, rgba(122, 61, 138, 0.08), transparent 55%),
     radial-gradient(circle at bottom right, rgba(0, 188, 164, 0.06), transparent 55%);
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
   line-height: 1.5;
   min-height: 100vh;
 }
@@ -144,8 +144,8 @@ button {
 .font-semibold { font-weight: var(--font-weight-semibold); }
 .font-bold { font-weight: var(--font-weight-bold); }
 
-.text-purple { color: var(--femme-purple); }
-.text-muted { color: var(--femme-gray); }
+.text-purple { color: var(--iamkt-purple); }
+.text-muted { color: var(--iamkt-gray); }
 .text-center { text-align: center; }
 
 /* Outros */

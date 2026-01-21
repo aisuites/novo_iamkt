@@ -1,10 +1,10 @@
 /**
- * KNOWLEDGE.CSS - Base de Conhecimento FEMME
+ * KNOWLEDGE.CSS - Base de Conhecimento IAMKT
  * Estilos completos baseados em base_femme_form.html
  */
 
 /* ========================================
-   HERO BASE FEMME
+   HERO BASE IAMKT
    ======================================== */
 
 .hero-base {
@@ -36,7 +36,7 @@
   padding: 3px 10px;
   border-radius: 999px;
   background: rgba(244, 233, 248, 0.95);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.09em;
@@ -48,13 +48,13 @@
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: var(--femme-green);
+  background: var(--iamkt-green);
   box-shadow: 0 0 0 4px rgba(0, 188, 164, 0.25);
 }
 
 .hero-title {
   font-size: 22px;
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
 }
 
 .hero-title span.highlight {
@@ -66,7 +66,7 @@
 
 .hero-text {
   font-size: 13px;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
   max-width: 560px;
 }
 
@@ -82,7 +82,7 @@
   padding: 3px 8px;
   border-radius: 999px;
   background: rgba(122, 61, 138, 0.06);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
@@ -104,7 +104,7 @@
 .hero-base-status {
   padding: 10px 12px;
   border-radius: var(--radius-md);
-  background: var(--femme-gray-light);
+  background: var(--iamkt-gray-light);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -145,11 +145,11 @@
 
 .status-pill--green {
   background: rgba(0, 188, 164, 0.08);
-  color: var(--femme-green);
+  color: var(--iamkt-green);
 }
 
 .status-pill--green span.dot {
-  background: var(--femme-green);
+  background: var(--iamkt-green);
 }
 
 /* ========================================
@@ -177,18 +177,18 @@
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
 }
 
 .section-title {
   font-size: 16px;
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   font-weight: 600;
 }
 
 .section-subtitle {
   font-size: 12px;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
   margin-bottom: 8px;
 }
 
@@ -208,8 +208,8 @@
 .form-step-pill {
   padding: 4px 9px;
   border-radius: 999px;
-  background: var(--femme-gray-light);
-  color: var(--femme-gray);
+  background: var(--iamkt-gray-light);
+  color: var(--iamkt-gray);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -220,13 +220,13 @@
 
 .form-step-pill:hover {
   background: rgba(122, 61, 138, 0.08);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   transform: translateY(-1px);
 }
 
 .form-step-pill.active {
   background: rgba(122, 61, 138, 0.12);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   font-weight: 600;
 }
 
@@ -242,7 +242,7 @@
 
 .form-block {
   border-radius: var(--radius-md);
-  background: var(--femme-gray-light);
+  background: var(--iamkt-gray-light);
   padding: 12px 12px 10px;
   display: flex;
   flex-direction: column;
@@ -266,14 +266,14 @@
 .form-block-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
 }
 
 .form-block-kicker {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
 }
 
 .form-block-body {
@@ -283,7 +283,7 @@
 
 .form-block-description {
   font-size: 11px;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
 }
 
 .form-fields {
@@ -317,7 +317,7 @@
   height: 24px;
   border-radius: 999px;
   background: rgba(122, 61, 138, 0.08);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   font-size: 10px;
   transition: transform 0.3s ease, background 0.2s ease;
 }
@@ -367,7 +367,7 @@
   padding: 4px 10px;
   border-radius: 999px;
   background: rgba(122, 61, 138, 0.08);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
 }
 
 /* ========================================
@@ -384,7 +384,7 @@
 }
 
 .form-footer-left {
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
 }
 
 .form-footer-actions {
@@ -404,7 +404,7 @@
 
 .hero-status-hint {
   font-size: 11px;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
   margin-top: 6px;
 }
 
@@ -529,7 +529,7 @@
 
 .segment-description {
   font-size: 11px;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
 }
 
 /* Toggle Switch */
@@ -665,7 +665,7 @@
 .modal-header h3 {
   font-size: 16px;
   font-weight: 600;
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   margin: 0;
 }
 
@@ -673,7 +673,7 @@
   background: none;
   border: none;
   font-size: 24px;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -718,14 +718,14 @@ select {
   padding: 8px 10px;
   font-size: 12px;
   font-family: inherit;
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
   outline: none;
   transition: border 0.15s ease, box-shadow 0.15s ease;
   width: 100%;
 }
 
 select:focus {
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
   box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
 }
 
@@ -736,13 +736,13 @@ input[type="number"] {
   padding: 8px 10px;
   font-size: 12px;
   font-family: inherit;
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
   outline: none;
   transition: border 0.15s ease, box-shadow 0.15s ease;
 }
 
 input[type="number"]:focus {
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
   box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
 }
 
@@ -760,7 +760,7 @@ input[type="number"]:focus {
 }
 
 .tags-input-wrapper:focus-within {
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
   box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
 }
 
@@ -821,7 +821,7 @@ input[type="number"]:focus {
 }
 
 .tag-input::placeholder {
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
   opacity: 0.6;
 }
 
@@ -919,7 +919,7 @@ input[type="number"]:focus {
   gap: 6px;
   padding: 8px 12px;
   background: rgba(122, 61, 138, 0.08);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   border: 1px dashed rgba(122, 61, 138, 0.3);
   border-radius: var(--radius-sm);
   font-size: 12px;
@@ -932,7 +932,7 @@ input[type="number"]:focus {
 
 .btn-add-color:hover {
   background: rgba(122, 61, 138, 0.12);
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
 }
 
 /* ========================================
@@ -977,13 +977,13 @@ input[type="number"]:focus {
   align-items: center;
   gap: 10px;
   font-weight: 600;
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
   font-size: 13px;
 }
 
 .toggle-icon {
   font-size: 10px;
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   transition: transform 0.2s ease;
 }
 
@@ -1053,7 +1053,7 @@ input[type="number"]:focus {
 
 .fonte-tipo-option.active {
   background: white;
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -1078,7 +1078,7 @@ input[type="number"]:focus {
 
 .fonte-preview-text {
   font-size: 32px;
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
   margin: 0;
 }
 
@@ -1088,7 +1088,7 @@ input[type="number"]:focus {
   gap: 6px;
   padding: 8px 12px;
   background: rgba(122, 61, 138, 0.08);
-  color: var(--femme-purple);
+  color: var(--iamkt-purple);
   border: 1px dashed rgba(122, 61, 138, 0.3);
   border-radius: var(--radius-sm);
   font-size: 12px;
@@ -1100,7 +1100,7 @@ input[type="number"]:focus {
 
 .btn-add-fonte:hover {
   background: rgba(122, 61, 138, 0.12);
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
 }
 
 /* ========================================
@@ -1128,7 +1128,7 @@ input[type="number"]:focus {
 }
 
 .logo-preview-item:hover {
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
   box-shadow: 0 4px 12px rgba(122, 61, 138, 0.15);
 }
 
@@ -1149,13 +1149,13 @@ input[type="number"]:focus {
 .logo-preview-name {
   font-size: 11px;
   font-weight: 600;
-  color: var(--femme-gray-dark);
+  color: var(--iamkt-gray-dark);
   text-align: center;
 }
 
 .logo-preview-type {
   font-size: 10px;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
 }
 
 .btn-remove-logo {
@@ -1208,7 +1208,7 @@ input[type="number"]:focus {
 }
 
 .reference-preview-item:hover {
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
   box-shadow: 0 4px 12px rgba(122, 61, 138, 0.15);
 }
 
@@ -1275,18 +1275,18 @@ input[type="number"]:focus {
 }
 
 .upload-area:hover {
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
   background: rgba(244, 233, 248, 0.4);
 }
 
 .upload-area.drag-over {
-  border-color: var(--femme-green);
+  border-color: var(--iamkt-green);
   background: rgba(0, 188, 164, 0.1);
 }
 
 .btn-upload {
   padding: 10px 16px;
-  background: var(--femme-purple);
+  background: var(--iamkt-purple);
   color: white;
   border: none;
   border-radius: var(--radius-sm);
@@ -1305,7 +1305,7 @@ input[type="number"]:focus {
 .upload-hint {
   margin-top: 8px;
   font-size: 11px;
-  color: var(--femme-gray);
+  color: var(--iamkt-gray);
 }
 
 /* ========================================
@@ -1372,7 +1372,7 @@ input[type="number"]:focus {
 }
 
 .social-network-field input[type="url"]:focus {
-  border-color: var(--femme-purple);
+  border-color: var(--iamkt-purple);
   outline: none;
   box-shadow: 0 0 0 1px rgba(122, 61, 138, 0.2);
 }
@@ -1382,7 +1382,7 @@ input[type="number"]:focus {
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, var(--femme-purple), #9b59b6);
+  background: linear-gradient(135deg, var(--iamkt-purple), #9b59b6);
   color: white;
   border: none;
   border-radius: var(--radius-md);
