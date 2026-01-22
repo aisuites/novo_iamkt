@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from .models import Organization, QuotaUsageDaily
+from .decorators import require_organization
 from apps.content.models import Pauta, Post
 from apps.knowledge.models import KnowledgeBase
 from apps.campaigns.models import Project, Approval
