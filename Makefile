@@ -1,5 +1,5 @@
 # IAMKT - MAKEFILE OPERACIONAL
-.PHONY: help setup up down restart logs shell dbshell validate solo
+.PHONY: help setup up down restart recreate logs shell dbshell validate solo
 
 ENV_FILE ?= development
 COMPOSE_PROJECT = iamkt
@@ -10,6 +10,7 @@ help:
 	@echo "make up             - Iniciar modo normal"
 	@echo "make solo           - Iniciar modo focado (mais recursos)"
 	@echo "make down           - Parar todos os serviços"
+	@echo "make recreate       - Recriar containers (útil após mudar .env)"
 	@echo "make logs           - Ver logs em tempo real"
 	@echo "make shell          - Shell Django"
 	@echo "make dbshell        - Shell PostgreSQL"
@@ -32,6 +33,12 @@ down:
 	@echo "⏹️  Parando IAMKT..."
 	@docker compose down
 	@echo "✅ IAMKT parado!"
+
+recreate:
+	@echo "🔄 Recriando containers IAMKT..."
+	@docker compose down
+	@docker compose --env-file .env.$(ENV_FILE) up -d
+	@echo "✅ Containers recriados! Variáveis de ambiente recarregadas."
 
 logs:
 	@docker compose logs -f
