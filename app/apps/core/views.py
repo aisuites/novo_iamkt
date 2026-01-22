@@ -188,5 +188,13 @@ def health_check(request):
     """Health check endpoint"""
     return JsonResponse({
         'status': 'healthy',
-        'service': 'iamkt'
+        'timestamp': timezone.now().isoformat()
     })
+
+
+@require_http_methods(["GET"])
+def terms_view(request):
+    """
+    Página de Termos de Uso
+    """
+    return render(request, 'legal/terms.html')
