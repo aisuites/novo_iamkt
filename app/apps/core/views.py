@@ -47,17 +47,17 @@ def dashboard(request):
         kb_exists = False
         kb_completude = 0
     
-    # Estatísticas do usuário/área
+    # Estatísticas da organização (compartilhadas entre todos os usuários)
     user_area = user.areas.first() if user.areas.exists() else None
     
-    # Pautas
-    pautas_total = Pauta.objects.filter(user=user).count()
-    pautas_pendentes = Pauta.objects.filter(user=user, status='pending').count()
+    # Pautas (da organização, não do usuário)
+    pautas_total = Pauta.objects.for_request(request).count()
+    pautas_pendentes = Pauta.objects.for_request(request).filter(status='pending').count()
     
-    # Posts gerados
-    posts_total = Post.objects.filter(user=user).count()
-    posts_draft = Post.objects.filter(user=user, status='draft').count()
-    posts_aprovados = Post.objects.filter(user=user, status='approved').count()
+    # Posts gerados (da organização, não do usuário)
+    posts_total = Post.objects.for_request(request).count()
+    posts_draft = Post.objects.for_request(request).filter(status='draft').count()
+    posts_aprovados = Post.objects.for_request(request).filter(status='approved').count()
     
     # Projetos
     projetos_ativos = Project.objects.filter(
@@ -74,8 +74,8 @@ def dashboard(request):
     else:
         aprovacoes_pendentes = 0
     
-    # Trends recentes
-    trends_recentes = TrendMonitor.objects.filter(
+    # Trends recentes (da organização)
+    trends_recentes = TrendMonitor.objects.for_request(request).filter(
         is_active=True
     ).order_by('-created_at')[:5]
     
