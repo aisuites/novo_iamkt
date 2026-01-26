@@ -45,6 +45,7 @@ def handle_organization_changes(sender, instance, created, **kwargs):
     1. Aprovada: approved_at None → valor
     2. Suspensa: is_active True → False
     3. Reativada: is_active False → True (já aprovada)
+    4. Mudança de motivo de suspensão: suspension_reason alterado (já inativa)
     """
     
     # Ignorar se acabou de ser criada (já envia email no cadastro)
@@ -62,10 +63,10 @@ def handle_organization_changes(sender, instance, created, **kwargs):
         logger.info(f'[SIGNAL] Organização {instance.name} aprovada. Enviando email...')
         send_organization_approved_email(instance)
     
-    # EVENTO 2: Organização SUSPENSA
+    # EVENTO 2: Organização SUSPENSA (primeira vez)
     # Detecta quando is_active muda de True para False
     elif old_state['is_active'] and not instance.is_active:
-        logger.info(f'[SIGNAL] Organização {instance.name} suspensa. Enviando email...')
+        logger.info(f'[SIGNAL] Organização {instance.name} suspensa ({instance.suspension_reason}). Enviando email...')
         send_organization_suspended_email(instance)
     
     # EVENTO 3: Organização REATIVADA
@@ -73,6 +74,14 @@ def handle_organization_changes(sender, instance, created, **kwargs):
     elif not old_state['is_active'] and instance.is_active and instance.approved_at:
         logger.info(f'[SIGNAL] Organização {instance.name} reativada. Enviando email...')
         send_organization_reactivated_email(instance)
+    
+    # EVENTO 4: Mudança de motivo de suspensão (já estava inativa)
+    # Detecta quando suspension_reason muda (ex: payment → canceled)
+    elif (not instance.is_active and 
+          old_state['suspension_reason'] != instance.suspension_reason and
+          instance.suspension_reason in ['payment', 'terms', 'canceled']):
+        logger.info(f'[SIGNAL] Organização {instance.name} mudou motivo de suspensão: {old_state["suspension_reason"]} → {instance.suspension_reason}. Enviando email...')
+        send_organization_suspended_email(instance)
     
     # Limpar cache
     if instance.pk in _org_state_cache:
