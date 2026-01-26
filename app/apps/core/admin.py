@@ -244,6 +244,7 @@ class OrganizationAdmin(admin.ModelAdmin):
             return
         
         count = 0
+        users_activated = 0
         for org in queryset:
             # Definir approved_at se ainda não tiver (primeira aprovação)
             if not org.approved_at:
@@ -256,11 +257,15 @@ class OrganizationAdmin(admin.ModelAdmin):
             # Aplicar template
             template.apply_to_organization(org)
             org.save()
+            
+            # ✅ Ativar todos os usuários da organização
+            users_activated += org.users.filter(is_active=False).update(is_active=True)
+            
             count += 1
         
         self.message_user(
             request,
-            f'{count} organização(ões) aprovada(s) com template "{template.name}" ({template.get_quota_summary()}).',
+            f'{count} organização(ões) aprovada(s) com template "{template.name}". {users_activated} usuário(s) ativado(s).',
             messages.SUCCESS
         )
     approve_with_template.short_description = "✅ Aprovar com Template Configurável"
@@ -271,6 +276,7 @@ class OrganizationAdmin(admin.ModelAdmin):
         template = PlanTemplate.objects.filter(plan_type='free', is_active=True).first()
         
         count = 0
+        users_activated = 0
         for org in queryset:
             # Definir approved_at se ainda não tiver (primeira aprovação)
             if not org.approved_at:
@@ -291,12 +297,16 @@ class OrganizationAdmin(admin.ModelAdmin):
                 org.quota_posts_mes = 15
             
             org.save()
+            
+            # ✅ Ativar todos os usuários da organização
+            users_activated += org.users.filter(is_active=False).update(is_active=True)
+            
             count += 1
         
         quota_info = f"({org.quota_pautas_dia}/{org.quota_posts_dia}/{org.quota_posts_mes})"
         self.message_user(
             request,
-            f'{count} organização(ões) aprovada(s) como FREE {quota_info}.',
+            f'{count} organização(ões) aprovada(s) como FREE {quota_info}. {users_activated} usuário(s) ativado(s).',
             messages.SUCCESS
         )
     approve_as_free.short_description = "✅ Aprovar como FREE (3/3/15)"
@@ -307,6 +317,7 @@ class OrganizationAdmin(admin.ModelAdmin):
         template = PlanTemplate.objects.filter(plan_type='basic', is_active=True).first()
         
         count = 0
+        users_activated = 0
         for org in queryset:
             # Definir approved_at se ainda não tiver (primeira aprovação)
             if not org.approved_at:
@@ -327,12 +338,16 @@ class OrganizationAdmin(admin.ModelAdmin):
                 org.quota_posts_mes = 30
             
             org.save()
+            
+            # ✅ Ativar todos os usuários da organização
+            users_activated += org.users.filter(is_active=False).update(is_active=True)
+            
             count += 1
         
         quota_info = f"({org.quota_pautas_dia}/{org.quota_posts_dia}/{org.quota_posts_mes})"
         self.message_user(
             request,
-            f'{count} organização(ões) aprovada(s) como BASIC {quota_info}.',
+            f'{count} organização(ões) aprovada(s) como BASIC {quota_info}. {users_activated} usuário(s) ativado(s).',
             messages.SUCCESS
         )
     approve_as_basic.short_description = "✅ Aprovar como BASIC (5/5/30)"
@@ -343,6 +358,7 @@ class OrganizationAdmin(admin.ModelAdmin):
         template = PlanTemplate.objects.filter(plan_type='premium', is_active=True).first()
         
         count = 0
+        users_activated = 0
         for org in queryset:
             # Definir approved_at se ainda não tiver (primeira aprovação)
             if not org.approved_at:
@@ -363,12 +379,16 @@ class OrganizationAdmin(admin.ModelAdmin):
                 org.quota_posts_mes = 60
             
             org.save()
+            
+            # ✅ Ativar todos os usuários da organização
+            users_activated += org.users.filter(is_active=False).update(is_active=True)
+            
             count += 1
         
         quota_info = f"({org.quota_pautas_dia}/{org.quota_posts_dia}/{org.quota_posts_mes})"
         self.message_user(
             request,
-            f'{count} organização(ões) aprovada(s) como PREMIUM {quota_info}.',
+            f'{count} organização(ões) aprovada(s) como PREMIUM {quota_info}. {users_activated} usuário(s) ativado(s).',
             messages.SUCCESS
         )
     approve_as_premium.short_description = "✅ Aprovar como PREMIUM (10/10/60)"

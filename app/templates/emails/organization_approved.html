@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conta Aprovada - IAMKT</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 40px 40px 30px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
+                                🎉 Conta Aprovada!
+                            </h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Olá, <strong>{{ user_name }}</strong>!
+                            </p>
+                            
+                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Temos uma ótima notícia! Sua conta da empresa <strong>{{ organization_name }}</strong> foi aprovada e já está ativa na plataforma IAMKT. 🚀
+                            </p>
+                            
+                            <!-- Plan Info Box -->
+                            <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 30px 0; background-color: #f8f9fa; border-radius: 6px; border-left: 4px solid #667eea;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="margin: 0 0 10px; color: #667eea; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                            Seu Plano
+                                        </p>
+                                        <p style="margin: 0 0 15px; color: #333333; font-size: 20px; font-weight: 600;">
+                                            {{ plan_type }}
+                                        </p>
+                                        <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.5;">
+                                            <strong>Quotas disponíveis:</strong><br>
+                                            • Pautas: {{ quota_pautas }} por dia<br>
+                                            • Posts: {{ quota_posts_dia }} por dia ({{ quota_posts_mes }} por mês)
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 0 0 30px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Agora você já pode fazer login e começar a usar todas as funcionalidades da plataforma!
+                            </p>
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td align="center" style="padding: 10px 0;">
+                                        <a href="{{ login_url }}" style="display: inline-block; padding: 14px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);">
+                                            Acessar Plataforma
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 30px 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                Se tiver alguma dúvida ou precisar de ajuda, nossa equipe está à disposição!
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+                            <p style="margin: 0 0 10px; color: #999999; font-size: 14px;">
+                                <strong>IAMKT</strong> - Inteligência Artificial para Marketing
+                            </p>
+                            <p style="margin: 0; color: #999999; font-size: 12px;">
+                                Suporte: suporte@aisuites.com.br
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

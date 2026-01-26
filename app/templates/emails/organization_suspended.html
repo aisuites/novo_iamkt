@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conta Suspensa - IAMKT</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 40px 40px 30px; text-align: center; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
+                                ⚠️ Conta Suspensa
+                            </h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Olá, <strong>{{ user_name }}</strong>,
+                            </p>
+                            
+                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Informamos que a conta da empresa <strong>{{ organization_name }}</strong> foi suspensa na plataforma IAMKT.
+                            </p>
+                            
+                            <!-- Reason Box -->
+                            <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 30px 0; background-color: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="margin: 0 0 10px; color: #856404; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                            Motivo da Suspensão
+                                        </p>
+                                        <p style="margin: 0 0 15px; color: #333333; font-size: 18px; font-weight: 600;">
+                                            {{ suspension_reason }}
+                                        </p>
+                                        <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.5;">
+                                            {{ reason_message }}
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Durante o período de suspensão, você não terá acesso à plataforma e suas funcionalidades.
+                            </p>
+                            
+                            <p style="margin: 0 0 30px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Para resolver esta situação ou obter mais informações, entre em contato com nosso suporte:
+                            </p>
+                            
+                            <!-- Contact Box -->
+                            <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #f8f9fa; border-radius: 6px;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="margin: 0 0 10px; color: #666666; font-size: 14px;">
+                                            <strong>Email de Suporte</strong>
+                                        </p>
+                                        <p style="margin: 0; color: #667eea; font-size: 16px; font-weight: 600;">
+                                            <a href="mailto:{{ support_email }}" style="color: #667eea; text-decoration: none;">
+                                                {{ support_email }}
+                                            </a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 30px 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                Nossa equipe está à disposição para ajudá-lo a resolver qualquer pendência.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+                            <p style="margin: 0 0 10px; color: #999999; font-size: 14px;">
+                                <strong>IAMKT</strong> - Inteligência Artificial para Marketing
+                            </p>
+                            <p style="margin: 0; color: #999999; font-size: 12px;">
+                                Suporte: {{ support_email }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

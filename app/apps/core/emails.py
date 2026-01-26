@@ -117,27 +117,33 @@ def send_registration_notification(user, organization):
         return False
 
 
-def send_approval_email(user, organization, plan_type):
+def send_organization_approved_email(organization):
     """
-    Envia email de aprovação para o usuário (futuro)
+    Envia email para owner da organização quando aprovada.
+    Chamado automaticamente via signal.
     
     Args:
-        user: Instância do User
         organization: Instância da Organization
-        plan_type: Tipo de plano aprovado
     """
+    if not organization.owner:
+        logger.warning(f'Organização {organization.name} sem owner. Email de aprovação não enviado.')
+        return False
+    
+    user = organization.owner
     subject = 'Sua conta IAMKT foi aprovada! 🎉'
     
     context = {
         'user_name': user.first_name or user.email.split('@')[0],
         'organization_name': organization.name,
-        'user_email': user.email,
         'plan_type': organization.get_plan_type_display(),
         'login_url': f"{settings.SITE_URL}/login/",
+        'quota_pautas': organization.quota_pautas_dia,
+        'quota_posts_dia': organization.quota_posts_dia,
+        'quota_posts_mes': organization.quota_posts_mes,
     }
     
     # Renderizar template HTML
-    html_message = render_to_string('emails/approval_notification.html', context)
+    html_message = render_to_string('emails/organization_approved.html', context)
     plain_message = strip_tags(html_message)
     
     try:
@@ -149,8 +155,100 @@ def send_approval_email(user, organization, plan_type):
             html_message=html_message,
             fail_silently=False,
         )
-        logger.info(f'Email de aprovação enviado para: {user.email}')
+        logger.info(f'Email de aprovação enviado para: {user.email} (org: {organization.name})')
         return True
     except Exception as e:
         logger.error(f'Erro ao enviar email de aprovação para {user.email}: {str(e)}')
+        return False
+
+
+def send_organization_suspended_email(organization):
+    """
+    Envia email para owner quando organização é suspensa.
+    Chamado automaticamente via signal.
+    
+    Args:
+        organization: Instância da Organization
+    """
+    if not organization.owner:
+        logger.warning(f'Organização {organization.name} sem owner. Email de suspensão não enviado.')
+        return False
+    
+    user = organization.owner
+    subject = 'Sua conta IAMKT foi suspensa'
+    
+    # Mensagem personalizada por motivo
+    reason_messages = {
+        'payment': 'Identificamos um problema com o pagamento da sua assinatura.',
+        'terms': 'Identificamos uma violação dos nossos termos de uso.',
+        'canceled': 'Sua conta foi cancelada conforme solicitado.',
+        'other': 'Sua conta foi suspensa.',
+    }
+    
+    context = {
+        'user_name': user.first_name or user.email.split('@')[0],
+        'organization_name': organization.name,
+        'suspension_reason': organization.get_suspension_reason_display(),
+        'reason_message': reason_messages.get(organization.suspension_reason, 'Sua conta foi suspensa.'),
+        'support_email': 'suporte@aisuites.com.br',
+    }
+    
+    # Renderizar template HTML
+    html_message = render_to_string('emails/organization_suspended.html', context)
+    plain_message = strip_tags(html_message)
+    
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        logger.info(f'Email de suspensão enviado para: {user.email} (org: {organization.name})')
+        return True
+    except Exception as e:
+        logger.error(f'Erro ao enviar email de suspensão para {user.email}: {str(e)}')
+        return False
+
+
+def send_organization_reactivated_email(organization):
+    """
+    Envia email para owner quando organização é reativada.
+    Chamado automaticamente via signal.
+    
+    Args:
+        organization: Instância da Organization
+    """
+    if not organization.owner:
+        logger.warning(f'Organização {organization.name} sem owner. Email de reativação não enviado.')
+        return False
+    
+    user = organization.owner
+    subject = 'Sua conta IAMKT foi reativada! ✅'
+    
+    context = {
+        'user_name': user.first_name or user.email.split('@')[0],
+        'organization_name': organization.name,
+        'login_url': f"{settings.SITE_URL}/login/",
+    }
+    
+    # Renderizar template HTML
+    html_message = render_to_string('emails/organization_reactivated.html', context)
+    plain_message = strip_tags(html_message)
+    
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        logger.info(f'Email de reativação enviado para: {user.email} (org: {organization.name})')
+        return True
+    except Exception as e:
+        logger.error(f'Erro ao enviar email de reativação para {user.email}: {str(e)}')
         return False
