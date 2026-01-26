@@ -73,15 +73,19 @@
   }
 
   /**
-   * Abre um bloco (accordion)
+   * Destaca um bloco com erro
+   * @param {string} blockId - ID do bloco
+   * @param {boolean} shouldOpen - Se deve abrir o accordion
    */
-  function openBlock(blockId) {
+  function highlightBlock(blockId, shouldOpen = false) {
     const block = document.getElementById(blockId);
-    if (block) {
-      // Adicionar classe de erro
-      block.classList.add('form-block--error');
-      
-      // Abrir o accordion
+    if (!block) return;
+    
+    // SEMPRE adicionar classe de erro (destaque vermelho)
+    block.classList.add('form-block--error');
+    
+    // Só abrir o accordion se for o primeiro bloco
+    if (shouldOpen) {
       block.classList.remove('accordion-closed');
       block.classList.add('accordion-open');
       
@@ -90,6 +94,7 @@
         block.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
+    // Demais blocos ficam fechados mas com destaque vermelho
   }
 
   /**
@@ -97,7 +102,6 @@
    */
   function validateForm(form) {
     let isValid = true;
-    const errors = [];
     const blocksWithErrors = new Set();
 
     // Validar cada bloco
@@ -110,35 +114,20 @@
         if (field && !validateField(field)) {
           isValid = false;
           blocksWithErrors.add(blockId);
-          
-          const label = FIELD_LABELS[fieldName] || fieldName;
-          errors.push({
-            block: blockId,
-            field: fieldName,
-            label: label
-          });
         }
       });
     });
 
-    // Se houver erros, abrir blocos com erro e mostrar mensagem
+    // Se houver erros, destacar TODOS os blocos com erro
     if (!isValid) {
-      // Abrir primeiro bloco com erro
-      const firstBlockWithError = Array.from(blocksWithErrors)[0];
-      if (firstBlockWithError) {
-        openBlock(firstBlockWithError);
-      }
-
-      // Mostrar toast com resumo dos erros
-      if (window.toaster) {
-        const errorCount = errors.length;
-        const blockCount = blocksWithErrors.size;
-        
-        window.toaster.error(
-          `Existem ${errorCount} campo(s) obrigatório(s) não preenchido(s) em ${blockCount} bloco(s). Verifique os campos destacados.`,
-          { duration: 8000 }
-        );
-      }
+      const blocksArray = Array.from(blocksWithErrors);
+      
+      blocksArray.forEach((blockId, index) => {
+        // Primeiro bloco: abre + scroll
+        // Demais blocos: só destaque vermelho (fechados)
+        const isFirstBlock = index === 0;
+        highlightBlock(blockId, isFirstBlock);
+      });
     }
 
     return isValid;
@@ -189,11 +178,12 @@
     if (window.VALIDATION_ERRORS) {
       const { blocks, fields } = window.VALIDATION_ERRORS;
       
-      // Abrir e destacar blocos com erro
+      // Destacar TODOS os blocos com erro (abrir apenas o primeiro)
       if (blocks && blocks.length > 0) {
-        blocks.forEach(blockNum => {
+        blocks.forEach((blockNum, index) => {
           const blockId = `bloco${blockNum}`;
-          openBlock(blockId);
+          const isFirstBlock = index === 0;
+          highlightBlock(blockId, isFirstBlock);
         });
       }
 
