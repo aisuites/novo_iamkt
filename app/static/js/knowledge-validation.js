@@ -78,7 +78,12 @@
   function openBlock(blockId) {
     const block = document.getElementById(blockId);
     if (block) {
+      // Adicionar classe de erro
       block.classList.add('form-block--error');
+      
+      // Abrir o accordion
+      block.classList.remove('accordion-closed');
+      block.classList.add('accordion-open');
       
       // Scroll suave até o bloco
       setTimeout(() => {

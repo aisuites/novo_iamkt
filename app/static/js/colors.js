@@ -106,13 +106,8 @@ document.addEventListener('DOMContentLoaded', function() {
         colorsData.forEach(color => {
             addColor(color.hex_code, color.name);
         });
-    } else {
-        // Adicionar cores padrão FEMME se não houver cores salvas
-        addColor('#7A3D8A', 'Roxo FEMME');
-        addColor('#00BCA4', 'Verde água');
-        addColor('#FFB7C9', 'Rosa claro');
-        addColor('#F4E9F8', 'Lilás suave');
     }
+    // Empresas novas começam sem cores pré-preenchidas
 });
 
 // Expor funções globalmente
