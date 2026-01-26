@@ -139,6 +139,13 @@ CELERY_TIMEZONE = TIME_ZONE
 # CUSTOM USER MODEL
 AUTH_USER_MODEL = 'core.User'
 
+# AUTHENTICATION BACKENDS
+# Backend customizado que permite login com email
+AUTHENTICATION_BACKENDS = [
+    'apps.core.backends.EmailBackend',  # Login com email (prioridade)
+    'django.contrib.auth.backends.ModelBackend',  # Fallback para username
+]
+
 # AI INTEGRATIONS
 # OpenAI
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
