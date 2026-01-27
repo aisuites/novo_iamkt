@@ -34,7 +34,7 @@ async function editSegment(segmentId) {
         
         document.getElementById('segmentModal').classList.remove('modal-hidden');
     } catch (error) {
-        console.error('Erro ao editar segmento:', error);
+        logger.error('Erro ao editar segmento:', error);
         if (window.toaster) {
             toaster.error('Erro ao carregar dados do segmento');
         }
@@ -99,7 +99,7 @@ async function saveSegment() {
         }, 1500);
         
     } catch (error) {
-        console.error('Erro ao salvar segmento:', error);
+        logger.error('Erro ao salvar segmento:', error);
         if (window.toaster) {
             toaster.error(error.message || 'Erro ao salvar segmento');
         }
@@ -154,7 +154,7 @@ async function toggleSegment(segmentId, activate) {
         }
         
     } catch (error) {
-        console.error(`Erro ao ${action} segmento:`, error);
+        logger.error(`Erro ao ${action} segmento:`, error);
         
         // Reverter checkbox em caso de erro
         const segmentItem = document.querySelector(`.segment-item[data-segment-id="${segmentId}"]`);

@@ -18,7 +18,7 @@
         const imageType = imageElement.dataset.imageType; // 'logo' ou 'reference'
         
         if (!imageId || !imageType) {
-            console.error('Image element missing data-image-id or data-image-type');
+            logger.error('Image element missing data-image-id or data-image-type');
             return;
         }
 
@@ -43,7 +43,7 @@
             }
             
         } catch (error) {
-            console.error('Error loading image preview:', error);
+            logger.error('Error loading image preview:', error);
             
             // Mostrar placeholder de erro
             imageElement.src = '/static/images/placeholder-error.png';

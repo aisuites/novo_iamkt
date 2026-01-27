@@ -49,7 +49,7 @@ class ImagePreviewLoader {
                 
                 // Validar s3Key
                 if (!s3Key || s3Key === 'undefined' || s3Key === '#') {
-                    console.warn('s3Key inválido:', s3Key);
+                    logger.warn('s3Key inválido:', s3Key);
                     continue;
                 }
                 
@@ -75,7 +75,7 @@ class ImagePreviewLoader {
                     this.observer.unobserve(img);
                     
                 } catch (error) {
-                    console.error('Erro ao carregar preview:', error);
+                    logger.error('Erro ao carregar preview:', error);
                     img.classList.remove('loading');
                     img.classList.add('error');
                     

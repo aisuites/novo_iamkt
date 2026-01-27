@@ -24,6 +24,7 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     'rest_framework',
     'corsheaders',
+    'compressor',
 ]
 
 LOCAL_APPS = [
@@ -85,6 +86,24 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# STATICFILES FINDERS (para django-compressor)
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+    'compressor.finders.CompressorFinder',
+]
+
+# DJANGO COMPRESSOR
+COMPRESS_ENABLED = not DEBUG  # Apenas em produção
+COMPRESS_OFFLINE = True  # Comprimir durante collectstatic
+COMPRESS_CSS_FILTERS = [
+    'compressor.filters.css_default.CssAbsoluteFilter',
+    'compressor.filters.cssmin.rCSSMinFilter',
+]
+COMPRESS_JS_FILTERS = [
+    'compressor.filters.jsmin.rJSMinFilter',
+]
 
 # STATICFILES_STORAGE - Usar ManifestStaticFilesStorage para cache busting
 # Isso resolve o problema do collectstatic não copiar arquivos corretamente

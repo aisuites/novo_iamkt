@@ -55,7 +55,7 @@ function addFonte(tipo = 'GOOGLE', nomeFonte = '', variante = '', uso = '', arqu
     // Se for fonte customizada com ID, adicionar data-font-id
     if (fontId) {
         fonteItem.setAttribute('data-font-id', fontId);
-        console.log(`DEBUG: data-font-id="${fontId}" adicionado ao fonteItem`);
+        logger.debug(`DEBUG: data-font-id="${fontId}" adicionado ao fonteItem`);
     }
     
     // Obter usos disponíveis ANTES de marcar como ocupado
@@ -270,7 +270,7 @@ async function removeFonte(indexOrButton, uso) {
     }
     
     if (!fonteItem) {
-        console.log('DEBUG: fonteItem não encontrado');
+        logger.debug('DEBUG: fonteItem não encontrado');
         return;
     }
     
@@ -279,7 +279,7 @@ async function removeFonte(indexOrButton, uso) {
     const tipo = fonteItem.dataset.tipo;  // Usar data-tipo ao invés de querySelector
     const isCustomFont = tipo === 'UPLOAD';
     
-    console.log('DEBUG removeFonte:', {
+    logger.debug('DEBUG removeFonte:', {
         fontId: fontId,
         tipo: tipo,
         isCustomFont: isCustomFont,
@@ -319,7 +319,7 @@ async function removeFonte(indexOrButton, uso) {
                 toaster.success('Fonte removida com sucesso!');
             }
         } catch (error) {
-            console.error('Erro ao remover fonte:', error);
+            logger.error('Erro ao remover fonte:', error);
             if (typeof toaster !== 'undefined') {
                 toaster.error('Erro ao remover fonte');
             } else {
@@ -522,7 +522,7 @@ async function handleFonteUpload(index, input) {
             fonteItem.appendChild(fontIdInput);
             
         } catch (error) {
-            console.error('Erro no upload da fonte:', error);
+            logger.error('Erro no upload da fonte:', error);
             if (typeof toaster !== 'undefined') {
                 toaster.error('Erro ao enviar fonte: ' + error.message);
             }
@@ -563,7 +563,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Adicionar fontes customizadas (Upload)
     if (customFontsData.length > 0) {
         customFontsData.forEach(font => {
-            console.log('DEBUG: Adicionando fonte customizada:', font);
+            logger.debug('DEBUG: Adicionando fonte customizada:', font);
             // Passar ID como 5º parâmetro para ser adicionado como data-font-id
             addFonte('UPLOAD', font.name, '', font.font_type.toUpperCase(), font.s3_url, font.id);
         });

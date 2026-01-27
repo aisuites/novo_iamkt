@@ -52,7 +52,7 @@ function parseJSON(value) {
         const parsed = JSON.parse(value);
         return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
-        console.warn('Erro ao parsear JSON:', e);
+        logger.warn('Erro ao parsear JSON:', e);
         return [];
     }
 }
@@ -172,7 +172,7 @@ async function saveTags(fieldName, tags) {
         }
         
     } catch (error) {
-        console.error('Erro ao salvar tags:', error);
+        logger.error('Erro ao salvar tags:', error);
         if (window.toaster) {
             toaster.error(error.message || 'Erro ao salvar tags');
         }

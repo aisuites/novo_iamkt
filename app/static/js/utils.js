@@ -134,7 +134,7 @@ async function copyToClipboard(text) {
         await navigator.clipboard.writeText(text);
         return true;
     } catch (err) {
-        console.error('Erro ao copiar:', err);
+        logger.error('Erro ao copiar:', err);
         return false;
     }
 }
