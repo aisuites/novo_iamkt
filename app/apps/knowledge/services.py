@@ -232,7 +232,7 @@ class FontService:
     @transaction.atomic
     def process_fonts(request, kb: KnowledgeBase) -> Tuple[int, List[str]]:
         """
-        Processa e salva fontes
+        Processa e salva fontes usando Typography model
         
         Args:
             request: HttpRequest com POST data
@@ -241,6 +241,8 @@ class FontService:
         Returns:
             Tuple (fonts_created, errors)
         """
+        from apps.knowledge.models import Typography
+        
         errors = []
         fonts_created = 0
         
@@ -248,9 +250,9 @@ class FontService:
         post_keys = [k for k in request.POST.keys() if 'font' in k.lower()]
         print(f"🔤 DEBUG FontService - POST keys com 'font': {post_keys}", flush=True)
         
-        # Limpar fontes existentes
-        deleted_count = kb.custom_fonts.all().delete()
-        print(f"🗑️  Removidas {deleted_count[0] if deleted_count else 0} fontes existentes", flush=True)
+        # Limpar tipografias existentes
+        deleted_count = kb.typography_settings.all().delete()
+        print(f"🗑️  Removidas {deleted_count[0] if deleted_count else 0} tipografias existentes", flush=True)
         
         # Processar novas fontes - formato: fontes[0][tipo], fontes[0][nome_fonte], etc
         fontes_dict = {}
@@ -266,13 +268,14 @@ class FontService:
         
         print(f"📊 DEBUG FontService - fontes_dict: {fontes_dict}", flush=True)
         
-        # Criar fontes (apenas Google Fonts por enquanto)
+        # Criar tipografias (Google Fonts ou Upload)
         for index, fonte_data in sorted(fontes_dict.items()):
             tipo = fonte_data.get('tipo', 'GOOGLE')
             nome_fonte = fonte_data.get('nome_fonte', '').strip()
             uso = fonte_data.get('uso', '').strip()
+            variante = fonte_data.get('variante', '400').strip()
             
-            print(f"🔍 Processando fonte {index}: tipo={tipo}, nome={nome_fonte}, uso={uso}", flush=True)
+            print(f"🔍 Processando fonte {index}: tipo={tipo}, nome={nome_fonte}, uso={uso}, variante={variante}", flush=True)
             
             if tipo == 'GOOGLE' and nome_fonte and uso:
                 # Validar nome da fonte
@@ -281,21 +284,20 @@ class FontService:
                     errors.append(f'Fonte "{nome_fonte}": {error_msg}')
                     continue
                 
-                # Mapear uso para font_type do model
-                font_type = FontService.FONT_TYPE_MAP.get(uso.upper(), 'corpo')
-                
                 try:
-                    # Criar fonte com URL do Google Fonts
-                    CustomFont.objects.create(
+                    # Criar Typography com Google Font
+                    Typography.objects.create(
                         knowledge_base=kb,
-                        name=nome_fonte,
-                        font_type=font_type,
-                        s3_key=f'google-fonts/{nome_fonte.replace(" ", "-").lower()}',
-                        s3_url=f'https://fonts.googleapis.com/css2?family={nome_fonte.replace(" ", "+")}',
-                        file_format='woff2'
+                        usage=uso,  # TITULO, TEXTO, LEGENDA, etc
+                        font_source='google',
+                        google_font_name=nome_fonte,
+                        google_font_weight=variante,
+                        google_font_url=f'https://fonts.googleapis.com/css2?family={nome_fonte.replace(" ", "+")}:wght@{variante}',
+                        order=int(index),
+                        updated_by=request.user  # ✅ CORRIGIDO: Preencher updated_by
                     )
                     fonts_created += 1
-                    print(f"✅ Fonte criada: {nome_fonte} (uso: {uso}, tipo: {font_type})", flush=True)
+                    print(f"✅ Typography criada: {nome_fonte} (uso: {uso}, variante: {variante})", flush=True)
                 except Exception as e:
                     error_msg = f'Erro ao salvar fonte "{nome_fonte}": {str(e)}'
                     errors.append(error_msg)
@@ -303,7 +305,7 @@ class FontService:
             else:
                 print(f"⚠️  Fonte {index} ignorada: tipo={tipo}, nome={nome_fonte}, uso={uso}", flush=True)
         
-        print(f"🔤 Total de fontes criadas: {fonts_created}", flush=True)
+        print(f"🔤 Total de tipografias criadas: {fonts_created}", flush=True)
         return fonts_created, errors
 
 

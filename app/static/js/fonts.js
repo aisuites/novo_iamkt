@@ -69,7 +69,7 @@ function addFonte(tipo = 'GOOGLE', nomeFonte = '', variante = '', uso = '', arqu
         <div class="fonte-item-header" onclick="toggleFonteItem(${fonteIndex})">
             <div class="fonte-item-title">
                 <span class="toggle-icon">▶</span>
-                <span>Fonte #${fonteIndex + 1} - ${usoLabel}</span>
+                <span>Fonte #${fonteIndex + 1} - ${nomeFonte || 'Selecione...'} - ${usoLabel}</span>
             </div>
             <div class="fonte-item-actions" onclick="event.stopPropagation()">
                 <button type="button" class="btn-remove-fonte" onclick="removeFonte(${fonteIndex}, '${uso}')">Remover</button>
@@ -221,6 +221,11 @@ function updateFontePreview(index) {
         loadGoogleFont(nomeFonte);
         preview.style.fontFamily = `"${nomeFonte}", sans-serif`;
         preview.style.fontWeight = variante;
+        
+        // ✅ Atualizar título com nome da fonte
+        const usoLabel = fonteItem.querySelector('.fonte-uso-select option:checked').textContent;
+        fonteItem.querySelector('.fonte-item-title span:last-child').textContent = 
+            `Fonte #${parseInt(index) + 1} - ${nomeFonte} - ${usoLabel}`;
     }
 }
 
@@ -238,9 +243,11 @@ function updateFonteUso(index) {
     
     fonteItem.setAttribute('data-uso-atual', novoUso);
     
-    // Atualizar título
+    // Atualizar título com nome da fonte
+    const nomeFonte = fonteItem.querySelector('.fonte-nome-select')?.value || 'Selecione...';
     const usoLabel = fonteItem.querySelector('.fonte-uso-select option:checked').textContent;
-    fonteItem.querySelector('.fonte-item-title span:last-child').textContent = `Fonte #${parseInt(index) + 1} - ${usoLabel}`;
+    fonteItem.querySelector('.fonte-item-title span:last-child').textContent = 
+        `Fonte #${parseInt(index) + 1} - ${nomeFonte} - ${usoLabel}`;
 }
 
 // Remover fonte

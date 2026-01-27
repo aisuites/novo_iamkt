@@ -52,29 +52,37 @@ def colors_to_json(queryset):
 @register.filter(name='fonts_to_json')
 def fonts_to_json(queryset):
     """
-    Converte queryset de CustomFont para JSON compatível com fonts.js
+    Converte queryset de Typography para JSON compatível com fonts.js
     """
     if not queryset:
         return '[]'
     
     try:
         fonts_list = []
-        # Mapear font_type do model para uso do frontend
-        font_type_to_uso = {
-            'titulo': 'TITULO',
-            'corpo': 'TEXTO',
-            'destaque': 'BOTAO'
-        }
         
-        for font in queryset:
+        for typo in queryset:
+            # Determinar tipo e nome da fonte
+            if typo.font_source == 'google':
+                tipo = 'GOOGLE'
+                nome = typo.google_font_name
+                variante = typo.google_font_weight or '400'
+                arquivo_url = ''
+            else:  # upload
+                tipo = 'UPLOAD'
+                nome = typo.custom_font.name if typo.custom_font else ''
+                variante = '400'
+                arquivo_url = typo.custom_font.s3_url if typo.custom_font else ''
+            
             fonts_list.append({
-                'id': font.id,
-                'tipo': 'GOOGLE',  # Por enquanto todas são Google Fonts
-                'nome': font.name,
-                'uso': font_type_to_uso.get(font.font_type, 'TITULO'),
-                'variante': '400',  # Default
-                'arquivo_url': font.s3_url
+                'id': typo.id,
+                'tipo': tipo,
+                'nome': nome,
+                'uso': typo.usage,  # Já está no formato correto (TITULO, TEXTO, etc)
+                'variante': variante,
+                'arquivo_url': arquivo_url
             })
+        
         return json.dumps(fonts_list, ensure_ascii=False)
-    except Exception:
+    except Exception as e:
+        print(f"❌ Erro em fonts_to_json: {str(e)}", flush=True)
         return '[]'

@@ -86,9 +86,7 @@ def knowledge_view(request):
             knowledge_base=kb
         ).select_related('uploaded_by').order_by('-is_primary', 'logo_type')
         
-        fonts = CustomFont.objects.filter(
-            knowledge_base=kb
-        ).select_related('uploaded_by').order_by('font_type')
+        fonts = kb.typography_settings.select_related('updated_by', 'custom_font').order_by('order', 'usage')
     else:
         # KB não existe ou não tem pk, inicializar vazios
         internal_segments = []
