@@ -607,6 +607,7 @@
    MODAL
    ======================================== */
 
+/* Container do modal - específico para knowledge */
 .modal {
   position: fixed;
   top: 0;
@@ -619,97 +620,8 @@
   justify-content: center;
 }
 
-.modal-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.modal-content {
-  position: relative;
-  background: white;
-  border-radius: var(--radius-lg);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.modal-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(122, 61, 138, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modal-header h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--iamkt-purple);
-  margin: 0;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: var(--iamkt-gray);
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: background 0.15s ease;
-}
-
-.modal-close:hover {
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-}
-
-.modal-body {
-  padding: 20px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.modal-body .field {
-  margin-bottom: 14px;
-}
-
-.modal-body .field:last-child {
-  margin-bottom: 0;
-}
-
-.modal-footer {
-  padding: 14px 20px;
-  border-top: 1px solid rgba(122, 61, 138, 0.1);
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
+/* Estilos de modal-overlay, modal-content, modal-header, modal-body, modal-footer
+   estão definidos em components.css para reutilização em todo o sistema */
 
 select {
   border-radius: var(--radius-md);
@@ -1545,3 +1457,4 @@ input.hidden-field {
 
 .toast-info {
   border-left: 4px solid #1565c0;
+}
