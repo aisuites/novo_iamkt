@@ -19,6 +19,72 @@ class ColorService:
     """Serviço para gerenciar paleta de cores"""
     
     @staticmethod
+    def generate_color_name(hex_code: str) -> str:
+        """
+        Gera nome descritivo baseado no código HEX
+        Ex: #FF0000 -> Vermelho, #00FF00 -> Verde, #0000FF -> Azul
+        """
+        # Converter HEX para RGB
+        hex_code = hex_code.lstrip('#')
+        r = int(hex_code[0:2], 16)
+        g = int(hex_code[2:4], 16)
+        b = int(hex_code[4:6], 16)
+        
+        # Calcular luminosidade
+        luminosity = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        
+        # Determinar cor base
+        max_val = max(r, g, b)
+        min_val = min(r, g, b)
+        
+        # Tons de cinza
+        if max_val - min_val < 30:
+            if luminosity > 0.9:
+                return "Branco"
+            elif luminosity > 0.7:
+                return "Cinza Claro"
+            elif luminosity > 0.4:
+                return "Cinza Médio"
+            elif luminosity > 0.2:
+                return "Cinza Escuro"
+            else:
+                return "Preto"
+        
+        # Cores cromáticas
+        color_name = ""
+        if r > g and r > b:
+            if g > b + 50:
+                color_name = "Laranja"
+            elif b > g + 30:
+                color_name = "Rosa"
+            else:
+                color_name = "Vermelho"
+        elif g > r and g > b:
+            if r > b + 50:
+                color_name = "Amarelo"
+            elif b > r + 30:
+                color_name = "Ciano"
+            else:
+                color_name = "Verde"
+        elif b > r and b > g:
+            if r > g + 30:
+                color_name = "Roxo"
+            elif g > r + 30:
+                color_name = "Azul Turquesa"
+            else:
+                color_name = "Azul"
+        else:
+            color_name = "Cor"
+        
+        # Adicionar modificador de luminosidade
+        if luminosity > 0.7:
+            return f"{color_name} Claro"
+        elif luminosity < 0.3:
+            return f"{color_name} Escuro"
+        else:
+            return color_name
+    
+    @staticmethod
     def validate_hex_color(hex_code: str) -> Tuple[bool, Optional[str]]:
         """
         Valida código HEX de cor
@@ -67,8 +133,13 @@ class ColorService:
         errors = []
         colors_created = 0
         
+        # DEBUG: Verificar quais chaves estão no POST
+        post_keys = [k for k in request.POST.keys() if 'cor' in k.lower()]
+        print(f"🎨 DEBUG ColorService - POST keys com 'cor': {post_keys}", flush=True)
+        
         # Limpar cores existentes
-        kb.colors.all().delete()
+        deleted_count = kb.colors.all().delete()
+        print(f"🗑️  Removidas {deleted_count[0] if deleted_count else 0} cores existentes", flush=True)
         
         # Processar novas cores - formato: cores[0][hex], cores[0][nome]
         cores_dict = {}
@@ -82,14 +153,21 @@ class ColorService:
                         cores_dict[index] = {}
                     cores_dict[index][field] = request.POST.get(key)
         
+        print(f"📊 DEBUG ColorService - cores_dict: {cores_dict}", flush=True)
+        
         # Criar cores
         for index, cor_data in sorted(cores_dict.items()):
             hex_code = cor_data.get('hex', '').strip()
             nome = cor_data.get('nome', '').strip()
             
             # Validar dados básicos
-            if not hex_code or not nome:
+            if not hex_code:
                 continue
+            
+            # Gerar nome automático se não fornecido
+            if not nome:
+                nome = ColorService.generate_color_name(hex_code)
+                print(f"🎨 Nome automático gerado: {nome} para {hex_code}", flush=True)
             
             # Normalizar HEX
             hex_code = ColorService.normalize_hex_color(hex_code)
@@ -109,9 +187,13 @@ class ColorService:
                     order=int(index)
                 )
                 colors_created += 1
+                print(f"✅ Cor criada: {nome} ({hex_code})", flush=True)
             except Exception as e:
-                errors.append(f'Erro ao salvar cor "{nome}": {str(e)}')
+                error_msg = f'Erro ao salvar cor "{nome}": {str(e)}'
+                errors.append(error_msg)
+                print(f"❌ {error_msg}", flush=True)
         
+        print(f"🎨 Total de cores criadas: {colors_created}", flush=True)
         return colors_created, errors
 
 
@@ -162,8 +244,13 @@ class FontService:
         errors = []
         fonts_created = 0
         
+        # DEBUG: Verificar quais chaves estão no POST
+        post_keys = [k for k in request.POST.keys() if 'font' in k.lower()]
+        print(f"🔤 DEBUG FontService - POST keys com 'font': {post_keys}", flush=True)
+        
         # Limpar fontes existentes
-        kb.custom_fonts.all().delete()
+        deleted_count = kb.custom_fonts.all().delete()
+        print(f"🗑️  Removidas {deleted_count[0] if deleted_count else 0} fontes existentes", flush=True)
         
         # Processar novas fontes - formato: fontes[0][tipo], fontes[0][nome_fonte], etc
         fontes_dict = {}
@@ -177,11 +264,15 @@ class FontService:
                         fontes_dict[index] = {}
                     fontes_dict[index][field] = request.POST.get(key)
         
+        print(f"📊 DEBUG FontService - fontes_dict: {fontes_dict}", flush=True)
+        
         # Criar fontes (apenas Google Fonts por enquanto)
         for index, fonte_data in sorted(fontes_dict.items()):
             tipo = fonte_data.get('tipo', 'GOOGLE')
             nome_fonte = fonte_data.get('nome_fonte', '').strip()
             uso = fonte_data.get('uso', '').strip()
+            
+            print(f"🔍 Processando fonte {index}: tipo={tipo}, nome={nome_fonte}, uso={uso}", flush=True)
             
             if tipo == 'GOOGLE' and nome_fonte and uso:
                 # Validar nome da fonte
@@ -204,9 +295,15 @@ class FontService:
                         file_format='woff2'
                     )
                     fonts_created += 1
+                    print(f"✅ Fonte criada: {nome_fonte} (uso: {uso}, tipo: {font_type})", flush=True)
                 except Exception as e:
-                    errors.append(f'Erro ao salvar fonte "{nome_fonte}": {str(e)}')
+                    error_msg = f'Erro ao salvar fonte "{nome_fonte}": {str(e)}'
+                    errors.append(error_msg)
+                    print(f"❌ {error_msg}", flush=True)
+            else:
+                print(f"⚠️  Fonte {index} ignorada: tipo={tipo}, nome={nome_fonte}, uso={uso}", flush=True)
         
+        print(f"🔤 Total de fontes criadas: {fonts_created}", flush=True)
         return fonts_created, errors
 
 
@@ -348,7 +445,6 @@ class KnowledgeBaseService:
     """Serviço principal para operações da Base de Conhecimento"""
     
     @staticmethod
-    @transaction.atomic
     def save_all_blocks(request, kb: KnowledgeBase, forms: Dict) -> Tuple[bool, List[str]]:
         """
         Salva todos os blocos da base de conhecimento
@@ -361,10 +457,12 @@ class KnowledgeBaseService:
         Returns:
             Tuple (success, errors)
         """
+        print("🚀 INÍCIO save_all_blocks", flush=True)
         all_errors = []
         
         # Validar todos os forms
         all_valid = all(form.is_valid() for form in forms.values())
+        print(f"📋 Forms válidos: {all_valid}", flush=True)
         
         if not all_valid:
             for block_name, form in forms.items():
@@ -375,29 +473,34 @@ class KnowledgeBaseService:
             return False, all_errors
         
         try:
-            # Salvar cada form
-            for block_name, form in forms.items():
-                kb = form.save(commit=False)
-                kb.last_updated_by = request.user
-                kb.save()
+            with transaction.atomic():
+                # Salvar cada form
+                for block_name, form in forms.items():
+                    kb = form.save(commit=False)
+                    kb.last_updated_by = request.user
+                    kb.save()
+                
+                # Processar cores da paleta (Bloco 5)
+                colors_created, color_errors = ColorService.process_colors(request, kb)
+                if color_errors:
+                    all_errors.extend(color_errors)
+                
+                # Processar fontes
+                fonts_created, font_errors = FontService.process_fonts(request, kb)
+                all_errors.extend(font_errors)
+                
+                # Processar redes sociais
+                networks_updated, network_errors = SocialNetworkService.process_social_networks(request, kb)
+                all_errors.extend(network_errors)
             
-            # Processar cores da paleta (Bloco 5)
-            colors_created, color_errors = ColorService.process_colors(request, kb)
-            if color_errors:
-                all_errors.extend(color_errors)
-            
-            # Processar fontes
-            fonts_created, font_errors = FontService.process_fonts(request, kb)
-            all_errors.extend(font_errors)
-            
-            # Processar redes sociais
-            networks_updated, network_errors = SocialNetworkService.process_social_networks(request, kb)
-            all_errors.extend(network_errors)
-            
-            # Não adicionar mensagens individuais - apenas a mensagem principal na view
-            
+            # Transação foi commitada com sucesso aqui
+            print(f"✅ save_all_blocks SUCESSO - Erros: {all_errors}", flush=True)
             return True, all_errors
             
         except Exception as e:
-            all_errors.append(f'Erro ao salvar: {str(e)}')
+            error_msg = f'Erro ao salvar: {str(e)}'
+            all_errors.append(error_msg)
+            print(f"❌ save_all_blocks ERRO: {error_msg}", flush=True)
+            import traceback
+            print(traceback.format_exc(), flush=True)
             return False, all_errors

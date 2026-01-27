@@ -323,10 +323,13 @@ def knowledge_save_all(request):
         return redirect('knowledge:view')
     
     # Se validação passou, usar Service Layer para salvar
+    print("🔄 Chamando KnowledgeBaseService.save_all_blocks...", flush=True)
     success, errors = KnowledgeBaseService.save_all_blocks(request, kb, forms)
+    print(f"🔄 save_all_blocks retornou: success={success}, errors={errors}", flush=True)
     
     if success:
         messages.success(request, '✅ Base de Conhecimento salva com sucesso!')
+        print("✅ Mensagem de sucesso adicionada", flush=True)
         
         # Limpar erros de validação da sessão
         if 'validation_errors' in request.session:
@@ -337,9 +340,11 @@ def knowledge_save_all(request):
             messages.warning(request, error)
     else:
         # Mostrar erros críticos
+        print(f"❌ Salvamento falhou, adicionando mensagens de erro", flush=True)
         for error in errors:
             messages.error(request, error)
     
+    print("🔄 Redirecionando para knowledge:view", flush=True)
     return redirect('knowledge:view')
 
 
