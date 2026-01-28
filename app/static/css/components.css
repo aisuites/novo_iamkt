@@ -550,16 +550,21 @@
 
 /* Botão para remover itens (cores, fontes, concorrentes, etc) */
 .btn-remove-item {
-  padding: 6px 12px;
-  background: rgba(193, 18, 58, 0.08);
-  color: #c1123a;
-  border: 1px solid rgba(193, 18, 58, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background: rgba(220, 53, 69, 0.08);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.2);
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s ease;
-  font-family: inherit;
-  font-weight: 600;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 90px;
+  flex-shrink: 0;
 }
 
 .btn-remove-item:hover {

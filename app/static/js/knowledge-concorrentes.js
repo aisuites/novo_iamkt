@@ -113,17 +113,28 @@ function syncConcorrentesToForm() {
 function initConcorrentes() {
   const jsonScript = document.getElementById('concorrentes_json_data');
   
+  console.log('🔄 initConcorrentes: Iniciando...');
+  
   if (jsonScript) {
     try {
       const data = JSON.parse(jsonScript.textContent);
+      console.log(`📥 Dados carregados do banco:`, data);
+      console.log(`📊 Total de concorrentes no banco: ${Array.isArray(data) ? data.length : 0}`);
+      
       if (Array.isArray(data) && data.length > 0) {
-        data.forEach(concorrente => {
+        data.forEach((concorrente, index) => {
+          console.log(`  Carregando concorrente ${index + 1}: nome="${concorrente.nome}", url="${concorrente.url}"`);
           addConcorrenteLine(concorrente.nome || '', concorrente.url || '');
         });
+        console.log(`✅ ${data.length} concorrente(s) carregado(s) com sucesso`);
+      } else {
+        console.log('ℹ️ Nenhum concorrente encontrado no banco');
       }
     } catch (e) {
-      console.error('Erro ao parsear concorrentes:', e);
+      console.error('❌ Erro ao parsear concorrentes:', e);
     }
+  } else {
+    console.warn('⚠️ Script tag concorrentes_json_data não encontrado');
   }
 }
 
