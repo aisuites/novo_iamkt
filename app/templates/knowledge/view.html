@@ -502,7 +502,7 @@
                   class="concorrente-input"
                 >
               </div>
-              <button type="button" id="btn-add-concorrente" class="btn-add-item" onclick="addConcorrente()">
+              <button type="button" class="btn-add-item" onclick="addConcorrente()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="12" y1="5" x2="12" y2="19"></line>
                   <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -692,30 +692,7 @@ window.VALIDATION_ERRORS = {
 <script src="{% static 'js/uploads-simple.js' %}?v=20260128-1154"></script>
 <script src="{% static 'js/knowledge-events.js' %}?v=20260128-1154"></script>
 <script src="{% static 'js/knowledge-validation.js' %}?v=20260128-1154"></script>
-<script>
-console.log('🔍 DEBUG: Verificando funções carregadas');
-console.log('- removeConcorrente:', typeof removeConcorrente !== 'undefined' ? '✅ OK' : '❌ NÃO ENCONTRADA');
-console.log('- addConcorrente:', typeof addConcorrente !== 'undefined' ? '✅ OK' : '❌ NÃO ENCONTRADA');
-console.log('- saveConcorrentes:', typeof saveConcorrentes !== 'undefined' ? '✅ OK' : '❌ NÃO ENCONTRADA');
-console.log('- renderConcorrentes:', typeof renderConcorrentes !== 'undefined' ? '✅ OK' : '❌ NÃO ENCONTRADA');
-
-// Verificar campo hidden
-setTimeout(() => {
-  const hiddenField = document.getElementById('concorrentes_data');
-  console.log('🔍 Campo hidden concorrentes_data:', hiddenField ? '✅ EXISTE' : '❌ NÃO EXISTE');
-  if (hiddenField) {
-    console.log('   Valor atual:', hiddenField.value || '(vazio)');
-  }
-  
-  // Verificar container de lista
-  const listContainer = document.getElementById('concorrentes-list');
-  console.log('🔍 Container concorrentes-list:', listContainer ? '✅ EXISTE' : '❌ NÃO EXISTE');
-  
-  // Verificar botões de adicionar
-  const addBtn = document.getElementById('btn-add-concorrente');
-  console.log('🔍 Botão adicionar:', addBtn ? '✅ EXISTE' : '❌ NÃO EXISTE');
-}, 1000);
-</script>
+<!-- Logs de debug movidos para knowledge-concorrentes.js -->
 <!-- <script src="{% static 'js/uploads.js' %}"></script> --> <!-- Mock antigo - comentado para teste -->
 <script>
 // Carregar redes sociais existentes

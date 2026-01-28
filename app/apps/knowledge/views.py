@@ -228,6 +228,37 @@ def knowledge_save_block(request, block_number):
                 # Registrar no histórico (simplificado)
                 # TODO: Implementar log detalhado de mudanças
                 
+                # Processar concorrentes do Bloco 6
+                concorrentes_raw = request.POST.get('concorrentes', '[]')
+                logger.debug(f"🔍 DEBUG Concorrentes - Raw POST data: {concorrentes_raw}")
+                logger.debug(f"🔍 DEBUG Concorrentes - POST keys: {list(request.POST.keys())}")
+                
+                try:
+                    concorrentes_list = json.loads(concorrentes_raw) if concorrentes_raw else []
+                    logger.debug(f"🔍 DEBUG Concorrentes - Parsed JSON: {concorrentes_list}")
+                    logger.debug(f"🔍 DEBUG Concorrentes - Type: {type(concorrentes_list)}, Length: {len(concorrentes_list)}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"❌ Erro ao parsear concorrentes JSON: {e}")
+                    concorrentes_list = []
+                
+                # Validar estrutura
+                if not isinstance(concorrentes_list, list):
+                    logger.warning(f"⚠️  Concorrentes não é uma lista: {type(concorrentes_list)}")
+                    concorrentes_list = []
+                
+                logger.debug(f"✅ DEBUG Concorrentes - Validados: {concorrentes_list}")
+                
+                # Verificar valor ANTES de salvar
+                logger.debug(f"🔍 DEBUG KB ANTES - concorrentes: {kb.concorrentes}")
+                
+                kb.concorrentes = concorrentes_list
+                kb.save()
+                
+                # Verificar valor DEPOIS de salvar
+                kb.refresh_from_db()
+                logger.debug(f"💾 DEBUG KB DEPOIS - concorrentes: {kb.concorrentes}")
+                logger.debug(f"💾 DEBUG Concorrentes - Salvos no KB (id={kb.id})")
+                
                 return JsonResponse({
                     'success': True,
                     'message': f'Bloco {block_number} salvo com sucesso!',

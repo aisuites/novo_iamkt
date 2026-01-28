@@ -193,6 +193,15 @@ function escapeHtml(text) {
   return text.replace(/[&<>"']/g, m => map[m]);
 }
 
+// Logs de debug (apenas desenvolvimento)
+if (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1')) {
+  console.log('🔍 DEBUG knowledge-concorrentes.js carregado');
+  console.log('- removeConcorrente:', typeof removeConcorrente !== 'undefined' ? '✅' : '❌');
+  console.log('- addConcorrente:', typeof addConcorrente !== 'undefined' ? '✅' : '❌');
+  console.log('- saveConcorrentes:', typeof saveConcorrentes !== 'undefined' ? '✅' : '❌');
+  console.log('- renderConcorrentes:', typeof renderConcorrentes !== 'undefined' ? '✅' : '❌');
+}
+
 // Inicializar quando o DOM estiver pronto
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initConcorrentes);
