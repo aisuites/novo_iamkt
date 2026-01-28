@@ -253,7 +253,7 @@ class N8NService:
             # 4. Preparar headers
             headers = {
                 'Content-Type': 'application/json',
-                'X-API-Key': settings.N8N_WEBHOOK_SECRET,
+                'X-INTERNAL-TOKEN': settings.N8N_WEBHOOK_SECRET,
                 'X-Signature': signature,
                 'X-Timestamp': str(timestamp),
                 'X-Organization-ID': str(kb_instance.organization_id),
@@ -361,7 +361,19 @@ def n8n_webhook_fundamentos(request):
     - Rate limiting
     """
     
-    # CAMADA 1: Validação de IP
+    # CAMADA 1: Validação de Token Interno
+    internal_token = request.headers.get('X-INTERNAL-TOKEN')
+    
+    if internal_token != settings.N8N_WEBHOOK_SECRET:
+        logger.warning(
+            f"Invalid internal token from IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        return JsonResponse({
+            'success': False,
+            'error': 'Unauthorized'
+        }, status=401)
+    
+    # CAMADA 1.5: Validação de IP (opcional, mas recomendado)
     client_ip = request.META.get('REMOTE_ADDR')
     allowed_ips = settings.N8N_ALLOWED_IPS.split(',')
     
@@ -547,12 +559,17 @@ def n8n_webhook_fundamentos(request):
 2. Buscar "Webhook"
 3. Configurar:
    - **HTTP Method:** POST
-   - **Path:** `2f87eab4-40da-4975-a219-74f15dbb2576`
+   - **Path:** `fundamentos`
    - **Authentication:** Header Auth
-   - **Header Name:** `X-API-Key`
+   - **Header Name:** `X-INTERNAL-TOKEN`
    - **Header Value:** `{{$env.N8N_WEBHOOK_SECRET}}` (variável de ambiente)
    - **Response Mode:** When Last Node Finishes
    - **Response Code:** 200
+
+**IMPORTANTE:** O N8N irá gerar a URL completa automaticamente:
+```
+https://n8n.srv812718.hstgr.cloud/webhook/fundamentos
+```
 
 #### **Passo 3: Adicionar Validação de Assinatura**
 
@@ -631,9 +648,22 @@ return {
 2. Nomear: "Enviar Análise para Django"
 3. Configurar:
    - **Method:** POST
-   - **URL:** `{{ $env.DJANGO_WEBHOOK_URL }}/api/webhooks/fundamentos/`
+   - **URL:** `https://iamkt-femmeintegra.aisuites.com.br/api/webhooks/fundamentos/`
    - **Authentication:** None (usaremos headers customizados)
    - **Send Headers:** Sim
+
+**⚠️ IMPORTANTE - URL Hardcoded:**
+- N8N **NÃO suporta** variáveis de ambiente em campos de URL
+- A URL precisa ser **hardcoded** no workflow
+- Para trocar de ambiente (dev → prod), você precisará:
+  1. Duplicar o workflow
+  2. Alterar a URL manualmente
+  3. Ou usar um nó "Switch" para escolher URL baseado em uma variável
+
+**🔒 SEGURANÇA:**
+- A URL exposta não é um problema de segurança
+- A proteção está nos **headers** (X-Signature, X-Timestamp, X-API-Key)
+- Sem os headers corretos, a requisição será rejeitada pelo Django
 
 #### **Passo 7: Configurar Headers de Segurança**
 
@@ -657,9 +687,13 @@ return {
 ```javascript
 const crypto = require('crypto');
 
-// Montar payload
+// Pegar dados do webhook original
+const webhookData = $('Webhook').item.json.body;
+
+// Montar payload com IDENTIFICAÇÃO da empresa
 const payload = {
-  kb_id: $('Webhook').item.json.body.kb_id,
+  kb_id: webhookData.kb_id,                    // ✅ ID da Knowledge Base
+  organization_id: webhookData.organization_id, // ✅ ID da Organização
   revision_id: $('Responder Webhook').item.json.revision_id,
   payload: $('Processar Análise').item.json.analysis,
   reference_images_analysis: $('Processar Imagens').item.json.images || []
@@ -668,8 +702,8 @@ const payload = {
 // Gerar timestamp
 const timestamp = Math.floor(Date.now() / 1000);
 
-// Serializar payload
-const payloadString = JSON.stringify(payload);
+// Serializar payload (ordem alfabética para consistência)
+const payloadString = JSON.stringify(payload, Object.keys(payload).sort());
 const message = `${payloadString}${timestamp}`;
 
 // Gerar assinatura HMAC SHA-256
@@ -687,6 +721,12 @@ return {
   }
 };
 ```
+
+**✅ IDENTIFICAÇÃO DA EMPRESA:**
+- `kb_id`: Identifica qual Knowledge Base está sendo analisada
+- `organization_id`: Identifica qual organização/empresa
+- Esses dados vêm do **payload original** enviado pelo Django
+- Django usa esses IDs para validar e armazenar a resposta corretamente
 
 #### **Passo 9: Configurar Body do HTTP Request**
 
@@ -711,9 +751,38 @@ return {
 ```bash
 # Secret compartilhado com Django
 N8N_WEBHOOK_SECRET=MESMO_TOKEN_DO_DJANGO_ENV
+```
 
-# URL do webhook Django
-DJANGO_WEBHOOK_URL=https://iamkt-femmeintegra.aisuites.com.br
+**⚠️ LIMITAÇÃO DO N8N:**
+- N8N **NÃO suporta** variáveis de ambiente em campos de URL de nós HTTP Request
+- URLs precisam ser **hardcoded** nos workflows
+- Variáveis de ambiente funcionam apenas em:
+  - Headers
+  - Body (usando expressões)
+  - Código JavaScript (Function nodes)
+
+**💡 SOLUÇÃO PARA MÚLTIPLOS AMBIENTES:**
+
+**Opção 1: Workflows Separados (Recomendado)**
+- Criar workflow "IAMKT - Fundamentos - DEV"
+- Criar workflow "IAMKT - Fundamentos - PROD"
+- Cada um com URL hardcoded diferente
+
+**Opção 2: Nó Switch**
+```javascript
+// No início do workflow, adicionar nó Function:
+const environment = process.env.ENVIRONMENT || 'dev';
+
+return {
+  json: {
+    django_url: environment === 'prod' 
+      ? 'https://iamkt.com.br/api/webhooks/fundamentos/'
+      : 'https://iamkt-femmeintegra.aisuites.com.br/api/webhooks/fundamentos/'
+  }
+};
+
+// Depois usar no HTTP Request:
+// URL: {{ $('Get Environment').item.json.django_url }}
 ```
 
 ---
