@@ -279,12 +279,75 @@ compilation_completed_at = DateTimeField(null=True)
 
 ## 🔄 INTEGRAÇÃO N8N
 
+### **📚 Documentação Completa de Segurança**
+
+**Consultar:** `docs/SEGURANCA_N8N_INTEGRACAO.md`
+
+Este documento contém:
+- Arquitetura de segurança em 5 camadas
+- Implementação completa de HMAC + Timestamp
+- Rate limiting e proteção contra ataques
+- Passo a passo de configuração N8N
+- Plano de resposta a incidentes
+
+---
+
+### **Endpoints e Configuração**
+
+#### **Django → N8N (Envio)**
+
+**Desenvolvimento:**
+```
+POST https://n8n.srv812718.hstgr.cloud/webhook/2f87eab4-40da-4975-a219-74f15dbb2576
+```
+
+**Produção:**
+```
+POST https://n8n-prod.srv812718.hstgr.cloud/webhook/fundamentos-prod
+```
+
+**Headers:**
+```
+Content-Type: application/json
+X-API-Key: {N8N_WEBHOOK_SECRET}
+X-Signature: {HMAC-SHA256 do payload + timestamp}
+X-Timestamp: {Unix timestamp}
+X-Organization-ID: {organization_id}
+X-KB-ID: {kb_id}
+```
+
+#### **N8N → Django (Retorno)**
+
+**Desenvolvimento:**
+```
+POST https://iamkt-femmeintegra.aisuites.com.br/api/webhooks/fundamentos/
+```
+
+**Produção:**
+```
+POST https://[dominio-producao]/api/webhooks/fundamentos/
+```
+
+**Headers:**
+```
+Content-Type: application/json
+X-API-Key: {N8N_WEBHOOK_SECRET}
+X-Signature: {HMAC-SHA256 do payload + timestamp}
+X-Timestamp: {Unix timestamp}
+X-Revision-ID: {revision_id}
+```
+
+---
+
 ### **Payload Real Enviado (Fluxo 1)**
 
 Após clicar "Salvar Base IAMKT", sistema envia:
 
 ```json
 {
+  "kb_id": 56,
+  "organization_id": 1,
+  "organization_name": "Fulanas Papelaria",
   "mission": "",
   "vision": "",
   "value_proposition": "",
@@ -299,13 +362,9 @@ Após clicar "Salvar Base IAMKT", sistema envia:
   "website_url": "",
   "social_networks": [],
   "competitors": [],
-  "reference_images": [],
-  "payload_hash": "baf776eed59e421dd940ea36e80317a1279cde48afdb50b98ef3d922f6a8bc4c"
+  "reference_images": []
 }
 ```
-
-**Webhook URL:** `https://n8n.srv1080437.hstgr.cloud/webhook/fundamentos-prod`  
-**Execution Mode:** `production`
 
 ---
 
