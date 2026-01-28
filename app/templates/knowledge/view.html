@@ -487,6 +487,11 @@
             {{ kb.concorrentes|json_script:"concorrentes_json_data" }}
             <input type="hidden" id="concorrentes_data" name="concorrentes" value="">
             
+            
+            <!-- Container para linhas de concorrentes (padrão cores) -->
+            <div id="concorrentes-inputs-container" class="concorrentes-inputs-container">
+              <!-- Linhas serão adicionadas dinamicamente -->
+            </div>
             <!-- Botão para adicionar nova linha -->
             <button type="button" class="btn-add-item" onclick="addConcorrenteLine()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -495,11 +500,7 @@
               </svg>
               Adicionar Concorrente
             </button>
-            
-            <!-- Container para linhas de concorrentes (padrão cores) -->
-            <div id="concorrentes-inputs-container" class="concorrentes-inputs-container">
-              <!-- Linhas serão adicionadas dinamicamente -->
-            </div>
+
           </div>
         </div>
       </div>
