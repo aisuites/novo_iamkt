@@ -6,6 +6,7 @@ from . import views
 from . import views_segments
 from . import views_tags
 from . import views_upload
+from . import views_n8n
 
 app_name = 'knowledge'
 
@@ -47,4 +48,7 @@ urlpatterns = [
     path('segment/<int:segment_id>/update/', views_segments.segment_update, name='segment_update'),
     path('segment/<int:segment_id>/delete/', views_segments.segment_delete, name='segment_delete'),
     path('segment/<int:segment_id>/restore/', views_segments.segment_restore, name='segment_restore'),
+    
+    # N8N Webhooks
+    path('webhook/fundamentos/', views_n8n.n8n_webhook_fundamentos, name='n8n_webhook_fundamentos'),
 ]
