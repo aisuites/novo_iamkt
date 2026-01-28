@@ -311,34 +311,13 @@
       <a href="{% url 'knowledge:view' %}" class="btn btn-primary">
         {% if kb_exists %}Completar Base de Conhecimento{% else %}Configurar Base de Conhecimento{% endif %}
       </a>
-      <button type="button" class="btn btn-secondary" onclick="closeWelcomeModal()">
-        Explorar Dashboard
-      </button>
     </div>
   </div>
 </div>
 
 <script>
-  function closeWelcomeModal() {
-    const modal = document.getElementById('welcomeModal');
-    if (modal) {
-      modal.remove();
-    }
-  }
-  
-  // Fechar modal ao clicar fora
-  document.getElementById('welcomeModal')?.addEventListener('click', function(e) {
-    if (e.target === this) {
-      closeWelcomeModal();
-    }
-  });
-  
-  // Fechar com ESC
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-      closeWelcomeModal();
-    }
-  });
+  // Modal fecha automaticamente ao clicar no botão "Completar Base de Conhecimento"
+  // (é um link que redireciona para a página de Base de Conhecimento)
 </script>
 {% endif %}
 {% endblock modals %}
