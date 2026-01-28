@@ -49,9 +49,46 @@ function initConcorrentes() {
 }
 
 /**
- * Adiciona um novo concorrente
+ * Mostra o formulário de adicionar concorrente
  */
-function addConcorrente() {
+function showConcorrenteForm() {
+  const btn = document.getElementById('btn-show-concorrente-form');
+  const form = document.getElementById('concorrentes-add-form');
+  
+  if (btn && form) {
+    btn.style.display = 'none';
+    form.style.display = 'block';
+    
+    // Focar no primeiro campo
+    const nomeInput = document.getElementById('concorrente_nome');
+    if (nomeInput) {
+      setTimeout(() => nomeInput.focus(), 100);
+    }
+  }
+}
+
+/**
+ * Cancela adição de concorrente
+ */
+function cancelAddConcorrente() {
+  const btn = document.getElementById('btn-show-concorrente-form');
+  const form = document.getElementById('concorrentes-add-form');
+  const nomeInput = document.getElementById('concorrente_nome');
+  const urlInput = document.getElementById('concorrente_url');
+  
+  // Limpar campos
+  if (nomeInput) nomeInput.value = '';
+  if (urlInput) urlInput.value = '';
+  
+  // Ocultar formulário
+  if (form) form.style.display = 'none';
+  if (btn) btn.style.display = 'inline-flex';
+}
+
+/**
+ * Confirma adição de concorrente
+ */
+function confirmAddConcorrente() {
   const nomeInput = document.getElementById('concorrente_nome');
   const urlInput = document.getElementById('concorrente_url');
   
@@ -94,14 +131,19 @@ function addConcorrente() {
     url: url || ''
   });
   
-  // Limpar inputs
-  nomeInput.value = '';
-  if (urlInput) urlInput.value = '';
-  nomeInput.focus();
-  
   // Atualizar UI e campo hidden
   renderConcorrentes();
   saveConcorrentes();
+  
+  // Ocultar formulário e limpar
+  cancelAddConcorrente();
+}
+
+/**
+ * Adiciona um novo concorrente (mantido para compatibilidade)
+ */
+function addConcorrente() {
+  confirmAddConcorrente();
 }
 
 /**

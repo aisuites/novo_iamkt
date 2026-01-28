@@ -484,10 +484,19 @@
             </div>
             
             <!-- Campo hidden para armazenar JSON -->
-            <input type="hidden" id="concorrentes_data" name="concorrentes" value="{{ kb.concorrentes|default:'[]'|safe }}">
+            <input type="hidden" id="concorrentes_data" name="concorrentes" value="{{ kb.concorrentes|default_if_none:'[]'|escapejs }}">
             
-            <!-- Formulário para adicionar concorrente -->
-            <div class="concorrentes-add-form">
+            <!-- Botão para mostrar formulário -->
+            <button type="button" id="btn-show-concorrente-form" class="btn-add-item" onclick="showConcorrenteForm()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Adicionar Concorrente
+            </button>
+            
+            <!-- Formulário para adicionar concorrente (oculto inicialmente) -->
+            <div id="concorrentes-add-form" class="concorrentes-add-form" style="display: none;">
               <div class="concorrentes-inputs">
                 <input 
                   type="text" 
@@ -502,13 +511,14 @@
                   class="concorrente-input"
                 >
               </div>
-              <button type="button" class="btn-add-item" onclick="addConcorrente()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Adicionar Concorrente
-              </button>
+              <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <button type="button" class="btn-add-item" onclick="confirmAddConcorrente()" style="flex: 1;">
+                  Confirmar
+                </button>
+                <button type="button" class="btn-remove-item" onclick="cancelAddConcorrente()" style="flex: 1;">
+                  Cancelar
+                </button>
+              </div>
             </div>
             
             <!-- Lista de concorrentes adicionados -->
