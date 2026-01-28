@@ -19,33 +19,22 @@ def dashboard(request):
     """
     user = request.user
     
-    # Verificar se deve mostrar modal de boas-vindas
-    # Condições: 1) Não mostrado nesta sessão, 2) KB não está 100% completa
-    show_welcome = False
-    
-    if not request.session.get('welcome_shown', False):
-        # Verificar se Base de Conhecimento está 100% completa
-        try:
-            knowledge_base = KnowledgeBase.objects.first()
-            kb_completude = knowledge_base.completude_percentual if knowledge_base else 0
-            
-            # Só mostrar modal se KB não estiver 100% completa
-            if kb_completude < 100:
-                show_welcome = True
-                request.session['welcome_shown'] = True
-        except:
-            # Se não tem KB, mostrar modal
-            show_welcome = True
-            request.session['welcome_shown'] = True
-    
     # Verificar se existe Base de Conhecimento
     try:
         knowledge_base = KnowledgeBase.objects.first()
         kb_exists = True
         kb_completude = knowledge_base.completude_percentual if knowledge_base else 0
+        kb = knowledge_base
     except:
         kb_exists = False
         kb_completude = 0
+        kb = None
+    
+    # ETAPA 6: Modal baseado em onboarding_completed
+    # Modal só aparece se onboarding não foi concluído
+    show_welcome = False
+    if kb and not kb.onboarding_completed:
+        show_welcome = True
     
     # Estatísticas da organização (compartilhadas entre todos os usuários)
     user_area = user.areas.first() if user.areas.exists() else None
