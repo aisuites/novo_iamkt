@@ -1,54 +1,71 @@
 <!-- Sidebar VibeMKT -->
 <aside class="sidebar">
   
-  <!-- Navegação -->
-  <div>
-    <div class="sidebar-section-title">Navegação</div>
-    <nav class="sidebar-nav">
-      <a href="{% url 'core:dashboard' %}" class="sidebar-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-        <span class="icon">🏠</span>
-        <span>Dashboard</span>
-      </a>
-      <a href="{% url 'knowledge:view' %}" class="sidebar-link {% if 'knowledge' in request.resolver_match.namespace %}active{% endif %}">
-        <span class="icon">🧠</span>
-        <span>Base IAMKT</span>
-      </a>
-    </nav>
-  </div>
+  {% comment %}
+  ETAPA 5: Menu sidebar dinâmico baseado em onboarding_completed
+  - Se onboarding NÃO concluído: apenas "Base IAMKT"
+  - Se onboarding concluído: menu completo (Dashboard, Ferramentas, Gestão)
+  {% endcomment %}
+  
+  {% if not kb_onboarding_completed %}
+    <!-- ONBOARDING NÃO CONCLUÍDO: Apenas Base IAMKT -->
+    <div>
+      <div class="sidebar-section-title">Configuração Inicial</div>
+      <nav class="sidebar-nav">
+        <a href="{% url 'knowledge:view' %}" class="sidebar-link {% if 'knowledge' in request.resolver_match.namespace %}active{% endif %}">
+          <span class="icon">🧠</span>
+          <span>Base IAMKT</span>
+        </a>
+      </nav>
+    </div>
+  {% else %}
+    <!-- ONBOARDING CONCLUÍDO: Menu completo -->
+    
+    <!-- Navegação -->
+    <div>
+      <div class="sidebar-section-title">Navegação</div>
+      <nav class="sidebar-nav">
+        <a href="{% url 'core:dashboard' %}" class="sidebar-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+          <span class="icon">🏠</span>
+          <span>Dashboard</span>
+        </a>
+      </nav>
+    </div>
 
-  <div class="sidebar-divider"></div>
+    <div class="sidebar-divider"></div>
 
-  <!-- Ferramentas -->
-  <div>
-    <div class="sidebar-section-title">Ferramentas</div>
-    <nav class="sidebar-nav">
-      <a href="{% url 'content:pautas' %}" class="sidebar-link">
-        <span class="icon">📝</span>
-        <span>Pautas</span>
-      </a>
-      <a href="{% url 'content:posts' %}" class="sidebar-link">
-        <span class="icon">🎨</span>
-        <span>Posts</span>
-      </a>
-      <a href="{% url 'content:trends' %}" class="sidebar-link">
-        <span class="icon">📈</span>
-        <span>Trends</span>
-      </a>
-    </nav>
-  </div>
+    <!-- Ferramentas -->
+    <div>
+      <div class="sidebar-section-title">Ferramentas</div>
+      <nav class="sidebar-nav">
+        <a href="{% url 'content:pautas' %}" class="sidebar-link">
+          <span class="icon">📝</span>
+          <span>Pautas</span>
+        </a>
+        <a href="{% url 'content:posts' %}" class="sidebar-link">
+          <span class="icon">🎨</span>
+          <span>Posts</span>
+        </a>
+        <a href="{% url 'content:trends' %}" class="sidebar-link">
+          <span class="icon">📈</span>
+          <span>Trends</span>
+        </a>
+      </nav>
+    </div>
 
-  <div class="sidebar-divider"></div>
+    <div class="sidebar-divider"></div>
 
-  <!-- Gestão -->
-  <div>
-    <div class="sidebar-section-title">Gestão</div>
-    <nav class="sidebar-nav">
-      <a href="{% url 'campaigns:projects' %}" class="sidebar-link">
-        <span class="icon">🚀</span>
-        <span>Projetos</span>
-      </a>
-    </nav>
-  </div>
+    <!-- Gestão -->
+    <div>
+      <div class="sidebar-section-title">Gestão</div>
+      <nav class="sidebar-nav">
+        <a href="{% url 'campaigns:projects' %}" class="sidebar-link">
+          <span class="icon">🚀</span>
+          <span>Projetos</span>
+        </a>
+      </nav>
+    </div>
+  {% endif %}
 
   {% if user.is_staff %}
   <div class="sidebar-divider"></div>
