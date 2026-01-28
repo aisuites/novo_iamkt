@@ -2,11 +2,15 @@
 {% load static %}
 {% load knowledge_filters %}
 
+<!-- DEBUG: Cache busting timestamp -->
+<script>console.log(' Template carregado em:', new Date().toISOString());</script>
+
 {% block title %}Base IAMKT - Edição{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/knowledge.css' %}">
-<link rel="stylesheet" href="{% static 'css/uploads.css' %}">
+<link rel="stylesheet" href="{% static 'css/knowledge.css' %}?v=20260128-1154">
+<link rel="stylesheet" href="{% static 'css/uploads.css' %}?v=20260128-1154">
+<script>console.log(' CSS Knowledge carregado com versão: 20260128-1154');</script>
 {% endblock %}
 
 {% block content %}
@@ -673,19 +677,25 @@ window.VALIDATION_ERRORS = {
 };
 {% endif %}
 </script>
-<link rel="stylesheet" href="{% static 'css/confirm-modal.css' %}">
-<script src="{% static 'js/toaster.js' %}"></script>
-<script src="{% static 'js/knowledge-navigation.js' %}"></script>
-<script src="{% static 'js/segments.js' %}"></script>
-<script src="{% static 'js/tags.js' %}"></script>
-<script src="{% static 'js/colors.js' %}"></script>
-<script src="{% static 'js/fonts.js' %}"></script>
-<script src="{% static 'js/knowledge-concorrentes.js' %}"></script>
-<script src="{% static 'js/image-validator.js' %}"></script>
-<script src="{% static 'js/image-preview-loader.js' %}"></script>
-<script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/knowledge-events.js' %}"></script>
-<script src="{% static 'js/knowledge-validation.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/confirm-modal.css' %}?v=20260128-1154">
+<script src="{% static 'js/toaster.js' %}?v=20260128-1154"></script>
+<script src="{% static 'js/knowledge-navigation.js' %}?v=20260128-1154"></script>
+<script src="{% static 'js/segments.js' %}?v=20260128-1154"></script>
+<script src="{% static 'js/tags.js' %}?v=20260128-1154"></script>
+<script src="{% static 'js/colors.js' %}?v=20260128-1154"></script>
+<script src="{% static 'js/fonts.js' %}?v=20260128-1154"></script>
+<script src="{% static 'js/knowledge-concorrentes.js' %}?v=20260128-1154"></script>
+<script>console.log('🔍 JS knowledge-concorrentes.js carregado com versão: 20260128-1154');</script>
+<script src="{% static 'js/image-validator.js' %}?v=20260128-1154"></script>
+<script src="{% static 'js/image-preview-loader.js' %}?v=20260128-1154"></script>
+<script src="{% static 'js/uploads-simple.js' %}?v=20260128-1154"></script>
+<script src="{% static 'js/knowledge-events.js' %}?v=20260128-1154"></script>
+<script src="{% static 'js/knowledge-validation.js' %}?v=20260128-1154"></script>
+<script>
+console.log('🔍 DEBUG: Verificando funções carregadas');
+console.log('- removeConcorrente:', typeof removeConcorrente !== 'undefined' ? '✅ OK' : '❌ NÃO ENCONTRADA');
+console.log('- addConcorrente:', typeof addConcorrente !== 'undefined' ? '✅ OK' : '❌ NÃO ENCONTRADA');
+</script>
 <!-- <script src="{% static 'js/uploads.js' %}"></script> --> <!-- Mock antigo - comentado para teste -->
 <script>
 // Carregar redes sociais existentes
