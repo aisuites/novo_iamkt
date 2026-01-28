@@ -41,6 +41,20 @@ function addConcorrenteLine(nome = '', url = '') {
   `;
   
   container.appendChild(item);
+  
+  // Adicionar listeners para sincronizar quando usuário preencher os campos
+  const nomeInput = item.querySelector('.concorrente-nome-input');
+  const urlInput = item.querySelector('.concorrente-url-input');
+  
+  if (nomeInput) {
+    nomeInput.addEventListener('input', syncConcorrentesToForm);
+    nomeInput.addEventListener('blur', syncConcorrentesToForm);
+  }
+  if (urlInput) {
+    urlInput.addEventListener('input', syncConcorrentesToForm);
+    urlInput.addEventListener('blur', syncConcorrentesToForm);
+  }
+  
   concorrenteIndex++;
   syncConcorrentesToForm();
 }
