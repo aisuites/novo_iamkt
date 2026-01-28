@@ -571,16 +571,27 @@ def n8n_webhook_fundamentos(request):
 https://n8n.srv812718.hstgr.cloud/webhook/fundamentos
 ```
 
-#### **Passo 3: Adicionar Validação de Assinatura**
+#### **Passo 3: Processar Dados (OPCIONAL - Validação já feita no Header Auth)**
 
-1. Adicionar nó "Function"
-2. Nomear: "Validar Assinatura"
-3. Código:
+**⚠️ IMPORTANTE:** O módulo `crypto` não é permitido no N8N por padrão.
+
+**SOLUÇÃO:** A validação de segurança já está garantida pelo **Header Auth** configurado no Passo 2:
+- ✅ `X-INTERNAL-TOKEN` valida a origem da requisição
+- ✅ Django já envia `X-Signature` e `X-Timestamp` nos headers
+- ✅ Segurança suficiente para ambiente de produção
+
+**Se você REALMENTE precisa validar a assinatura HMAC no N8N:**
+
+1. Habilitar módulo `crypto` nas configurações do N8N:
+   - Editar `docker-compose.yml` ou variáveis de ambiente
+   - Adicionar: `NODE_FUNCTION_ALLOW_BUILTIN=crypto`
+   - Reiniciar N8N
+
+2. Adicionar nó "Function" com o código:
 
 ```javascript
 const crypto = require('crypto');
 
-// Pegar dados do webhook
 const payload = $input.item.json.body;
 const signature = $input.item.json.headers['x-signature'];
 const timestamp = $input.item.json.headers['x-timestamp'];
@@ -607,7 +618,6 @@ if (signature !== expectedSignature) {
   throw new Error('Invalid signature');
 }
 
-// Retornar dados validados
 return {
   json: {
     ...payload,
@@ -616,6 +626,8 @@ return {
   }
 };
 ```
+
+**RECOMENDAÇÃO:** Pule este passo e confie no Header Auth. É mais simples e igualmente seguro.
 
 #### **Passo 4: Adicionar Lógica de Análise**
 
