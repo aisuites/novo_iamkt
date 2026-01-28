@@ -62,30 +62,27 @@ function addConcorrenteLine(nome = '', url = '') {
 /**
  * Remove uma linha de concorrente (com modal de confirmação)
  */
-function removeConcorrenteLine(index) {
+async function removeConcorrenteLine(index) {
   const item = document.querySelector(`.concorrente-item[data-index="${index}"]`);
   if (!item) return;
   
   const nomeInput = item.querySelector('.concorrente-nome-input');
-  const nome = nomeInput ? nomeInput.value.trim() : 'este concorrente';
+  const nome = nomeInput ? nomeInput.value.trim() : '';
+  const mensagem = `Tem certeza que deseja remover ${nome ? `"${nome}"` : 'este concorrente'}?`;
   
-  // Usar modal de confirmação se disponível
-  if (typeof showConfirmModal === 'function') {
-    showConfirmModal(
-      'Remover concorrente',
-      `Tem certeza que deseja remover ${nome ? `"${nome}"` : 'este concorrente'}?`,
-      () => {
-        // Confirmado - remover
-        item.classList.add('removing');
-        setTimeout(() => {
-          item.remove();
-          syncConcorrentesToForm();
-        }, 200);
-      }
-    );
+  // Usar modal de confirmação (window.confirmModal.show)
+  if (window.confirmModal && typeof window.confirmModal.show === 'function') {
+    const confirmed = await window.confirmModal.show(mensagem, 'Remover concorrente');
+    if (confirmed) {
+      item.classList.add('removing');
+      setTimeout(() => {
+        item.remove();
+        syncConcorrentesToForm();
+      }, 200);
+    }
   } else {
     // Fallback: confirmação nativa
-    if (confirm(`Tem certeza que deseja remover ${nome ? `"${nome}"` : 'este concorrente'}?`)) {
+    if (confirm(mensagem)) {
       item.classList.add('removing');
       setTimeout(() => {
         item.remove();

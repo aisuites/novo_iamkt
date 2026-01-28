@@ -293,15 +293,21 @@ async function removeFonte(indexOrButton, uso) {
         datasetKeys: Object.keys(fonteItem.dataset)
     });
     
+    // Confirmar remoção
+    const usoLabel = fonteItem.querySelector('.fonte-uso-select')?.selectedOptions[0]?.text || 'esta fonte';
+    const mensagem = `Tem certeza que deseja remover ${usoLabel}?`;
+    
+    let confirmed = false;
+    if (window.confirmModal && typeof window.confirmModal.show === 'function') {
+        confirmed = await window.confirmModal.show(mensagem, 'Remover fonte');
+    } else {
+        confirmed = confirm(mensagem);
+    }
+    
+    if (!confirmed) return;
+    
     // Se for fonte customizada, deletar do banco
     if (isCustomFont && fontId) {
-        const confirmed = await showConfirm(
-            'Esta ação não pode ser desfeita. A fonte será removida permanentemente do sistema.',
-            'Remover fonte?'
-        );
-        if (!confirmed) {
-            return;
-        }
         
         try {
             const response = await fetch(`/knowledge/font/${fontId}/delete/`, {

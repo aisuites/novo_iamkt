@@ -563,7 +563,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
-  min-width: 90px;
+  max-width: 90px;
   flex-shrink: 0;
 }
 

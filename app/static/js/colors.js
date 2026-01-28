@@ -67,11 +67,23 @@ function updateColorPicker(index, hexValue) {
     syncColorsToForm();
 }
 
-// Remover uma cor
-function removeColor(button) {
+// Remover uma cor (com modal de confirmação)
+async function removeColor(button) {
     const colorItem = button.closest('.color-item');
-    colorItem.classList.add('removing');
+    const nameInput = colorItem.querySelector('.color-name-input');
+    const nome = nameInput ? nameInput.value.trim() : '';
+    const mensagem = `Tem certeza que deseja remover ${nome ? `a cor "${nome}"` : 'esta cor'}?`;
     
+    // Usar modal de confirmação
+    if (window.confirmModal && typeof window.confirmModal.show === 'function') {
+        const confirmed = await window.confirmModal.show(mensagem, 'Remover cor');
+        if (!confirmed) return;
+    } else {
+        // Fallback: confirmação nativa
+        if (!confirm(mensagem)) return;
+    }
+    
+    colorItem.classList.add('removing');
     setTimeout(() => {
         colorItem.remove();
         syncColorsToForm();
