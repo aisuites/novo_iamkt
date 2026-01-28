@@ -65,9 +65,9 @@ def post_create(request):
 def trends_list(request):
     """Listar trends monitoradas da organization"""
     # CRÍTICO: Filtrar explicitamente por organization do request
-    trends_list = TrendMonitor.objects.for_request(request).select_related(
-        'created_by'
-    ).filter(is_active=True).order_by('-created_at')
+    trends_list = TrendMonitor.objects.for_request(request).filter(
+        is_active=True
+    ).order_by('-created_at')
     
     # Paginação
     paginator = Paginator(trends_list, 30)  # 30 trends por página
