@@ -335,13 +335,23 @@ def knowledge_save_all(request):
         # ========================================
         # ONBOARDING: Marcar como concluído
         # ========================================
+        print(f"🔍 DEBUG ONBOARDING - KB ID: {kb.id}", flush=True)
+        print(f"🔍 DEBUG ONBOARDING - onboarding_completed ANTES: {kb.onboarding_completed}", flush=True)
+        
         if not kb.onboarding_completed:
             from django.utils import timezone
             
+            print(f"🎯 MARCANDO ONBOARDING COMO CONCLUÍDO", flush=True)
             kb.onboarding_completed = True
             kb.onboarding_completed_at = timezone.now()
             kb.onboarding_completed_by = request.user
             kb.save(update_fields=['onboarding_completed', 'onboarding_completed_at', 'onboarding_completed_by'])
+            
+            # Recarregar do banco para confirmar
+            kb.refresh_from_db()
+            print(f"✅ ONBOARDING MARCADO - onboarding_completed DEPOIS: {kb.onboarding_completed}", flush=True)
+            print(f"✅ ONBOARDING MARCADO - onboarding_completed_at: {kb.onboarding_completed_at}", flush=True)
+            print(f"✅ ONBOARDING MARCADO - onboarding_completed_by: {kb.onboarding_completed_by}", flush=True)
             
             # TODO: Integração N8N (implementar após definir payload e retorno)
             # ========================================
@@ -360,6 +370,8 @@ def knowledge_save_all(request):
             
             messages.success(request, '🎉 Base de Conhecimento salva com sucesso! Bem-vindo ao IAMKT!')
             return redirect('core:dashboard')
+        else:
+            print(f"ℹ️ ONBOARDING JÁ CONCLUÍDO - Apenas atualizando dados", flush=True)
         
         messages.success(request, '✅ Base de Conhecimento atualizada com sucesso!')
         return redirect('knowledge:view')
