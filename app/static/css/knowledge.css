@@ -817,8 +817,16 @@ input[type="number"]:focus {
 
 .concorrentes-inputs {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 2fr;
   gap: 12px;
+}
+
+.concorrente-input {
+  padding: 10px 14px;
+  border: 1.5px solid rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  transition: all 0.2s ease;
 }
 
 .concorrente-item {
@@ -829,10 +837,25 @@ input[type="number"]:focus {
   padding: 12px 14px;
   background: rgba(248, 249, 250, 0.95);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border: 1.5px solid rgba(0, 0, 0, 0.12);
   border-radius: var(--radius-md);
-  font-size: 14px;
   transition: all 0.2s ease;
+}
+
+.concorrente-item:hover {
+  background: rgba(248, 249, 250, 1);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.concorrente-nome-display {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.concorrente-url-display {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  word-break: break-all;
 }
 
 /* Classes btn-add-item e btn-remove-item movidas para components.css (global) */
