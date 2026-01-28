@@ -31,23 +31,11 @@ def tenant_context(request):
         from apps.knowledge.models import KnowledgeBase
         try:
             org = getattr(request, 'organization', None)
-            print(f"🔍 CONTEXT PROCESSOR - User: {request.user.email}", flush=True)
-            print(f"🔍 CONTEXT PROCESSOR - Organization: {org}", flush=True)
-            
             kb = KnowledgeBase.objects.filter(organization=org).first()
-            
-            if kb:
-                print(f"🔍 CONTEXT PROCESSOR - KB ID: {kb.id}", flush=True)
-                print(f"🔍 CONTEXT PROCESSOR - onboarding_completed: {kb.onboarding_completed}", flush=True)
-                context['kb_onboarding_completed'] = kb.onboarding_completed
-            else:
-                print(f"⚠️ CONTEXT PROCESSOR - KB não encontrada!", flush=True)
-                context['kb_onboarding_completed'] = False
-        except Exception as e:
-            print(f"❌ CONTEXT PROCESSOR - Erro: {e}", flush=True)
+            context['kb_onboarding_completed'] = kb.onboarding_completed if kb else False
+        except Exception:
             context['kb_onboarding_completed'] = False
     else:
         context['kb_onboarding_completed'] = False
     
-    print(f"✅ CONTEXT PROCESSOR - kb_onboarding_completed final: {context.get('kb_onboarding_completed')}", flush=True)
     return context

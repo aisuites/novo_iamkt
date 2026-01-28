@@ -36,9 +36,6 @@ def dashboard(request):
     show_welcome = False
     if kb and not kb.onboarding_completed:
         show_welcome = True
-        print(f"🔍 DASHBOARD VIEW - Modal DEVE aparecer (onboarding_completed=False)", flush=True)
-    else:
-        print(f"🔍 DASHBOARD VIEW - Modal NÃO deve aparecer (onboarding_completed={kb.onboarding_completed if kb else 'KB não existe'})", flush=True)
     
     # Estatísticas da organização (compartilhadas entre todos os usuários)
     user_area = user.areas.first() if user.areas.exists() else None

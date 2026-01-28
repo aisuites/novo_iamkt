@@ -3,14 +3,6 @@
 
 {% block title %}Dashboard - VibeMKT{% endblock %}
 
-{% block extra_head %}
-<script>
-  console.log('🔍 DEBUG TEMPLATE - show_welcome_modal:', {{ show_welcome_modal|yesno:"true,false" }});
-  console.log('🔍 DEBUG TEMPLATE - kb_onboarding_completed:', {{ kb_onboarding_completed|yesno:"true,false" }});
-  console.log('🔍 DEBUG TEMPLATE - kb_exists:', {{ kb_exists|yesno:"true,false" }});
-</script>
-{% endblock %}
-
 {% block content %}
 <!-- Welcome Section -->
   <div class="mb-6">
