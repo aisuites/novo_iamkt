@@ -147,7 +147,8 @@ class N8NService:
                 
                 # BLOCO 7: Dados & Insights
                 'reference_images': [r.s3_url for r in kb_instance.reference_images.all() if r.s3_url],
-                'data_insights': kb_instance.dados_insights or '',
+                'trusted_sources': kb_instance.fontes_confiaveis or [],
+                'trend_channels': kb_instance.canais_trends or [],
             }
             
             # 3. Gerar timestamp e assinatura

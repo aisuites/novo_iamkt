@@ -105,5 +105,14 @@
     "https://s3.amazonaws.com/bucket/org-9/references/ref-1.jpg",
     "https://s3.amazonaws.com/bucket/org-9/references/ref-2.jpg"
   ],
-  "data_insights": "Principais insights: 80% das pacientes chegam por indicação, faixa etária predominante 25-45 anos, maior demanda por consultas preventivas."
+  "trusted_sources": [
+    "https://www.who.int",
+    "https://www.febrasgo.org.br",
+    "https://www.sbmfc.org.br"
+  ],
+  "trend_channels": [
+    "Instagram: @saudefeminina",
+    "YouTube: Canal Saúde da Mulher",
+    "Blog: https://blog.saudefeminina.com.br"
+  ]
 }

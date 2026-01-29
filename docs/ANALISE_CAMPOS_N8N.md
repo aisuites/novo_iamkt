@@ -89,7 +89,8 @@ payload = {
 
 ### **BLOCO 7: Dados & Insights**
 - ✅ `imagens_referencia` (relacionamento ReferenceImage) - Enviado como `reference_images`
-- ✅ `dados_insights` - **FALTA ENVIAR**
+- ✅ `fontes_confiaveis` (JSON) - Enviado como `trusted_sources`
+- ✅ `canais_trends` (JSON) - Enviado como `trend_channels`
 
 ---
 
