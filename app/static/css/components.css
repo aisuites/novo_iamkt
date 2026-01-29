@@ -1303,3 +1303,267 @@ label:has(+ select[required])::after {
   font-weight: 600;
 }
 
+/* ========================================
+   COMPONENTES DE ANÁLISE (Perfil da Empresa)
+   ======================================== */
+
+/* Card de Análise de Campo */
+.analysis-card {
+  background: var(--white-90);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-subtle);
+  padding: var(--spacing-6);
+  margin-bottom: var(--spacing-4);
+  transition: all var(--transition-base);
+}
+
+.analysis-card:hover {
+  box-shadow: var(--shadow-soft);
+}
+
+.analysis-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-4);
+  padding-bottom: var(--spacing-4);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-muted) 20%, transparent);
+}
+
+.analysis-card-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.analysis-card-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: var(--spacing-1) 0 0 0;
+}
+
+.analysis-card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.analysis-section-full {
+  grid-column: 1 / -1;
+}
+
+.analysis-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.analysis-content {
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  line-height: 1.6;
+  padding: var(--spacing-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  min-height: 60px;
+}
+
+.analysis-content:empty::before {
+  content: "Não informado";
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.analysis-card-actions {
+  display: flex;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-3);
+}
+
+.btn-action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-action-accept {
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 20%, transparent);
+}
+
+.btn-action-accept:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
+  border-color: var(--color-success);
+  transform: translateY(-1px);
+}
+
+.btn-action-accept.active {
+  background: var(--color-success);
+  color: var(--color-white);
+  border-color: var(--color-success);
+}
+
+.btn-action-reject {
+  background: color-mix(in srgb, var(--color-error) 10%, transparent);
+  color: var(--color-error);
+  border-color: color-mix(in srgb, var(--color-error) 20%, transparent);
+}
+
+.btn-action-reject:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-error) 15%, transparent);
+  border-color: var(--color-error);
+  transform: translateY(-1px);
+}
+
+.btn-action-reject.active {
+  background: var(--color-error);
+  color: var(--color-white);
+  border-color: var(--color-error);
+}
+
+.analysis-feedback {
+  padding: var(--spacing-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-align: center;
+  display: none;
+}
+
+.analysis-feedback.show {
+  display: block;
+}
+
+.analysis-feedback-accepted {
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  color: var(--color-success);
+  border: 1px solid color-mix(in srgb, var(--color-success) 20%, transparent);
+}
+
+.analysis-feedback-rejected {
+  background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);
+  color: var(--color-text);
+  border: 1px solid color-mix(in srgb, var(--color-text-muted) 20%, transparent);
+}
+
+/* Resumo Geral */
+.analysis-summary {
+  background: var(--white-90);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-subtle);
+  padding: var(--spacing-6);
+  margin-bottom: var(--spacing-6);
+}
+
+.analysis-summary-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  margin-bottom: var(--spacing-4);
+}
+
+.analysis-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-4);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-4);
+  border-radius: var(--radius-md);
+  text-align: center;
+  transition: all var(--transition-base);
+}
+
+.stat-item:hover {
+  transform: translateY(-2px);
+}
+
+.stat-item.stat-danger {
+  background: color-mix(in srgb, var(--color-error) 10%, transparent);
+}
+
+.stat-item.stat-warning {
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+}
+
+.stat-item.stat-success {
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+}
+
+.stat-number {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  margin-bottom: var(--spacing-1);
+}
+
+.stat-item.stat-danger .stat-number {
+  color: var(--color-error);
+}
+
+.stat-item.stat-warning .stat-number {
+  color: var(--color-warning);
+}
+
+.stat-item.stat-success .stat-number {
+  color: var(--color-success);
+}
+
+.stat-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .analysis-card-body {
+    grid-template-columns: 1fr;
+  }
+  
+  .analysis-section-full {
+    grid-column: 1;
+  }
+  
+  .analysis-summary-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .analysis-card-actions {
+    flex-direction: column;
+  }
+  
+  .btn-action {
+    width: 100%;
+  }
+}
+
