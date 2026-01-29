@@ -412,14 +412,12 @@ def knowledge_save_all(request):
             kb.onboarding_completed_at = timezone.now()
             kb.onboarding_completed_by = request.user
             kb.save(update_fields=['onboarding_completed', 'onboarding_completed_at', 'onboarding_completed_by'])
-            
-            # Redirecionar para página Perfil da Empresa (primeira vez)
             messages.success(request, '🎉 Base de Conhecimento salva com sucesso! Redirecionando para análise...')
-            return redirect('knowledge:perfil_view')
+        else:
+            messages.success(request, '✅ Base de Conhecimento atualizada com sucesso! Redirecionando para análise...')
         
-        # Atualização (não é primeira vez)
-        messages.success(request, '✅ Base de Conhecimento atualizada com sucesso!')
-        return redirect('knowledge:view')
+        # Redirecionar SEMPRE para Perfil da Empresa após salvar
+        return redirect('knowledge:perfil_view')
     else:
         # Mostrar erros críticos
         print(f"❌ Salvamento falhou, adicionando mensagens de erro", flush=True)
