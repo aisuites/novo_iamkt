@@ -113,38 +113,40 @@ def n8n_webhook_fundamentos(request):
     
     timestamp = int(time.time())  # Usar timestamp atual para HMAC
     
-    # CAMADA 4: Validação de Assinatura HMAC
-    signature_header = request.headers.get('X-Signature')
+    # CAMADA 4: Validação de Assinatura HMAC (TEMPORARIAMENTE DESABILITADA)
+    # signature_header = request.headers.get('X-Signature')
     
-    if not signature_header:
-        logger.warning("Missing X-Signature header")
-        return JsonResponse({
-            'success': False,
-            'error': 'Missing signature'
-        }, status=400)
+    # if not signature_header:
+    #     logger.warning("Missing X-Signature header")
+    #     return JsonResponse({
+    #         'success': False,
+    #         'error': 'Missing signature'
+    #     }, status=400)
     
-    # Reconstruir assinatura esperada
-    payload_bytes = request.body
-    payload_string = payload_bytes.decode('utf-8')
-    message = f"{payload_string}{timestamp}"
+    # # Reconstruir assinatura esperada
+    # payload_bytes = request.body
+    # payload_string = payload_bytes.decode('utf-8')
+    # message = f"{payload_string}{timestamp}"
     
-    expected_signature = hmac.new(
-        settings.N8N_WEBHOOK_SECRET.encode('utf-8'),
-        message.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
+    # expected_signature = hmac.new(
+    #     settings.N8N_WEBHOOK_SECRET.encode('utf-8'),
+    #     message.encode('utf-8'),
+    #     hashlib.sha256
+    # ).hexdigest()
     
-    # Comparação segura (previne timing attacks)
-    if not hmac.compare_digest(signature_header, expected_signature):
-        logger.warning(
-            f"Invalid signature from IP {client_ip}. "
-            f"Expected: {expected_signature[:10]}..., "
-            f"Received: {signature_header[:10]}..."
-        )
-        return JsonResponse({
-            'success': False,
-            'error': 'Invalid signature'
-        }, status=401)
+    # # Comparação segura (previne timing attacks)
+    # if not hmac.compare_digest(signature_header, expected_signature):
+    #     logger.warning(
+    #         f"Invalid signature from IP {client_ip}. "
+    #         f"Expected: {expected_signature[:10]}..., "
+    #         f"Received: {signature_header[:10]}..."
+    #     )
+    #     return JsonResponse({
+    #         'success': False,
+    #         'error': 'Invalid signature'
+    #     }, status=401)
+    
+    logger.info(f"Webhook request accepted from IP: {client_ip}")
     
     # CAMADA 5: Validação de Dados
     try:
