@@ -136,21 +136,41 @@ class KnowledgeBaseAdmin(admin.ModelAdmin):
             return format_html('<em style="color: #999;">Nenhuma análise recebida</em>')
         
         try:
+            # Adicionar resumo
+            payload = obj.n8n_analysis.get('payload', [])
+            revision_id = obj.n8n_analysis.get('revision_id', 'N/A')
+            received_at = obj.n8n_analysis.get('received_at', 'N/A')
+            
+            campos_analisados = 0
+            if payload and len(payload) > 0 and isinstance(payload[0], dict):
+                campos_analisados = len(payload[0].keys())
+            
+            # Contar status
+            status_count = {'fraco': 0, 'médio': 0, 'bom': 0}
+            if payload and len(payload) > 0:
+                for campo_data in payload[0].values():
+                    if isinstance(campo_data, dict):
+                        status = campo_data.get('status', '')
+                        if status in status_count:
+                            status_count[status] += 1
+            
+            html = f'<div style="margin-bottom: 15px; padding: 12px; background: white; border-left: 4px solid #7c3aed; border-radius: 4px;">'
+            html += f'<p style="margin: 0 0 8px 0;"><strong>Resumo da Análise:</strong></p>'
+            html += f'<p style="margin: 0 0 4px 0; font-size: 0.9em;">📊 <strong>{campos_analisados}</strong> campos analisados</p>'
+            html += f'<p style="margin: 0 0 4px 0; font-size: 0.9em;">🔴 <strong>{status_count["fraco"]}</strong> fracos | 🟡 <strong>{status_count["médio"]}</strong> médios | 🟢 <strong>{status_count["bom"]}</strong> bons</p>'
+            html += f'<p style="margin: 0 0 4px 0; font-size: 0.85em; color: #666;">Revision ID: <code>{revision_id}</code></p>'
+            html += f'<p style="margin: 0; font-size: 0.85em; color: #666;">Recebido em: {received_at}</p>'
+            html += '</div>'
+            
             # Formatar JSON com indentação
             json_str = json.dumps(obj.n8n_analysis, indent=2, ensure_ascii=False)
             # Limitar tamanho para não sobrecarregar a página
-            if len(json_str) > 5000:
-                json_str = json_str[:5000] + '\n... (truncado)'
+            if len(json_str) > 8000:
+                json_str = json_str[:8000] + '\n... (truncado)'
             
-            html = f'<div style="font-family: monospace; background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 400px; overflow-y: auto;">'
-            html += f'<pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">{json_str}</pre>'
+            html += f'<div style="font-family: monospace; background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 500px; overflow-y: auto;">'
+            html += f'<pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 0.85em;">{json_str}</pre>'
             html += '</div>'
-            
-            # Adicionar resumo
-            payload = obj.n8n_analysis.get('payload', [])
-            if payload and len(payload) > 0:
-                campos = len(payload[0].keys()) if isinstance(payload[0], dict) else 0
-                html = f'<p><strong>Resumo:</strong> {campos} campos analisados</p>' + html
             
             return format_html(html)
         except Exception as e:

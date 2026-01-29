@@ -422,9 +422,14 @@ Adicionar em `static/css/components.css`:
 
 ### **Layout da Página**
 
+**IMPORTANTE:** A página usa o layout padrão da aplicação (header + sidebar), não é uma página standalone.
+
 Arquivo: `templates/knowledge/perfil.html`
 
 ```html
+{% extends 'base.html' %}
+
+{% block content %}
 <div class="perfil-container">
   <div class="perfil-header">
     <div class="perfil-header-left">
@@ -448,6 +453,7 @@ Arquivo: `templates/knowledge/perfil.html`
     </button>
   </div>
 </div>
+{% endblock %}
 ```
 
 ### **Arquivos a Criar/Modificar**
