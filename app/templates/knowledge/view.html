@@ -7,6 +7,76 @@
 
 {% block title %}Base IAMKT - Edição{% endblock %}
 
+{% block modals %}
+<!-- Modal de Boas-vindas (FLUXO 1) -->
+{% if show_welcome_modal %}
+<div id="welcomeModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>🎉 Bem-vindo ao IAMKT!</h3>
+    </div>
+    <div class="modal-body">
+      <p>Olá, <strong>{{ user_name }}</strong>!</p>
+      <p>É ótimo ter você aqui. Para começar a usar o sistema de forma eficiente, recomendamos que você:</p>
+      
+      <div class="welcome-steps">
+        <div class="welcome-step">
+          <span class="step-number">1</span>
+          <div class="step-content">
+            <h4>Preencha a Base de Conhecimento</h4>
+            <p>Configure informações sobre sua empresa, público-alvo, paleta de cores e identidade visual. Isso ajudará a IA a gerar conteúdos mais alinhados com sua marca.</p>
+          </div>
+        </div>
+        
+        <div class="welcome-step">
+          <span class="step-number">2</span>
+          <div class="step-content">
+            <h4>Salve a Base IAMKT</h4>
+            <p>Após preencher os campos, clique em "Salvar Base IAMKT" para enviar seus dados para análise do agente de IA.</p>
+          </div>
+        </div>
+        
+        <div class="welcome-step">
+          <span class="step-number">3</span>
+          <div class="step-content">
+            <h4>Revise as Sugestões</h4>
+            <p>O agente IAMKT analisará suas informações e fornecerá sugestões de melhoria para cada campo.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="welcome-kb-status">
+        {% if kb_exists %}
+          <p class="kb-status-complete">✅ Sua Base de Conhecimento está <strong>{{ kb_completude|floatformat:0 }}%</strong> completa.</p>
+        {% else %}
+          <p class="kb-status-incomplete">⚠️ Sua Base de Conhecimento ainda não foi configurada.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="closeWelcomeModal" class="btn btn-primary">
+        Começar Agora
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Fechar modal ao clicar no botão
+  document.getElementById('closeWelcomeModal').addEventListener('click', function() {
+    document.getElementById('welcomeModal').style.display = 'none';
+  });
+  
+  // Fechar modal ao clicar fora
+  document.getElementById('welcomeModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      this.style.display = 'none';
+    }
+  });
+</script>
+{% endif %}
+{% endblock modals %}
+
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/knowledge.css' %}?v=20260128-1557">
 <link rel="stylesheet" href="{% static 'css/uploads.css' %}?v=20260128-1154">
