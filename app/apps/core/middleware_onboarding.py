@@ -48,11 +48,16 @@ class OnboardingRequiredMiddleware(MiddlewareMixin):
             try:
                 kb = KnowledgeBase.objects.filter(organization=organization).first()
                 
-                # Se onboarding não concluído, redirecionar para Base de Conhecimento
-                if kb and not kb.onboarding_completed:
-                    # Evitar loop de redirecionamento
-                    if not request.path.startswith('/knowledge/'):
-                        return redirect('knowledge:view')
+                if kb:
+                    # Se onboarding não concluído, redirecionar para Base de Conhecimento
+                    if not kb.onboarding_completed:
+                        # Evitar loop de redirecionamento
+                        if not request.path.startswith('/knowledge/'):
+                            return redirect('knowledge:view')
+                    else:
+                        # Onboarding concluído: redirecionar para Perfil se tentar acessar dashboard
+                        if request.path == '/':
+                            return redirect('knowledge:perfil_view')
             except Exception:
                 # Em caso de erro, permitir acesso (fail-safe)
                 pass

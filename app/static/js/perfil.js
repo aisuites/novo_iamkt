@@ -7,6 +7,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // Estado das decisões do usuário
     const decisions = {};
     
+    // Inicializar todos os cards com "Rejeitar" selecionado por padrão
+    const allCards = document.querySelectorAll('.analysis-card');
+    allCards.forEach(card => {
+        const fieldName = card.dataset.field;
+        const rejectBtn = card.querySelector('.btn-action-reject');
+        const feedbackRejected = card.querySelector('.analysis-feedback-rejected');
+        
+        // Marcar como rejeitado por padrão
+        decisions[fieldName] = 'reject';
+        rejectBtn.classList.add('active');
+        feedbackRejected.classList.add('show');
+    });
+    
+    // Atualizar contador inicial (deve ser 0 aceitos)
+    updateCounter();
+    
     // Botões de ação (aceitar/rejeitar)
     const actionButtons = document.querySelectorAll('.btn-action');
     

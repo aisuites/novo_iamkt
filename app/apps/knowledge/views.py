@@ -693,7 +693,8 @@ def perfil_view(request):
             'kb': kb,
             'analysis_status': analysis_status,
             'campos_analise': campos_analise,
-            'stats': stats
+            'stats': stats,
+            'kb_onboarding_completed': kb.onboarding_completed if kb else False
         }
         
         return render(request, 'knowledge/perfil.html', context)
@@ -701,7 +702,8 @@ def perfil_view(request):
     # Outros estados: apenas passar status
     context = {
         'kb': kb,
-        'analysis_status': analysis_status
+        'analysis_status': analysis_status,
+        'kb_onboarding_completed': kb.onboarding_completed if kb else False
     }
     
     return render(request, 'knowledge/perfil.html', context)
