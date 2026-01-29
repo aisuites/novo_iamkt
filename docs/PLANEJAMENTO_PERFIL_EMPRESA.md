@@ -18,7 +18,35 @@ Implementar página "Perfil da Empresa" que:
 
 ---
 
-## 👤 FLUXO DO USUÁRIO COMPLETO
+## � RESUMO DOS 3 FLUXOS DE NAVEGAÇÃO
+
+### **FLUXO 1: Onboarding Não Concluído**
+- **Condição:** `onboarding_completed = False`
+- **Login redireciona para:** Base de Conhecimento (`/knowledge/view/`)
+- **Sidebar:** Apenas "Base IAMKT"
+- **Modal Welcome:** Aparece
+- **Páginas bloqueadas:** Todas exceto Base de Conhecimento
+- **Objetivo:** Preencher e salvar Base IAMKT
+
+### **FLUXO 2: Aguardando Revisão de Sugestões**
+- **Condição:** `onboarding_completed = True` e `suggestions_reviewed = False`
+- **Login redireciona para:** Perfil da Empresa - Edição (`/knowledge/perfil/`)
+- **Sidebar:** Apenas "Perfil da Empresa"
+- **Modal Welcome:** NÃO aparece
+- **Páginas bloqueadas:** Todas exceto Perfil da Empresa
+- **Objetivo:** Aprovar/rejeitar sugestões do agente IAMKT
+
+### **FLUXO 3: Acesso Total Liberado**
+- **Condição:** `onboarding_completed = True` e `suggestions_reviewed = True`
+- **Login redireciona para:** Dashboard (`/dashboard/`)
+- **Sidebar:** Menu completo (Dashboard, Perfil, Pautas, Posts, Trends, Projetos)
+- **Modal Welcome:** NÃO aparece
+- **Páginas bloqueadas:** Nenhuma (acesso total)
+- **Base IAMKT:** NÃO aparece no menu
+
+---
+
+## �👤 FLUXO DO USUÁRIO COMPLETO
 
 ### **1. CADASTRO E ONBOARDING**
 
@@ -28,21 +56,23 @@ Implementar página "Perfil da Empresa" que:
 - Sistema cria conta
 - **Equipe interna libera acesso** (aprovação manual)
 
-#### **1.2 Primeiro Login**
+#### **1.2 Primeiro Login (FLUXO 1)**
 - Usuário faz login pela primeira vez
 - `onboarding_completed = False`
-- Redireciona para dashboard
+- **Redireciona automaticamente para Base de Conhecimento**
 
 #### **1.3 Modal Welcome**
-- Modal aparece automaticamente
+- Modal aparece automaticamente no dashboard
 - Título: "Bem-vindo! Vamos começar?"
 - Botão: "Iniciar Onboarding" → Redireciona para `/knowledge/view/`
 - Link: "Pular por enquanto" → Fecha modal
+- **Nota:** Modal só aparece quando `onboarding_completed = False`
 
-#### **1.4 Restrição de Acesso**
+#### **1.4 Restrição de Acesso (FLUXO 1)**
 - **Apenas página "Base de Conhecimento" está liberada**
 - Demais páginas bloqueadas até `onboarding_completed = True`
-- Menu sidebar mostra apenas "Base de Conhecimento"
+- Menu sidebar mostra apenas "Base IAMKT"
+- Middleware redireciona qualquer tentativa de acesso para `/knowledge/view/`
 
 #### **1.5 Preenchimento da Base de Conhecimento**
 
@@ -73,26 +103,37 @@ Implementar página "Perfil da Empresa" que:
 - Palavras-chave para trends
 - Imagens de referência
 
-#### **1.6 Salvamento e Liberação de Acesso**
+#### **1.6 Salvamento e Transição para FLUXO 2**
 - Usuário preenche campos (mínimo: descrição do produto)
 - Clica em "Salvar Base IAMKT"
 - Dados são salvos no banco
 - Arquivos (logos, fontes, imagens) são enviados ao S3
 - **Sistema marca `onboarding_completed = True`**
-- **Acesso liberado para toda a plataforma**
-- Redireciona para dashboard
+- **Sistema marca `analysis_status = 'processing'`**
+- **Redireciona para `/knowledge/perfil/` (Perfil da Empresa - Edição)**
 - Modal não aparece mais automaticamente
+- **IMPORTANTE:** Acesso ainda NÃO está liberado para toda plataforma, apenas para Perfil
 
 ---
 
-### **2. PÁGINA "PERFIL DA EMPRESA"**
+### **2. PÁGINA "PERFIL DA EMPRESA" (FLUXO 2 e 3)**
 
-#### **2.1 Acesso**
-- **Aparece no menu sidebar APÓS `onboarding_completed = True`**
-- Item "Base de Conhecimento" some do menu
-- Item "Perfil da Empresa" aparece
+#### **2.1 Acesso e Fluxos**
+
+**FLUXO 2: Modo Edição (Sugestões Não Revisadas)**
+- `onboarding_completed = True` e `suggestions_reviewed = False`
+- **Usuário é FORÇADO a ficar nesta página**
+- Sidebar mostra apenas "Perfil da Empresa"
+- Middleware bloqueia acesso a outras páginas
+- Usuário deve aprovar/rejeitar sugestões antes de prosseguir
 - URL: `/knowledge/perfil/`
-- Badge de status no menu (opcional)
+
+**FLUXO 3: Acesso Liberado (Sugestões Revisadas)**
+- `onboarding_completed = True` e `suggestions_reviewed = True`
+- Usuário tem acesso total à plataforma
+- Sidebar mostra menu completo (Dashboard, Perfil, Pautas, Posts, Trends, Projetos)
+- Item "Base de Conhecimento" NÃO aparece no menu
+- Perfil da Empresa disponível para consulta
 
 #### **2.2 Estados da Página**
 
@@ -115,9 +156,9 @@ Implementar página "Perfil da Empresa" que:
 - Polling a cada 10 segundos para verificar status
 - Quando N8N retorna análise → ESTADO 4
 
-##### **ESTADO 4: Modo Edição (Análise Recebida)**
+##### **ESTADO 4: Modo Edição (Análise Recebida) - FLUXO 2**
 
-**IMPORTANTE:** Página fica em modo edição até que empresa complete fase de aprovar avaliação/sugestões.
+**CRÍTICO:** Esta é a página do FLUXO 2. Usuário DEVE passar por aqui antes de acessar o resto da plataforma.
 
 - Exibir análise por campo:
   - Campo: "Missão"
@@ -125,21 +166,23 @@ Implementar página "Perfil da Empresa" que:
   - Avaliação: "A missão da marca não está definida."
   - Status: "Fraco" (badge vermelho)
   - Sugestão do agente IAMKT: [texto sugerido]
-  - Checkbox: "Aceitar sugestão"
+  - Botões: "✓ Aceitar" / "✕ Rejeitar" (Rejeitar selecionado por padrão)
   
 - Resumo geral:
   - X campos fracos
   - Y campos médios
   - Z campos bons
+  - Y sugestões aceitas
   
 - Botão: "Aplicar Sugestões Selecionadas"
 - Ao clicar:
-  - Atualiza campos da KB com sugestões aceitas
-  - Solicita compilação ao N8N
-  - Status muda para 'compiling'
-  - Redireciona para ESTADO 5
+  - Salva decisões do usuário (aceitar/rejeitar)
+  - **Marca `suggestions_reviewed = True`**
+  - **Libera acesso para toda a plataforma (FLUXO 3)**
+  - Envia dados para N8N (compilação - implementar futuramente)
+  - Redireciona para Dashboard
 
-**Sem aprovar sugestões:** Página não pode entrar no modo visualização
+**Importante:** Usuário pode aceitar 0 sugestões (rejeitar todas) e mesmo assim prosseguir
 
 ##### **ESTADO 5: Processando Compilação**
 - Loading state com animação
