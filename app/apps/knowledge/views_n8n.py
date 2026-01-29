@@ -149,6 +149,9 @@ def n8n_webhook_fundamentos(request):
     logger.info(f"Webhook request accepted from IP: {client_ip}")
     
     # CAMADA 5: Validação de Dados
+    payload_bytes = request.body
+    payload_string = payload_bytes.decode('utf-8')
+    
     try:
         data = json.loads(payload_string)
     except json.JSONDecodeError:
