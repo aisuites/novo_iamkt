@@ -19,8 +19,7 @@ from .forms import (
     SocialNetworkForm, ReferenceImageUploadForm,
     LogoUploadForm, CustomFontUploadForm
 )
-from . import services as services_module
-KnowledgeBaseService = services_module.KnowledgeBaseService
+from .kb_services import KnowledgeBaseService
 from apps.utils.s3 import upload_to_s3, get_signed_url
 from apps.utils.image_hash import (
     calculate_perceptual_hash, 
