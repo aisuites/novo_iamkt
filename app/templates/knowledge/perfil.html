@@ -6,6 +6,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/perfil.css' %}?v=20260129-1703">
 <link rel="stylesheet" href="{% static 'css/logo-upload-widget.css' %}?v=20260129-1703">
+<link rel="stylesheet" href="{% static 'css/confirm-modal.css' %}?v=20260129-1703">
 {% endblock %}
 
 {% block content %}
@@ -275,13 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!logoId) return;
             
-            confirmModal.show({
-                title: 'Remover logotipo?',
-                message: 'Esta ação não pode ser desfeita.',
-                confirmText: 'Remover',
-                cancelText: 'Cancelar',
-                type: 'danger'
-            }).then(async (confirmed) => {
+            confirmModal.show('Esta ação não pode ser desfeita.', 'Remover logotipo?').then(async (confirmed) => {
                 if (!confirmed) return;
                 
                 try {
