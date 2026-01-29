@@ -601,18 +601,25 @@ def perfil_view(request):
     Página "Perfil da Empresa" - Exibe análise N8N e permite aceitar/rejeitar sugestões
     Estados: pending, processing, completed, compiling, compiled, error
     """
+    print(f"🔍 [PERFIL_VIEW] Iniciando view", flush=True)
+    
     # Buscar KnowledgeBase da organization
     try:
         kb = KnowledgeBase.objects.for_request(request).first()
-    except Exception:
+        print(f"🔍 [PERFIL_VIEW] KB encontrado: {kb is not None}", flush=True)
+    except Exception as e:
+        print(f"❌ [PERFIL_VIEW] Erro ao buscar KB: {e}", flush=True)
         kb = None
     
     if not kb:
         messages.error(request, 'Base de Conhecimento não encontrada.')
         return redirect('knowledge:view')
     
+    print(f"🔍 [PERFIL_VIEW] Onboarding completo: {kb.onboarding_completed}", flush=True)
+    
     # Determinar estado atual
     analysis_status = kb.analysis_status
+    print(f"🔍 [PERFIL_VIEW] Status da análise: {analysis_status}", flush=True)
     
     # ESTADO 4: Modo Edição (Análise Completa)
     if analysis_status == 'completed' and kb.n8n_analysis:
@@ -697,6 +704,8 @@ def perfil_view(request):
             'kb_onboarding_completed': kb.onboarding_completed if kb else False
         }
         
+        print(f"✅ [PERFIL_VIEW] Contexto criado - kb_onboarding_completed: {context['kb_onboarding_completed']}", flush=True)
+        
         return render(request, 'knowledge/perfil.html', context)
     
     # Outros estados: apenas passar status
@@ -705,5 +714,7 @@ def perfil_view(request):
         'analysis_status': analysis_status,
         'kb_onboarding_completed': kb.onboarding_completed if kb else False
     }
+    
+    print(f"✅ [PERFIL_VIEW] Contexto criado (outros estados) - kb_onboarding_completed: {context['kb_onboarding_completed']}", flush=True)
     
     return render(request, 'knowledge/perfil.html', context)

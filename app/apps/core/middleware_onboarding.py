@@ -42,24 +42,34 @@ class OnboardingRequiredMiddleware(MiddlewareMixin):
         
         # Verificar onboarding
         organization = getattr(request, 'organization', None)
+        print(f"🔍 [MIDDLEWARE] Path: {request.path} | Organization: {organization}", flush=True)
+        
         if organization:
             from apps.knowledge.models import KnowledgeBase
             
             try:
                 kb = KnowledgeBase.objects.filter(organization=organization).first()
+                print(f"🔍 [MIDDLEWARE] KB encontrado: {kb is not None}", flush=True)
                 
                 if kb:
+                    print(f"🔍 [MIDDLEWARE] Onboarding completo: {kb.onboarding_completed}", flush=True)
+                    
                     # Se onboarding não concluído, redirecionar para Base de Conhecimento
                     if not kb.onboarding_completed:
                         # Evitar loop de redirecionamento
                         if not request.path.startswith('/knowledge/'):
+                            print(f"🔄 [MIDDLEWARE] Redirecionando para knowledge:view (onboarding incompleto)", flush=True)
                             return redirect('knowledge:view')
                     else:
                         # Onboarding concluído: redirecionar para Perfil se tentar acessar dashboard
                         if request.path == '/':
+                            print(f"🔄 [MIDDLEWARE] Redirecionando para perfil (onboarding completo)", flush=True)
                             return redirect('knowledge:perfil_view')
-            except Exception:
+                        else:
+                            print(f"✅ [MIDDLEWARE] Permitindo acesso a {request.path} (onboarding completo)", flush=True)
+            except Exception as e:
                 # Em caso de erro, permitir acesso (fail-safe)
+                print(f"❌ [MIDDLEWARE] Erro: {e}", flush=True)
                 pass
         
         return None

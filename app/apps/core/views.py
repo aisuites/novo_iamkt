@@ -37,6 +37,8 @@ def dashboard(request):
     if kb and not kb.onboarding_completed:
         show_welcome = True
     
+    print(f"🔍 [DASHBOARD] KB: {kb is not None} | Onboarding: {kb.onboarding_completed if kb else 'N/A'} | Show Welcome: {show_welcome}", flush=True)
+    
     # Estatísticas da organização (compartilhadas entre todos os usuários)
     user_area = user.areas.first() if user.areas.exists() else None
     
