@@ -31,13 +31,7 @@ def dashboard(request):
         kb_completude = 0
         kb = None
     
-    # ETAPA 6: Modal baseado em onboarding_completed
-    # Modal só aparece se onboarding não foi concluído
-    show_welcome = False
-    if kb and not kb.onboarding_completed:
-        show_welcome = True
-    
-    print(f"🔍 [DASHBOARD] KB: {kb is not None} | Onboarding: {kb.onboarding_completed if kb else 'N/A'} | Suggestions: {kb.suggestions_reviewed if kb else 'N/A'} | Show Welcome: {show_welcome}", flush=True)
+    print(f"🔍 [DASHBOARD] KB: {kb is not None} | Onboarding: {kb.onboarding_completed if kb else 'N/A'} | Suggestions: {kb.suggestions_reviewed if kb else 'N/A'}", flush=True)
     
     # Estatísticas da organização (compartilhadas entre todos os usuários)
     user_area = user.areas.first() if user.areas.exists() else None
@@ -167,7 +161,6 @@ def dashboard(request):
         'trends_recentes': trends_recentes,
         'quota_info': quota_info,
         'atividades_recentes': atividades_recentes,
-        'show_welcome_modal': show_welcome,
     }
     
     return render(request, 'dashboard/dashboard.html', context)

@@ -62,15 +62,23 @@
 </div>
 
 <script>
-  // Fechar modal ao clicar no botão
-  document.getElementById('closeWelcomeModal').addEventListener('click', function() {
-    document.getElementById('welcomeModal').style.display = 'none';
-  });
-  
-  // Fechar modal ao clicar fora
-  document.getElementById('welcomeModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-      this.style.display = 'none';
+  // Exibir modal welcome e configurar eventos de fechamento
+  document.addEventListener('DOMContentLoaded', function() {
+    const welcomeModal = document.getElementById('welcomeModal');
+    const closeBtn = document.getElementById('closeWelcomeModal');
+    
+    if (welcomeModal && closeBtn) {
+      // Fechar modal ao clicar no botão
+      closeBtn.addEventListener('click', function() {
+        welcomeModal.style.display = 'none';
+      });
+      
+      // Fechar modal ao clicar fora (no overlay)
+      welcomeModal.addEventListener('click', function(e) {
+        if (e.target === welcomeModal) {
+          welcomeModal.style.display = 'none';
+        }
+      });
     }
   });
 </script>
