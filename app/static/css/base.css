@@ -47,7 +47,8 @@
   
   /* Estados */
   --color-success: #22c55e;
-  --color-progress-fill-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
   --color-info: #3b82f6;
   
   /* ========================================
@@ -71,6 +72,13 @@
   --iamkt-gray-light: var(--color-surface);
   --iamkt-gray: var(--color-text-muted);
   --iamkt-gray-dark: var(--color-text);
+  
+  /* Femme design system compatibility */
+  --femme-warning: var(--color-warning);
+  --femme-error: var(--color-error);
+  --femme-danger: var(--color-error);
+  --femme-bg-alt: var(--color-surface);
+  --femme-border: #e5e7eb;
 
   /* Sombras */
   --shadow-soft: 0 18px 40px rgba(20, 5, 36, 0.08);
