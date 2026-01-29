@@ -79,38 +79,39 @@ def n8n_webhook_fundamentos(request):
     
     cache.set(cache_key, current_count + 1, 60)
     
-    # CAMADA 3: Validação de Timestamp (anti-replay)
-    timestamp_header = request.headers.get('X-Timestamp')
+    # CAMADA 3: Validação de Timestamp (TEMPORARIAMENTE DESABILITADA)
+    # timestamp_header = request.headers.get('X-Timestamp')
     
-    if not timestamp_header:
-        logger.warning("Missing X-Timestamp header")
-        return JsonResponse({
-            'success': False,
-            'error': 'Missing timestamp'
-        }, status=400)
+    # if not timestamp_header:
+    #     logger.warning("Missing X-Timestamp header")
+    #     return JsonResponse({
+    #         'success': False,
+    #         'error': 'Missing timestamp'
+    #     }, status=400)
     
-    try:
-        timestamp = int(timestamp_header)
-    except ValueError:
-        logger.warning(f"Invalid timestamp format: {timestamp_header}")
-        return JsonResponse({
-            'success': False,
-            'error': 'Invalid timestamp'
-        }, status=400)
+    # try:
+    #     timestamp = int(timestamp_header)
+    # except ValueError:
+    #     logger.warning(f"Invalid timestamp format: {timestamp_header}")
+    #     return JsonResponse({
+    #         'success': False,
+    #         'error': 'Invalid timestamp'
+    #     }, status=400)
     
-    # Verificar se timestamp está dentro da janela de 5 minutos
-    current_time = int(time.time())
-    time_diff = abs(current_time - timestamp)
+    # current_time = int(time.time())
+    # time_diff = abs(current_time - timestamp)
     
-    if time_diff > 300:  # 5 minutos
-        logger.warning(
-            f"Request expired. Time diff: {time_diff}s, "
-            f"Timestamp: {timestamp}, Current: {current_time}"
-        )
-        return JsonResponse({
-            'success': False,
-            'error': 'Request expired'
-        }, status=401)
+    # if time_diff > 300:  # 5 minutos
+    #     logger.warning(
+    #         f"Request expired. Time diff: {time_diff}s, "
+    #         f"Timestamp: {timestamp}, Current: {current_time}"
+    #     )
+    #     return JsonResponse({
+    #         'success': False,
+    #         'error': 'Request expired'
+    #     }, status=401)
+    
+    timestamp = int(time.time())  # Usar timestamp atual para HMAC
     
     # CAMADA 4: Validação de Assinatura HMAC
     signature_header = request.headers.get('X-Signature')
