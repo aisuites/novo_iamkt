@@ -104,27 +104,50 @@ class N8NService:
                 'analysis_requested_at'
             ])
             
-            # 4. Montar payload com revision_id
+            # 4. Montar payload COMPLETO com revision_id
             payload = {
+                # Metadados
                 'kb_id': kb_instance.id,
                 'organization_id': kb_instance.organization_id,
                 'organization_name': kb_instance.organization.name,
                 'revision_id': revision_id,
+                
+                # BLOCO 1: Identidade Institucional
+                'company_name': kb_instance.nome_empresa or '',
                 'mission': kb_instance.missao or '',
                 'vision': kb_instance.visao or '',
+                'values': kb_instance.valores or '',
+                'description': kb_instance.descricao_produto or '',
+                
+                # BLOCO 2: Públicos & Segmentos
+                'target_audience': kb_instance.publico_externo or '',
+                'internal_audience': kb_instance.publico_interno or '',
+                'internal_segments': kb_instance.segmentos_internos or [],
+                
+                # BLOCO 3: Posicionamento & Diferenciais
+                'positioning': kb_instance.posicionamento or '',
                 'value_proposition': kb_instance.proposta_valor or '',
                 'differentials': kb_instance.diferenciais or '',
-                'phrase_10_words': '',
-                'target_audience': kb_instance.publico_externo or '',
+                
+                # BLOCO 4: Tom de Voz
                 'tone_of_voice': kb_instance.tom_voz_externo or '',
-                'description': kb_instance.descricao_produto or '',
+                'internal_tone_of_voice': kb_instance.tom_voz_interno or '',
+                'recommended_words': kb_instance.palavras_recomendadas or [],
+                'words_to_avoid': kb_instance.palavras_evitar or [],
+                
+                # BLOCO 5: Identidade Visual
                 'palette_colors': [c.hex_code for c in kb_instance.colors.all()],
                 'logo_files': [l.s3_url for l in kb_instance.logos.all() if l.s3_url],
                 'fonts': [{'name': t.google_font_name or t.custom_font.name if t.custom_font else '', 'url': t.google_font_url or (t.custom_font.s3_url if t.custom_font else '')} for t in kb_instance.typography_settings.all()],
+                
+                # BLOCO 6: Sites e Redes Sociais
                 'website_url': kb_instance.site_institucional or '',
                 'social_networks': [{'platform': s.platform, 'url': s.url} for s in kb_instance.social_networks.all()],
                 'competitors': kb_instance.concorrentes or [],
+                
+                # BLOCO 7: Dados & Insights
                 'reference_images': [r.s3_url for r in kb_instance.reference_images.all() if r.s3_url],
+                'data_insights': kb_instance.dados_insights or '',
             }
             
             # 3. Gerar timestamp e assinatura

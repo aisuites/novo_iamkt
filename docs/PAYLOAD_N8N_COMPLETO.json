@@ -1,0 +1,109 @@
+{
+  "// METADADOS": "Informações de controle e identificação",
+  "kb_id": 5,
+  "organization_id": 9,
+  "organization_name": "Fulanas",
+  "revision_id": "abc123def4567890",
+  
+  "// BLOCO 1": "Identidade Institucional",
+  "company_name": "Fulanas - Clínica de Saúde da Mulher",
+  "mission": "Promover a saúde integral da mulher através de atendimento humanizado e especializado.",
+  "vision": "Ser referência nacional em saúde feminina até 2030.",
+  "values": "Empatia, Excelência, Respeito, Inovação, Acolhimento",
+  "description": "Clínica especializada em saúde da mulher, oferecendo consultas ginecológicas, obstetrícia, exames preventivos e tratamentos especializados.",
+  
+  "// BLOCO 2": "Públicos & Segmentos",
+  "target_audience": "Mulheres de 18 a 65 anos, classes A e B, que buscam atendimento médico de qualidade e humanizado.",
+  "internal_audience": "Equipe médica especializada, enfermeiras, recepcionistas e equipe administrativa.",
+  "internal_segments": [
+    "Médicos Ginecologistas",
+    "Médicos Obstetras",
+    "Enfermeiras",
+    "Recepção",
+    "Administrativo"
+  ],
+  
+  "// BLOCO 3": "Posicionamento & Diferenciais",
+  "positioning": "Clínica premium de saúde da mulher com foco em atendimento humanizado e tecnologia de ponta.",
+  "value_proposition": "Cuidado integral da saúde feminina com equipe especializada e ambiente acolhedor.",
+  "differentials": "Atendimento personalizado, tecnologia de última geração, equipe 100% feminina, ambiente acolhedor e seguro.",
+  
+  "// BLOCO 4": "Tom de Voz",
+  "tone_of_voice": "Acolhedor, empático, profissional, confiável e próximo. Linguagem clara e acessível, sem termos técnicos excessivos.",
+  "internal_tone_of_voice": "Colaborativo, respeitoso, técnico quando necessário, motivador e alinhado aos valores da clínica.",
+  "recommended_words": [
+    "Cuidado",
+    "Acolhimento",
+    "Saúde integral",
+    "Bem-estar",
+    "Empoderamento",
+    "Prevenção",
+    "Qualidade de vida",
+    "Humanização"
+  ],
+  "words_to_avoid": [
+    "Problema",
+    "Complicação",
+    "Risco",
+    "Difícil",
+    "Impossível",
+    "Nunca",
+    "Sempre"
+  ],
+  
+  "// BLOCO 5": "Identidade Visual",
+  "palette_colors": [
+    "#E91E63",
+    "#F8BBD0",
+    "#880E4F",
+    "#FFFFFF",
+    "#263238"
+  ],
+  "logo_files": [
+    "https://s3.amazonaws.com/bucket/org-9/logos/logo-fulanas.png"
+  ],
+  "fonts": [
+    {
+      "name": "Montserrat",
+      "url": "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap"
+    },
+    {
+      "name": "Open Sans",
+      "url": "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap"
+    }
+  ],
+  
+  "// BLOCO 6": "Sites e Redes Sociais",
+  "website_url": "https://www.fulanas.com.br",
+  "social_networks": [
+    {
+      "platform": "instagram",
+      "url": "https://instagram.com/fulanas"
+    },
+    {
+      "platform": "facebook",
+      "url": "https://facebook.com/fulanas"
+    },
+    {
+      "platform": "linkedin",
+      "url": "https://linkedin.com/company/fulanas"
+    }
+  ],
+  "competitors": [
+    {
+      "nome": "Clínica Vida",
+      "url": "https://www.clinicavida.com.br"
+    },
+    {
+      "nome": "Espaço Mulher",
+      "url": "https://www.espacomulher.com.br"
+    }
+  ],
+  
+  "// BLOCO 7": "Dados & Insights",
+  "reference_images": [
+    "https://s3.amazonaws.com/bucket/org-9/references/ref-1.jpg",
+    "https://s3.amazonaws.com/bucket/org-9/references/ref-2.jpg"
+  ],
+  "data_insights": "Principais insights: 80% das pacientes chegam por indicação, faixa etária predominante 25-45 anos, maior demanda por consultas preventivas."
+}
