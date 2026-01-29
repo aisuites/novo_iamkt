@@ -107,13 +107,13 @@
 
     <!-- Aprovações -->
     {% if aprovacoes_pendentes > 0 %}
-    <div class="card" style="border-color: var(--femme-warning);">
+    <div class="card card-warning">
       <div class="card-header">
         <h3 class="card-title">⏳ Aprovações Pendentes</h3>
       </div>
       <div class="flex items-center justify-between">
         <div>
-          <div class="text-2xl font-bold" style="color: var(--femme-warning);">{{ aprovacoes_pendentes }}</div>
+          <div class="text-2xl font-bold text-warning">{{ aprovacoes_pendentes }}</div>
           <div class="text-sm text-muted">Aguardando sua aprovação</div>
         </div>
         <a href="{% url 'campaigns:approvals' %}" class="btn btn-outline btn-sm">
@@ -136,8 +136,8 @@
             <span class="text-xs text-muted">Pautas Hoje</span>
             <span class="text-xs font-semibold">{{ quota_info.pautas_hoje }} / {{ quota_info.pautas_dia_max }}</span>
           </div>
-          <div class="w-full bg-gray-200 rounded-full h-1.5">
-            <div class="h-1.5 rounded-full {% if quota_info.pautas_dia_percentual >= 100 %}bg-red-500{% elif quota_info.pautas_dia_percentual >= 80 %}bg-yellow-500{% else %}bg-purple{% endif %}" style="width: {{ quota_info.pautas_dia_percentual|floatformat:0 }}%;"></div>
+          <div class="progress-bar">
+            <div class="progress-fill {% if quota_info.pautas_dia_percentual >= 100 %}progress-fill-danger{% elif quota_info.pautas_dia_percentual >= 80 %}progress-fill-warning{% else %}progress-fill-success{% endif %}" style="width: {{ quota_info.pautas_dia_percentual|floatformat:0 }}%;"></div>
           </div>
         </div>
         
@@ -147,8 +147,8 @@
             <span class="text-xs text-muted">Posts Hoje</span>
             <span class="text-xs font-semibold">{{ quota_info.posts_hoje }} / {{ quota_info.posts_dia_max }}</span>
           </div>
-          <div class="w-full bg-gray-200 rounded-full h-1.5">
-            <div class="h-1.5 rounded-full {% if quota_info.posts_dia_percentual >= 100 %}bg-red-500{% elif quota_info.posts_dia_percentual >= 80 %}bg-yellow-500{% else %}bg-purple{% endif %}" style="width: {{ quota_info.posts_dia_percentual|floatformat:0 }}%;"></div>
+          <div class="progress-bar">
+            <div class="progress-fill {% if quota_info.posts_dia_percentual >= 100 %}progress-fill-danger{% elif quota_info.posts_dia_percentual >= 80 %}progress-fill-warning{% else %}progress-fill-success{% endif %}" style="width: {{ quota_info.posts_dia_percentual|floatformat:0 }}%;"></div>
           </div>
         </div>
         
@@ -158,8 +158,8 @@
             <span class="text-xs text-muted">Posts Mês</span>
             <span class="text-xs font-semibold">{{ quota_info.posts_mes }} / {{ quota_info.posts_mes_max }}</span>
           </div>
-          <div class="w-full bg-gray-200 rounded-full h-1.5">
-            <div class="h-1.5 rounded-full {% if quota_info.posts_mes_percentual >= 100 %}bg-red-500{% elif quota_info.posts_mes_percentual >= 80 %}bg-yellow-500{% else %}bg-purple{% endif %}" style="width: {{ quota_info.posts_mes_percentual|floatformat:0 }}%;"></div>
+          <div class="progress-bar">
+            <div class="progress-fill {% if quota_info.posts_mes_percentual >= 100 %}progress-fill-danger{% elif quota_info.posts_mes_percentual >= 80 %}progress-fill-warning{% else %}progress-fill-success{% endif %}" style="width: {{ quota_info.posts_mes_percentual|floatformat:0 }}%;"></div>
           </div>
         </div>
         
@@ -188,7 +188,7 @@
       {% if atividades_recentes %}
         <div class="flex flex-col gap-3">
           {% for atividade in atividades_recentes %}
-            <div class="flex items-start gap-3 p-3 rounded-lg" style="background: var(--femme-bg-alt);">
+            <div class="flex items-start gap-3 p-3 rounded-lg bg-alt">
               <div class="flex-1">
                 <div class="font-medium">{{ atividade.titulo }}</div>
                 <div class="text-xs text-muted">
@@ -216,7 +216,7 @@
       {% if trends_recentes %}
         <div class="flex flex-col gap-3">
           {% for trend in trends_recentes %}
-            <div class="flex items-start gap-3 p-3 rounded-lg" style="background: var(--femme-bg-alt);">
+            <div class="flex items-start gap-3 p-3 rounded-lg bg-alt">
               <div class="flex-1">
                 <div class="font-medium">{{ trend.keyword }}</div>
                 <div class="text-xs text-muted">

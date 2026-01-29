@@ -164,11 +164,6 @@ def knowledge_view(request):
     if kb and not kb.onboarding_completed:
         show_welcome_modal = True
     
-    # DEBUG: Log para verificar modal
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"[MODAL DEBUG] kb exists: {kb is not None}, onboarding_completed: {kb.onboarding_completed if kb else 'N/A'}, show_welcome_modal: {show_welcome_modal}")
-    
     context = {
         'kb': kb,
         'forms': forms,

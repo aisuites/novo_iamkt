@@ -4,6 +4,27 @@
  */
 
 /* ========================================
+   USER INFO - Header Components
+   ======================================== */
+
+.user-name {
+  font-weight: 600;
+}
+
+.user-org {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+/* Footer */
+.footer-main {
+  background: var(--femme-bg-alt);
+  border-top: 1px solid var(--femme-border);
+  margin-top: var(--spacing-12);
+  padding: var(--spacing-8) 0;
+}
+
+/* ========================================
    0. AUTH PAGES (Login, Register)
    ======================================== */
 

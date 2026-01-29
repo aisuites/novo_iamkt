@@ -20,8 +20,8 @@
       <div class="user-info">
         <div class="user-avatar">{{ user.first_name|default:"U"|slice:":1"|upper }}</div>
         <div>
-          <div style="font-weight:600;">{{ user.first_name|default:user.username }}</div>
-          <div style="font-size:11px; color:var(--color-text-muted);">{{ user.organization.name|default:"IAMKT" }}</div>
+          <div class="user-name">{{ user.first_name|default:user.username }}</div>
+          <div class="user-org">{{ user.organization.name|default:"IAMKT" }}</div>
         </div>
       </div>
       <a href="{% url 'logout' %}" class="btn-logout" title="Sair">
