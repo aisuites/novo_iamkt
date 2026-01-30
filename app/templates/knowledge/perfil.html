@@ -4,7 +4,7 @@
 {% block title %}Perfil da Empresa - IAMKT{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/perfil.css' %}?v=20260129-1703">
+<link rel="stylesheet" href="{% static 'css/perfil.css' %}?v=20260130-0235">
 <link rel="stylesheet" href="{% static 'css/logo-upload-widget.css' %}?v=20260129-1703">
 <link rel="stylesheet" href="{% static 'css/confirm-modal.css' %}?v=20260129-1703">
 {% endblock %}
@@ -106,7 +106,11 @@
                 <div class="analysis-card-body">
                     <div class="analysis-section">
                         <label class="analysis-label">INFORMADO</label>
-                        <div class="analysis-value">{{ campo.informado|default:"Não informado" }}</div>
+                        <div class="analysis-value editable-field" 
+                             contenteditable="true" 
+                             data-field="{{ campo.nome }}"
+                             data-original="{{ campo.informado|default:'' }}">{{ campo.informado|default:"Não informado" }}</div>
+                        <div class="field-hint">Clique para editar</div>
                     </div>
                     
                     <div class="analysis-section">

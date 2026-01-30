@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Estado das decisões do usuário
     const decisions = {};
     
+    // Estado das edições nos campos INFORMADO
+    const editedFields = {};
+    
     // Inicializar todos os cards com "Rejeitar" selecionado por padrão
     const allCards = document.querySelectorAll('.analysis-card');
     allCards.forEach(card => {
@@ -18,6 +21,36 @@ document.addEventListener('DOMContentLoaded', function() {
         decisions[fieldName] = 'reject';
         rejectBtn.classList.add('active');
         feedbackRejected.classList.add('show');
+    });
+    
+    // Rastrear edições nos campos INFORMADO
+    const editableFields = document.querySelectorAll('.editable-field');
+    editableFields.forEach(field => {
+        const fieldName = field.dataset.field;
+        const originalValue = field.dataset.original;
+        
+        field.addEventListener('input', function() {
+            const currentValue = this.textContent.trim();
+            
+            // Verificar se houve mudança
+            if (currentValue !== originalValue) {
+                editedFields[fieldName] = currentValue;
+                this.classList.add('edited');
+            } else {
+                delete editedFields[fieldName];
+                this.classList.remove('edited');
+            }
+            
+            updateCounter();
+        });
+        
+        field.addEventListener('blur', function() {
+            // Salvar valor ao perder foco
+            const currentValue = this.textContent.trim();
+            if (currentValue !== originalValue) {
+                console.log(`Campo ${fieldName} editado: "${originalValue}" → "${currentValue}"`);
+            }
+        });
     });
     
     // Atualizar contador inicial (deve ser 0 aceitos)
@@ -80,20 +113,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * Atualiza contador de sugestões aceitas
+     * Atualiza o contador de sugestões aceitas + campos editados
      */
     function updateCounter() {
         const acceptedCount = Object.values(decisions).filter(d => d === 'accept').length;
+        const editedCount = Object.keys(editedFields).length;
+        const totalChanges = acceptedCount + editedCount;
+        
+        const counter = document.querySelector('.counter');
         const submitBtn = document.getElementById('btn-submit-suggestions');
         
+        if (counter) {
+            counter.textContent = totalChanges;
+        }
+        
         if (submitBtn) {
-            const counterSpan = submitBtn.querySelector('.counter');
-            if (counterSpan) {
-                counterSpan.textContent = acceptedCount;
-            }
+            submitBtn.disabled = totalChanges === 0;
             
-            // Habilitar/desabilitar botão
-            submitBtn.disabled = acceptedCount === 0;
+            // Atualizar texto do botão
+            if (editedCount > 0 && acceptedCount > 0) {
+                submitBtn.innerHTML = `Salvar Alterações <span class="counter">${totalChanges}</span>`;
+            } else if (editedCount > 0) {
+                submitBtn.innerHTML = `Salvar Edições <span class="counter">${totalChanges}</span>`;
+            } else {
+                submitBtn.innerHTML = `Aplicar Sugestões Selecionadas <span class="counter">${totalChanges}</span>`;
+            }
         }
     }
     
