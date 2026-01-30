@@ -77,20 +77,28 @@
             </div>
         </div>
         
-        <!-- Lista de Cards de Análise -->
+        <!-- Lista de Cards de Análise Agrupados por Bloco -->
         <div class="analysis-cards-list">
-            {% for campo_nome, campo_data in campos_analise.items %}
-            <div class="analysis-card" data-field="{{ campo_nome }}">
+            {% for bloco in blocos_analise %}
+            <!-- Cabeçalho do Bloco -->
+            <div class="analysis-block-header">
+                <div class="form-block-kicker">Bloco {{ bloco.numero }}</div>
+                <div class="form-block-title">{{ bloco.titulo }}</div>
+            </div>
+            
+            <!-- Campos do Bloco -->
+            {% for campo in bloco.campos %}
+            <div class="analysis-card" data-field="{{ campo.nome }}">
                 <div class="analysis-card-header">
                     <div>
-                        <h3 class="analysis-card-title">{{ campo_data.label }}</h3>
-                        <p class="analysis-card-subtitle">Bloco avaliado pelo agente</p>
+                        <h3 class="analysis-card-title">{{ campo.label }}</h3>
+                        <p class="analysis-card-subtitle">Campo avaliado pelo agente</p>
                     </div>
-                    {% if campo_data.status == 'fraco' %}
+                    {% if campo.status == 'fraco' %}
                         <span class="badge badge-danger">fraco</span>
-                    {% elif campo_data.status == 'médio' %}
+                    {% elif campo.status == 'médio' %}
                         <span class="badge badge-warning">médio</span>
-                    {% elif campo_data.status == 'bom' %}
+                    {% elif campo.status == 'bom' %}
                         <span class="badge badge-success">bom</span>
                     {% endif %}
                 </div>
@@ -98,30 +106,28 @@
                 <div class="analysis-card-body">
                     <div class="analysis-section">
                         <label class="analysis-label">INFORMADO</label>
-                        <div class="analysis-content">{{ campo_data.informado|default:"" }}</div>
+                        <div class="analysis-value">{{ campo.informado|default:"Não informado" }}</div>
                     </div>
                     
                     <div class="analysis-section">
                         <label class="analysis-label">AVALIAÇÃO</label>
-                        <div class="analysis-content">{{ campo_data.avaliacao }}</div>
+                        <div class="analysis-evaluation">{{ campo.avaliacao }}</div>
                     </div>
                     
-                    {% if campo_data.sugestao %}
-                    <div class="analysis-section analysis-section-full">
-                        <label class="analysis-label">SUGESTÃO DO AGENTE</label>
-                        <div class="analysis-content">{{ campo_data.sugestao }}</div>
+                    {% if campo.sugestao %}
+                    <div class="analysis-section">
+                        <label class="analysis-label">SUGESTÃO</label>
+                        <div class="analysis-suggestion">{{ campo.sugestao }}</div>
+                        <div class="analysis-actions">
+                            <button type="button" class="btn-action btn-action-accept" data-action="accept-suggestion" data-field="{{ campo.nome }}">
+                                ✓ Aceitar Sugestão
+                            </button>
+                            <button type="button" class="btn-action btn-action-reject" data-action="reject-suggestion" data-field="{{ campo.nome }}">
+                                × Rejeitar
+                            </button>
+                        </div>
                     </div>
                     {% endif %}
-                </div>
-                
-                {% if campo_data.sugestao %}
-                <div class="analysis-card-actions">
-                    <button class="btn-action btn-action-accept">
-                        ✓ Aceitar
-                    </button>
-                    <button class="btn-action btn-action-reject">
-                        ✗ Rejeitar
-                    </button>
                 </div>
                 
                 <div class="analysis-feedback analysis-feedback-accepted">

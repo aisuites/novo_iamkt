@@ -671,67 +671,134 @@ def perfil_view(request):
         campos_raw = payload[0] if isinstance(payload, list) else {}
         
         # Mapear nomes técnicos para labels amigáveis
+        # IMPORTANTE: Usar os mesmos títulos da página Base de Conhecimento
         field_labels = {
-            'missao': 'Missão',
-            'visao': 'Visão',
-            'valores': 'Valores',
-            'descricao_do_produto': 'Descrição do Produto/Serviço',
-            'publico_alvo': 'Público-Alvo',
-            'posicionamento': 'Posicionamento',
-            'diferenciais': 'Diferenciais',
-            'proposta_de_valor': 'Proposta de Valor',
-            'tom_de_voz': 'Tom de Voz',
-            'paleta_de_cores': 'Paleta de Cores',
-            'fontes': 'Fontes Tipográficas',
-            'logotipo': 'Logotipo',
-            'imagens_de_referencia': 'Imagens de Referência',
-            'website': 'Website',
-            'redes_sociais': 'Redes Sociais',
-            'concorrencia': 'Concorrência',
-            'frase_em_10_palavras': 'Frase em 10 Palavras',
-            'sugestoes_estrategicas_de_ativacao_de_marca': 'Sugestões Estratégicas'
+            # BLOCO 1: Identidade Institucional
+            'company_name': 'Nome da empresa',
+            'mission': 'Missão',
+            'vision': 'Visão',
+            'values': 'Valores & princípios',
+            'description': 'Descrição do Produto/Serviço',
+            
+            # BLOCO 2: Públicos & Segmentos
+            'target_audience': 'Público externo',
+            'internal_audience': 'Público interno',
+            'internal_segments': 'Segmentos internos',
+            
+            # BLOCO 3: Posicionamento & Diferenciais
+            'positioning': 'Posicionamento de mercado',
+            'value_proposition': 'Proposta de valor',
+            'differentials': 'Diferenciais competitivos',
+            
+            # BLOCO 4: Tom de Voz & Linguagem
+            'tone_of_voice': 'Tom de voz externo',
+            'internal_tone_of_voice': 'Tom de voz interno',
+            'recommended_words': 'Palavras recomendadas',
+            'words_to_avoid': 'Palavras a evitar',
+            
+            # BLOCO 5: Identidade Visual
+            'palette_colors': 'Cores da identidade visual',
+            'fonts': 'Tipografia da marca',
+            'logo_files': 'Logotipos',
+            'reference_images': 'Imagens de referência',
+            
+            # BLOCO 6: Sites e Redes Sociais
+            'website_url': 'Site institucional',
+            'social_networks': 'Redes sociais',
+            'competitors': 'Concorrentes',
+            'phrase_in_10_words': 'Frase em 10 Palavras',
+            'strategic_suggestions_for_brand_activation': 'Sugestões Estratégicas'
         }
         
-        # Processar campos para o template
-        campos_analise = {}
+        # Ordem dos campos por bloco (mesma ordem da Base de Conhecimento)
+        blocos_estrutura = [
+            {
+                'numero': 1,
+                'titulo': 'Identidade institucional',
+                'campos': ['company_name', 'mission', 'vision', 'values', 'description']
+            },
+            {
+                'numero': 2,
+                'titulo': 'Públicos & segmentos',
+                'campos': ['target_audience', 'internal_audience', 'internal_segments']
+            },
+            {
+                'numero': 3,
+                'titulo': 'Posicionamento & diferenciais',
+                'campos': ['positioning', 'value_proposition', 'differentials']
+            },
+            {
+                'numero': 4,
+                'titulo': 'Tom de voz & linguagem',
+                'campos': ['tone_of_voice', 'internal_tone_of_voice', 'recommended_words', 'words_to_avoid']
+            },
+            {
+                'numero': 5,
+                'titulo': 'Identidade visual',
+                'campos': ['palette_colors', 'fonts', 'logo_files', 'reference_images']
+            },
+            {
+                'numero': 6,
+                'titulo': 'Sites e redes sociais',
+                'campos': ['website_url', 'social_networks', 'competitors']
+            }
+        ]
+        
+        # Processar campos agrupados por bloco
+        blocos_analise = []
         stats = {'fraco': 0, 'medio': 0, 'bom': 0}
         
-        for campo_nome, campo_data in campos_raw.items():
-            if not isinstance(campo_data, dict):
-                continue
+        for bloco in blocos_estrutura:
+            campos_bloco = []
             
-            status = campo_data.get('status', '')
+            for campo_nome in bloco['campos']:
+                if campo_nome not in campos_raw:
+                    continue
+                
+                campo_data = campos_raw[campo_nome]
+                if not isinstance(campo_data, dict):
+                    continue
+                
+                status = campo_data.get('status', '')
+                
+                # Contar estatísticas
+                if status == 'fraco':
+                    stats['fraco'] += 1
+                elif status == 'médio':
+                    stats['medio'] += 1
+                elif status == 'bom':
+                    stats['bom'] += 1
+                
+                # Preparar dados do campo
+                informado = campo_data.get('informado_pelo_usuario', '')
+                
+                # Converter listas/dicts em string legível
+                if isinstance(informado, list):
+                    informado = ', '.join(str(i) for i in informado) if informado else ''
+                elif isinstance(informado, dict):
+                    informado = json.dumps(informado, ensure_ascii=False, indent=2)
+                
+                sugestao = campo_data.get('sugestao_do_agente_iamkt', '')
+                if isinstance(sugestao, list):
+                    sugestao = '\n'.join(f"• {s}" for s in sugestao)
+                elif isinstance(sugestao, dict):
+                    sugestao = json.dumps(sugestao, ensure_ascii=False, indent=2)
+                
+                campos_bloco.append({
+                    'nome': campo_nome,
+                    'label': field_labels.get(campo_nome, campo_nome.replace('_', ' ').title()),
+                    'status': status,
+                    'informado': informado,
+                    'avaliacao': campo_data.get('avaliacao', ''),
+                    'sugestao': sugestao
+                })
             
-            # Contar estatísticas
-            if status == 'fraco':
-                stats['fraco'] += 1
-            elif status == 'médio':
-                stats['medio'] += 1
-            elif status == 'bom':
-                stats['bom'] += 1
-            
-            # Preparar dados do campo
-            informado = campo_data.get('informado_pelo_usuario', '')
-            
-            # Converter listas/dicts em string legível
-            if isinstance(informado, list):
-                informado = ', '.join(str(i) for i in informado) if informado else ''
-            elif isinstance(informado, dict):
-                informado = json.dumps(informado, ensure_ascii=False, indent=2)
-            
-            sugestao = campo_data.get('sugestao_do_agente_iamkt', '')
-            if isinstance(sugestao, list):
-                sugestao = '\n'.join(f"• {s}" for s in sugestao)
-            elif isinstance(sugestao, dict):
-                sugestao = json.dumps(sugestao, ensure_ascii=False, indent=2)
-            
-            campos_analise[campo_nome] = {
-                'label': field_labels.get(campo_nome, campo_nome.replace('_', ' ').title()),
-                'status': status,
-                'informado': informado,
-                'avaliacao': campo_data.get('avaliacao', ''),
-                'sugestao': sugestao
-            }
+            if campos_bloco:  # Só adicionar bloco se tiver campos
+                blocos_analise.append({
+                    'numero': bloco['numero'],
+                    'titulo': bloco['titulo'],
+                    'campos': campos_bloco
+                })
         
         from apps.knowledge.models import Logo
         primary_logo = Logo.objects.filter(
@@ -742,7 +809,7 @@ def perfil_view(request):
         context = {
             'kb': kb,
             'analysis_status': analysis_status,
-            'campos_analise': campos_analise,
+            'blocos_analise': blocos_analise,
             'stats': stats,
             'kb_onboarding_completed': kb.onboarding_completed if kb else False,
             'kb_suggestions_reviewed': kb.suggestions_reviewed if kb else False,
