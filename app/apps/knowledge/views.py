@@ -1,10 +1,11 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponse
-from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.cache import never_cache
 from django.db import transaction
+from django.utils import timezone
 import json
 
 from .models import (

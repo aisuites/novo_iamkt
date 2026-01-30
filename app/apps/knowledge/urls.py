@@ -7,6 +7,7 @@ from . import views_segments
 from . import views_tags
 from . import views_upload
 from . import views_n8n
+from . import views_perfil
 
 app_name = 'knowledge'
 
@@ -14,6 +15,7 @@ urlpatterns = [
     # Visualização e edição (página única)
     path('', views.knowledge_view, name='view'),
     path('perfil/', views.perfil_view, name='perfil_view'),
+    path('perfil/apply-suggestions/', views_perfil.perfil_apply_suggestions, name='perfil_apply_suggestions'),
     
     # Salvamento
     path('save-block/<int:block_number>/', views.knowledge_save_block, name='save_block'),

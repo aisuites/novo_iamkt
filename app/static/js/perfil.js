@@ -153,18 +153,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 .filter(([_, action]) => action === 'accept')
                 .map(([field, _]) => field);
             
-            if (acceptedFields.length === 0) {
-                alert('Selecione pelo menos uma sugestão para aplicar.');
+            const editedCount = Object.keys(editedFields).length;
+            const totalChanges = acceptedFields.length + editedCount;
+            
+            if (totalChanges === 0) {
+                alert('Nenhuma alteração foi feita.');
                 return;
             }
             
             // Confirmar ação
-            const confirmed = confirm(
-                `Você está prestes a aplicar ${acceptedFields.length} sugestão(ões).\n\n` +
-                'Isso irá atualizar os campos da sua Base de Conhecimento e solicitar ' +
-                'a compilação final ao agente IAMKT.\n\n' +
-                'Deseja continuar?'
-            );
+            let message = '';
+            if (editedCount > 0 && acceptedFields.length > 0) {
+                message = `Você editou ${editedCount} campo(s) e aceitou ${acceptedFields.length} sugestão(ões).\n\n`;
+            } else if (editedCount > 0) {
+                message = `Você editou ${editedCount} campo(s).\n\n`;
+            } else {
+                message = `Você aceitou ${acceptedFields.length} sugestão(ões).\n\n`;
+            }
+            message += 'Isso irá atualizar os campos da sua Base de Conhecimento.\n\nDeseja continuar?';
+            
+            const confirmed = confirm(message);
             
             if (!confirmed) return;
             
@@ -180,7 +188,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         'X-CSRFToken': getCookie('csrftoken')
                     },
                     body: JSON.stringify({
-                        accepted_suggestions: decisions
+                        accepted_suggestions: acceptedFields,
+                        edited_fields: editedFields
                     })
                 });
                 
