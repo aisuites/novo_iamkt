@@ -10,44 +10,31 @@
   padding: var(--spacing-8) var(--spacing-4);
 }
 
-/* Campos Editáveis */
+/* Campos Editáveis - Mesmo estilo da Base de Conhecimento */
 .editable-field {
-  padding: var(--spacing-3);
-  border: 2px dashed transparent;
-  border-radius: var(--radius-md);
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--white);
   transition: all 0.2s ease;
-  cursor: text;
-  min-height: 40px;
-}
-
-.editable-field:hover {
-  border-color: var(--color-border);
-  background: var(--white-95);
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
 }
 
 .editable-field:focus {
   outline: none;
   border-color: var(--color-primary);
-  background: var(--white);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .editable-field.edited {
   border-color: #f59e0b;
   background: #fffbeb;
-}
-
-.editable-field[contenteditable="true"]:empty:before {
-  content: "Clique para editar...";
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
-.field-hint {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-  margin-top: var(--spacing-1);
-  font-style: italic;
 }
 
 /* Header da Página */

@@ -106,11 +106,10 @@
                 <div class="analysis-card-body">
                     <div class="analysis-section">
                         <label class="analysis-label">INFORMADO</label>
-                        <div class="analysis-value editable-field" 
-                             contenteditable="true" 
-                             data-field="{{ campo.nome }}"
-                             data-original="{{ campo.informado|default:'' }}">{{ campo.informado|default:"Não informado" }}</div>
-                        <div class="field-hint">Clique para editar</div>
+                        <textarea class="analysis-value editable-field" 
+                                  data-field="{{ campo.nome }}"
+                                  data-original="{{ campo.informado|default:'' }}"
+                                  rows="3">{{ campo.informado|default:"Não informado" }}</textarea>
                     </div>
                     
                     <div class="analysis-section">

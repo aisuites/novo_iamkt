@@ -23,14 +23,14 @@ document.addEventListener('DOMContentLoaded', function() {
         feedbackRejected.classList.add('show');
     });
     
-    // Rastrear edições nos campos INFORMADO
+    // Rastrear edições nos campos INFORMADO (textarea)
     const editableFields = document.querySelectorAll('.editable-field');
     editableFields.forEach(field => {
         const fieldName = field.dataset.field;
         const originalValue = field.dataset.original;
         
         field.addEventListener('input', function() {
-            const currentValue = this.textContent.trim();
+            const currentValue = this.value.trim();
             
             // Verificar se houve mudança
             if (currentValue !== originalValue) {
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         field.addEventListener('blur', function() {
             // Salvar valor ao perder foco
-            const currentValue = this.textContent.trim();
+            const currentValue = this.value.trim();
             if (currentValue !== originalValue) {
                 console.log(`Campo ${fieldName} editado: "${originalValue}" → "${currentValue}"`);
             }
