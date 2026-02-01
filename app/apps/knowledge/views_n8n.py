@@ -331,9 +331,20 @@ def n8n_compilation_webhook(request):
     # CAMADA 5: Processar Compilação
     try:
         # Extrair dados da compilação
-        compilation_data = data.get('compilation', [])
+        # N8N pode enviar com chave 'compilation' ou diretamente os dados
+        compilation_data = data.get('compilation') or data
         
-        if not compilation_data:
+        # Remover metadados do Django (kb_id, organization_id, revision_id, flow_type)
+        # para manter apenas os dados compilados do N8N
+        metadata_keys = ['kb_id', 'organization_id', 'organization_name', 'revision_id', 'flow_type']
+        
+        # Se compilation_data ainda contém metadados, criar objeto limpo
+        if any(key in compilation_data for key in metadata_keys):
+            # Criar cópia sem metadados
+            clean_data = {k: v for k, v in compilation_data.items() if k not in metadata_keys}
+            compilation_data = clean_data
+        
+        if not compilation_data or len(compilation_data) == 0:
             logger.warning(
                 f"⚠️ [N8N_COMPILATION_WEBHOOK] Dados de compilação vazios para KB {kb.id}"
             )
@@ -342,11 +353,8 @@ def n8n_compilation_webhook(request):
                 'error': 'Dados de compilação vazios'
             }, status=400)
         
-        # Armazenar compilação (se vier como array, pegar primeiro item)
-        if isinstance(compilation_data, list) and len(compilation_data) > 0:
-            kb.n8n_compilation = compilation_data[0]
-        else:
-            kb.n8n_compilation = compilation_data
+        # Armazenar compilação diretamente
+        kb.n8n_compilation = compilation_data
         
         # Atualizar status
         kb.compilation_status = 'completed'
