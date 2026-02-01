@@ -216,12 +216,12 @@ def perfil_apply_suggestions(request):
             logger.info(f"✅ [PERFIL_APPLY] Enviado para N8N - Fluxo: {flow_type}")
         
         # 6. RETORNAR SUCESSO (frontend redireciona)
-        # Sempre redirecionar para perfil - middleware detectará compilation_status
+        # Redirecionar para perfil-visualizacao que detecta compilation_status
         return JsonResponse({
             'success': True,
             'updated_fields': updated_fields,
             'message': f'{len(updated_fields)} campo(s) atualizado(s) com sucesso!',
-            'redirect_url': '/knowledge/perfil/',
+            'redirect_url': '/knowledge/perfil-visualizacao/',
             'n8n_status': n8n_result['success'],
             'flow_type': flow_type,
             'is_reevaluation': bool(fields_for_reevaluation)
