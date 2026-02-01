@@ -340,15 +340,23 @@ def n8n_compilation_webhook(request):
         logger.info(f"🔍 [N8N_COMPILATION_WEBHOOK] Compilation data keys: {list(compilation_data.keys())}")
         
         # Remover metadados do Django (kb_id, organization_id, revision_id, flow_type)
-        # para manter apenas os dados compilados do N8N
+        # APENAS se existirem - não remover dados válidos do N8N
         metadata_keys = ['kb_id', 'organization_id', 'organization_name', 'revision_id', 'flow_type']
         
-        # Se compilation_data ainda contém metadados, criar objeto limpo
-        if any(key in compilation_data for key in metadata_keys):
+        # Verificar se há metadados para remover
+        has_metadata = any(key in compilation_data for key in metadata_keys)
+        
+        if has_metadata:
             # Criar cópia sem metadados
             clean_data = {k: v for k, v in compilation_data.items() if k not in metadata_keys}
-            compilation_data = clean_data
-            logger.info(f"🔍 [N8N_COMPILATION_WEBHOOK] Dados limpos - Keys: {list(compilation_data.keys())}")
+            # Só substituir se ainda houver dados após limpeza
+            if clean_data:
+                compilation_data = clean_data
+                logger.info(f"🔍 [N8N_COMPILATION_WEBHOOK] Metadados removidos - Keys restantes: {list(compilation_data.keys())}")
+            else:
+                logger.warning(f"⚠️ [N8N_COMPILATION_WEBHOOK] Todos os dados seriam removidos - mantendo original")
+        else:
+            logger.info(f"🔍 [N8N_COMPILATION_WEBHOOK] Nenhum metadado encontrado - usando dados diretamente")
         
         if not compilation_data or len(compilation_data) == 0:
             logger.warning(
