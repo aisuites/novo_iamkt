@@ -282,13 +282,14 @@ def n8n_webhook_fundamentos(request):
         
         # Se foi reavaliação, enviar para compilação automaticamente
         if is_reevaluation:
-            logger.info(f"🔄 [N8N_WEBHOOK] Enviando para compilação após reavaliação")
+            logger.info(f"🔄 [N8N_WEBHOOK] Enviando para compilação após reavaliação (semsugest)")
             from apps.knowledge.services.n8n_service import N8NService
             
             try:
-                compilation_result = N8NService.send_for_compilation(kb, has_accepted_suggestions=True)
+                # Sempre usar semsugest após reavaliação
+                compilation_result = N8NService.send_for_compilation(kb, has_accepted_suggestions=False)
                 if compilation_result['success']:
-                    logger.info(f"✅ [N8N_WEBHOOK] Compilação enviada com sucesso")
+                    logger.info(f"✅ [N8N_WEBHOOK] Compilação enviada com sucesso (semsugest)")
                 else:
                     logger.warning(f"⚠️ [N8N_WEBHOOK] Falha ao enviar compilação: {compilation_result.get('error')}")
             except Exception as e:
