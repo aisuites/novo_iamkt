@@ -227,9 +227,21 @@ def n8n_webhook_fundamentos(request):
             updated_count = 0
             for field_name in kb.accepted_suggestion_fields:
                 if field_name in new_payload:
-                    current_payload[field_name] = new_payload[field_name]
+                    new_field_data = new_payload[field_name]
+                    
+                    # Normalizar nomes dos campos do N8N para padrão do frontend
+                    # N8N usa: informado_pelo_usuario, status, sugestao_do_agente_iamkt
+                    # Frontend espera: informado, classificacao, sugestao
+                    normalized_field = {
+                        'informado': new_field_data.get('informado_pelo_usuario', ''),
+                        'classificacao': new_field_data.get('status', ''),
+                        'avaliacao': new_field_data.get('avaliacao', ''),
+                        'sugestao': new_field_data.get('sugestao_do_agente_iamkt', '')
+                    }
+                    
+                    current_payload[field_name] = normalized_field
                     updated_count += 1
-                    logger.info(f"   ✅ Campo atualizado: {field_name}")
+                    logger.info(f"   ✅ Campo atualizado: {field_name} (classificacao: {normalized_field['classificacao']})")
                 else:
                     logger.warning(f"   ⚠️ Campo não encontrado no retorno N8N: {field_name}")
             
