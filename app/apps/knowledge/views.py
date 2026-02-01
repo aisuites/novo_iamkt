@@ -1155,12 +1155,51 @@ def perfil_visualizacao_view(request):
     # Determinar estado da compilação
     compilation_status = kb.compilation_status
     
+    # Transformar dados do N8N para formato do template
+    compilation_data = {}
+    if kb.n8n_compilation:
+        n8n_data = kb.n8n_compilation
+        
+        # Mapear estrutura do N8N para estrutura do template
+        compilation_data = {
+            # Base consolidada - mapear de 'areas.base'
+            'base_consolidada': n8n_data.get('areas', {}).get('base', {}),
+            
+            # Presença digital - mapear de 'areas.digital_presence'
+            'presenca_digital': n8n_data.get('areas', {}).get('digital_presence', {}),
+            
+            # Identidade visual - mapear de 'areas.visual_identity'
+            'identidade_visual': n8n_data.get('areas', {}).get('visual_identity', {}),
+            
+            # Avaliação - mapear de 'evaluation', 'scores', 'assessment_summary'
+            'avaliacao': {
+                'evaluation': n8n_data.get('evaluation'),
+                'scores': n8n_data.get('scores', {}),
+                'summary': n8n_data.get('assessment_summary', {})
+            },
+            
+            # Melhorias - mapear de 'gaps'
+            'melhorias': n8n_data.get('gaps', []),
+            
+            # Plano de marketing - mapear de 'marketing_plan_4w'
+            'plano_marketing': n8n_data.get('marketing_plan_4w', []),
+            
+            # Lacunas - mapear de 'gaps'
+            'lacunas': n8n_data.get('gaps', []),
+            
+            # Links verificados - mapear de 'link_checks'
+            'links_verificados': n8n_data.get('link_checks', []),
+            
+            # Dados brutos para debug
+            '_raw': n8n_data
+        }
+    
     # Preparar contexto
     context = {
         'kb': kb,
         'compilation_status': compilation_status,
         'primary_logo': primary_logo,
-        'compilation_data': kb.n8n_compilation if kb.n8n_compilation else {},
+        'compilation_data': compilation_data,
     }
     
     return render(request, 'knowledge/perfil_visualizacao.html', context)
