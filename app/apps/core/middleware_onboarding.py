@@ -72,9 +72,9 @@ class OnboardingRequiredMiddleware(MiddlewareMixin):
                     
                     # FLUXO 3: Onboarding completo e sugestões revisadas - acesso total
                     else:
-                        # Redirecionar para dashboard se tentar acessar raiz
-                        if request.path in ['/', '/dashboard/', '/dashboard']:
-                            print(f"🔄 [MIDDLEWARE] FLUXO 3: Redirecionando para Dashboard", flush=True)
+                        # Redirecionar apenas a raiz para dashboard
+                        if request.path == '/':
+                            print(f"🔄 [MIDDLEWARE] FLUXO 3: Redirecionando raiz para Dashboard", flush=True)
                             return redirect('core:dashboard')
                         else:
                             print(f"✅ [MIDDLEWARE] FLUXO 3: Permitindo acesso a {request.path}", flush=True)
