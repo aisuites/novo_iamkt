@@ -234,9 +234,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         window.toaster.success(data.message || 'Alterações aplicadas com sucesso!');
                     }
                     
-                    // Redirecionar para Base de Conhecimento
+                    // Redirecionar para página de visualização
                     setTimeout(() => {
-                        window.location.href = '/knowledge/';
+                        window.location.href = data.redirect_url || '/knowledge/perfil-visualizacao/';
                     }, 1500);
                 } else {
                     // Mostrar erro

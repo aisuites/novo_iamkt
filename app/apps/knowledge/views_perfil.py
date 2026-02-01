@@ -12,6 +12,10 @@ from django.db import transaction
 import json
 
 from apps.knowledge.models import KnowledgeBase, ColorPalette
+from apps.knowledge.services.n8n_service import N8NService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @never_cache
@@ -181,12 +185,25 @@ def perfil_apply_suggestions(request):
             print(f"✅ [PERFIL_APPLY] Total de campos atualizados: {len(updated_fields)}", flush=True)
             print(f"✅ [PERFIL_APPLY] Campos: {updated_fields}", flush=True)
             print(f"💾 [PERFIL_APPLY] Dados salvos no banco (KB id={kb.id})", flush=True)
-            
-            return JsonResponse({
-                'success': True,
-                'updated_fields': updated_fields,
-                'message': f'{len(updated_fields)} campo(s) atualizado(s) com sucesso!'
-            })
+        
+        # 5. ENVIAR PARA N8N (fora da transação)
+        has_accepted = len(accepted_suggestions) > 0
+        n8n_result = N8NService.send_for_compilation(kb, has_accepted)
+        
+        if not n8n_result['success']:
+            logger.warning(f"⚠️ [PERFIL_APPLY] Falha ao enviar para N8N: {n8n_result.get('error')}")
+        else:
+            logger.info(f"✅ [PERFIL_APPLY] Enviado para N8N - Fluxo: {n8n_result.get('flow_type')}")
+        
+        # 6. RETORNAR SUCESSO (frontend redireciona)
+        return JsonResponse({
+            'success': True,
+            'updated_fields': updated_fields,
+            'message': f'{len(updated_fields)} campo(s) atualizado(s) com sucesso!',
+            'redirect_url': '/knowledge/perfil-visualizacao/',
+            'n8n_status': n8n_result['success'],
+            'flow_type': n8n_result.get('flow_type', 'unknown')
+        })
     
     except json.JSONDecodeError:
         return JsonResponse({

@@ -299,6 +299,17 @@ class KnowledgeBase(models.Model):
         default='pending',
         verbose_name='Status da Análise'
     )
+    compilation_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pendente'),
+            ('processing', 'Processando'),
+            ('completed', 'Completa'),
+            ('error', 'Erro'),
+        ],
+        default='pending',
+        verbose_name='Status da Compilação'
+    )
     analysis_revision_id = models.CharField(
         max_length=100,
         blank=True,

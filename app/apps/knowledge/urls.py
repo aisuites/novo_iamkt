@@ -60,4 +60,5 @@ urlpatterns = [
     
     # N8N Webhooks
     path('webhook/fundamentos/', views_n8n.n8n_webhook_fundamentos, name='n8n_webhook_fundamentos'),
+    path('webhook/compilation/', views_n8n.n8n_compilation_webhook, name='n8n_compilation_webhook'),
 ]

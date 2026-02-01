@@ -228,3 +228,146 @@ def n8n_webhook_fundamentos(request):
             'success': False,
             'error': 'Internal server error'
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def n8n_compilation_webhook(request):
+    """
+    Webhook para receber compilação do N8N (após aplicar sugestões).
+    
+    Segurança:
+    - Validação de token interno
+    - Validação de IP
+    - Rate limiting
+    """
+    
+    # CAMADA 1: Validação de Token Interno
+    internal_token = request.headers.get('X-INTERNAL-TOKEN')
+    
+    if internal_token != settings.N8N_INTERNAL_TOKEN:
+        logger.warning(
+            f"❌ [N8N_COMPILATION_WEBHOOK] Token inválido do IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        return JsonResponse({
+            'success': False,
+            'error': 'Unauthorized'
+        }, status=401)
+    
+    # CAMADA 2: Validação de IP
+    client_ip = request.META.get('HTTP_CF_CONNECTING_IP') or request.META.get('REMOTE_ADDR')
+    allowed_ips = settings.N8N_ALLOWED_IPS.split(',')
+    
+    if client_ip not in allowed_ips:
+        logger.warning(
+            f"❌ [N8N_COMPILATION_WEBHOOK] IP não autorizado: {client_ip}"
+        )
+        return JsonResponse({
+            'success': False,
+            'error': 'Forbidden'
+        }, status=403)
+    
+    # CAMADA 3: Rate Limiting por IP
+    cache_key = f"n8n_compilation_webhook_{client_ip}"
+    current_count = cache.get(cache_key, 0)
+    
+    limit_str = settings.N8N_RATE_LIMIT_PER_IP
+    max_requests = int(limit_str.split('/')[0])
+    
+    if current_count >= max_requests:
+        logger.warning(
+            f"⚠️ [N8N_COMPILATION_WEBHOOK] Rate limit excedido para IP {client_ip}"
+        )
+        return JsonResponse({
+            'success': False,
+            'error': 'Rate limit exceeded'
+        }, status=429)
+    
+    cache.set(cache_key, current_count + 1, 60)
+    
+    # CAMADA 4: Validação de Dados
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        logger.warning("❌ [N8N_COMPILATION_WEBHOOK] JSON inválido")
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    
+    # Extrair revision_id
+    revision_id = data.get('revision_id')
+    if not revision_id:
+        logger.warning("❌ [N8N_COMPILATION_WEBHOOK] revision_id ausente")
+        return JsonResponse({
+            'success': False,
+            'error': 'revision_id obrigatório'
+        }, status=400)
+    
+    # Buscar KB pelo revision_id
+    try:
+        kb = KnowledgeBase.objects.get(
+            analysis_revision_id=revision_id
+        )
+    except KnowledgeBase.DoesNotExist:
+        logger.error(
+            f"❌ [N8N_COMPILATION_WEBHOOK] KB não encontrado para revision_id: {revision_id}"
+        )
+        return JsonResponse({
+            'success': False,
+            'error': 'KB não encontrado'
+        }, status=404)
+    
+    # CAMADA 5: Processar Compilação
+    try:
+        # Extrair dados da compilação
+        compilation_data = data.get('compilation', [])
+        
+        if not compilation_data:
+            logger.warning(
+                f"⚠️ [N8N_COMPILATION_WEBHOOK] Dados de compilação vazios para KB {kb.id}"
+            )
+            return JsonResponse({
+                'success': False,
+                'error': 'Dados de compilação vazios'
+            }, status=400)
+        
+        # Armazenar compilação (se vier como array, pegar primeiro item)
+        if isinstance(compilation_data, list) and len(compilation_data) > 0:
+            kb.n8n_compilation = compilation_data[0]
+        else:
+            kb.n8n_compilation = compilation_data
+        
+        # Atualizar status
+        kb.compilation_status = 'completed'
+        kb.compilation_completed_at = timezone.now()
+        
+        kb.save(update_fields=[
+            'n8n_compilation',
+            'compilation_status',
+            'compilation_completed_at'
+        ])
+        
+        # Log sucesso
+        logger.info(
+            f"✅ [N8N_COMPILATION_WEBHOOK] Compilação recebida com sucesso. "
+            f"KB: {kb.id}, Org: {kb.organization.name}, Revision: {revision_id}"
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Compilação recebida com sucesso',
+            'kb_id': kb.id
+        }, status=200)
+        
+    except Exception as e:
+        logger.exception(f"❌ [N8N_COMPILATION_WEBHOOK] Erro ao processar compilação: {str(e)}")
+        
+        # Marcar como erro
+        kb.compilation_status = 'error'
+        kb.save(update_fields=['compilation_status'])
+        
+        return JsonResponse({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }, status=500)
