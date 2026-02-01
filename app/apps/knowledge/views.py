@@ -989,7 +989,8 @@ def perfil_view(request):
                         break
                 
                 if campo_data and isinstance(campo_data, dict):
-                    status = campo_data.get('status', '')
+                    # Buscar 'classificacao' (após merge seletivo) ou 'status' (primeira análise)
+                    status = campo_data.get('classificacao', campo_data.get('status', ''))
                     avaliacao = campo_data.get('avaliacao', '')
                     
                     # Contar estatísticas
@@ -1000,7 +1001,8 @@ def perfil_view(request):
                     elif status == 'bom':
                         stats['bom'] += 1
                     
-                    sugestao_raw = campo_data.get('sugestao_do_agente_iamkt', '')
+                    # Buscar 'sugestao' (após merge seletivo) ou 'sugestao_do_agente_iamkt' (primeira análise)
+                    sugestao_raw = campo_data.get('sugestao', campo_data.get('sugestao_do_agente_iamkt', ''))
                     if isinstance(sugestao_raw, list):
                         # Verificar se é lista de strings ou lista de objetos
                         if sugestao_raw and isinstance(sugestao_raw[0], dict):
