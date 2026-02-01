@@ -139,6 +139,22 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
+    padding: 8px;
+}
+
+/* Lazy loading - esconder até carregar */
+.lazy-load-image {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.lazy-load-image.loaded {
+    opacity: 1;
+}
+
+.lazy-load-image.error {
+    opacity: 0.3;
+    filter: grayscale(100%);
 }
 
 .logo-placeholder {

@@ -2,7 +2,10 @@
     <div class="header-content">
         <div class="header-logo">
             {% if primary_logo %}
-                <img src="{{ primary_logo.s3_url }}" alt="Logo {{ kb.nome_empresa }}" class="company-logo lazy-load">
+                <img src="#" 
+                     alt="Logo {{ kb.nome_empresa }}" 
+                     class="company-logo lazy-load-image"
+                     data-s3-key="{{ primary_logo.s3_key }}">
             {% else %}
                 <div class="logo-placeholder">
                     <span class="logo-initial">{{ kb.nome_empresa|first|upper }}</span>
