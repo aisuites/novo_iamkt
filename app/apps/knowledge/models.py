@@ -284,6 +284,12 @@ class KnowledgeBase(models.Model):
         verbose_name='Sugestões Aceitas',
         help_text='Campos onde usuário aceitou sugestão do agente'
     )
+    accepted_suggestion_fields = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Campos com Sugestões Aceitas',
+        help_text='Lista de nomes de campos que tiveram sugestões aceitas (para reavaliação)'
+    )
     
     # Status e metadados
     analysis_status = models.CharField(

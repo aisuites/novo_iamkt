@@ -74,6 +74,7 @@ def perfil_apply_suggestions(request):
         
         with transaction.atomic():
             updated_fields = []
+            fields_for_reevaluation = []  # Campos que precisam ser reavaliados (editados + aceitos)
             
             # 1. APLICAR EDIÇÕES MANUAIS (campos editados em tela)
             for field_en, new_value in edited_fields.items():
@@ -125,6 +126,7 @@ def perfil_apply_suggestions(request):
                     
                     setattr(kb, model_field, new_value)
                     updated_fields.append(model_field)
+                    fields_for_reevaluation.append(field_en)  # Adicionar à lista de reavaliação
                     print(f"✅ [PERFIL_APPLY] Campo editado: {field_en} → {model_field} = {new_value}", flush=True)
             
             # 2. APLICAR SUGESTÕES ACEITAS (buscar do JSON N8N)
@@ -145,7 +147,7 @@ def perfil_apply_suggestions(request):
                             print(f"⚠️ [PERFIL_APPLY] Campo {field_en} não mapeado ou não existe no modelo", flush=True)
                             continue
                         
-                        print(f"� [PERFIL_APPLY] Processando: {field_en} → {model_field}", flush=True)
+                        print(f"🔄 [PERFIL_APPLY] Processando: {field_en} → {model_field}", flush=True)
                         
                         # Buscar sugestão no payload (tentar vários nomes possíveis)
                         sugestao = None
@@ -169,7 +171,15 @@ def perfil_apply_suggestions(request):
                         # Salvar no modelo
                         setattr(kb, model_field, sugestao)
                         updated_fields.append(model_field)
+                        fields_for_reevaluation.append(field_en)  # Adicionar à lista de reavaliação
                         print(f"✅ [PERFIL_APPLY] Sugestão aplicada: {field_en} → {model_field}", flush=True)
+            
+            # 2.1 GUARDAR TODOS OS CAMPOS PARA REAVALIAÇÃO (editados + aceitos)
+            if fields_for_reevaluation:
+                kb.accepted_suggestion_fields = fields_for_reevaluation
+                print(f"📋 [PERFIL_APPLY] Campos para reavaliação: {fields_for_reevaluation}", flush=True)
+                print(f"   └─ Editados manualmente: {[f for f in fields_for_reevaluation if f in edited_fields]}", flush=True)
+                print(f"   └─ Sugestões aceitas: {[f for f in fields_for_reevaluation if f in accepted_suggestions]}", flush=True)
             
             # 3. MARCAR COMO REVISADO
             if not kb.suggestions_reviewed:
@@ -188,13 +198,22 @@ def perfil_apply_suggestions(request):
             print(f"💾 [PERFIL_APPLY] Dados salvos no banco (KB id={kb.id})", flush=True)
         
         # 5. ENVIAR PARA N8N (fora da transação)
-        has_accepted = len(accepted_suggestions) > 0
-        n8n_result = N8NService.send_for_compilation(kb, has_accepted)
+        # Se houver campos para reavaliar, enviar para fundamentos primeiro
+        # Senão, enviar direto para compilação
+        if fields_for_reevaluation:
+            print(f"🔄 [PERFIL_APPLY] Enviando para FUNDAMENTOS (reavaliação de {len(fields_for_reevaluation)} campos)", flush=True)
+            n8n_result = N8NService.send_fundamentos(kb)
+            flow_type = 'fundamentos_reevaluation'
+        else:
+            print(f"🔄 [PERFIL_APPLY] Enviando para COMPILAÇÃO (sem reavaliação)", flush=True)
+            has_accepted = len(accepted_suggestions) > 0
+            n8n_result = N8NService.send_for_compilation(kb, has_accepted)
+            flow_type = n8n_result.get('flow_type', 'compilation')
         
         if not n8n_result['success']:
             logger.warning(f"⚠️ [PERFIL_APPLY] Falha ao enviar para N8N: {n8n_result.get('error')}")
         else:
-            logger.info(f"✅ [PERFIL_APPLY] Enviado para N8N - Fluxo: {n8n_result.get('flow_type')}")
+            logger.info(f"✅ [PERFIL_APPLY] Enviado para N8N - Fluxo: {flow_type}")
         
         # 6. RETORNAR SUCESSO (frontend redireciona)
         return JsonResponse({

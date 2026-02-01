@@ -195,31 +195,109 @@ def n8n_webhook_fundamentos(request):
     
     # CAMADA 6: Processar Análise
     try:
-        # Armazenar análise
-        kb.n8n_analysis = {
-            'revision_id': revision_id,
-            'payload': analysis_payload,
-            'reference_images_analysis': data.get('reference_images_analysis', []),
-            'received_at': timezone.now().isoformat()
-        }
+        # Verificar se é reavaliação (campos aceitos/editados)
+        is_reevaluation = bool(kb.accepted_suggestion_fields)
+        
+        if is_reevaluation:
+            # MERGE SELETIVO: Atualizar apenas campos aceitos/editados
+            # Motivo: Preservar avaliações de campos que usuário já aprovou
+            logger.info(
+                f"🔄 [N8N_WEBHOOK] Reavaliação detectada. "
+                f"Campos para atualizar: {kb.accepted_suggestion_fields}"
+            )
+            
+            # Obter análise atual
+            current_analysis = kb.n8n_analysis or {}
+            current_payload = current_analysis.get('payload', [])
+            
+            # Normalizar payload atual (pode ser lista ou dict)
+            if isinstance(current_payload, list) and len(current_payload) > 0:
+                current_payload = current_payload[0]
+            elif not isinstance(current_payload, dict):
+                current_payload = {}
+            
+            # Normalizar novo payload
+            new_payload = analysis_payload
+            if isinstance(new_payload, list) and len(new_payload) > 0:
+                new_payload = new_payload[0]
+            elif not isinstance(new_payload, dict):
+                new_payload = {}
+            
+            # Atualizar APENAS campos aceitos/editados
+            updated_count = 0
+            for field_name in kb.accepted_suggestion_fields:
+                if field_name in new_payload:
+                    current_payload[field_name] = new_payload[field_name]
+                    updated_count += 1
+                    logger.info(f"   ✅ Campo atualizado: {field_name}")
+                else:
+                    logger.warning(f"   ⚠️ Campo não encontrado no retorno N8N: {field_name}")
+            
+            # Salvar análise com merge
+            kb.n8n_analysis = {
+                'revision_id': revision_id,
+                'payload': [current_payload],  # Manter como lista
+                'reference_images_analysis': data.get('reference_images_analysis', []),
+                'received_at': timezone.now().isoformat(),
+                'is_reevaluation': True,
+                'updated_fields': kb.accepted_suggestion_fields,
+                'updated_count': updated_count
+            }
+            
+            logger.info(
+                f"✅ [N8N_WEBHOOK] Merge seletivo concluído. "
+                f"{updated_count} campos atualizados de {len(kb.accepted_suggestion_fields)}"
+            )
+            
+            # Limpar lista de campos aceitos
+            kb.accepted_suggestion_fields = []
+            
+        else:
+            # PRIMEIRA VEZ: Armazenar análise completa
+            logger.info(f"📝 [N8N_WEBHOOK] Primeira análise - armazenando completo")
+            
+            kb.n8n_analysis = {
+                'revision_id': revision_id,
+                'payload': analysis_payload,
+                'reference_images_analysis': data.get('reference_images_analysis', []),
+                'received_at': timezone.now().isoformat()
+            }
+        
         kb.analysis_status = 'completed'
         kb.analysis_completed_at = timezone.now()
         kb.save(update_fields=[
             'n8n_analysis',
             'analysis_status',
-            'analysis_completed_at'
+            'analysis_completed_at',
+            'accepted_suggestion_fields'
         ])
         
         # Log sucesso
         logger.info(
             f"N8N analysis received and stored. "
             f"KB: {kb_id}, Org: {kb.organization_id}, "
-            f"Revision: {revision_id}"
+            f"Revision: {revision_id}, "
+            f"Reevaluation: {is_reevaluation}"
         )
+        
+        # Se foi reavaliação, enviar para compilação automaticamente
+        if is_reevaluation:
+            logger.info(f"🔄 [N8N_WEBHOOK] Enviando para compilação após reavaliação")
+            from apps.knowledge.services.n8n_service import N8NService
+            
+            try:
+                compilation_result = N8NService.send_compilation(kb)
+                if compilation_result['success']:
+                    logger.info(f"✅ [N8N_WEBHOOK] Compilação enviada com sucesso")
+                else:
+                    logger.warning(f"⚠️ [N8N_WEBHOOK] Falha ao enviar compilação: {compilation_result.get('error')}")
+            except Exception as e:
+                logger.exception(f"❌ [N8N_WEBHOOK] Erro ao enviar compilação: {str(e)}")
         
         return JsonResponse({
             'success': True,
-            'message': 'Analysis received and stored'
+            'message': 'Analysis received and stored',
+            'is_reevaluation': is_reevaluation
         }, status=200)
         
     except Exception as e:
