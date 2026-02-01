@@ -104,31 +104,36 @@ async function removeConcorrenteLinePerfil(index) {
  * Sincroniza concorrentes para editedFields (para salvamento no Perfil)
  */
 function syncConcorrentesPerfilToEditedFields() {
+    syncConcorrentesPerfil(true);
+}
+
+/**
+ * Sincroniza array de concorrentes com o campo hidden e editedFields
+ * @param {boolean} markAsEdited - Se true, marca como editado. Se false, apenas sincroniza.
+ */
+function syncConcorrentesPerfil(markAsEdited = true) {
     const container = document.getElementById('concorrentes-inputs-container-perfil');
     if (!container) return;
     
-    const items = container.querySelectorAll('.concorrente-item');
     const concorrentes = [];
+    const items = container.querySelectorAll('.concorrente-item');
     
-    items.forEach((item) => {
+    items.forEach(item => {
         const nomeInput = item.querySelector('.concorrente-nome-input');
         const urlInput = item.querySelector('.concorrente-url-input');
         
-        if (nomeInput) {
-            const nome = nomeInput.value.trim();
+        if (nomeInput && nomeInput.value.trim()) {
             let url = urlInput ? urlInput.value.trim() : '';
             
-            // Adicionar https:// se URL foi preenchida e não começa com http:// ou https://
+            // Adicionar https:// se houver URL e não começar com http
             if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
                 url = `https://${url}`;
             }
             
-            if (nome) {
-                concorrentes.push({
-                    nome: nome,
-                    url: url
-                });
-            }
+            concorrentes.push({
+                nome: nomeInput.value.trim(),
+                url: url || ''
+            });
         }
     });
     
@@ -138,8 +143,8 @@ function syncConcorrentesPerfilToEditedFields() {
         hiddenField.value = JSON.stringify(concorrentes);
     }
     
-    // Adicionar ao editedFields para o sistema de salvamento do Perfil
-    if (window.editedFields) {
+    // Adicionar ao editedFields APENAS se markAsEdited for true
+    if (markAsEdited && window.editedFields) {
         window.editedFields['competitors'] = JSON.stringify(concorrentes);
         
         // Atualizar contador
@@ -148,7 +153,7 @@ function syncConcorrentesPerfilToEditedFields() {
         }
     }
     
-    console.log(`✅ [PERFIL] Concorrentes sincronizados: ${concorrentes.length} item(ns)`);
+    console.log(`✅ [PERFIL] Concorrentes sincronizados: ${concorrentes.length} item(ns)${markAsEdited ? ' (marcado como editado)' : ''}`);
 }
 
 /**
@@ -163,6 +168,9 @@ function initConcorrentesPerfil(competitorsData) {
             addConcorrenteLinePerfil(concorrente.nome || '', concorrente.url || '');
         });
         console.log(`✅ [PERFIL] ${competitorsData.length} concorrente(s) carregado(s)`);
+        
+        // Sincronizar campo hidden SEM marcar como editado (é apenas carregamento inicial)
+        syncConcorrentesPerfil(false);
     } else {
         console.log('ℹ️ [PERFIL] Nenhum concorrente encontrado');
     }
