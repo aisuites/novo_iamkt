@@ -1,3 +1,5 @@
+{% load knowledge_filters %}
+
 <div class="perfil-section linha-5">
     <div class="section-row full-width">
         
@@ -14,9 +16,8 @@
                                 {% for gap in compilation_data.lacunas %}
                                 <li class="gap-item">
                                     <div class="gap-header">
-                                        <span class="gap-score">Score: {{ gap.score }}/100</span>
-                                        <span class="gap-area">{{ gap.area|title }}</span>
-                                        <span class="gap-field">{{ gap.field }}</span>
+                                        <h4 class="gap-title">{{ gap.area|translate_area }} - {{ gap.field|translate_field }}</h4>
+                                        <span class="gap-score">Pontuação: {{ gap.score }}/100</span>
                                     </div>
                                     <div class="gap-info">
                                         <p class="gap-issue"><strong>Problema:</strong> {{ gap.issue }}</p>

@@ -86,3 +86,46 @@ def fonts_to_json(queryset):
     except Exception as e:
         print(f"❌ Erro em fonts_to_json: {str(e)}", flush=True)
         return '[]'
+
+
+@register.filter(name='translate_area')
+def translate_area(area_code):
+    """
+    Traduz código de área técnico para nome amigável em português
+    Uso: {{ gap.area|translate_area }}
+    """
+    translations = {
+        'base': 'Base de Conhecimento',
+        'digital_presence': 'Presença Digital',
+        'visual_identity': 'Identidade Visual',
+    }
+    return translations.get(area_code, area_code)
+
+
+@register.filter(name='translate_field')
+def translate_field(field_code):
+    """
+    Traduz código de campo técnico para nome amigável em português
+    Uso: {{ gap.field|translate_field }}
+    """
+    translations = {
+        # Base de Conhecimento
+        'identity_essence': 'Identidade e Essência',
+        'audience': 'Público-Alvo',
+        'strategy_channels': 'Canais Estratégicos',
+        'key_messages': 'Mensagens-Chave',
+        'positioning': 'Posicionamento',
+        'tone_of_voice': 'Tom de Voz',
+        
+        # Presença Digital
+        'website_url': 'Site Institucional',
+        'social_networks': 'Redes Sociais',
+        'competitors': 'Concorrentes',
+        
+        # Identidade Visual
+        'palette_hex': 'Paleta de Cores',
+        'typography': 'Tipografia',
+        'logo_primary': 'Logo Principal',
+        'visual_references': 'Referências Visuais',
+    }
+    return translations.get(field_code, field_code.replace('_', ' ').title())

@@ -27,45 +27,6 @@
                         </div>
                         {% endif %}
                         
-                        {# Scores - mapear de scores #}
-                        {% if compilation_data.avaliacao.scores %}
-                        <div class="content-item">
-                            <h3 class="item-title">Pontuações</h3>
-                            <div class="item-content">
-                                <div class="scores-grid">
-                                    {% if compilation_data.avaliacao.scores.area_a %}
-                                    <div class="score-item">
-                                        <span class="score-label">Área A:</span>
-                                        <span class="score-value">{{ compilation_data.avaliacao.scores.area_a }}/100</span>
-                                    </div>
-                                    {% endif %}
-                                    {% if compilation_data.avaliacao.scores.area_b %}
-                                    <div class="score-item">
-                                        <span class="score-label">Área B:</span>
-                                        <span class="score-value">{{ compilation_data.avaliacao.scores.area_b }}/100</span>
-                                    </div>
-                                    {% endif %}
-                                    {% if compilation_data.avaliacao.scores.area_c %}
-                                    <div class="score-item">
-                                        <span class="score-label">Área C:</span>
-                                        <span class="score-value">{{ compilation_data.avaliacao.scores.area_c }}/100</span>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        {# Evaluation - mapear de evaluation #}
-                        {% if compilation_data.avaliacao.evaluation %}
-                        <div class="content-item">
-                            <h3 class="item-title">Avaliação Geral</h3>
-                            <div class="item-content">
-                                <p class="evaluation-status">{{ compilation_data.avaliacao.evaluation }}</p>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
                     </div>
                 {% else %}
                     <p class="no-data">Avaliação não disponível</p>

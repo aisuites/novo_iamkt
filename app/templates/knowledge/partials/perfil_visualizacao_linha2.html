@@ -10,16 +10,15 @@
                 
                 {% if kb.colors.all %}
                     <div class="block-content">
-                        <div class="color-palette-grid">
-                            {% for color in kb.colors.all %}
-                            <div class="color-item">
-                                <div class="color-swatch" style="background-color: {{ color.hex_code }};"></div>
-                                <div class="color-info">
-                                    <span class="color-name">{{ color.name }}</span>
-                                    <span class="color-hex">{{ color.hex_code }}</span>
+                        <div class="perfil-colors-wrapper">
+                            <div class="perfil-color-list">
+                                {% for color in kb.colors.all %}
+                                <div class="perfil-color-item">
+                                    <div class="perfil-color-preview" style="background-color: {{ color.hex_code }};"></div>
+                                    <span class="perfil-color-hex">{{ color.hex_code }}</span>
                                 </div>
+                                {% endfor %}
                             </div>
-                            {% endfor %}
                         </div>
                     </div>
                 {% else %}
@@ -73,10 +72,15 @@
                         <div class="logos-grid">
                             {% for logo in kb.logos.all %}
                             <div class="logo-item">
-                                <img src="{{ logo.s3_url }}" alt="Logo {{ forloop.counter }}" class="logo-image lazy-load">
-                                {% if logo.is_primary %}
-                                <span class="logo-badge">Principal</span>
-                                {% endif %}
+                                <div class="image-preview-wrapper">
+                                    <img src="{% url 'knowledge:preview_logo' logo.id %}" 
+                                         alt="Logo {{ forloop.counter }}" 
+                                         class="logo-image"
+                                         loading="lazy">
+                                    {% if logo.is_primary %}
+                                    <span class="logo-badge">Principal</span>
+                                    {% endif %}
+                                </div>
                             </div>
                             {% endfor %}
                         </div>
@@ -95,7 +99,12 @@
                         <div class="references-grid">
                             {% for ref in kb.reference_images.all %}
                             <div class="reference-item">
-                                <img src="{{ ref.s3_url }}" alt="Referência {{ forloop.counter }}" class="reference-image lazy-load">
+                                <div class="image-preview-wrapper">
+                                    <img src="{% url 'knowledge:preview_reference' ref.id %}" 
+                                         alt="Referência {{ forloop.counter }}" 
+                                         class="reference-image"
+                                         loading="lazy">
+                                </div>
                             </div>
                             {% endfor %}
                         </div>
