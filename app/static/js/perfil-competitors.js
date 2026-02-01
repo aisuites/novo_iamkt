@@ -64,7 +64,8 @@ function addConcorrenteLinePerfil(nome = '', url = '') {
     }
     
     concorrenteIndexPerfil++;
-    syncConcorrentesPerfilToEditedFields();
+    // NÃO chamar syncConcorrentesPerfilToEditedFields() aqui
+    // Será chamado manualmente quando necessário (botão adicionar, ou após init)
 }
 
 /**
