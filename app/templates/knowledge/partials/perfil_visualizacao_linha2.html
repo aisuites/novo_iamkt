@@ -73,10 +73,10 @@
                             {% for logo in kb.logos.all %}
                             <div class="logo-item">
                                 <div class="image-preview-wrapper">
-                                    <img src="{% url 'knowledge:preview_logo' logo.id %}" 
+                                    <img src="#" 
                                          alt="Logo {{ forloop.counter }}" 
-                                         class="logo-image"
-                                         loading="lazy">
+                                         class="logo-image lazy-load-image"
+                                         data-s3-key="{{ logo.s3_key }}">
                                     {% if logo.is_primary %}
                                     <span class="logo-badge">Principal</span>
                                     {% endif %}
@@ -100,10 +100,10 @@
                             {% for ref in kb.reference_images.all %}
                             <div class="reference-item">
                                 <div class="image-preview-wrapper">
-                                    <img src="{% url 'knowledge:preview_reference' ref.id %}" 
+                                    <img src="#" 
                                          alt="Referência {{ forloop.counter }}" 
-                                         class="reference-image"
-                                         loading="lazy">
+                                         class="reference-image lazy-load-image"
+                                         data-s3-key="{{ ref.s3_key }}">
                                 </div>
                             </div>
                             {% endfor %}
