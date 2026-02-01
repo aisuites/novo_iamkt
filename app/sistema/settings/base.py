@@ -215,4 +215,4 @@ N8N_RATE_LIMIT_PER_IP = config('N8N_RATE_LIMIT_PER_IP', default='10/minute')
 N8N_RATE_LIMIT_PER_ORG = config('N8N_RATE_LIMIT_PER_ORG', default='5/minute')
 N8N_MAX_RETRIES = config('N8N_MAX_RETRIES', default=3, cast=int)
 N8N_RETRY_DELAY = config('N8N_RETRY_DELAY', default=5, cast=int)
-N8N_INTERNAL_TOKEN = config('N8N_INTERNAL_TOKEN', default='')
+# N8N_INTERNAL_TOKEN removido - usar N8N_WEBHOOK_SECRET para autenticação

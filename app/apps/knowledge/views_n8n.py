@@ -245,7 +245,7 @@ def n8n_compilation_webhook(request):
     # CAMADA 1: Validação de Token Interno
     internal_token = request.headers.get('X-INTERNAL-TOKEN')
     
-    if internal_token != settings.N8N_INTERNAL_TOKEN:
+    if internal_token != settings.N8N_WEBHOOK_SECRET:
         logger.warning(
             f"❌ [N8N_COMPILATION_WEBHOOK] Token inválido do IP: {request.META.get('REMOTE_ADDR')}"
         )
