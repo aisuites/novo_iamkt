@@ -22,6 +22,7 @@ urlpatterns = [
     path('content/', include('apps.content.urls')),
     path('campaigns/', include('apps.campaigns.urls')),
     path('knowledge/', include('apps.knowledge.urls')),
+    path('pautas/', include('apps.pautas.urls')),
 ]
 
 if settings.DEBUG:

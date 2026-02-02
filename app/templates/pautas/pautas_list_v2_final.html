@@ -1,0 +1,190 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Pautas{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <!-- Header Principal -->
+    <div class="perfil-header mb-6">
+        <div class="header-content">
+            <div class="header-text">
+                <h1 class="text-3xl font-bold mb-2">📝 Pautas</h1>
+                <p class="text-lg opacity-90">
+                    Gere pautas inteligentes com IA baseadas na sua identidade visual 
+                    para gerar posts completos e evoluir continuamente em um cenário de 
+                    turbulência permanente.
+                </p>
+            </div>
+            <div class="header-actions">
+                {% if knowledge_base %}
+                    <button type="button" class="btn btn-light btn-lg" onclick="document.getElementById('modalGerarPauta').style.display='block'">
+                        <i class="fas fa-magic mr-2"></i>
+                        Gerar Pauta
+                    </button>
+                {% else %}
+                    <a href="{% url 'knowledge:perfil_view' %}" class="btn btn-light btn-lg">
+                        <i class="fas fa-cog mr-2"></i>
+                        Completar Perfil
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="card border-0 shadow-sm mb-6">
+        <div class="card-body p-6">
+            <h3 class="block-title mb-4">
+                <i class="fas fa-filter mr-2"></i>
+                Filtros
+            </h3>
+            <form method="get" class="w-full">
+                <div class="flex items-center gap-4 w-full">
+                    <!-- Campo Data -->
+                    <div style="width: 200px; flex-shrink: 0;">
+                        <input type="date" name="data" id="data" class="form-input-filter" 
+                               value="{{ filtros.data_inicio|default:'' }}" placeholder="Data">
+                    </div>
+                    
+                    <!-- Campo Buscar por Título -->
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="form-input-wrapper">
+                            <input type="text" name="search" id="search" class="form-input-filter" 
+                                   value="{{ filtros.search|default:'' }}" placeholder="Buscar por título...">
+                            <i class="fas fa-search form-input-icon"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Botões de Ação -->
+                    <div class="flex gap-3" style="flex-shrink: 0;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i>
+                            Buscar
+                        </button>
+                        <a href="{% url 'pautas:list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-eraser"></i>
+                            Limpar filtro
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Lista de Pautas -->
+    <div class="grid grid-cols-1 gap-4" id="pautas-container">
+        {% for pauta in page_obj %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <!-- Header do Card -->
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex gap-2">
+                            <span class="badge badge-{{ pauta.rede_social|lower|default:'secondary' }}">
+                                {{ pauta.get_rede_social_display }}
+                            </span>
+                            <span class="badge badge-{{ pauta.status|default:'secondary' }}">
+                                {{ pauta.get_status_display }}
+                            </span>
+                        </div>
+                        
+                        <div class="flex gap-1">
+                            <button type="button" class="btn btn-outline-primary btn-sm btn-edit" 
+                                    data-pauta-id="{{ pauta.id }}"
+                                    title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-success btn-sm" 
+                                    data-pauta-id="{{ pauta.id }}"
+                                    title="Gerar Post">
+                                <i class="fas fa-file-alt"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm btn-delete" 
+                                    data-pauta-id="{{ pauta.id }}"
+                                    data-pauta-title="{{ pauta.title }}"
+                                    title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Conteúdo do Card -->
+                    <div class="pauta-content" id="pauta-content-{{ pauta.id }}">
+                        <h5 class="font-semibold text-lg mb-2">{{ pauta.title }}</h5>
+                        <p class="text-muted mb-4">{{ pauta.content|truncatewords:30 }}</p>
+                        
+                        <div class="flex justify-between items-center text-sm text-muted">
+                            <span>
+                                <i class="fas fa-user mr-1"></i>
+                                {{ pauta.user.email }}
+                            </span>
+                            <span>
+                                <i class="fas fa-clock mr-1"></i>
+                                {{ pauta.created_at|date:"d/m/Y H:i" }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-span-full">
+                <div class="text-center py-12">
+                    <i class="fas fa-lightbulb text-6xl text-muted mb-4"></i>
+                    <h4 class="text-xl text-muted mb-2">Nenhuma pauta encontrada</h4>
+                    <p class="text-muted">
+                        {% if knowledge_base %}
+                            Clique em "Gerar Pauta" para criar sua primeira pauta inteligente.
+                        {% else %}
+                            Complete o perfil da sua empresa para começar a gerar pautas.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Paginação -->
+    {% if page_obj.has_other_pages %}
+        <div class="flex justify-center mt-8">
+            <nav aria-label="Paginação de pautas">
+                <div class="flex gap-2">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}" 
+                           class="btn btn-outline-secondary">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <span class="btn btn-primary">{{ num }}</span>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <a href="?page={{ num }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}" 
+                               class="btn btn-outline-secondary">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}" 
+                           class="btn btn-outline-secondary">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </nav>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal simplificado -->
+<div id="modalGerarPauta" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; min-width: 400px;">
+        <h3>Gerar Pauta</h3>
+        <p>Funcionalidade em desenvolvimento</p>
+        <button onclick="document.getElementById('modalGerarPauta').style.display='none'">Fechar</button>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="{% static 'js/pautas.js' %}"></script>
+{% endblock %}

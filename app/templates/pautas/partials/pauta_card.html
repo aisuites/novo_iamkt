@@ -1,0 +1,83 @@
+<div class="pauta-card" id="pauta-card-{{ pauta.id }}">
+    <div class="card border-0 shadow-sm">
+        <div class="p-6">
+            <!-- Header do Card -->
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="badge badge-{{ pauta.rede_social|lower|default:'secondary' }}">
+                        {{ pauta.get_rede_social_display }}
+                    </span>
+                    <span class="badge badge-{{ pauta.status|default:'secondary' }}">
+                        {{ pauta.get_status_display }}
+                    </span>
+                </div>
+                
+                <div class="flex gap-1">
+                    <button type="button" class="btn btn-outline-primary btn-sm btn-edit" 
+                            data-pauta-id="{{ pauta.id }}"
+                            title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-success btn-sm" 
+                            data-pauta-id="{{ pauta.id }}"
+                            title="Gerar Post">
+                        <i class="fas fa-file-alt"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm btn-delete" 
+                            data-pauta-id="{{ pauta.id }}"
+                            data-pauta-title="{{ pauta.title }}"
+                            title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Conteúdo do Card (Visualização) -->
+            <div class="pauta-content" id="pauta-content-{{ pauta.id }}">
+                <h5 class="font-semibold text-lg mb-2">{{ pauta.title }}</h5>
+                <p class="text-muted mb-4">{{ pauta.content|truncatewords:30 }}</p>
+                
+                <div class="flex justify-between items-center text-sm text-muted">
+                    <span>
+                        <i class="fas fa-user mr-1"></i>
+                        {{ pauta.user.email }}
+                    </span>
+                    <span>
+                        <i class="fas fa-clock mr-1"></i>
+                        {{ pauta.created_at|date:"d/m/Y H:i" }}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Formulário de Edição (Inicialmente oculto) -->
+            <div class="pauta-edit-form hidden" id="pauta-edit-{{ pauta.id }}">
+                <form id="form-edit-{{ pauta.id }}">
+                    <div class="form-group">
+                        <label for="title-{{ pauta.id }}" class="form-label">Título</label>
+                        <input type="text" class="form-input" 
+                               id="title-{{ pauta.id }}" name="title" 
+                               value="{{ pauta.title }}" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="content-{{ pauta.id }}" class="form-label">Conteúdo</label>
+                        <textarea class="form-input" 
+                                  id="content-{{ pauta.id }}" name="content" 
+                                  rows="4" required>{{ pauta.content }}</textarea>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-save mr-1"></i>
+                            Salvar
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm btn-cancel">
+                            <i class="fas fa-times mr-1"></i>
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

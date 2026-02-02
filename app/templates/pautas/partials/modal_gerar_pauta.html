@@ -1,0 +1,104 @@
+<!-- Modal Gerar Pauta -->
+<div class="modal fade" id="modalGerarPauta" tabindex="-1" aria-labelledby="modalGerarPautaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalGerarPautaLabel">
+                    <i class="fas fa-magic me-2"></i>
+                    Gerar Novas Pautas
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            
+            <form id="form-gerar-pauta">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="tema" class="form-label">
+                            <i class="fas fa-lightbulb me-1"></i>
+                            Tema
+                            <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="tema" name="tema" 
+                               placeholder="Ex: mamografia, marketing digital, etc"
+                               minlength="3" maxlength="100" required>
+                        <div class="form-text">
+                            Descreva o tema sobre o qual você deseja gerar pautas.
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="rede_social" class="form-label">
+                            <i class="fas fa-share-alt me-1"></i>
+                            Rede Social
+                            <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="rede_social" name="rede_social" required>
+                            <option value="">Selecione uma rede social...</option>
+                            <option value="FACEBOOK">Facebook</option>
+                            <option value="INSTAGRAM">Instagram</option>
+                            <option value="LINKEDIN">LinkedIn</option>
+                            <option value="TWITTER">Twitter</option>
+                        </select>
+                        <div class="form-text">
+                            As pautas serão adaptadas para a rede social selecionada.
+                        </div>
+                    </div>
+                    
+                    <!-- Alerta de informações -->
+                    <div class="alert alert-info d-flex align-items-center" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <div>
+                            As pautas serão geradas com base na base estratégica da sua empresa 
+                            e enviadas para processamento pela nossa IA.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="btn-gerar">
+                        <i class="fas fa-magic me-1"></i>
+                        Gerar Pautas
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmação Exclusão -->
+<div class="modal fade" id="modalExcluirPauta" tabindex="-1" aria-labelledby="modalExcluirPautaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalExcluirPautaLabel">
+                    <i class="fas fa-exclamation-triangle me-2 text-danger"></i>
+                    Confirmar Exclusão
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            
+            <div class="modal-body">
+                <p>Tem certeza que deseja excluir esta pauta?</p>
+                <p class="fw-bold" id="pauta-excluir-titulo"></p>
+                <p class="text-muted">
+                    Esta ação não poderá ser desfeita.
+                </p>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>
+                    Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="btn-confirmar-excluir">
+                    <i class="fas fa-trash me-1"></i>
+                    Excluir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -323,16 +323,6 @@ button {
   appearance: none;
 }
 
-/* Textarea com mesmo estilo */
-.form-input-filter[type="textarea"],
-textarea.form-input-filter {
-  height: auto;
-  min-height: 100px;
-  padding: 12px 16px;
-  resize: vertical;
-  line-height: 1.5;
-}
-
 /* Estilo específico para input type="date" */
 .form-input-filter[type="date"] {
   cursor: pointer;
@@ -421,38 +411,6 @@ textarea.form-input-filter {
   font-family: "Quicksand", system-ui, sans-serif;
 }
 
-/* Campos do modal */
-.field {
-  margin-bottom: 20px;
-}
-
-.field label {
-  display: block;
-  margin-bottom: 6px;
-  color: #374151;
-  font-size: 14px;
-  font-weight: 500;
-  font-family: "Quicksand", system-ui, sans-serif;
-}
-
-.field label i {
-  font-size: 12px;
-  opacity: 0.7;
-  margin-right: 4px;
-}
-
-.field .text-danger {
-  color: #ef4444;
-  margin-left: 2px;
-}
-
-.field-hint {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #6b7280;
-  line-height: 1.4;
-}
-
 /* Botões unificados */
 .btn {
   height: 44px; /* Mesma altura dos inputs */
@@ -501,45 +459,6 @@ textarea.form-input-filter {
   padding: 3rem 2rem;
   border-radius: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* Modal header com posicionamento correto */
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.modal-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #374151;
-  margin: 0;
-  font-family: "Quicksand", system-ui, sans-serif;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: #6b7280;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.15s ease;
-  margin-left: auto;
-}
-
-.modal-close:hover {
-  background: #f3f4f6;
-  color: #374151;
 }
 
 .perfil-header .header-content {

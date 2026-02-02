@@ -6,7 +6,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from .models import Organization, QuotaUsageDaily
 from .decorators import require_organization
-from apps.content.models import Pauta, Post, TrendMonitor
+from apps.content.models import Post, TrendMonitor
+from apps.pautas.models import Pauta
 from apps.knowledge.models import KnowledgeBase
 from apps.campaigns.models import Project, Approval
 
@@ -37,13 +38,13 @@ def dashboard(request):
     user_area = user.areas.first() if user.areas.exists() else None
     
     # Pautas (da organização, não do usuário)
-    pautas_total = Pauta.objects.for_request(request).count()
-    pautas_pendentes = Pauta.objects.for_request(request).filter(status='pending').count()
+    pautas_total = Pauta.objects.filter(organization=request.organization).count()
+    pautas_pendentes = Pauta.objects.filter(organization=request.organization, status='requested').count()
     
     # Posts gerados (da organização, não do usuário)
-    posts_total = Post.objects.for_request(request).count()
-    posts_draft = Post.objects.for_request(request).filter(status='draft').count()
-    posts_aprovados = Post.objects.for_request(request).filter(status='approved').count()
+    posts_total = Post.objects.filter(organization=request.organization).count()
+    posts_draft = Post.objects.filter(organization=request.organization, status='draft').count()
+    posts_aprovados = Post.objects.filter(organization=request.organization, status='approved').count()
     
     # Projetos
     projetos_ativos = Project.objects.filter(
@@ -61,7 +62,8 @@ def dashboard(request):
         aprovacoes_pendentes = 0
     
     # Trends recentes (da organização)
-    trends_recentes = TrendMonitor.objects.for_request(request).filter(
+    trends_recentes = TrendMonitor.objects.filter(
+        organization=request.organization,
         is_active=True
     ).order_by('-created_at')[:5]
     
@@ -121,7 +123,7 @@ def dashboard(request):
     atividades_recentes = []
     
     # Últimas pautas
-    ultimas_pautas = Pauta.objects.filter(user=user).order_by('-created_at')[:3]
+    ultimas_pautas = Pauta.objects.filter(organization=request.organization).order_by('-created_at')[:3]
     for pauta in ultimas_pautas:
         atividades_recentes.append({
             'tipo': 'pauta',
@@ -131,7 +133,7 @@ def dashboard(request):
         })
     
     # Últimos posts
-    ultimos_posts = Post.objects.filter(user=user).order_by('-created_at')[:3]
+    ultimos_posts = Post.objects.filter(organization=request.organization).order_by('-created_at')[:3]
     for post in ultimos_posts:
         atividades_recentes.append({
             'tipo': 'post',

@@ -123,7 +123,7 @@ class PlanTemplateAdmin(admin.ModelAdmin):
 @admin.register(Organization)
 class OrganizationAdmin(admin.ModelAdmin):
     list_display = [
-        'name', 'status_badge', 'plan_type', 'uso_hoje',
+        'name', 'status_badge', 'plan_type', 'modules_summary', 'uso_hoje',
         'billing_cycle_day', 'created_at'
     ]
     list_filter = ['plan_type', 'is_active', 'suspension_reason', 'created_at']
@@ -148,6 +148,16 @@ class OrganizationAdmin(admin.ModelAdmin):
         ('Plano e Status', {
             'fields': ('plan_type', 'is_active', 'suspension_reason', 'approved_at', 'approved_by')
         }),
+        ('Módulos e Ferramentas', {
+            'fields': (
+                'pautas_enabled',
+                'posts_enabled',
+                'trends_enabled',
+                'videos_avatar_enabled',
+                'email_marketing_enabled'
+            ),
+            'description': 'Habilite/desabilite ferramentas para esta empresa'
+        }),
         ('Quotas de Conteúdo', {
             'fields': (
                 'quota_pautas_dia',
@@ -157,7 +167,6 @@ class OrganizationAdmin(admin.ModelAdmin):
         }),
         ('Quotas de Vídeos Avatar', {
             'fields': (
-                'videos_avatar_enabled',
                 'quota_videos_dia',
                 'quota_videos_mes'
             )
@@ -222,6 +231,27 @@ class OrganizationAdmin(admin.ModelAdmin):
         usage = obj.get_quota_usage_today()
         return f"Pautas: {usage['pautas_used']}/{obj.quota_pautas_dia} | Posts: {usage['posts_used']}/{obj.quota_posts_dia}"
     uso_hoje.short_description = 'Uso Hoje'
+    
+    def modules_summary(self, obj):
+        """Mostra resumo dos módulos habilitados"""
+        modules = []
+        if obj.pautas_enabled:
+            modules.append('<span style="color:green;">✅ Pautas</span>')
+        if obj.posts_enabled:
+            modules.append('<span style="color:green;">✅ Posts</span>')
+        if obj.trends_enabled:
+            modules.append('<span style="color:green;">✅ Trends</span>')
+        if obj.videos_avatar_enabled:
+            modules.append('<span style="color:green;">✅ Vídeos</span>')
+        if obj.email_marketing_enabled:
+            modules.append('<span style="color:green;">✅ Email</span>')
+        
+        if not modules:
+            modules.append('<span style="color:red;">❌ Nenhum</span>')
+            
+        return ' '.join(modules)
+    modules_summary.short_description = 'Módulos'
+    modules_summary.allow_tags = True
     
     # ========================================
     # ACTIONS - Aprovação e Gestão de Planos

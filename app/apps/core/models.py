@@ -309,6 +309,46 @@ class PlanTemplate(TimeStampedModel):
     def get_quota_summary(self):
         """Retorna resumo das quotas em formato legível"""
         return f"Pautas: {self.quota_pautas_dia}/dia | Posts: {self.quota_posts_dia}/dia, {self.quota_posts_mes}/mês"
+    
+    @property
+    def has_pautas_module(self):
+        """Verifica se empresa tem módulo de pautas contratado"""
+        return self.pautas_enabled
+    
+    @property
+    def has_posts_module(self):
+        """Verifica se empresa tem módulo de posts contratado"""
+        return self.posts_enabled
+    
+    @property
+    def has_trends_module(self):
+        """Verifica se empresa tem módulo de trends contratado"""
+        return self.trends_enabled
+    
+    @property
+    def has_videos_avatar_module(self):
+        """Verifica se empresa tem módulo de vídeos avatar contratado"""
+        return self.videos_avatar_enabled
+    
+    @property
+    def has_email_marketing_module(self):
+        """Verifica se empresa tem módulo de email marketing contratado"""
+        return self.email_marketing_enabled
+    
+    def get_enabled_modules(self):
+        """Retorna lista de módulos habilitados"""
+        modules = []
+        if self.pautas_enabled:
+            modules.append('pautas')
+        if self.posts_enabled:
+            modules.append('posts')
+        if self.trends_enabled:
+            modules.append('trends')
+        if self.videos_avatar_enabled:
+            modules.append('videos_avatar')
+        if self.email_marketing_enabled:
+            modules.append('email_marketing')
+        return modules
 
 
 class Organization(TimeStampedModel):
@@ -408,6 +448,37 @@ class Organization(TimeStampedModel):
         default=False,
         help_text="Empresa autorizada a criar vídeos avatar",
         verbose_name='Vídeos Avatar Habilitados'
+    )
+    
+    # Módulos/Ferramentas Contratadas
+    pautas_enabled = models.BooleanField(
+        default=True,  # Habilitado por padrão
+        help_text="Empresa autorizada a usar módulo de pautas",
+        verbose_name='Pautas Habilitadas'
+    )
+    
+    posts_enabled = models.BooleanField(
+        default=True,  # Habilitado por padrão
+        help_text="Empresa autorizada a usar módulo de posts",
+        verbose_name='Posts Habilitados'
+    )
+    
+    trends_enabled = models.BooleanField(
+        default=False,  # Desabilitado por padrão
+        help_text="Empresa autorizada a usar módulo de trends",
+        verbose_name='Trends Habilitados'
+    )
+    
+    videos_avatar_enabled = models.BooleanField(
+        default=False,  # Desabilitado por padrão
+        help_text="Empresa autorizada a criar vídeos avatar",
+        verbose_name='Vídeos Avatar Habilitados'
+    )
+    
+    email_marketing_enabled = models.BooleanField(
+        default=False,  # Desabilitado por padrão
+        help_text="Empresa autorizada a usar módulo de email marketing",
+        verbose_name='Email Marketing Habilitado'
     )
     
     # Ciclo de Faturamento (Billing Cycle)
@@ -605,6 +676,46 @@ class Organization(TimeStampedModel):
         ).aggregate(total=Sum('amount'))['total'] or 0
         
         return max(0, total + adjustments)
+    
+    @property
+    def has_pautas_module(self):
+        """Verifica se empresa tem módulo de pautas contratado"""
+        return self.pautas_enabled
+    
+    @property
+    def has_posts_module(self):
+        """Verifica se empresa tem módulo de posts contratado"""
+        return self.posts_enabled
+    
+    @property
+    def has_trends_module(self):
+        """Verifica se empresa tem módulo de trends contratado"""
+        return self.trends_enabled
+    
+    @property
+    def has_videos_avatar_module(self):
+        """Verifica se empresa tem módulo de vídeos avatar contratado"""
+        return self.videos_avatar_enabled
+    
+    @property
+    def has_email_marketing_module(self):
+        """Verifica se empresa tem módulo de email marketing contratado"""
+        return self.email_marketing_enabled
+    
+    def get_enabled_modules(self):
+        """Retorna lista de módulos habilitados"""
+        modules = []
+        if self.pautas_enabled:
+            modules.append('pautas')
+        if self.posts_enabled:
+            modules.append('posts')
+        if self.trends_enabled:
+            modules.append('trends')
+        if self.videos_avatar_enabled:
+            modules.append('videos_avatar')
+        if self.email_marketing_enabled:
+            modules.append('email_marketing')
+        return modules
     
     def can_create_pauta(self):
         """Verifica se pode criar pauta. Retorna: (bool, str|None, str|None)"""

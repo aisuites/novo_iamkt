@@ -1,0 +1,167 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Pautas{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <!-- Header Principal -->
+    <div class="card bg-gradient-primary text-white mb-6">
+        <div class="p-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="flex-1">
+                    <h1 class="text-3xl font-bold mb-2">📝 Pautas</h1>
+                    <p class="opacity-75">
+                        Gere pautas inteligentes com IA baseadas na sua identidade visual 
+                        para gerar posts completos e evoluir continuamente em um cenário de 
+                        turbulência permanente.
+                    </p>
+                </div>
+                <div class="flex-shrink-0">
+                    {% if knowledge_base %}
+                        <button type="button" class="btn btn-light btn-lg" onclick="document.getElementById('modalGerarPauta').style.display='block'">
+                            <i class="fas fa-magic mr-2"></i>
+                            Gerar Pauta
+                        </button>
+                    {% else %}
+                        <a href="{% url 'knowledge:perfil_view' %}" class="btn btn-light btn-lg">
+                            <i class="fas fa-cog mr-2"></i>
+                            Completar Perfil
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="card border-0 shadow-sm mb-6">
+        <div class="p-6">
+            <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="form-group">
+                    <label for="rede" class="form-label">Rede Social</label>
+                    <select name="rede" id="rede" class="form-input">
+                        <option value="">Todas</option>
+                        {% for choice in rede_choices %}
+                            <option value="{{ choice.0 }}" {% if filtros.rede == choice.0 %}selected{% endif %}>
+                                {{ choice.1 }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="status" class="form-label">Status</label>
+                    <select name="status" id="status" class="form-input">
+                        <option value="">Todos</option>
+                        {% for choice in status_choices %}
+                            <option value="{{ choice.0 }}" {% if filtros.status == choice.0 %}selected{% endif %}>
+                                {{ choice.1 }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="data_inicio" class="form-label">Data Início</label>
+                    <input type="date" name="data_inicio" id="data_inicio" class="form-input" 
+                           value="{{ filtros.data_inicio }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="search" class="form-label">Buscar</label>
+                    <input type="text" name="search" id="search" class="form-input" 
+                           value="{{ filtros.search }}" placeholder="Buscar pauta...">
+                </div>
+                
+                <div class="form-group">
+                    <label for="data_fim" class="form-label">Data Fim</label>
+                    <input type="date" name="data_fim" id="data_fim" class="form-input" 
+                           value="{{ filtros.data_fim }}">
+                </div>
+                
+                <div>
+                    <label class="form-label">&nbsp;</label>
+                    <div class="flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter mr-1"></i>
+                            Filtrar
+                        </button>
+                        <a href="{% url 'pautas:list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times mr-1"></i>
+                            Limpar
+                        </a>
+                    </div>
+                </div>
+            </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Lista de Pautas -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="pautas-container">
+        {% for pauta in page_obj %}
+            {% include 'pautas/partials/pauta_card.html' %}
+        {% empty %}
+            <div class="col-span-full">
+                <div class="text-center py-12">
+                    <i class="fas fa-lightbulb text-6xl text-muted mb-4"></i>
+                    <h4 class="text-xl text-muted mb-2">Nenhuma pauta encontrada</h4>
+                    <p class="text-muted">
+                        {% if knowledge_base %}
+                            Clique em "Gerar Pauta" para criar sua primeira pauta inteligente.
+                        {% else %}
+                            Complete o perfil da sua empresa para começar a gerar pautas.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Paginação -->
+    {% if page_obj.has_other_pages %}
+        <div class="flex justify-center mt-8">
+            <nav aria-label="Paginação de pautas">
+                <div class="flex gap-2">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}" 
+                           class="btn btn-outline-secondary">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <span class="btn btn-primary">{{ num }}</span>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <a href="?page={{ num }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}" 
+                               class="btn btn-outline-secondary">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}" 
+                           class="btn btn-outline-secondary">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+                </nav>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal simplificado -->
+<div id="modalGerarPauta" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; min-width: 400px;">
+        <h3>Gerar Pauta</h3>
+        <p>Funcionalidade em desenvolvimento</p>
+        <button onclick="document.getElementById('modalGerarPauta').style.display='none'">Fechar</button>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="{% static 'js/pautas.js' %}"></script>
+{% endblock %}

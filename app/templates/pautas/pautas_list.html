@@ -1,0 +1,345 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Pautas{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/toaster.css' %}?v=20260201-2227">
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <!-- Header Principal -->
+    <div class="perfil-header mb-6">
+        <div class="header-content">
+            <div class="header-text">
+                <h1 class="text-3xl font-bold mb-2">📝 Pautas</h1>
+                <p class="text-lg opacity-90">
+                    Gere pautas inteligentes com IA baseadas na sua identidade visual 
+                    para gerar posts completos e evoluir continuamente em um cenário de 
+                    turbulência permanente.
+                </p>
+            </div>
+            <div class="header-actions">
+                {% if knowledge_base %}
+                    <button type="button" class="btn btn-light btn-lg" onclick="document.getElementById('modalGerarPauta').style.display='block'">
+                        <i class="fas fa-magic mr-2"></i>
+                        Gerar Pauta
+                    </button>
+                {% else %}
+                    <a href="{% url 'knowledge:perfil_view' %}" class="btn btn-light btn-lg">
+                        <i class="fas fa-cog mr-2"></i>
+                        Completar Perfil
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-6">
+            <h3 class="block-title mb-4">
+                <i class="fas fa-filter mr-2"></i>
+                Filtros
+            </h3>
+            <form method="get" class="w-full">
+                <div class="flex items-center gap-4 w-full">
+                    <!-- Campo Data -->
+                    <div style="width: 200px; flex-shrink: 0;">
+                        <input type="date" name="data" id="data" class="form-input-filter" 
+                               value="{{ filtros.data_inicio|default:'' }}" placeholder="Data">
+                    </div>
+                    
+                    <!-- Campo Buscar por Título -->
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="form-input-wrapper">
+                            <input type="text" name="search" id="search" class="form-input-filter" 
+                                   value="{{ filtros.search|default:'' }}" placeholder="Buscar por título...">
+                            <i class="fas fa-search form-input-icon"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Botões de Ação -->
+                    <div class="flex gap-3" style="flex-shrink: 0;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i>
+                            Buscar
+                        </button>
+                        <a href="{% url 'pautas:list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-eraser"></i>
+                            Limpar filtro
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Paginação -->
+    {% if page_obj.has_other_pages %}
+    <div class="mb-6" style="background: #1f2937; border-radius: 8px; padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="color: #9ca3af; font-size: 14px;">
+            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} pautas)
+        </div>
+        
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <!-- Primeira página -->
+            <a href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+               style="padding: 8px 12px; background: {% if page_obj.number == 1 %}#6366f1{% else %}transparent{% endif %}; border: 1px solid #374151; border-radius: 6px; color: #fff; text-decoration: none; min-width: 40px; text-align: center;">
+                «
+            </a>
+            
+            <!-- Página anterior -->
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+               style="padding: 8px 12px; background: transparent; border: 1px solid #374151; border-radius: 6px; color: #fff; text-decoration: none; min-width: 40px; text-align: center;">
+                ‹
+            </a>
+            {% endif %}
+            
+            <!-- Números de página -->
+            {% for num in page_obj.paginator.page_range %}
+                {% if num == page_obj.number %}
+                    <span style="padding: 8px 12px; background: #6366f1; border: 1px solid #6366f1; border-radius: 6px; color: #fff; min-width: 40px; text-align: center; font-weight: 500;">
+                        {{ num }}
+                    </span>
+                {% elif num > page_obj.number|add:'-4' and num < page_obj.number|add:'4' %}
+                    <a href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+                       style="padding: 8px 12px; background: transparent; border: 1px solid #374151; border-radius: 6px; color: #fff; text-decoration: none; min-width: 40px; text-align: center;">
+                        {{ num }}
+                    </a>
+                {% endif %}
+            {% endfor %}
+            
+            <!-- Próxima página -->
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+               style="padding: 8px 12px; background: transparent; border: 1px solid #374151; border-radius: 6px; color: #fff; text-decoration: none; min-width: 40px; text-align: center;">
+                ›
+            </a>
+            {% endif %}
+            
+            <!-- Última página -->
+            <a href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+               style="padding: 8px 12px; background: {% if page_obj.number == page_obj.paginator.num_pages %}#6366f1{% else %}transparent{% endif %}; border: 1px solid #374151; border-radius: 6px; color: #fff; text-decoration: none; min-width: 40px; text-align: center;">
+                »
+            </a>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Lista de Pautas -->
+    <div class="grid grid-cols-1 gap-4" id="pautas-container">
+        {% for pauta in page_obj %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <!-- Header do Card -->
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex gap-2">
+                            <span class="badge badge-{{ pauta.rede_social|lower|default:'secondary' }}">
+                                {{ pauta.get_rede_social_display }}
+                            </span>
+                            <span class="badge badge-{{ pauta.status|default:'secondary' }}">
+                                {{ pauta.get_status_display }}
+                            </span>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button type="button" class="btn btn-sm btn-edit" 
+                                    data-pauta-id="{{ pauta.id }}"
+                                    style="background: transparent; border: 1px solid #6c757d; color: #fff; padding: 6px 12px; border-radius: 4px;">
+                                Editar
+                            </button>
+                            <button type="button" class="btn btn-sm btn-delete" 
+                                    data-pauta-id="{{ pauta.id }}"
+                                    data-pauta-title="{{ pauta.title }}"
+                                    style="background: transparent; border: 1px solid #dc3545; color: #dc3545; padding: 6px 12px; border-radius: 4px;">
+                                Excluir
+                            </button>
+                            <button type="button" class="btn btn-sm" 
+                                    data-pauta-id="{{ pauta.id }}"
+                                    style="background: #6366f1; border: none; color: #fff; padding: 6px 12px; border-radius: 4px;">
+                                Gerar Post
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Conteúdo do Card - Modo Visualização -->
+                    <div class="pauta-content" id="pauta-content-{{ pauta.id }}">
+                        <h5 class="font-semibold text-lg mb-2">{{ pauta.title }}</h5>
+                        <p class="text-muted mb-4">{{ pauta.content }}</p>
+                        
+                        <div class="flex justify-between items-center text-sm text-muted">
+                            <span>
+                                <i class="fas fa-user mr-1"></i>
+                                {{ pauta.user.email }}
+                            </span>
+                            <span>
+                                <i class="fas fa-clock mr-1"></i>
+                                {{ pauta.created_at|date:"d/m/Y H:i" }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Formulário de Edição - Inicialmente Oculto -->
+                    <div class="pauta-edit-form" id="pauta-edit-{{ pauta.id }}" style="display: none;">
+                        <div class="mb-4">
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="edit-title-{{ pauta.id }}" 
+                                   value="{{ pauta.title }}"
+                                   placeholder="Título"
+                                   style="width: 100%; padding: 12px; border: 1px solid #374151; border-radius: 8px; background: #1f2937; color: #fff; font-size: 16px;">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <textarea class="form-control" 
+                                      id="edit-content-{{ pauta.id }}" 
+                                      rows="6"
+                                      placeholder="Conteúdo"
+                                      style="width: 100%; padding: 12px; border: 1px solid #374151; border-radius: 8px; background: #1f2937; color: #fff; font-size: 14px; resize: vertical;">{{ pauta.content }}</textarea>
+                        </div>
+                        
+                        <div class="flex gap-2 justify-end">
+                            <button type="button" 
+                                    class="btn btn-cancel-edit" 
+                                    data-pauta-id="{{ pauta.id }}"
+                                    style="background: transparent; border: 1px solid #6c757d; color: #9ca3af; padding: 8px 20px; border-radius: 6px; font-size: 14px;">
+                                Cancelar
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-save-edit" 
+                                    data-pauta-id="{{ pauta.id }}"
+                                    style="background: #6366f1; border: none; color: #fff; padding: 8px 20px; border-radius: 6px; font-size: 14px;">
+                                Salvar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-span-full">
+                <div class="text-center py-12">
+                    <i class="fas fa-lightbulb text-6xl text-muted mb-4"></i>
+                    <h4 class="text-xl text-muted mb-2">Nenhuma pauta encontrada</h4>
+                    <p class="text-muted">
+                        {% if knowledge_base %}
+                            Clique em "Gerar Pauta" para criar sua primeira pauta inteligente.
+                        {% else %}
+                            Complete o perfil da sua empresa para começar a gerar pautas.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modal Gerar Pauta -->
+<div id="modalGerarPauta" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Gerador de Pautas</h3>
+            <button type="button" class="modal-close" onclick="closeModal('modalGerarPauta')">×</button>
+        </div>
+        
+        <form id="form-gerar-pauta">
+            <div class="modal-body">
+                <p style="margin-bottom: 16px; color: #374151; line-height: 1.6;">
+                    Digite no campo abaixo sobre o que você quer postar em suas Redes Sociais. Se quiser colocar apenas palavras-chave, separe elas por ";".
+                </p>
+                
+                <p style="margin-bottom: 24px; color: #374151; line-height: 1.6;">
+                    Se não tiver nada em mente, deixe em branco que traremos sugestões baseadas na atualidade que estão relacionadas com seu perfil.
+                </p>
+                
+                <div class="field">
+                    <label for="rede_social">
+                        Rede Social
+                        <span class="text-danger">*</span>
+                    </label>
+                    <select id="rede_social" name="rede_social" class="form-input-filter" required>
+                        <option value="">Selecione uma rede social...</option>
+                        {% for choice in rede_choices %}
+                            <option value="{{ choice.0 }}">{{ choice.1 }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="field">
+                    <label for="tema">
+                        Tema
+                    </label>
+                    <textarea id="tema" name="tema" class="form-input-filter" rows="4" 
+                              placeholder="Digite sobre o que você quer postar ou separe palavras-chave por ;"></textarea>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" onclick="closeModal('modalGerarPauta')">
+                    Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary" id="btn-gerar">
+                    Gerar Pauta
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script>
+// Funções para controlar o modal
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+}
+
+// Abrir modal ao clicar no botão
+document.addEventListener('DOMContentLoaded', function() {
+    const btnGerarPauta = document.querySelector('[onclick*="modalGerarPauta"]');
+    if (btnGerarPauta) {
+        btnGerarPauta.removeAttribute('onclick');
+        btnGerarPauta.addEventListener('click', function() {
+            openModal('modalGerarPauta');
+        });
+    }
+    
+    // Fechar modal ao clicar no overlay
+    const modalOverlay = document.getElementById('modalGerarPauta');
+    if (modalOverlay) {
+        modalOverlay.addEventListener('click', function(e) {
+            if (e.target === modalOverlay) {
+                closeModal('modalGerarPauta');
+            }
+        });
+    }
+    
+    // Fechar modal com ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeModal('modalGerarPauta');
+        }
+    });
+    
+    // O event listener foi movido para pautas.js para evitar conflitos
+});
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/toaster.js' %}?v=20260201-2227"></script>
+<script src="{% static 'js/pautas.js' %}?v=20260201-2227"></script>
+{% endblock %}

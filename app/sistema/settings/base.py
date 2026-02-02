@@ -32,6 +32,7 @@ LOCAL_APPS = [
     'apps.knowledge',
     'apps.content',
     'apps.campaigns',
+    'apps.pautas',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -166,6 +167,11 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  # Fallback para username
 ]
 
+# LOGIN URLs
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/dashboard/'
+LOGOUT_REDIRECT_URL = '/login/'
+
 # AI INTEGRATIONS
 # OpenAI
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
@@ -208,6 +214,7 @@ DEFAULT_MONTHLY_COST_LIMIT = config('DEFAULT_MONTHLY_COST_LIMIT', default=100.00
 N8N_WEBHOOK_FUNDAMENTOS = config('N8N_WEBHOOK_FUNDAMENTOS', default='')
 N8N_WEBHOOK_COMPILE_SEMSUGEST = config('N8N_WEBHOOK_COMPILA_SEM_SUGEST', default='')
 N8N_WEBHOOK_COMPILE_COMSUGEST = config('N8N_WEBHOOK_COMPILA_COM_SUGEST', default='')
+N8N_WEBHOOK_GERAR_PAUTA = config('N8N_WEBHOOK_GERAR_PAUTA', default='')
 N8N_WEBHOOK_TIMEOUT = config('N8N_WEBHOOK_TIMEOUT', default=30, cast=int)
 N8N_WEBHOOK_SECRET = config('N8N_WEBHOOK_SECRET', default='')
 N8N_ALLOWED_IPS = config('N8N_ALLOWED_IPS', default='127.0.0.1')
