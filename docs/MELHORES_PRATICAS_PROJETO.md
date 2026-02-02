@@ -336,7 +336,136 @@ logger.error('Erro ao processar', exc_info=True)
 
 ---
 
-## 📦 5. ORGANIZAÇÃO DE CÓDIGO
+## 🎨 5. CÓDIGO LIMPO E MELHORES PRÁTICAS (CRÍTICO)
+
+### **NUNCA usar Hardcode**
+
+**Regra absoluta:**
+- ❌ **NUNCA** valores fixos no código
+- ✅ **SEMPRE** usar variáveis de ambiente
+- ✅ **SEMPRE** usar configurações
+- ✅ **SEMPRE** usar constantes nomeadas
+
+**Exemplos:**
+
+```python
+# ❌ ERRADO - Hardcode
+url = "https://api.example.com/endpoint"
+max_items = 100
+api_key = "abc123xyz"
+timeout = 30
+
+# ✅ CORRETO - Configurável
+from django.conf import settings
+
+url = settings.API_ENDPOINT
+max_items = settings.MAX_ITEMS_PER_PAGE
+api_key = settings.API_KEY
+timeout = settings.REQUEST_TIMEOUT
+```
+
+```javascript
+// ❌ ERRADO - Hardcode
+const apiUrl = 'https://api.example.com';
+const maxRetries = 3;
+
+// ✅ CORRETO - Configurável
+const apiUrl = window.APP_CONFIG.apiUrl;
+const maxRetries = window.APP_CONFIG.maxRetries;
+```
+
+---
+
+### **NUNCA usar CSS Inline**
+
+**Regra absoluta:**
+- ❌ **NUNCA** usar atributo `style=""` em HTML
+- ✅ **SEMPRE** criar classes CSS em arquivos .css
+- ✅ **SEMPRE** usar componentes reutilizáveis
+- ✅ **SEMPRE** separar apresentação de estrutura
+
+**Exemplos:**
+
+```html
+<!-- ❌ ERRADO - CSS Inline -->
+<div style="color: red; padding: 10px; margin-bottom: 20px;">
+    Texto de erro
+</div>
+
+<button style="background: #6366f1; color: white; padding: 8px 16px;">
+    Salvar
+</button>
+
+<!-- ✅ CORRETO - Classes CSS -->
+<div class="alert alert-danger mb-4">
+    Texto de erro
+</div>
+
+<button class="btn btn-primary">
+    Salvar
+</button>
+```
+
+**Arquivo CSS correspondente:**
+```css
+/* static/css/components.css */
+.alert {
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.alert-danger {
+    color: #dc3545;
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
+.btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: #6366f1;
+    color: white;
+}
+```
+
+**Exceções permitidas:**
+- ✅ Estilos dinâmicos calculados via JavaScript (ex: posição baseada em scroll)
+- ✅ Estilos de debug temporários (remover antes de commit)
+
+---
+
+### **Melhores Práticas de Mercado**
+
+**DRY (Don't Repeat Yourself):**
+- ✅ Criar funções/componentes reutilizáveis
+- ✅ Consolidar código duplicado
+- ✅ Usar herança e composição
+
+**Separação de Responsabilidades:**
+- ✅ HTML: Estrutura
+- ✅ CSS: Apresentação
+- ✅ JavaScript: Comportamento
+- ✅ Python: Lógica de negócio
+
+**Componentização:**
+- ✅ Criar componentes pequenos e focados
+- ✅ Reutilizar componentes existentes
+- ✅ Documentar componentes
+
+**Código Limpo:**
+- ✅ Nomes descritivos
+- ✅ Funções pequenas (máx 50 linhas)
+- ✅ Comentários apenas quando necessário
+- ✅ Evitar complexidade desnecessária
+
+---
+
+## 📦 6. ORGANIZAÇÃO DE CÓDIGO
 
 ### **Estrutura de Arquivos**
 
