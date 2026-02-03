@@ -417,10 +417,10 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 </script>
 
 {% load static %}
-{% now "U" as timestamp %}
-<script src="{% static 'js/posts.js' %}?v={{ timestamp }}"></script>
-<script src="{% static 'js/posts-modal.js' %}?v={{ timestamp }}"></script>
-<script src="{% static 'js/posts-gallery.js' %}?v={{ timestamp }}"></script>
+<script src="{% static 'js/posts.js' %}?v=20260203-0137"></script>
+<!-- Temporariamente desabilitados para debug -->
+<!-- <script src="{% static 'js/posts-modal.js' %}?v=20260203-0129"></script> -->
+<!-- <script src="{% static 'js/posts-gallery.js' %}?v=20260203-0129"></script> -->
 
 <script>
 // Inicializar lazyload para imagens dos posts

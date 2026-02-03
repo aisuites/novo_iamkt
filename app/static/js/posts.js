@@ -364,14 +364,6 @@
     }
   }
 
-  /**
-   * Fecha modal de edição
-   */
-  function closeEditPostModal() {
-    closeModal(dom.modalEditarPost);
-    editingPostRef = null;
-  }
-
   // Event listeners para abrir modais
   $$('[data-open]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1020,11 +1012,21 @@
    * Constrói botões de ação
    */
   function buildPostActions(post) {
+    console.log('[DEBUG] buildPostActions chamado com post:', post);
     const actionsContainer = document.getElementById('postActions');
-    if (!actionsContainer) return;
+    console.log('[DEBUG] actionsContainer:', actionsContainer);
+    if (!actionsContainer) {
+      console.error('[DEBUG] postActions container não encontrado!');
+      return;
+    }
     
     actionsContainer.innerHTML = '';
-    if (!post) return;
+    if (!post) {
+      console.error('[DEBUG] Post é null ou undefined');
+      return;
+    }
+    
+    console.log('[DEBUG] Post status:', post.status);
     
     // Status: generating - Mostrar badge
     if (post.status === 'generating') {
@@ -1064,6 +1066,9 @@
     
     // Status: pending, image_generating ou image_ready - Mostrar botões
     if (post.status === 'pending' || post.status === 'image_generating' || post.status === 'image_ready') {
+      console.log('[DEBUG] Status é pending/image_generating/image_ready - criando botões');
+      console.log('[DEBUG] post.images:', post.images);
+      
       // Botão Rejeitar
       const btnReject = document.createElement('button');
       btnReject.type = 'button';
@@ -1092,6 +1097,7 @@
       
       // Botão Gerar Imagem (apenas se não tem imagem)
       if (!post.images || post.images.length === 0) {
+        console.log('[DEBUG] Sem imagens - criando 4 botões');
         const btnGenerate = document.createElement('button');
         btnGenerate.type = 'button';
         btnGenerate.className = 'btn btn-primary';
@@ -1099,6 +1105,7 @@
         btnGenerate.addEventListener('click', () => startImageGeneration(post));
         
         actionsContainer.append(btnReject, btnRequest, btnEdit, btnGenerate);
+        console.log('[DEBUG] 4 botões adicionados ao container');
       } else {
         // Botão Aprovar (se tem imagem)
         const btnApprove = document.createElement('button');
