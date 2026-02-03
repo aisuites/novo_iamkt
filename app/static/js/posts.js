@@ -805,8 +805,9 @@
    */
   function updatePostDetails(post) {
     if (!post) return;
-    
-    const dom = window.postsDOM || {};
+
+    if (dom.textRequestBox) dom.textRequestBox.hidden = !post.textRequestOpen;
+    if (dom.imageRequestBox) dom.imageRequestBox.hidden = !post.imageRequestOpen;
     
     // Banner de status de geração de texto (coluna esquerda)
     const bannerContainer = dom.postStatus?.parentElement?.parentElement;
@@ -827,30 +828,60 @@
       bannerContainer.insertBefore(textBanner, dom.postStatus.parentElement);
     }
     
-    // Status
     if (dom.postStatus) {
       const info = statusInfo[post.status] || statusInfo.pending;
-      dom.postStatus.textContent = post.statusLabel || info.label;
+      const label = post.statusLabel || info.label;
+      dom.postStatus.textContent = label;
       dom.postStatus.className = `status-pill ${info.className}`;
     }
     
-    // Campos de texto
+    if (dom.postTags) {
+      dom.postTags.innerHTML = '';
+      
+      const tags = [];
+      if (post.formats && post.formats.length) {
+        post.formats.forEach(format => {
+          tags.push(`${post.network || 'Canal'} - ${format.toUpperCase()}`);
+        });
+      } else if (post.network) {
+        tags.push(post.network);
+      }
+      if (post.carousel) {
+        const amount = Math.min(5, Math.max(2, Number(post.carousel_quantity) || 2));
+        tags.push(`CARROSSEL - ${amount} IMAGENS`);
+      }
+      tags.forEach(text => {
+        const span = document.createElement('span');
+        span.className = 'post-tag';
+        span.textContent = text;
+        dom.postTags.appendChild(span);
+      });
+    }
+    
     if (dom.postTitulo) dom.postTitulo.textContent = post.title || '—';
     if (dom.postSubtitulo) dom.postSubtitulo.textContent = post.subtitle || '—';
     if (dom.postLegenda) dom.postLegenda.textContent = post.caption || '—';
-    if (dom.postHashtags) dom.postHashtags.textContent = Array.isArray(post.hashtags) ? post.hashtags.join(' ') : (post.hashtags || '—');
+    if (dom.postHashtags) dom.postHashtags.textContent = (post.hashtags && post.hashtags.length) ? post.hashtags.join(' ') : '—';
     if (dom.postCTA) dom.postCTA.textContent = post.cta || '—';
-    if (dom.postDescricaoImagem) dom.postDescricaoImagem.textContent = post.image_prompt || '—';
     
-    // Revisões e data
-    if (dom.postRevisoes) {
-      const rev = typeof post.imageChanges === 'number' ? post.imageChanges : 0;
-      const max = 1;
-      dom.postRevisoes.textContent = `${rev}/${max}`;
+    if (dom.postDescricaoImagem) {
+      dom.postDescricaoImagem.textContent = post.image_prompt || post.description || '—';
+      
+      if (post.carousel && post.carousel_quantity > 1) {
+        if (!dom.postDescricaoImagem.classList.contains('post-image-prompt')) {
+          dom.postDescricaoImagem.classList.add('post-image-prompt');
+        }
+      } else {
+        dom.postDescricaoImagem.classList.remove('post-image-prompt');
+      }
     }
     
-    if (dom.postDataCriacao && post.created_at) {
-      dom.postDataCriacao.textContent = formatDateTime(post.created_at);
+    if (dom.postRevisoes) dom.postRevisoes.textContent = `Revisões restantes: ${Math.max(0, post.remaining_revisions ?? 0)}`;
+    if (dom.postDataCriacao) dom.postDataCriacao.textContent = `Data da criação: ${formatDateTime(post.created_at)}`;
+
+    if (dom.textRequestInput) {
+      dom.textRequestInput.classList.remove('invalid');
+      dom.textRequestInput.value = post.textRequestOpen ? (post.pendingTextRequest || '') : '';
     }
   }
 
