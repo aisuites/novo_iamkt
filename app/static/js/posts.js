@@ -14,8 +14,14 @@
 (function() {
   'use strict';
   
+  console.log('========================================');
+  console.log('[POSTS.JS] ARQUIVO CARREGADO E EXECUTANDO');
+  console.log('[POSTS.JS] Timestamp:', new Date().toISOString());
+  console.log('========================================');
+  
   // Identificador de versão para debug
   window.POSTS_JS_VERSION = '2026-02-02-20:42-REBUILD';
+  console.log('[POSTS.JS] Versão:', window.POSTS_JS_VERSION);
 
   // ============================================================================
   // CONFIGURAÇÃO E CONSTANTES
@@ -287,7 +293,7 @@
     btnLimparFiltros: document.getElementById('btnLimparFiltros'),
     
     // Lista de posts
-    postsPane: document.getElementById('tab-posts'),
+    postsPane: document.getElementById('postsMain'), // Corrigido: tab-posts não existe, usar postsMain
     postsEmpty: document.getElementById('postsEmpty'),
     postsMain: document.getElementById('postsMain'),
     
@@ -1123,12 +1129,14 @@
    * Renderiza posts
    */
   function renderPosts(scrollIntoView = false) {
+    console.log('[DEBUG renderPosts] Início');
     const filtered = applyFilters();
     const total = filtered.length;
-
-    if (!dom.postsPane) return;
+    console.log('[DEBUG renderPosts] Total filtrado:', total);
 
     if (total === 0) {
+      console.log('[DEBUG renderPosts] Total é 0, mostrando mensagem vazia');
+
       if (dom.postsEmpty) dom.postsEmpty.style.display = '';
       if (dom.postsMain) dom.postsMain.hidden = true;
       if (dom.postPagerInfo) {
@@ -1180,6 +1188,9 @@
     }
     postsState.selectedId = current?.id || postsState.selectedId || null;
     
+    console.log('[DEBUG renderPosts] Post atual (current):', current);
+    console.log('[DEBUG renderPosts] current?.id:', current?.id);
+    
     // Salvar post selecionado no localStorage
     if (postsState.selectedId) {
       try {
@@ -1189,10 +1200,15 @@
       }
     }
 
+    console.log('[DEBUG renderPosts] Chamando updatePostDetails...');
     updatePostDetails(current);
+    console.log('[DEBUG renderPosts] Chamando updatePostVisual...');
     updatePostVisual(current);
+    console.log('[DEBUG renderPosts] Chamando buildPostActions...');
     buildPostActions(current);
+    console.log('[DEBUG renderPosts] Chamando buildPagination...');
     buildPagination(total, totalPages);
+    console.log('[DEBUG renderPosts] Fim');
 
     if (scrollIntoView) {
       const offset = (window.app && window.app.stickyOffset) ? window.app.stickyOffset : 80;
@@ -1221,8 +1237,25 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = label;
+      btn.className = 'pager-btn'; // Classe base para estilos
       if (extraClass) btn.classList.add(extraClass);
       btn.disabled = disabled;
+      
+      // Aplicar estilos inline para garantir visual correto
+      btn.style.cssText = `
+        padding: 8px 12px;
+        background: ${extraClass === 'active' ? '#6366f1' : 'transparent'};
+        border: 1px solid ${extraClass === 'active' ? '#6366f1' : '#374151'};
+        border-radius: 6px;
+        color: #fff;
+        min-width: 40px;
+        text-align: center;
+        cursor: ${disabled ? 'not-allowed' : 'pointer'};
+        opacity: ${disabled ? '0.5' : '1'};
+        font-weight: ${extraClass === 'active' ? '500' : '400'};
+        transition: all 0.2s ease;
+      `;
+      
       if (!disabled) {
         btn.addEventListener('click', () => {
           if (postsState.page === page) return;
@@ -1230,6 +1263,18 @@
           postsState.selectedId = null; // CRÍTICO: Limpa selectedId para não sobrescrever navegação manual
           renderPosts(true);
         });
+        
+        // Hover effect
+        if (extraClass !== 'active') {
+          btn.addEventListener('mouseenter', () => {
+            btn.style.borderColor = '#6366f1';
+            btn.style.color = '#6366f1';
+          });
+          btn.addEventListener('mouseleave', () => {
+            btn.style.borderColor = '#374151';
+            btn.style.color = '#fff';
+          });
+        }
       }
       dom.pagerButtons.appendChild(btn);
     };
@@ -1551,12 +1596,21 @@
   // INICIALIZAÇÃO
   // ============================================================================
 
+  console.log('[POSTS.JS] Iniciando...');
+  console.log('[POSTS.JS] window.INITIAL_POSTS:', window.INITIAL_POSTS);
+  
   // Verificar se temos posts
   if (!window.INITIAL_POSTS) {
+    console.log('[POSTS.JS] INITIAL_POSTS não existe, criando array vazio');
     window.INITIAL_POSTS = [];
   }
 
+  console.log('[POSTS.JS] Total de posts:', window.INITIAL_POSTS.length);
+  console.log('[POSTS.JS] Chamando renderPosts()...');
+  
   // Renderizar posts iniciais
   renderPosts();
+  
+  console.log('[POSTS.JS] renderPosts() executado');
 
 })();
