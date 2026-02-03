@@ -2,7 +2,6 @@
  * POSTS.JS - Página de Posts
  * Extraído de resumo.html e adaptado para padrão IAMKT
  * Data: 02/02/2026
- * Versão: 2026-02-02-20:42 (REBUILD COMPLETO)
  * 
  * ADAPTAÇÕES:
  * - Removido console.log → logger.debug()
@@ -13,9 +12,6 @@
 
 (function() {
   'use strict';
-  
-  // Identificador de versão para debug
-  window.POSTS_JS_VERSION = '2026-02-02-20:42-REBUILD';
 
   // ============================================================================
   // CONFIGURAÇÃO E CONSTANTES
@@ -112,15 +108,10 @@
   // ESTADO DA APLICAÇÃO
   // ============================================================================
 
-  // Obter página atual da URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const currentPageFromURL = parseInt(urlParams.get('page')) || 1;
-  
-  // Estado global
   const postsState = {
     items: INITIAL_POSTS.slice(),
     filtered: [],
-    page: currentPageFromURL,
+    page: 1,
     perPage: 1,
     filters: { date: '', status: 'all', search: '' },
     selectedId: null,
@@ -622,63 +613,47 @@
   // ============================================================================
 
   /**
-   * Aplica filtros aos posts (retorna items filtrados)
+   * Aplica filtros aos posts
    */
-  function applyFilters() {
-    const { date, status, search } = postsState.filters;
-    let items = postsState.items.slice();
-    
+  function applyPostFilters() {
+    let filtered = [...postsState.items];
+
     // Filtro por data
-    if (date) {
-      items = items.filter(post => {
-        const postDate = new Date(post.created_at).toISOString().split('T')[0];
-        return postDate === date;
+    if (dom.filtroData && dom.filtroData.value) {
+      const selectedDate = dom.filtroData.value;
+      filtered = filtered.filter(p => {
+        const postDate = new Date(p.created_at).toISOString().split('T')[0];
+        return postDate === selectedDate;
       });
     }
-    
+
     // Filtro por status
-    if (status && status !== 'all') {
-      items = items.filter(post => post.status === status);
+    if (dom.filtroStatus && dom.filtroStatus.value && dom.filtroStatus.value !== 'all') {
+      filtered = filtered.filter(p => p.status === dom.filtroStatus.value);
     }
-    
+
     // Busca por título
-    if (search) {
-      const q = search.toLowerCase();
-      items = items.filter(post => 
-        (post.title || '').toLowerCase().includes(q) ||
-        String(post.id).includes(q)
+    if (dom.filtroBusca && dom.filtroBusca.value.trim()) {
+      const query = dom.filtroBusca.value.toLowerCase();
+      filtered = filtered.filter(p =>
+        (p.titulo || '').toLowerCase().includes(query) ||
+        String(p.id).includes(query)
       );
     }
-    
-    postsState.filtered = items;
-    return items;
+
+    postsState.filtered = filtered;
+    postsState.page = 1;
+    renderPosts();
   }
 
   // Event listeners para filtros
-  dom.filtroStatus?.addEventListener('change', () => {
-    postsState.filters.status = dom.filtroStatus.value;
-    postsState.page = 1;
-    renderPosts();
-  });
-  
-  dom.filtroData?.addEventListener('change', () => {
-    postsState.filters.date = dom.filtroData.value;
-    postsState.page = 1;
-    renderPosts();
-  });
-  
-  dom.btnBuscar?.addEventListener('click', () => {
-    postsState.filters.search = dom.filtroBusca?.value.trim() || '';
-    postsState.page = 1;
-    renderPosts();
-  });
-  
+  dom.filtroStatus?.addEventListener('change', applyPostFilters);
+  dom.filtroData?.addEventListener('change', applyPostFilters);
+  dom.btnBuscar?.addEventListener('click', applyPostFilters);
   dom.filtroBusca?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      postsState.filters.search = dom.filtroBusca.value.trim();
-      postsState.page = 1;
-      renderPosts();
+      applyPostFilters();
     }
   });
 
@@ -697,119 +672,11 @@
   });
 
   /**
-   * Obtém post atual baseado na página
-   */
-  function getCurrentPost() {
-    if (!postsState.filtered.length) return null;
-    const index = Math.min(postsState.filtered.length - 1, Math.max(0, postsState.page - 1));
-    return postsState.filtered[index];
-  }
-
-  /**
-   * Atualiza detalhes do post
-   */
-  function updatePostDetails(post) {
-    if (!post) return;
-    
-    const dom = window.postsDOM || {};
-    
-    // Status
-    if (dom.postStatus) {
-      const info = statusInfo[post.status] || statusInfo.pending;
-      dom.postStatus.textContent = post.statusLabel || info.label;
-      dom.postStatus.className = `status-pill ${info.className}`;
-    }
-    
-    // Campos de texto
-    if (dom.postTitulo) dom.postTitulo.textContent = post.title || '—';
-    if (dom.postSubtitulo) dom.postSubtitulo.textContent = post.subtitle || '—';
-    if (dom.postLegenda) dom.postLegenda.textContent = post.caption || '—';
-    if (dom.postHashtags) dom.postHashtags.textContent = Array.isArray(post.hashtags) ? post.hashtags.join(' ') : (post.hashtags || '—');
-    if (dom.postCTA) dom.postCTA.textContent = post.cta || '—';
-    if (dom.postDescricaoImagem) dom.postDescricaoImagem.textContent = post.image_prompt || '—';
-  }
-
-  /**
-   * Constrói botões de ação
-   */
-  function buildPostActions(post) {
-    const actionsContainer = document.getElementById('postActions');
-    if (!actionsContainer) return;
-    
-    actionsContainer.innerHTML = '';
-    if (!post) return;
-    
-    // Status: generating
-    if (post.status === 'generating') {
-      const badge = document.createElement('span');
-      badge.className = 'badge-muted';
-      badge.textContent = 'Agente gerando conteúdo — aguarde';
-      actionsContainer.appendChild(badge);
-      return;
-    }
-    
-    // Status: pending - MOSTRAR 4 BOTÕES
-    if (post.status === 'pending') {
-      const btnReject = document.createElement('button');
-      btnReject.type = 'button';
-      btnReject.className = 'btn btn-outline-danger';
-      btnReject.textContent = 'Rejeitar';
-      btnReject.onclick = () => alert('Funcionalidade em desenvolvimento');
-      
-      const btnRequest = document.createElement('button');
-      btnRequest.type = 'button';
-      btnRequest.className = 'btn btn-outline-secondary';
-      btnRequest.textContent = 'Solicitar Alteração';
-      btnRequest.onclick = () => alert('Funcionalidade em desenvolvimento');
-      
-      const btnEdit = document.createElement('button');
-      btnEdit.type = 'button';
-      btnEdit.className = 'btn btn-outline-secondary';
-      btnEdit.textContent = 'Editar';
-      btnEdit.onclick = () => alert('Funcionalidade em desenvolvimento');
-      
-      const btnGenerate = document.createElement('button');
-      btnGenerate.type = 'button';
-      btnGenerate.className = 'btn btn-primary';
-      btnGenerate.textContent = 'Gerar Imagem';
-      btnGenerate.onclick = () => alert('Funcionalidade em desenvolvimento');
-      
-      actionsContainer.append(btnReject, btnRequest, btnEdit, btnGenerate);
-    }
-  }
-
-  /**
    * Renderiza posts
    */
   function renderPosts() {
-    const filtered = applyFilters();
-    const total = filtered.length;
-    
-    if (total === 0) {
-      logger.warn('[POSTS] Nenhum post para exibir');
-      return;
-    }
-    
-    const totalPages = Math.max(1, Math.ceil(total / postsState.perPage));
-    postsState.page = Math.min(totalPages, Math.max(1, postsState.page));
-    
-    const startIndex = (postsState.page - 1) * postsState.perPage;
-    let current = filtered[startIndex] || null;
-    
-    if (!current && filtered.length) {
-      current = filtered[0];
-      postsState.page = 1;
-    }
-    
-    if (!current) {
-      logger.warn('[POSTS] Nenhum post atual');
-      return;
-    }
-    
-    logger.info('[POSTS] Post atual:', current.id, 'Status:', current.status);
-    
-    updatePostDetails(current);
-    buildPostActions(current);
+    // TODO: Implementar renderização de posts
+    logger.debug('[POSTS] Renderizando posts...');
   }
 
   /**
@@ -824,12 +691,10 @@
   // INICIALIZAÇÃO
   // ============================================================================
 
-  // Verificar se temos posts
-  if (!window.INITIAL_POSTS) {
-    window.INITIAL_POSTS = [];
-  }
+  logger.debug('[POSTS] Página de posts inicializada com sucesso');
+  logger.debug('[POSTS] Total de posts:', postsState.items.length);
 
-  // Renderizar posts iniciais
-  renderPosts();
+  // Aplicar filtros iniciais
+  applyPostFilters();
 
 })();

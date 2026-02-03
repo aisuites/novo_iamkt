@@ -165,8 +165,21 @@ class Post(models.Model):
     
     # Imagem gerada (S3)
     has_image = models.BooleanField(default=False, verbose_name='Tem Imagem')
-    image_s3_key = models.CharField(max_length=500, blank=True, verbose_name='Chave S3 Imagem')
-    image_s3_url = models.URLField(max_length=1000, blank=True, verbose_name='URL S3 Imagem')
+    image_file = models.ImageField(
+        upload_to='temp/posts/',
+        blank=True,
+        null=True,
+        verbose_name='Upload de Imagem',
+        help_text='Faça upload da imagem aqui. Será automaticamente enviada para S3.'
+    )
+    generated_images = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Imagens Geradas',
+        help_text='Array de objetos com s3_key, s3_url, width, height de cada imagem gerada'
+    )
+    image_s3_key = models.CharField(max_length=500, blank=True, verbose_name='Chave S3 Imagem (Principal)')
+    image_s3_url = models.URLField(max_length=1000, blank=True, verbose_name='URL S3 Imagem (Principal)')
     image_prompt = models.TextField(blank=True, verbose_name='Prompt da Imagem')
     image_width = models.IntegerField(null=True, blank=True, verbose_name='Largura')
     image_height = models.IntegerField(null=True, blank=True, verbose_name='Altura')
@@ -235,3 +248,36 @@ class Post(models.Model):
         if not self.formats:
             return self.content_type or ""
         return self.formats[0] if self.formats else ""
+
+
+class PostImage(models.Model):
+    """
+    Imagens geradas para um Post (suporta múltiplas imagens por post)
+    """
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name='images',
+        verbose_name='Post'
+    )
+    image_file = models.ImageField(
+        upload_to='temp/posts/',
+        blank=True,
+        null=True,
+        verbose_name='Upload de Imagem',
+        help_text='Faça upload da imagem. Será automaticamente enviada para S3.'
+    )
+    s3_key = models.CharField(max_length=500, blank=True, verbose_name='Chave S3')
+    s3_url = models.URLField(max_length=1000, blank=True, verbose_name='URL S3')
+    width = models.IntegerField(null=True, blank=True, verbose_name='Largura')
+    height = models.IntegerField(null=True, blank=True, verbose_name='Altura')
+    order = models.PositiveSmallIntegerField(default=0, verbose_name='Ordem')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+    
+    class Meta:
+        verbose_name = 'Imagem do Post'
+        verbose_name_plural = 'Imagens do Post'
+        ordering = ['order', 'created_at']
+    
+    def __str__(self):
+        return f"Imagem {self.order} - Post #{self.post.id}"

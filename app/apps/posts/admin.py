@@ -1,9 +1,19 @@
 from django.contrib import admin
-from .models import Post
+from .models import Post, PostImage
+
+
+class PostImageInline(admin.TabularInline):
+    model = PostImage
+    extra = 1
+    fields = ('image_file', 's3_url', 'order')
+    readonly_fields = ('s3_url',)
+    verbose_name = 'Imagem do Post'
+    verbose_name_plural = 'Imagens do Post'
 
 
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
+    inlines = [PostImageInline]
     list_display = [
         'id',
         'title',
@@ -32,6 +42,9 @@ class PostAdmin(admin.ModelAdmin):
         'created_at',
         'updated_at',
         'organization',
+        'image_s3_url',
+        'image_s3_key',
+        'has_image',
     ]
     fieldsets = (
         ('Informações Básicas', {
@@ -74,12 +87,14 @@ class PostAdmin(admin.ModelAdmin):
         ('Imagem', {
             'fields': (
                 'has_image',
-                'image_s3_key',
                 'image_s3_url',
+                'image_s3_key',
                 'image_prompt',
                 'image_width',
                 'image_height',
-            )
+                'reference_images',
+            ),
+            'description': 'Campos de referência da imagem principal. Para fazer upload de imagens, use a seção "POST IMAGES" abaixo.'
         }),
         ('Status e Revisões', {
             'fields': (

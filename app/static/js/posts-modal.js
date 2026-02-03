@@ -1,11 +1,7 @@
 /**
- * POSTS-MODAL.JS - Lógica do Modal Gerar Post
- * Adaptado do resumo.html com padrão IAMKT
- * VERSÃO: 2026-02-02 11:20 - COM INICIALIZAÇÃO DO CARROSSEL
+ * POSTS-MODAL.JS - Modal de Gerar Post
+ * VERSÃO: 2026-02-02 21:15 - LOGS REMOVIDOS
  */
-
-console.log('🚀 POSTS-MODAL.JS CARREGADO - VERSÃO 11:20');
-console.log('✅ Inicialização do carrossel implementada');
 
 (function() {
     'use strict';
@@ -119,8 +115,6 @@ console.log('✅ Inicialização do carrossel implementada');
             return;
         }
         
-        console.log('🔄 setCarrossel chamado com enabled:', enabled);
-        
         dom.carrosselToggle.classList.toggle('active', enabled);
         dom.carrosselToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
         dom.carrosselQtyField.hidden = !enabled;
@@ -128,8 +122,6 @@ console.log('✅ Inicialização do carrossel implementada');
         
         // Atualizar texto do botão
         dom.carrosselToggle.textContent = enabled ? 'Desativar' : 'Ativar';
-        
-        console.log('✅ Carrossel atualizado - Campo display:', dom.carrosselQtyField.style.display);
     }
 
     if (dom.carrosselToggle) {
@@ -285,10 +277,7 @@ console.log('✅ Inicialização do carrossel implementada');
 
         for (let upload of pendingUploads) {
             try {
-                console.log('📤 Processando upload:', upload.file.name);
-                
                 // 1. Obter Presigned URL
-                console.log('🔑 Solicitando presigned URL...');
                 const urlResponse = await fetch('/posts/reference/upload-url/', {
                     method: 'POST',
                     headers: {
@@ -370,16 +359,13 @@ console.log('✅ Inicialização do carrossel implementada');
     // ============================================
     async function handleSubmit(event) {
         event.preventDefault();
-        console.log('🚀 handleSubmit iniciado');
 
         if (!dom.form) {
-            console.error('❌ Formulário não encontrado');
+            console.error('Formulário não encontrado');
             return;
         }
 
         try {
-            console.log('✅ Iniciando validações...');
-            
             // Validações
             if (!dom.redePost?.value) {
                 console.warn('⚠️ Rede social não selecionada');
@@ -393,24 +379,17 @@ console.log('✅ Inicialização do carrossel implementada');
                 return;
             }
 
-            console.log('✅ Validações OK');
-
             // Desabilitar botão
             if (dom.btnEnviarPost) {
                 dom.btnEnviarPost.disabled = true;
                 dom.btnEnviarPost.textContent = 'Enviando...';
-                console.log('✅ Botão desabilitado');
             }
 
             // Upload de imagens para S3
             let referenceImages = [];
             if (pendingUploads.length > 0) {
-                console.log('📤 Fazendo upload de', pendingUploads.length, 'imagens...');
                 window.toaster?.info('Fazendo upload das imagens...');
                 referenceImages = await uploadReferencesToS3();
-                console.log('✅ Upload concluído:', referenceImages);
-            } else {
-                console.log('ℹ️ Nenhuma imagem para upload');
             }
 
             // Coletar dados do formulário
@@ -428,10 +407,7 @@ console.log('✅ Inicialização do carrossel implementada');
                 reference_images: referenceImages
             };
 
-            console.log('📦 Payload preparado:', payload);
-
             // Enviar para backend
-            console.log('🌐 Enviando POST para /posts/gerar/...');
             const response = await fetch('/posts/gerar/', {
                 method: 'POST',
                 headers: {
@@ -441,17 +417,12 @@ console.log('✅ Inicialização do carrossel implementada');
                 body: JSON.stringify(payload)
             });
 
-            console.log('📥 Resposta recebida - Status:', response.status);
-
             const result = await response.json();
-            console.log('📄 Resultado parseado:', result);
 
             if (!response.ok || !result.success) {
-                console.error('❌ Erro na resposta:', result.error);
+                console.error('Erro na resposta:', result.error);
                 throw new Error(result.error || 'Erro ao criar post');
             }
-
-            console.log('✅ Post criado com sucesso!');
             window.toaster?.success(result.data.message || 'Post criado com sucesso!');
             window.logger?.info('Post criado:', result.data);
             
@@ -499,10 +470,6 @@ console.log('✅ Inicialização do carrossel implementada');
     // ============================================
     
     // Garantir estado inicial correto do carrossel
-    console.log('🔍 Verificando elementos do carrossel...');
-    console.log('carrosselToggle:', dom.carrosselToggle);
-    console.log('carrosselQtyField:', dom.carrosselQtyField);
-    
     if (dom.carrosselToggle && dom.carrosselQtyField) {
         // Sempre iniciar com carrossel desativado
         dom.carrosselToggle.classList.remove('active');
@@ -512,12 +479,6 @@ console.log('✅ Inicialização do carrossel implementada');
         // Forçar esconder o campo com display none
         dom.carrosselQtyField.hidden = true;
         dom.carrosselQtyField.style.display = 'none';
-        
-        console.log('✅ Estado inicial do carrossel configurado: desativado');
-        console.log('Campo Qtd Imagens hidden:', dom.carrosselQtyField.hidden);
-        console.log('Campo Qtd Imagens display:', dom.carrosselQtyField.style.display);
-    } else {
-        console.error('❌ Elementos do carrossel não encontrados!');
     }
     
     window.logger?.debug('Posts Modal JS carregado');

@@ -414,7 +414,7 @@
 .post-section p {
   margin: 0;
   white-space: pre-line;
-  color: var(--posts-text);
+  color: var(--color-gray-900);
 }
 
 /* ========================================

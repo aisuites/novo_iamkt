@@ -394,33 +394,9 @@
 <script src="{% static 'js/toaster.js' %}?v=20260202-1008"></script>
 <script src="{% static 'js/logger.js' %}?v=20260202-1008"></script>
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260202-1008"></script>
-
-<script>
-// ============================================================================
-// INJETAR DADOS DO BACKEND - DEVE VIR ANTES DO posts.js
-// ============================================================================
-
-// Injetar variáveis para o posts.js
-window.POSTS_WEBHOOK_URL = "{{ posts_webhook_url|escapejs }}";
-window.CSRF_TOKEN = "{{ csrf_token|escapejs }}";
-
-// Injetar INITIAL_POSTS de forma segura
-try {
-    window.INITIAL_POSTS = JSON.parse('{{ posts_json|escapejs }}');
-} catch (e) {
-    console.error('Erro ao parsear INITIAL_POSTS:', e);
-    window.INITIAL_POSTS = [];
-}
-
-window.CURRENT_USER = "{{ request.user.email|default:''|escapejs }}";
-window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
-</script>
-
-{% load static %}
-{% now "U" as timestamp %}
-<script src="{% static 'js/posts.js' %}?v={{ timestamp }}"></script>
-<script src="{% static 'js/posts-modal.js' %}?v={{ timestamp }}"></script>
-<script src="{% static 'js/posts-gallery.js' %}?v={{ timestamp }}"></script>
+<script src="{% static 'js/posts.js' %}?v=20260202-1008"></script>
+<script src="{% static 'js/posts-modal.js' %}?v=20260202-1210"></script>
+<script src="{% static 'js/posts-gallery.js' %}?v=20260202-1554"></script>
 
 <script>
 // Inicializar lazyload para imagens dos posts
@@ -432,22 +408,34 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Verificar se veio da página de pautas com dados pré-preenchidos
     const params = new URLSearchParams(window.location.search);
+    console.log('🔍 Query params detectados:', window.location.search);
+    console.log('🔍 Action:', params.get('action'));
+    console.log('🔍 Rede:', params.get('rede'));
+    console.log('🔍 Tema:', params.get('tema'));
     
     if (params.get('action') === 'gerar') {
         const rede = params.get('rede');
         const tema = params.get('tema');
         
+        console.log('✅ Detectado action=gerar, abrindo modal com dados:', { rede, tema });
+        
         // Abrir modal primeiro
         setTimeout(function() {
+            console.log('🚀 Abrindo modal...');
             openModal('modalGerarPost');
             
             // DEPOIS de abrir, preencher campos (quando já existem no DOM)
             setTimeout(function() {
+                console.log('📝 Preenchendo campos do modal...');
+                
                 // Preencher rede
                 if (rede) {
                     const redeSelect = document.getElementById('redePost');
                     if (redeSelect) {
                         redeSelect.value = rede.toLowerCase();
+                        console.log('✅ Rede preenchida:', rede);
+                    } else {
+                        console.error('❌ Campo redePost não encontrado');
                     }
                 }
                 
@@ -455,16 +443,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (tema) {
                     const temaTextarea = document.getElementById('temaPost');
                     if (temaTextarea) {
-                        temaTextarea.value = decodeURIComponent(tema);
+                        const maxLength = temaTextarea.maxLength || tema.length;
+                        temaTextarea.value = tema.slice(0, maxLength);
+                        console.log('✅ Tema preenchido:', tema.substring(0, 50) + '...');
+                        
+                        // Atualizar contador de caracteres
+                        const counter = document.getElementById('temaContador');
+                        if (counter) {
+                            counter.textContent = `${temaTextarea.value.length}/${maxLength}`;
+                        }
+                        
+                        // Focar no campo tema
+                        temaTextarea.focus();
+                        temaTextarea.setSelectionRange(temaTextarea.value.length, temaTextarea.value.length);
+                    } else {
+                        console.error('❌ Campo temaPost não encontrado');
                     }
                 }
                 
                 // Limpar query params da URL
                 setTimeout(function() {
                     window.history.replaceState({}, '', '/posts/');
+                    console.log('🧹 URL limpa');
                 }, 300);
             }, 400);
         }, 100);
+    } else {
+        console.log('ℹ️ Nenhum action=gerar detectado, modal não será aberto automaticamente');
     }
 });
 </script>
@@ -534,5 +539,12 @@ function toggleCarrossel() {
     
     console.log('✅ Carrossel atualizado - display:', carrosselQtyField.style.display);
 }
+
+// Injetar variáveis para o posts.js
+window.POSTS_WEBHOOK_URL = "{{ posts_webhook_url|escapejs }}";
+window.CSRF_TOKEN = "{{ csrf_token|escapejs }}";
+window.INITIAL_POSTS = {{ posts_json|safe }};
+window.CURRENT_USER = "{{ request.user.email|default:''|escapejs }}";
+window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 </script>
 {% endblock %}

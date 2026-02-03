@@ -158,8 +158,11 @@
                                     style="background: transparent; border: 1px solid #dc3545; color: #dc3545; padding: 6px 12px; border-radius: 4px;">
                                 Excluir
                             </button>
-                            <button type="button" class="btn btn-sm" 
+                            <button type="button" class="btn btn-sm btn-gerar-post" 
                                     data-pauta-id="{{ pauta.id }}"
+                                    data-pauta-rede="{{ pauta.rede_social }}"
+                                    data-pauta-title="{{ pauta.title }}"
+                                    data-pauta-content="{{ pauta.content }}"
                                     style="background: #6366f1; border: none; color: #fff; padding: 6px 12px; border-radius: 4px;">
                                 Gerar Post
                             </button>
@@ -333,6 +336,34 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Escape') {
             closeModal('modalGerarPauta');
         }
+    });
+    
+    // Botões "Gerar Post" - Redirecionar para /posts/ com dados da pauta
+    const btnGerarPosts = document.querySelectorAll('.btn-gerar-post');
+    console.log('🔍 Encontrados', btnGerarPosts.length, 'botões Gerar Post');
+    
+    btnGerarPosts.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const rede = this.dataset.pautaRede || 'instagram';
+            const titulo = this.dataset.pautaTitle || '';
+            const conteudo = this.dataset.pautaContent || '';
+            const tema = [titulo, conteudo].filter(Boolean).join(' — ');
+            
+            console.log('📝 Dados capturados:', { rede, titulo, conteudo, tema });
+            
+            // Criar query params
+            const params = new URLSearchParams({
+                action: 'gerar',
+                rede: rede,
+                tema: tema
+            });
+            
+            const url = `/posts/?${params.toString()}`;
+            console.log('🔗 Redirecionando para:', url);
+            
+            // Redirecionar para página de posts
+            window.location.href = url;
+        });
     });
     
     // O event listener foi movido para pautas.js para evitar conflitos

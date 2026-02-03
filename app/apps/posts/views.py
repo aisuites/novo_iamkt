@@ -33,28 +33,44 @@ def posts_list(request):
         posts = posts.filter(title__icontains=search)
         filtros['search'] = search
     
-    # Paginação
-    paginator = Paginator(posts, 10)  # 10 posts por página
+    # Paginação - 1 post por vez (como no resumo.html)
+    paginator = Paginator(posts, 1)  # 1 post por página
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
     
     # Verificar se tem knowledge base
     knowledge_base = hasattr(request.user.organization, 'knowledge_base')
     
-    # Preparar dados para JavaScript
+    # Preparar dados para JavaScript - ENVIAR TODOS OS POSTS (como no resumo.html)
+    # O JavaScript faz a paginação no frontend
     import json
+    
     posts_json = []
-    for post in page_obj:
-        posts_json.append({
-            'id': post.id,
-            'title': post.title or '',
-            'subtitle': post.subtitle or '',
-            'caption': post.caption or '',
-            'status': post.status,
-            'social_network': post.social_network,
-            'created_at': post.created_at.isoformat(),
-            'has_image': bool(post.has_image),  # Garantir que é booleano
-        })
+    for post in posts.order_by('-created_at'):
+        try:
+            posts_json.append({
+                'id': post.id,
+                'title': post.title or '',
+                'subtitle': post.subtitle or '',
+                'caption': post.caption or '',
+                'hashtags': list(post.hashtags) if post.hashtags else [],
+                'cta': post.cta or '',
+                'image_prompt': post.image_prompt or '',
+                'status': post.status,
+                'social_network': post.social_network,
+                'rede': post.social_network,
+                'formats': list(post.formats) if post.formats else [],
+                'carrossel': bool(post.is_carousel),
+                'qtdImagens': int(post.image_count) if post.is_carousel else 1,
+                'created_at': post.created_at.isoformat() if post.created_at else '',
+                'has_image': bool(post.has_image),
+                'imagens': [],
+                'imageStatus': 'none',
+                'imageChanges': 0,
+                'revisoesRestantes': 3,
+            })
+        except Exception:
+            continue
     
     # Converter para JSON string para passar ao template
     posts_json = json.dumps(posts_json)

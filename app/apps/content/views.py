@@ -34,31 +34,7 @@ def pauta_create(request):
     return redirect('content:pautas')
 
 
-@login_required
-@require_organization
-def posts_list(request):
-    """Listar posts da organization"""
-    # CRÍTICO: Filtrar explicitamente por organization do request
-    posts_list = Post.objects.for_request(request).select_related(
-        'user', 'pauta', 'area'
-    ).prefetch_related('assets').order_by('-created_at')
-    
-    # Paginação
-    paginator = Paginator(posts_list, 20)  # 20 posts por página
-    page_number = request.GET.get('page')
-    posts = paginator.get_page(page_number)
-    
-    context = {'posts': posts}
-    return render(request, 'content/posts_list.html', context)
-
-
-@login_required
-@require_organization
-def post_create(request):
-    """Criar novo post"""
-    # TODO: Implementar formulário
-    messages.info(request, 'Funcionalidade em desenvolvimento')
-    return redirect('content:posts')
+# NOTA: Views de posts removidas - posts agora são gerenciados em apps.posts
 
 
 @login_required
