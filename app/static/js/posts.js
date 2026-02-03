@@ -213,15 +213,11 @@
   // ESTADO DA APLICAÇÃO
   // ============================================================================
 
-  // Obter página atual da URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const currentPageFromURL = parseInt(urlParams.get('page')) || 1;
-  
   // Estado global
   const postsState = {
     items: INITIAL_POSTS.slice(),
     filtered: [],
-    page: currentPageFromURL,
+    page: 1,
     perPage: 1,
     filters: { date: '', status: 'all', search: '' },
     selectedId: null,
