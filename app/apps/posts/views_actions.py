@@ -61,33 +61,116 @@ def generate_image(request, post_id):
     
     POST /posts/<id>/generate-image/
     Body: { "mensagem": "..." } (opcional)
+    
+    Implementação completa com:
+    - PostChangeRequest (rastreamento de alterações)
+    - Webhook N8N para geração de imagem
+    - Email de notificação
+    - Audit log
     """
+    from .models import PostChangeRequest
+    from .utils import (
+        _notify_image_request_email,
+        _notify_revision_request,
+        _post_audit,
+        _resolve_user_name
+    )
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
     try:
-        post = Post.objects.get(
+        # Buscar post com related data
+        post = Post.objects.select_related(
+            'organization',
+            'user'
+        ).prefetch_related(
+            'change_requests'
+        ).get(
             id=post_id,
             organization=request.organization
         )
         
-        # Parse body
-        data = json.loads(request.body) if request.body else {}
-        mensagem = data.get('mensagem', '')
+        # Parse body (suporta JSON e form-data)
+        payload_data = {}
+        if request.content_type and request.content_type.startswith('application/json'):
+            try:
+                payload_data = json.loads(request.body.decode('utf-8'))
+            except (TypeError, ValueError):
+                payload_data = {}
+        elif request.method == 'POST':
+            payload_data = request.POST.dict()
         
-        # Atualizar status
-        post.status = 'generating'  # Usar status existente
-        post.save()
+        message = (payload_data.get('mensagem') or payload_data.get('message') or '').strip()
         
-        # TODO: Integrar com N8N para geração de imagem
-        # webhook_url = settings.N8N_WEBHOOK_GENERATE_IMAGE
-        # requests.post(webhook_url, json={
-        #     'post_id': post.id,
-        #     'organization_id': post.organization.id,
-        #     'mensagem': mensagem
-        # })
+        # Verificar limite de alterações de imagem
+        image_change_count = post.change_requests.filter(
+            change_type=PostChangeRequest.ChangeType.IMAGE,
+            is_initial=False
+        ).count()
+        
+        if message and image_change_count >= 1:
+            return JsonResponse({
+                'success': False,
+                'error': 'Limite de solicitações de imagem atingido.'
+            }, status=400)
+        
+        # Atualizar status para image_generating se necessário
+        if post.status != 'image_generating':
+            post.status = 'image_generating'
+            post.save(update_fields=['status', 'updated_at'])
+        
+        # Resolver nome e email do solicitante
+        requester_name = _resolve_user_name(payload_data, request.user, post.organization)
+        requester_email = ''
+        if request.user and request.user.is_authenticated:
+            requester_email = getattr(request.user, 'email', '') or ''
+        
+        # Criar PostChangeRequest
+        change_request = PostChangeRequest.objects.create(
+            post=post,
+            message=message or 'Solicitação de geração de imagem',
+            requester_name=requester_name[:160],
+            requester_email=requester_email[:254],
+            change_type=PostChangeRequest.ChangeType.IMAGE,
+            is_initial=not bool(message),
+        )
+        
+        if not change_request.is_initial:
+            image_change_count += 1
+        
+        # Log de auditoria
+        _post_audit(post, 'image_requested', request.user, meta={
+            'message': message,
+            'is_initial': change_request.is_initial
+        })
+        
+        # Enviar email de notificação
+        try:
+            if change_request.is_initial:
+                # Solicitação INICIAL de imagem (sem mensagem)
+                _notify_image_request_email(post, request=request)
+            else:
+                # Solicitação de ALTERAÇÃO de imagem (com mensagem)
+                _notify_revision_request(
+                    post,
+                    message,
+                    payload=payload_data,
+                    user=request.user,
+                    request=request
+                )
+        except Exception as exc:
+            logger.warning(f'Erro ao enviar email de solicitação: {exc}')
         
         return JsonResponse({
             'success': True,
+            'id': post.id,
+            'serverId': post.id,
             'status': post.status,
-            'statusLabel': post.get_status_display()
+            'statusLabel': post.get_status_display(),
+            'imageStatus': 'generating',
+            'imageChanges': image_change_count,
+            'imageRequestedAt': change_request.created_at.isoformat(),
         })
         
     except Post.DoesNotExist:
@@ -96,6 +179,7 @@ def generate_image(request, post_id):
             'error': 'Post não encontrado'
         }, status=404)
     except Exception as e:
+        logger.error(f'Erro ao gerar imagem: {e}', exc_info=True)
         return JsonResponse({
             'success': False,
             'error': str(e)

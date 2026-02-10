@@ -814,8 +814,12 @@
       existingTextBanner.remove();
     }
     
-    // Mostrar banner apenas se status === 'generating'
-    if (dom.postStatus && post.status === 'generating' && bannerContainer) {
+    // Mostrar banner de TEXTO apenas se status === 'generating' (não 'image_generating')
+    console.log('[updatePostDetails] Status do post:', post.status);
+    console.log('[updatePostDetails] Deve mostrar banner de texto?', post.status === 'generating' && post.status !== 'image_generating');
+    
+    if (dom.postStatus && post.status === 'generating' && post.status !== 'image_generating' && bannerContainer) {
+      console.log('[updatePostDetails] Mostrando banner de TEXTO');
       const textBanner = document.createElement('div');
       textBanner.className = 'post-text-status-banner';
       textBanner.innerHTML = `
@@ -885,16 +889,17 @@
 
   /**
    * Atualiza área visual do post (imagens, galeria, banners)
+   * EXATAMENTE IDÊNTICO ao resumo.html
    */
   function updatePostVisual(post) {
     if (!post || !dom.postImageFrame || !dom.postGallery) {
       return;
     }
-    
-    // Limpar containers
-    dom.postImageFrame.innerHTML = '';
-    dom.postGallery.innerHTML = '';
-    dom.postGallery.hidden = true;
+    if (dom.postImageFrame) dom.postImageFrame.innerHTML = '';
+    if (dom.postGallery) {
+      dom.postGallery.innerHTML = '';
+      dom.postGallery.hidden = true;
+    }
     if (dom.postImageActions) dom.postImageActions.innerHTML = '';
     
     // Remover banner existente
@@ -919,15 +924,13 @@
       `;
       dom.postImageFrame.parentElement.insertBefore(banner, dom.postImageFrame);
     }
-    
-    // Controlar caixa de solicitação de alteração de imagem
+
     if (dom.imageRequestBox) dom.imageRequestBox.hidden = !post.imageRequestOpen;
     if (dom.imageRequestInput) {
       dom.imageRequestInput.classList.remove('invalid');
       dom.imageRequestInput.value = post.imageRequestOpen ? (post.pendingImageRequest || '') : '';
     }
-    
-    // Status 'agent' - Agente alterando
+
     if (post.status === 'agent') {
       const span = document.createElement('span');
       span.className = 'placeholder';
@@ -941,25 +944,37 @@
       const index = Math.max(0, Math.min(post.imagens.length - 1, post.activeImageIndex || 0));
       post.activeImageIndex = index;
       
-      // Mostrar imagem principal
+      // Mostrar imagem principal com lazyload
       const img = document.createElement('img');
-      img.src = post.imagens[index];
+      img.src = '#';
+      img.setAttribute('data-lazy-load', post.imagens[index]);
       img.alt = `Pré-visualização da imagem ${index + 1}`;
       dom.postImageFrame.appendChild(img);
+      
+      // Ativar lazyload para a imagem
+      if (window.imagePreviewLoader) {
+        window.imagePreviewLoader.observe(img);
+      }
       
       // Galeria de miniaturas (se houver múltiplas imagens)
       if (post.imagens.length > 1 && dom.postGallery) {
         dom.postGallery.hidden = false;
-        post.imagens.forEach((url, idx) => {
+        post.imagens.forEach((s3Key, idx) => {
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'gallery-thumb';
           if (idx === index) btn.classList.add('active');
           
           const thumb = document.createElement('img');
-          thumb.src = url;
+          thumb.src = '#';
+          thumb.setAttribute('data-lazy-load', s3Key);
           thumb.alt = `Miniatura ${idx + 1}`;
           btn.appendChild(thumb);
+          
+          // Ativar lazyload para miniatura
+          if (window.imagePreviewLoader) {
+            window.imagePreviewLoader.observe(thumb);
+          }
           
           btn.addEventListener('click', () => {
             post.activeImageIndex = idx;
@@ -1061,6 +1076,15 @@
       return;
     }
     
+    // Status: image_generating - Mostrar badge (idêntico ao resumo.html)
+    if (post.status === 'image_generating') {
+      const badge = document.createElement('span');
+      badge.className = 'badge-muted';
+      badge.textContent = 'Gerando imagem — aguarde';
+      actionsContainer.appendChild(badge);
+      return;
+    }
+    
     // Status: rejected - Mostrar badge
     if (post.status === 'rejected') {
       const badge = document.createElement('span');
@@ -1070,8 +1094,8 @@
       return;
     }
     
-    // Status: pending, image_generating ou image_ready - Mostrar botões
-    if (post.status === 'pending' || post.status === 'image_generating' || post.status === 'image_ready') {
+    // Status: pending - Mostrar botões (idêntico ao resumo.html)
+    if (post.status === 'pending') {
       console.log('[DEBUG] Status é pending/image_generating/image_ready - criando botões');
       console.log('[DEBUG] post.images:', post.images);
       
@@ -1572,6 +1596,32 @@
       post.pendingImageRequest = '';
       if (dom.imageRequestInput) dom.imageRequestInput.value = '';
       renderPosts();
+      
+      // Mostrar mensagem de sucesso com prazo recalculado
+      setTimeout(() => {
+        const bannerContainer = dom.postImageFrame?.parentElement;
+        if (!bannerContainer) return;
+        
+        // Remover banner anterior se existir
+        const existingBanner = bannerContainer.querySelector('.post-image-status-banner');
+        if (existingBanner) existingBanner.remove();
+        
+        // Calcular prazo de entrega usando data da solicitação (não data de criação)
+        const requestedAt = data?.imageRequestedAt || new Date().toISOString();
+        const deadline = calculateImageDeadline(requestedAt);
+        const deadlineText = formatDeadline(deadline);
+        
+        // Criar novo banner
+        const imageBanner = document.createElement('div');
+        imageBanner.className = 'post-image-status-banner';
+        imageBanner.innerHTML = `
+          <span class="status-icon">🔄</span>
+          <span class="status-text">Sua imagem será gerada até ${deadlineText}</span>
+          <button type="button" class="btn btn-sm" onclick="window.location.reload()">Atualizar Status</button>
+        `;
+        bannerContainer.insertBefore(imageBanner, dom.postImageFrame);
+      }, 100);
+      
       window.toaster?.success('Solicitação enviada ao agente.');
     } catch (error) {
       console.error(error);
@@ -1586,6 +1636,181 @@
       renderPosts();
       window.toaster?.error(error.message || 'Não foi possível enviar a solicitação. Tente novamente.');
     }
+  }
+
+  // ============================================================================
+  // GERAÇÃO DE IMAGEM
+  // ============================================================================
+
+  /**
+   * Inicia geração de imagem para um post (botão "Gerar Imagem")
+   * Idêntico ao resumo.html
+   */
+  async function startImageGeneration(post) {
+    const serverId = getServerId(post);
+    if (!serverId) {
+      window.toaster?.error('Não foi possível identificar o post selecionado.');
+      return;
+    }
+    
+    // Salvar estado anterior para rollback
+    const previousStatus = post.status;
+    const previousStatusLabel = post.statusLabel;
+    const previousImageStatus = post.imageStatus;
+    const previousImages = Array.isArray(post.images) ? post.images.slice() : null;
+    const previousImageChanges = post.imageChanges || 0;
+    
+    // Atualizar UI imediatamente (optimistic update)
+    post.imageStatus = 'generating';
+    post.status = 'image_generating';
+    post.statusLabel = statusInfo.image_generating?.label || 'Agente Gerando Imagem';
+    
+    console.log('[GERAR IMAGEM] Status atualizado:', {
+      status: post.status,
+      imageStatus: post.imageStatus,
+      statusLabel: post.statusLabel
+    });
+    
+    renderPosts();
+    
+    try {
+      const response = await fetch(`/posts/${serverId}/generate-image/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': CSRF_TOKEN,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ mensagem: '' }),
+      });
+      
+      const data = await response.json().catch(() => null);
+      
+      if (!response.ok) {
+        throw new Error(data?.error || ('HTTP ' + response.status));
+      }
+      
+      // Atualizar post com resposta do servidor
+      post.status = data?.status || 'image_generating';
+      post.statusLabel = data?.statusLabel || statusInfo[post.status]?.label || statusInfo.image_generating?.label || 'Agente Gerando Imagem';
+      post.imageStatus = data?.imageStatus || 'generating';
+      if (typeof data?.imageChanges === 'number') post.imageChanges = data.imageChanges;
+      
+      renderPosts();
+      
+    } catch (error) {
+      console.error(error);
+      
+      // Rollback em caso de erro
+      post.status = previousStatus;
+      post.statusLabel = previousStatusLabel;
+      post.imageStatus = previousImageStatus || 'none';
+      if (previousImages) post.images = previousImages;
+      post.imageChanges = previousImageChanges;
+      
+      renderPosts();
+      window.toaster?.error(error.message || 'Não foi possível acionar a geração de imagem. Tente novamente.');
+    }
+  }
+
+  /**
+   * Verifica se deve mostrar banner de geração de imagem
+   * Idêntico ao resumo.html
+   */
+  function shouldShowImageGenerationBanner(post) {
+    return (post.status === 'image_generating' || post.imageStatus === 'generating') 
+           && (!post.images || post.images.length === 0);
+  }
+
+  /**
+   * Calcula prazo de entrega da imagem (6 horas úteis)
+   * EXATAMENTE IDÊNTICO ao resumo.html
+   */
+  function calculateImageDeadline(createdAtStr) {
+    const created = new Date(createdAtStr);
+    
+    // Função auxiliar: adicionar dias úteis (pula fim de semana)
+    function addBusinessDays(date, days) {
+      const result = new Date(date);
+      let added = 0;
+      while (added < days) {
+        result.setDate(result.getDate() + 1);
+        const dayOfWeek = result.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Não é sábado ou domingo
+          added++;
+        }
+      }
+      return result;
+    }
+    
+    // Função auxiliar: ir para próximo dia útil às 09:00
+    function nextBusinessDay09(date) {
+      const result = new Date(date);
+      result.setDate(result.getDate() + 1);
+      result.setHours(9, 0, 0, 0);
+      
+      // Se cair em fim de semana, ir para segunda
+      while (result.getDay() === 0 || result.getDay() === 6) {
+        result.setDate(result.getDate() + 1);
+      }
+      return result;
+    }
+    
+    // PASSO 1: Normalizar horário de início
+    let startTime = new Date(created);
+    const dayOfWeek = startTime.getDay();
+    const hour = startTime.getHours();
+    
+    // Se é fim de semana (sábado=6, domingo=0) → próxima segunda às 09:00
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      startTime = new Date(created);
+      // Ir para segunda-feira
+      const daysToAdd = dayOfWeek === 0 ? 1 : 2; // domingo=1, sábado=2
+      startTime.setDate(startTime.getDate() + daysToAdd);
+      startTime.setHours(9, 0, 0, 0);
+    }
+    // Se antes das 09:00 → contar como 09:00 do mesmo dia
+    else if (hour < 9) {
+      startTime.setHours(9, 0, 0, 0);
+    }
+    // Se depois das 17:00 → próximo dia útil às 09:00
+    else if (hour >= 17) {
+      startTime = nextBusinessDay09(startTime);
+    }
+    
+    // PASSO 2: Adicionar 6 horas ao horário normalizado
+    const deadline = new Date(startTime);
+    deadline.setHours(deadline.getHours() + 6);
+    
+    // PASSO 3: Aplicar regras de resultado
+    const deadlineHour = deadline.getHours();
+    
+    // Se horário normalizado >= 16:00 → próximo dia 15:00
+    if (startTime.getHours() >= 16) {
+      const nextDay = addBusinessDays(startTime, 1);
+      nextDay.setHours(15, 0, 0, 0);
+      return nextDay;
+    }
+    
+    // Se resultado > 17:00 → próximo dia 09:00
+    if (deadlineHour > 17) {
+      return nextBusinessDay09(startTime);
+    }
+    
+    return deadline;
+  }
+
+  /**
+   * Formata data de prazo para exibição (DD/MM/YY às HH:MM)
+   * EXATAMENTE IDÊNTICO ao resumo.html
+   */
+  function formatDeadline(date) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    const hour = String(date.getHours()).padStart(2, '0');
+    const minute = String(date.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} às ${hour}:${minute}`;
   }
 
   // ============================================================================

@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitação de Alteração de Post</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+            margin: -30px -30px 30px -30px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #f59e0b;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #f59e0b;
+        }
+        .info-item {
+            margin: 10px 0;
+            line-height: 1.8;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #f59e0b;
+        }
+        .info-value {
+            color: #333;
+        }
+        .image-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+            justify-content: flex-start;
+        }
+        .image-grid .image-item {
+            flex: 0 0 calc(33.333% - 10px);
+            max-width: calc(33.333% - 10px);
+        }
+        @media (max-width: 600px) {
+            .image-grid .image-item {
+                flex: 0 0 calc(50% - 8px);
+                max-width: calc(50% - 8px);
+            }
+        }
+        .image-item {
+            text-align: center;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .image-item img {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            background-color: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .image-item a {
+            font-size: 12px;
+            color: #f59e0b;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        .url-list {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .url-list li {
+            margin: 8px 0;
+            word-break: break-all;
+        }
+        .url-list a {
+            color: #f59e0b;
+            text-decoration: none;
+        }
+        .url-list a:hover {
+            text-decoration: underline;
+        }
+        .download-btn {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 4px 8px;
+            background: #f59e0b;
+            color: white !important;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .download-btn:hover {
+            background: #d97706;
+        }
+        .download-note {
+            font-size: 11px;
+            color: #666;
+            font-style: italic;
+            margin-top: 5px;
+        }
+        .copy-instructions {
+            background: #ecfdf5;
+            border: 2px solid #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .copy-instructions strong {
+            color: #059669;
+            font-size: 14px;
+        }
+        .copy-instructions p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #065f46;
+        }
+        .button {
+            display: inline-block;
+            padding: 14px 35px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white !important;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .button:hover {
+            opacity: 0.9;
+        }
+        .alert {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .message-box {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .message-box h4 {
+            margin-top: 0;
+            color: #d97706;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+        .no-content {
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✏️ Solicitação de Alteração de Post</h1>
+        </div>
+        
+        <!-- INSTRUÇÕES DE CÓPIA -->
+        <div class="copy-instructions">
+            <strong>📋 Para copiar e colar no ChatGPT:</strong>
+            <p>1. Selecione todo o conteúdo abaixo (Ctrl+A ou Cmd+A)</p>
+            <p>2. Copie (Ctrl+C ou Cmd+C)</p>
+            <p>3. Cole no ChatGPT (Ctrl+V ou Cmd+V)</p>
+        </div>
+        
+        <!-- MENSAGEM DO SOLICITANTE -->
+        {% if message %}
+        <div class="message-box">
+            <h4>💬 Mensagem do Solicitante:</h4>
+            <p style="white-space: pre-wrap; margin: 0;">{{ message }}</p>
+        </div>
+        {% endif %}
+        
+        <!-- INFORMAÇÕES DO POST -->
+        <div class="section">
+            <h3>📊 Informações do Post</h3>
+            
+            <div class="info-item">
+                <span class="info-label">Organização:</span> 
+                <span class="info-value">{{ organization.name }}</span>
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Tema Atual:</span> 
+                <span class="info-value">{{ post.requested_theme|default:"Não informado" }}</span>
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Rede Social:</span> 
+                <span class="info-value">{{ network_display|default:"Não informado" }}</span>
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Formato:</span> 
+                <span class="info-value">{{ formats_display|default:"Não informado" }}</span>
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Carrossel:</span> 
+                <span class="info-value">{{ carousel_display }}</span>
+            </div>
+            
+            {% if post.image_count > 1 %}
+            <div class="info-item">
+                <span class="info-label">Qtd. Imagens:</span> 
+                <span class="info-value">{{ post.image_count }}</span>
+            </div>
+            {% endif %}
+            
+            <div class="info-item">
+                <span class="info-label">Status Atual:</span> 
+                <span class="info-value">{{ post.get_status_display }}</span>
+            </div>
+        </div>
+        
+        <!-- PRAZO DE ENTREGA -->
+        <div class="section">
+            <h3>⏰ Prazo de Entrega</h3>
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 4px;">
+                <p style="margin: 0; font-size: 16px; font-weight: bold; color: #d97706;">
+                    {{ deadline }}
+                </p>
+                <p style="margin: 5px 0 0 0; font-size: 13px; color: #92400e;">
+                    Solicitado em: {{ requested_at|date:"d/m/Y às H:i" }}
+                </p>
+                <p style="margin: 5px 0 0 0; font-size: 13px; color: #92400e;">
+                    Solicitado por: {{ requester_name }}
+                </p>
+                <p style="margin: 5px 0 0 0; font-size: 12px; color: #78350f;">
+                    Prazo: 6 horas úteis (horário comercial 09:00-17:00)
+                </p>
+            </div>
+        </div>
+        
+        <!-- IMAGENS ATUAIS DO POST -->
+        <div class="section">
+            <h3>🖼️ Imagens Atuais do Post</h3>
+            {% if current_images %}
+                <!-- Grid visual com thumbnails -->
+                <div class="image-grid">
+                    {% for img in current_images %}
+                    <div class="image-item">
+                        <img src="{{ img.url }}" alt="Imagem {{ forloop.counter }}">
+                        <a href="{{ img.url }}" target="_blank">Imagem {{ img.order|add:1 }}</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Lista completa de URLs -->
+                <div style="margin-top: 20px;">
+                    <strong>📎 Links diretos ({{ current_images|length }}):</strong>
+                    <p class="download-note">💡 Clique no botão azul para abrir a imagem, depois clique com botão direito → "Salvar imagem como..."</p>
+                    <ul class="url-list">
+                        {% for img in current_images %}
+                        <li>
+                            <a href="{{ img.url }}" target="_blank">Imagem {{ img.order|add:1 }}</a>
+                            <a href="{{ img.url }}" target="_blank" class="download-btn">🔗 Abrir</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <div class="no-content">
+                    Nenhuma imagem gerada ainda
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- LOGOTIPO -->
+        <div class="section">
+            <h3>🏢 Logotipo da Organização</h3>
+            {% if logos %}
+                <!-- Thumbnail principal (mais recente) -->
+                <div style="text-align: center; margin: 20px 0;">
+                    <img src="{{ logos.0.url }}" 
+                         alt="Logotipo" 
+                         style="max-width: 200px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <p style="margin-top: 10px; color: #666; font-size: 14px;">
+                        {{ logos.0.name }}
+                    </p>
+                </div>
+                
+                <!-- Lista de todas as versões -->
+                {% if logos|length > 1 %}
+                <div style="margin-top: 20px;">
+                    <strong>📎 Todas as versões disponíveis ({{ logos|length }}):</strong>
+                    <p class="download-note">💡 Clique no botão azul para abrir a imagem, depois clique com botão direito → "Salvar imagem como..."</p>
+                    <ul class="url-list">
+                        {% for logo in logos %}
+                        <li>
+                            <a href="{{ logo.url }}" target="_blank">{{ logo.name }}</a>
+                            <a href="{{ logo.url }}" target="_blank" class="download-btn">🔗 Abrir</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="alert">
+                    ❌ NÃO HÁ IMAGEM DE LOGOTIPO SALVA NA BASE
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- IMAGENS DE REFERÊNCIA DA BASE DE CONHECIMENTO -->
+        <div class="section">
+            <h3>📁 Imagens de Referência da Base de Conhecimento</h3>
+            {% if kb_references %}
+                <!-- Grid visual com thumbnails -->
+                <div class="image-grid">
+                    {% for ref in kb_references %}
+                    <div class="image-item">
+                        <img src="{{ ref.url }}" alt="{{ ref.name }}">
+                        <a href="{{ ref.url }}" target="_blank">{{ ref.name|truncatechars:25 }}</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Lista completa de URLs -->
+                <div style="margin-top: 20px;">
+                    <strong>📎 Links diretos ({{ kb_references|length }}):</strong>
+                    <p class="download-note">💡 Clique no botão azul para abrir a imagem, depois clique com botão direito → "Salvar imagem como..."</p>
+                    <ul class="url-list">
+                        {% for ref in kb_references %}
+                        <li>
+                            <a href="{{ ref.url }}" target="_blank">{{ ref.name }}</a>
+                            <a href="{{ ref.url }}" target="_blank" class="download-btn">🔗 Abrir</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <div class="no-content">
+                    Nenhuma imagem de referência cadastrada na base de conhecimento
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- IMAGENS ANEXADAS NO POST -->
+        <div class="section">
+            <h3>📎 Imagens Anexadas neste Post</h3>
+            {% if post_references %}
+                <!-- Grid visual com thumbnails -->
+                <div class="image-grid">
+                    {% for ref in post_references %}
+                    <div class="image-item">
+                        <img src="{{ ref.url }}" alt="{{ ref.name }}">
+                        <a href="{{ ref.url }}" target="_blank">{{ ref.name|truncatechars:25 }}</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Lista completa de URLs -->
+                <div style="margin-top: 20px;">
+                    <strong>📎 Links diretos ({{ post_references|length }}):</strong>
+                    <p class="download-note">💡 Clique no botão azul para abrir a imagem, depois clique com botão direito → "Salvar imagem como..."</p>
+                    <ul class="url-list">
+                        {% for ref in post_references %}
+                        <li>
+                            <a href="{{ ref.url }}" target="_blank">{{ ref.name }}</a>
+                            <a href="{{ ref.url }}" target="_blank" class="download-btn">🔗 Abrir</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <div class="no-content">
+                    Nenhuma imagem anexada neste post
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- AÇÃO RÁPIDA -->
+        <div style="text-align: center; margin: 40px 0;">
+            <p style="margin-bottom: 15px; color: #666;">
+                Para fazer as alterações solicitadas e atualizar o post:
+            </p>
+            <a href="{{ admin_url }}" class="button">
+                🚀 EDITAR POST NO ADMIN
+            </a>
+        </div>
+        
+        <div class="footer">
+            <p>Este é um email automático enviado pelo sistema AIsuites.</p>
+            <p><strong>Post ID:</strong> {{ post.pk }} | <strong>Organização:</strong> {{ organization.name }}</p>
+        </div>
+    </div>
+</body>
+</html>

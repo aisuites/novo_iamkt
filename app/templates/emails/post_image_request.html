@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitação de Imagem para Post</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+            margin: -30px -30px 30px -30px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #667eea;
+        }
+        .info-item {
+            margin: 10px 0;
+            line-height: 1.8;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #667eea;
+        }
+        .info-value {
+            color: #333;
+        }
+        .image-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+            justify-content: flex-start;
+        }
+        .image-grid .image-item {
+            flex: 0 0 calc(33.333% - 10px);
+            max-width: calc(33.333% - 10px);
+        }
+        @media (max-width: 600px) {
+            .image-grid .image-item {
+                flex: 0 0 calc(50% - 8px);
+                max-width: calc(50% - 8px);
+            }
+        }
+        .image-item {
+            text-align: center;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .image-item img {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            background-color: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .image-item a {
+            font-size: 12px;
+            color: #667eea;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        .url-list {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .url-list li {
+            margin: 8px 0;
+            word-break: break-all;
+        }
+        .url-list a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .url-list a:hover {
+            text-decoration: underline;
+        }
+        .download-btn {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 4px 8px;
+            background: #667eea;
+            color: white !important;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .download-btn:hover {
+            background: #5568d3;
+        }
+        .download-note {
+            font-size: 11px;
+            color: #666;
+            font-style: italic;
+            margin-top: 5px;
+        }
+        .copy-instructions {
+            background: #ecfdf5;
+            border: 2px solid #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .copy-instructions strong {
+            color: #059669;
+            font-size: 14px;
+        }
+        .copy-instructions p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #065f46;
+        }
+        .button {
+            display: inline-block;
+            padding: 14px 35px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white !important;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .button:hover {
+            opacity: 0.9;
+        }
+        .alert {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+        .no-content {
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 Solicitação de Imagem para Post</h1>
+        </div>
+        
+        <!-- INSTRUÇÕES DE CÓPIA -->
+        <div class="copy-instructions">
+            <strong>📋 Para copiar e colar no ChatGPT:</strong>
+            <p>1. Selecione todo o conteúdo abaixo (Ctrl+A ou Cmd+A)</p>
+            <p>2. Copie (Ctrl+C ou Cmd+C)</p>
+            <p>3. Cole no ChatGPT (Ctrl+V ou Cmd+V)</p>
+        </div>
+        
+        <!-- INFORMAÇÕES DO POST -->
+        <div class="section">
+            <h3>📊 Informações do Post</h3>
+            
+            <div class="info-item">
+                <span class="info-label">Organização:</span> 
+                <span class="info-value">{{ organization.name }}</span>
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Rede Social:</span> 
+                <span class="info-value">{{ post.get_social_network_display|default:"Não informado" }}</span>
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Formato:</span> 
+                <span class="info-value">{{ post.get_content_type_display|default:"Não informado" }}</span>
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Carrossel:</span> 
+                <span class="info-value">{% if post.is_carousel %}Sim{% else %}Não{% endif %}</span>
+            </div>
+            
+            {% if post.image_count > 1 %}
+            <div class="info-item">
+                <span class="info-label">Qtd. Imagens:</span> 
+                <span class="info-value">{{ post.image_count }}</span>
+            </div>
+            {% endif %}
+            
+            <div class="info-item">
+                <span class="info-label">Título:</span> 
+                <span class="info-value">{{ post.title|default:"Não informado" }}</span>
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Subtítulo:</span> 
+                <span class="info-value">{{ post.subtitle|default:"Não informado" }}</span>
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">CTA:</span> 
+                <span class="info-value">{{ post.cta|default:"Não informado" }}</span>
+            </div>
+            
+            {% if post.image_prompt %}
+            <div style="margin-top: 20px;">
+                <strong style="color: #667eea;">Descrição da Imagem (Prompt):</strong>
+                <p style="background: white; padding: 15px; border-radius: 4px; margin-top: 10px;">
+                    {{ post.image_prompt }}
+                </p>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- PRAZO DE ENTREGA -->
+        <div class="section">
+            <h3>⏰ Prazo de Entrega</h3>
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 4px;">
+                <p style="margin: 0; font-size: 16px; font-weight: bold; color: #d97706;">
+                    {{ deadline }}
+                </p>
+                <p style="margin: 5px 0 0 0; font-size: 13px; color: #92400e;">
+                    Solicitado em: {{ requested_at|date:"d/m/Y às H:i" }}
+                </p>
+                <p style="margin: 5px 0 0 0; font-size: 12px; color: #78350f;">
+                    Prazo: 6 horas úteis (horário comercial 09:00-17:00)
+                </p>
+            </div>
+        </div>
+        
+        <!-- AÇÃO RÁPIDA -->
+        <div style="text-align: center; margin: 40px 0;">
+            <p style="margin-bottom: 15px; color: #666;">
+                Para fazer upload da imagem gerada e atualizar o status do post:
+            </p>
+            {% if post_url %}
+            <a href="{{ post_url }}" class="button">
+                🚀 EDITAR POST NO ADMIN
+            </a>
+            {% endif %}
+        </div>
+        
+        <div class="footer">
+            <p>Este é um email automático enviado pelo sistema AIsuites.</p>
+            <p><strong>Post ID:</strong> {{ post.pk }} | <strong>Organização:</strong> {{ organization.name }}</p>
+        </div>
+    </div>
+</body>
+</html>

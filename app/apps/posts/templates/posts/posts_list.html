@@ -240,16 +240,16 @@
                     {% endif %}
                 </div>
 
-                <!-- Galeria de Miniaturas (para múltiplas imagens) -->
-                {% if post.images.count > 1 %}
-                <div class="post-gallery" id="postGallery">
-                    {% for img in post.images.all %}
-                    <button type="button" class="gallery-thumb {% if forloop.first %}active{% endif %}" data-image-index="{{ forloop.counter0 }}" data-s3-key="{{ img.s3_key }}">
-                        <img src="#" alt="Miniatura {{ forloop.counter }}" data-lazy-load="{{ img.s3_key }}">
-                    </button>
-                    {% endfor %}
+                <!-- Galeria de Miniaturas (sempre existe, hidden quando não há múltiplas imagens) -->
+                <div class="post-gallery" id="postGallery" {% if post.images.count <= 1 %}hidden{% endif %}>
+                    {% if post.images.count > 1 %}
+                        {% for img in post.images.all %}
+                        <button type="button" class="gallery-thumb {% if forloop.first %}active{% endif %}" data-image-index="{{ forloop.counter0 }}" data-s3-key="{{ img.s3_key }}">
+                            <img src="#" alt="Miniatura {{ forloop.counter }}" data-lazy-load="{{ img.s3_key }}">
+                        </button>
+                        {% endfor %}
+                    {% endif %}
                 </div>
-                {% endif %}
 
                 <!-- Ações Visuais -->
                 <div class="post-visual-actions" id="postImageActions"></div>
@@ -459,7 +459,7 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 </script>
 
 {% load static %}
-<script src="{% static 'js/posts.js' %}?v=20260203-0146"></script>
+<script src="{% static 'js/posts.js' %}?v=20260203-0321"></script>
 <!-- Temporariamente desabilitados para debug -->
 <!-- <script src="{% static 'js/posts-modal.js' %}?v=20260203-0129"></script> -->
 <!-- <script src="{% static 'js/posts-gallery.js' %}?v=20260203-0129"></script> -->

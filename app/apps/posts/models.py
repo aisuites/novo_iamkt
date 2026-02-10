@@ -188,16 +188,15 @@ class Post(models.Model):
     status = models.CharField(
         max_length=20,
         choices=[
-            ('draft', 'Rascunho'),
-            ('generating', 'Gerando'),
             ('pending', 'Pendente de Aprovação'),
-            ('in_adjustment', 'Em Ajuste'),
+            ('generating', 'Agente Gerando Conteúdo'),
+            ('image_generating', 'Agente Gerando Imagem'),
+            ('image_ready', 'Imagem Disponível'),
             ('approved', 'Aprovado'),
+            ('agent', 'Agente Alterando — Aguarde'),
             ('rejected', 'Rejeitado'),
-            ('published', 'Publicado'),
-            ('archived', 'Arquivado'),
         ],
-        default='draft',
+        default='pending',
         verbose_name='Status'
     )
     
@@ -281,3 +280,55 @@ class PostImage(models.Model):
     
     def __str__(self):
         return f"Imagem {self.order} - Post #{self.post.id}"
+
+
+class PostChangeRequest(models.Model):
+    """
+    Solicitações de alteração de posts (texto ou imagem)
+    """
+    class ChangeType(models.TextChoices):
+        TEXT = 'text', 'Texto'
+        IMAGE = 'image', 'Imagem'
+    
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name='change_requests',
+        verbose_name='Post'
+    )
+    message = models.TextField(
+        verbose_name='Mensagem',
+        help_text='Mensagem de solicitação de alteração'
+    )
+    requester_name = models.CharField(
+        max_length=160,
+        blank=True,
+        verbose_name='Nome do Solicitante'
+    )
+    requester_email = models.EmailField(
+        max_length=254,
+        blank=True,
+        verbose_name='Email do Solicitante'
+    )
+    change_type = models.CharField(
+        max_length=10,
+        choices=ChangeType.choices,
+        default=ChangeType.TEXT,
+        verbose_name='Tipo de Alteração'
+    )
+    is_initial = models.BooleanField(
+        default=False,
+        verbose_name='É Solicitação Inicial',
+        help_text='True se é a primeira solicitação (sem mensagem customizada)'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+    
+    class Meta:
+        verbose_name = 'Solicitação de Alteração'
+        verbose_name_plural = 'Solicitações de Alteração'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        tipo = self.get_change_type_display()
+        inicial = " (inicial)" if self.is_initial else ""
+        return f"{tipo}{inicial} - Post #{self.post.id}"

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Post, PostImage
+from .models import Post, PostImage, PostChangeRequest
 
 
 class PostImageInline(admin.TabularInline):
@@ -115,3 +115,51 @@ class PostAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return qs
         return qs.filter(organization=request.user.organization)
+
+
+@admin.register(PostChangeRequest)
+class PostChangeRequestAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'post',
+        'change_type',
+        'is_initial',
+        'requester_name',
+        'requester_email',
+        'created_at',
+    ]
+    list_filter = [
+        'change_type',
+        'is_initial',
+        'created_at',
+    ]
+    search_fields = [
+        'message',
+        'requester_name',
+        'requester_email',
+        'post__title',
+    ]
+    readonly_fields = [
+        'created_at',
+    ]
+    fieldsets = (
+        ('Solicitação', {
+            'fields': (
+                'post',
+                'change_type',
+                'is_initial',
+                'message',
+            )
+        }),
+        ('Solicitante', {
+            'fields': (
+                'requester_name',
+                'requester_email',
+            )
+        }),
+        ('Timestamp', {
+            'fields': (
+                'created_at',
+            )
+        }),
+    )

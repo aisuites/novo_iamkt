@@ -492,7 +492,7 @@
    ============================================ */
 
 .gaps-list li {
-    display: flex;
+    /*display: flex;*/
     gap: 1rem;
     padding: 1rem;
     background: var(--background-secondary, #f9fafb);
@@ -544,7 +544,7 @@
    ============================================ */
 
 .links-list li {
-    display: flex;
+    /*display: flex;*/
     gap: 1rem;
     padding: 1rem;
     background: var(--background-secondary, #f9fafb);

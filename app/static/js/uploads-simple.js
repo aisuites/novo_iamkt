@@ -123,7 +123,7 @@ function removeReferencePending(tempId) {
 
 async function uploadFileToS3(file, type, uploadUrlEndpoint, createRecordEndpoint) {
     try {
-        logger.debug('Iniciando upload:', {file: file.name, type, endpoint: uploadUrlEndpoint});
+        // logger.debug('Iniciando upload:', {file: file.name, type, endpoint: uploadUrlEndpoint});
         
         // 1. Obter Presigned URL
         const urlResponse = await fetch(uploadUrlEndpoint, {
@@ -139,8 +139,8 @@ async function uploadFileToS3(file, type, uploadUrlEndpoint, createRecordEndpoin
             })
         });
         
-        logger.debug('Response status:', urlResponse.status);
-        logger.debug('Response URL:', urlResponse.url);
+        // logger.debug('Response status:', urlResponse.status);
+        // logger.debug('Response URL:', urlResponse.url);
         
         if (!urlResponse.ok) {
             const contentType = urlResponse.headers.get('content-type');
@@ -149,7 +149,7 @@ async function uploadFileToS3(file, type, uploadUrlEndpoint, createRecordEndpoin
                 throw new Error(error.error || 'Erro ao obter URL de upload');
             } else {
                 const text = await urlResponse.text();
-                logger.error('Response HTML:', text.substring(0, 500));
+                // logger.error('Response HTML:', text.substring(0, 500));
                 
                 // Verificar se é redirect de login
                 if (text.includes('login') || text.includes('Login') || urlResponse.status === 302) {
@@ -161,8 +161,8 @@ async function uploadFileToS3(file, type, uploadUrlEndpoint, createRecordEndpoin
         }
         
         const urlData = await urlResponse.json();
-        logger.debug('Presigned URL obtida:', urlData.success);
-        logger.debug('Data recebida:', urlData.data);
+        // logger.debug('Presigned URL obtida:', urlData.success);
+        // logger.debug('Data recebida:', urlData.data);
         
         if (!urlData.success) {
             throw new Error(urlData.error || 'Erro ao obter URL de upload');
@@ -174,7 +174,7 @@ async function uploadFileToS3(file, type, uploadUrlEndpoint, createRecordEndpoin
             const match = urlData.data.s3_key.match(/org-(\d+)\//);
             if (match) {
                 orgId = match[1];
-                logger.debug('Organization ID extraído do s3_key:', orgId);
+                // logger.debug('Organization ID extraído do s3_key:', orgId);
             }
         }
         
@@ -185,8 +185,8 @@ async function uploadFileToS3(file, type, uploadUrlEndpoint, createRecordEndpoin
             ...(urlData.data.signed_headers || {})
         };
         
-        logger.debug('Headers enviados para S3:', uploadHeaders);
-        logger.debug('URL S3:', urlData.data.upload_url.substring(0, 150) + '...');
+        // logger.debug('Headers enviados para S3:', uploadHeaders);
+        // logger.debug('URL S3:', urlData.data.upload_url.substring(0, 150) + '...');
         
         const s3Response = await fetch(urlData.data.upload_url, {
             method: 'PUT',
@@ -194,11 +194,11 @@ async function uploadFileToS3(file, type, uploadUrlEndpoint, createRecordEndpoin
             headers: uploadHeaders
         });
         
-        logger.debug('S3 Response status:', s3Response.status);
+        // logger.debug('S3 Response status:', s3Response.status);
         
         if (!s3Response.ok) {
             const errorText = await s3Response.text();
-            logger.error('S3 Error response:', errorText.substring(0, 500));
+            // logger.error('S3 Error response:', errorText.substring(0, 500));
             throw new Error('Erro ao enviar arquivo para S3');
         }
         
@@ -219,7 +219,7 @@ async function uploadFileToS3(file, type, uploadUrlEndpoint, createRecordEndpoin
         
         if (!createResponse.ok) {
             const errorText = await createResponse.text();
-            logger.error('Erro ao criar registro (status ' + createResponse.status + '):', errorText.substring(0, 500));
+            // logger.error('Erro ao criar registro (status ' + createResponse.status + '):', errorText.substring(0, 500));
             try {
                 const error = JSON.parse(errorText);
                 throw new Error(error.error || 'Erro ao criar ' + type);
@@ -236,7 +236,7 @@ async function uploadFileToS3(file, type, uploadUrlEndpoint, createRecordEndpoin
         return createData.data;
         
     } catch (error) {
-        logger.error('Erro no upload:', error);
+        // logger.error('Erro no upload:', error);
         throw error;
     }
 }
@@ -434,7 +434,7 @@ async function removeLogo(logoId) {
             toaster.error(data.error || 'Erro ao remover logo');
         }
     } catch (error) {
-        logger.error('Erro ao remover logo:', error);
+        // logger.error('Erro ao remover logo:', error);
         toaster.error('Erro ao remover logo');
     }
 }
@@ -465,7 +465,7 @@ async function removeReference(refId) {
             toaster.error(data.error || 'Erro ao remover imagem');
         }
     } catch (error) {
-        logger.error('Erro ao remover referência:', error);
+        // logger.error('Erro ao remover referência:', error);
         toaster.error('Erro ao remover imagem');
     }
 }

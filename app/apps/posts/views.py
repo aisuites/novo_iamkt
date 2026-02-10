@@ -46,8 +46,26 @@ def posts_list(request):
     import json
     
     posts_json = []
-    for post in posts.order_by('-created_at'):
+    for post in posts.prefetch_related('images', 'change_requests').order_by('-created_at'):
         try:
+            # Buscar imagens do post (enviar s3_keys para usar com lazyload)
+            post_images = post.images.all().order_by('order')
+            imagens_keys = [img.s3_key for img in post_images if img.s3_key]
+            
+            # Calcular imageStatus baseado no status do post e se tem imagens
+            if post.status == 'image_generating':
+                image_status = 'generating'
+            elif post.status == 'image_ready' or (imagens_keys and post.status in ['approved', 'pending']):
+                image_status = 'ready'
+            else:
+                image_status = 'none'
+            
+            # Contar alterações de imagem
+            image_changes = post.change_requests.filter(
+                change_type='image',
+                is_initial=False
+            ).count()
+            
             posts_json.append({
                 'id': post.id,
                 'title': post.title or '',
@@ -64,9 +82,9 @@ def posts_list(request):
                 'qtdImagens': int(post.image_count) if post.is_carousel else 1,
                 'created_at': post.created_at.isoformat() if post.created_at else '',
                 'has_image': bool(post.has_image),
-                'imagens': [],
-                'imageStatus': 'none',
-                'imageChanges': 0,
+                'imagens': imagens_keys,
+                'imageStatus': image_status,
+                'imageChanges': image_changes,
                 'revisoesRestantes': 3,
             })
         except Exception:
