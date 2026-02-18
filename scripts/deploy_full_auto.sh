@@ -179,9 +179,9 @@ fi
 
 # Criar estrutura de diretórios
 log_info "Criando estrutura de diretórios..."
-mkdir -p /opt/{iamkt,traefik}
+mkdir -p /opt/traefik
 mkdir -p /opt/traefik/{letsencrypt,oauth2}
-mkdir -p /opt/backups/iamkt
+mkdir -p /opt/backups
 log_success "Diretórios criados em /opt/"
 
 # Criar rede Docker
@@ -321,28 +321,46 @@ fi
 log_success "FASE 2 CONCLUÍDA: Traefik configurado!"
 
 # =============================================================================
-# FASE 3: DEPLOY DA APLICAÇÃO IAMKT
+# FASE 3: DEPLOY DA APLICAÇÃO
 # =============================================================================
-log_step "FASE 3/4: DEPLOY DA APLICAÇÃO IAMKT"
+log_step "FASE 3/4: DEPLOY DA APLICAÇÃO"
+
+# Coletar informações do projeto ANTES de clonar
+echo ""
+log_info "=== CONFIGURAÇÃO DO PROJETO ==="
+echo ""
+read -p "Nome do projeto (ex: iamkt, vibemkt): " PROJECT_NAME
+PROJECT_NAME=${PROJECT_NAME:-iamkt}
+log_success "Nome do projeto: $PROJECT_NAME"
+
+read -p "Domínio da aplicação (ex: app.vibemkt.aisuites.com.br): " APP_DOMAIN
+log_success "Domínio: $APP_DOMAIN"
+
+# Definir diretório do projeto
+APP_DIR="/opt/${PROJECT_NAME}"
 
 # Clonar repositório
 log_info "Clonando repositório do GitHub..."
 cd /opt
-if [ -d "/opt/iamkt/.git" ]; then
-    log_warning "Repositório já existe. Atualizando..."
-    cd /opt/iamkt
+if [ -d "${APP_DIR}/.git" ]; then
+    log_warning "Repositório já existe em ${APP_DIR}. Atualizando..."
+    cd ${APP_DIR}
     git pull origin main
 else
-    git clone https://github.com/aisuites/novo_iamkt.git iamkt
-    cd /opt/iamkt
+    git clone https://github.com/aisuites/novo_iamkt.git ${PROJECT_NAME}
+    cd ${APP_DIR}
 fi
-log_success "Repositório clonado/atualizado"
+log_success "Repositório clonado/atualizado em ${APP_DIR}"
 
 # Ajustar permissões
 if [ "$REAL_USER" != "root" ]; then
-    chown -R $REAL_USER:$REAL_USER /opt/iamkt
+    chown -R $REAL_USER:$REAL_USER ${APP_DIR}
     log_success "Permissões ajustadas para $REAL_USER"
 fi
+
+# Criar diretório de backups para o projeto
+mkdir -p /opt/backups/${PROJECT_NAME}
+log_success "Diretório de backups criado: /opt/backups/${PROJECT_NAME}"
 
 # Configurar variáveis de ambiente
 log_info "Configurando variáveis de ambiente..."
@@ -357,17 +375,6 @@ cp .env.example .env.development
 SECRET_KEY=$(openssl rand -hex 32)
 N8N_WEBHOOK_SECRET=$(openssl rand -hex 32)
 DB_PASSWORD=$(openssl rand -hex 16)
-
-# Coletar informações do projeto
-echo ""
-log_info "=== CONFIGURAÇÃO DO PROJETO ==="
-echo ""
-read -p "Nome do projeto (ex: iamkt, vibemkt): " PROJECT_NAME
-PROJECT_NAME=${PROJECT_NAME:-iamkt}
-log_success "Nome do projeto: $PROJECT_NAME"
-
-read -p "Domínio da aplicação (ex: app.vibemkt.aisuites.com.br): " APP_DOMAIN
-log_success "Domínio: $APP_DOMAIN"
 
 echo ""
 log_info "=== CREDENCIAIS AWS ==="
@@ -553,9 +560,9 @@ echo "  🌐 Aplicação: https://${APP_DOMAIN}"
 echo "  👤 Admin: https://${APP_DOMAIN}/admin/"
 echo "  📊 Health: https://${APP_DOMAIN}/health/"
 echo ""
-echo "  📁 Diretório: /opt/iamkt"
-echo "  🐳 Containers: docker ps | grep iamkt"
-echo "  📝 Logs: cd /opt/iamkt && docker compose logs -f"
+echo "  📁 Diretório: ${APP_DIR}"
+echo "  🐳 Containers: docker ps | grep ${PROJECT_NAME}"
+echo "  📝 Logs: cd ${APP_DIR} && docker compose logs -f"
 echo ""
 echo -e "${YELLOW}🔧 PRÓXIMOS PASSOS:${NC}"
 echo ""
@@ -563,13 +570,13 @@ echo "  1. Aguardar certificado SSL ser gerado (pode levar alguns minutos)"
 echo "  2. Acessar https://${APP_DOMAIN} e testar"
 echo "  3. Fazer login no admin: https://${APP_DOMAIN}/admin/"
 echo "  4. (Opcional) Migrar dados do servidor antigo:"
-echo "     cd /opt/iamkt && bash scripts/deploy_migrate.sh"
+echo "     cd ${APP_DIR} && bash scripts/deploy_migrate.sh"
 echo ""
 echo -e "${YELLOW}📚 DOCUMENTAÇÃO:${NC}"
 echo ""
-echo "  - Guia completo: /opt/iamkt/docs/DEPLOY_NOVO_SERVIDOR.md"
+echo "  - Guia completo: ${APP_DIR}/docs/DEPLOY_NOVO_SERVIDOR.md"
 echo "  - GitHub: https://github.com/aisuites/novo_iamkt"
-echo "  - Validação: cd /opt/iamkt && bash scripts/deploy_validate.sh ${APP_DOMAIN}"
+echo "  - Validação: cd ${APP_DIR} && bash scripts/deploy_validate.sh ${APP_DOMAIN}"
 echo ""
 echo -e "${YELLOW}⚠️  IMPORTANTE:${NC}"
 echo ""
