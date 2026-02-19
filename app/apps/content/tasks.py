@@ -9,8 +9,9 @@ from django.db import models
 from datetime import datetime
 
 from apps.content.models import (
-    Pauta, Post, IAModelUsage, ContentMetrics, TrendMonitor
+    Pauta, IAModelUsage, ContentMetrics, TrendMonitor
 )
+from apps.posts.models import Post
 from apps.knowledge.models import KnowledgeBase
 from apps.utils.ai_openai import openai_manager
 from apps.utils.ai_gemini import gemini_manager
