@@ -95,6 +95,7 @@ class KnowledgeBaseAdmin(admin.ModelAdmin):
         }),
         ('Compilação N8N', {
             'fields': (
+                'compilation_status',
                 'compilation_requested_at', 'compilation_completed_at',
                 'display_n8n_compilation'
             ),
