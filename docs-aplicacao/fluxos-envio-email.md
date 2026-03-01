@@ -10,7 +10,8 @@
 
 **Total de fluxos:** 8 fluxos principais  
 **Uso de variáveis de ambiente:** ✅ Todos os destinatários usam variáveis de ambiente  
-**Emails hardcoded:** ⚠️ 3 ocorrências de email de suporte hardcoded
+**Emails hardcoded:** ✅ **ZERO** - Todos migrados para variáveis de ambiente  
+**URLs hardcoded:** ✅ **ZERO** - Todas migradas para variáveis de ambiente
 
 ---
 
@@ -35,6 +36,8 @@
 - `user_name`: Nome do usuário ou email
 - `user_email`: Email do usuário
 - `organization_name`: Nome da organização
+- `support_email`: Email de suporte (via `settings.NOTIFICATION_EMAIL_SUPORTE`)
+- `site_url`: URL base da aplicação (via `settings.SITE_URL`)
 
 **Observações:**
 - Email transacional enviado imediatamente após cadastro
@@ -62,7 +65,7 @@
 - `user_email`: Email do usuário
 - `organization_name`: Nome da organização
 - `created_at`: Data/hora do cadastro
-- `admin_url`: Link direto para admin da organização
+- `admin_url`: Link direto para admin da organização (via `settings.SITE_URL`)
 
 **Configuração no `.env.development`:**
 ```env
@@ -96,10 +99,11 @@ NEWUSER_NOTIFICATION_EMAILS=email3@domain.com
 - `user_name`: Nome do owner
 - `organization_name`: Nome da organização
 - `plan_type`: Tipo de plano (display)
-- `login_url`: URL de login (`{SITE_URL}/login/`)
+- `login_url`: URL de login (via `settings.SITE_URL`)
 - `quota_pautas`: Quota diária de pautas
 - `quota_posts_dia`: Quota diária de posts
 - `quota_posts_mes`: Quota mensal de posts
+- `support_email`: Email de suporte (via `settings.NOTIFICATION_EMAIL_SUPORTE`)
 
 **Observações:**
 - Enviado automaticamente via Django signal
@@ -128,7 +132,7 @@ NEWUSER_NOTIFICATION_EMAILS=email3@domain.com
 - `organization_name`: Nome da organização
 - `suspension_reason`: Motivo da suspensão (display)
 - `reason_message`: Mensagem personalizada por motivo
-- `support_email`: Email de suporte (**HARDCODED**)
+- `support_email`: Email de suporte (via `settings.NOTIFICATION_EMAIL_SUPORTE`)
 
 **Motivos de suspensão:**
 - `payment`: Problema com pagamento
@@ -136,9 +140,9 @@ NEWUSER_NOTIFICATION_EMAILS=email3@domain.com
 - `canceled`: Cancelamento solicitado
 - `other`: Outros motivos
 
-**⚠️ Problema identificado:**
-- Email de suporte hardcoded: `'suporte@aisuites.com.br'`
-- **Recomendação:** Migrar para variável `SUPPORT_EMAIL`
+**✅ Correção implementada:**
+- Email de suporte migrado para `settings.NOTIFICATION_EMAIL_SUPORTE`
+- Variável configurável por ambiente via `.env.development`
 
 ---
 
@@ -160,7 +164,8 @@ NEWUSER_NOTIFICATION_EMAILS=email3@domain.com
 **Contexto do template:**
 - `user_name`: Nome do owner
 - `organization_name`: Nome da organização
-- `login_url`: URL de login (`{SITE_URL}/login/`)
+- `login_url`: URL de login (via `settings.SITE_URL`)
+- `support_email`: Email de suporte (via `settings.NOTIFICATION_EMAIL_SUPORTE`)
 
 **Observações:**
 - Enviado automaticamente via Django signal
@@ -317,74 +322,71 @@ SUPPORT_EMAIL=suporte@aisuites.com.br
 
 ---
 
-## ⚠️ Emails Hardcoded Identificados
+## ✅ Correções Implementadas
 
-### 1. Email de Suporte
+### 1. Email de Suporte Migrado para Variável
 
-**Ocorrências:** 3 locais
+**Status:** ✅ **Corrigido** - Todas as 8 ocorrências migradas para `settings.NOTIFICATION_EMAIL_SUPORTE`
 
-#### a) `apps/core/emails.py` (linha 193)
-```python
-'support_email': 'suporte@aisuites.com.br',  # ← HARDCODED
-```
+#### Código Python (5 ocorrências):
+- ✅ `apps/core/emails.py` (linha 193) → `settings.NOTIFICATION_EMAIL_SUPORTE`
+- ✅ `apps/core/views_auth.py` (linha 49) → `settings.NOTIFICATION_EMAIL_SUPORTE`
+- ✅ `apps/core/models.py` (linhas 724, 741) → `settings.NOTIFICATION_EMAIL_SUPORTE`
 
-#### b) `apps/core/views_auth.py` (linha 49)
-```python
-messages.error(request, 'Sua organização está suspensa. Para mais detalhes, entre em contato com o suporte: suporte@aisuites.com.br')  # ← HARDCODED
-```
+#### Templates HTML (3 ocorrências):
+- ✅ `templates/emails/registration_confirmation.html` → `{{ support_email }}`
+- ✅ `templates/emails/organization_approved.html` → `{{ support_email }}`
+- ✅ `templates/emails/organization_reactivated.html` → `{{ support_email }}`
 
-#### c) `apps/core/models.py` (linhas 724, 741)
-```python
-return False, 'suspended', 'Essa empresa está suspensa no momento. Para mais detalhes entre em contato com o nosso suporte suporte@aisuites.com.br'  # ← HARDCODED
-```
+### 2. URL do Site Migrada para Variável
 
-### 2. Email de Suporte em Templates HTML
+**Status:** ✅ **Corrigido** - URL hardcoded migrada para variável
 
-**Arquivo:** `templates/emails/registration_confirmation.html` (linha 117)
-```html
-<a href="mailto:suporte@iamkt.com.br">suporte@iamkt.com.br</a>
-```
+#### Template HTML (1 ocorrência):
+- ✅ `templates/emails/registration_confirmation.html` (linha 125) → `{{ site_url }}`
 
-**⚠️ Observação:** Emails diferentes!
-- Código Python: `suporte@aisuites.com.br`
-- Template HTML: `suporte@iamkt.com.br`
+**Antes:** `https://iamkt.aisuites.com.br` (hardcoded)  
+**Depois:** `{{ site_url }}` (via `settings.SITE_URL`)
 
 ---
 
-## 💡 Recomendações
+## ✅ Implementações Concluídas
 
-### 1. Migrar Email de Suporte para Variável de Ambiente
+### 1. Email de Suporte Migrado para Variável
 
-**Adicionar ao `sistema/settings/base.py`:**
+**Implementado em `sistema/settings/base.py`:**
 ```python
-SUPPORT_EMAIL = config('SUPPORT_EMAIL', default='suporte@aisuites.com.br')
+NOTIFICATION_EMAIL_SUPORTE = config('NOTIFICATION_EMAIL_SUPORTE', default='suporte@aisuites.com.br')
 ```
 
-**Adicionar ao `.env.development`:**
+**Configuração no `.env.development`:**
 ```env
-SUPPORT_EMAIL=suporte@aisuites.com.br
+NOTIFICATION_EMAIL_SUPORTE=suporte@aisuites.com.br
 ```
 
-**Substituir nos arquivos:**
-- `apps/core/emails.py` → `settings.SUPPORT_EMAIL`
-- `apps/core/views_auth.py` → `settings.SUPPORT_EMAIL`
-- `apps/core/models.py` → `settings.SUPPORT_EMAIL`
-- Templates HTML → `{{ support_email }}` (passar via context)
+**Arquivos atualizados:**
+- ✅ `apps/core/emails.py` → `settings.NOTIFICATION_EMAIL_SUPORTE`
+- ✅ `apps/core/views_auth.py` → `settings.NOTIFICATION_EMAIL_SUPORTE`
+- ✅ `apps/core/models.py` → `settings.NOTIFICATION_EMAIL_SUPORTE`
+- ✅ Templates HTML → `{{ support_email }}` (passado via context)
 
-### 2. Padronizar Email de Suporte
+### 2. URL do Site Migrada para Variável
 
-Definir qual email usar:
-- `suporte@aisuites.com.br` (usado no código)
-- `suporte@iamkt.com.br` (usado em templates)
-
-### 3. Criar Variável para URL do Site em Templates
-
-Alguns templates usam URL hardcoded:
-```html
-<a href="https://iamkt.aisuites.com.br">iamkt.aisuites.com.br</a>
+**Já existia em `sistema/settings/base.py`:**
+```python
+SITE_URL = config('SITE_URL', default='https://iamkt.aisuites.com.br')
 ```
 
-**Recomendação:** Usar `{{ site_url }}` passado via context
+**Template atualizado:**
+- ✅ `templates/emails/registration_confirmation.html` → `{{ site_url }}`
+
+### 3. Funções de Envio Atualizadas
+
+Todas as funções de envio foram atualizadas para passar `support_email` e `site_url` no context:
+- ✅ `send_registration_confirmation()` → `support_email` + `site_url`
+- ✅ `send_organization_approved_email()` → `support_email`
+- ✅ `send_organization_reactivated_email()` → `support_email`
+- ✅ `send_organization_suspended_email()` → `support_email` (já existia)
 
 ---
 
@@ -394,11 +396,12 @@ Alguns templates usam URL hardcoded:
 |------|--------|------------|
 | **Destinatários via ENV** | ✅ | 8/8 (100%) |
 | **Remetente via ENV** | ✅ | 8/8 (100%) |
-| **URLs via ENV** | ✅ | 5/5 (100%) |
-| **Email de suporte hardcoded** | ⚠️ | 3 ocorrências |
-| **Email de suporte em templates** | ⚠️ | 1 ocorrência |
+| **URLs via ENV** | ✅ | 6/6 (100%) |
+| **Email de suporte hardcoded** | ✅ | 0 (todos migrados) |
+| **Email de suporte em templates** | ✅ | 0 (todos migrados) |
+| **URLs hardcoded em templates** | ✅ | 0 (todas migradas) |
 
-**Conformidade Geral:** 🟡 **Boa** (apenas email de suporte precisa ser migrado)
+**Conformidade Geral:** � **Excelente** (100% - Zero hardcoded restante!)
 
 ---
 
