@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Post, PostImage, PostChangeRequest
+from .models import Post, PostImage, PostChangeRequest, PostFormat
 
 
 class PostImageInline(admin.TabularInline):
@@ -86,6 +86,7 @@ class PostAdmin(admin.ModelAdmin):
         }),
         ('Imagem', {
             'fields': (
+                'post_format',
                 'has_image',
                 'image_s3_url',
                 'image_s3_key',
@@ -161,5 +162,23 @@ class PostChangeRequestAdmin(admin.ModelAdmin):
             'fields': (
                 'created_at',
             )
+        }),
+    )
+
+
+@admin.register(PostFormat)
+class PostFormatAdmin(admin.ModelAdmin):
+    list_display = ['social_network', 'name', 'width', 'height', 'aspect_ratio', 'is_active', 'order']
+    list_filter = ['social_network', 'is_active']
+    list_editable = ['order', 'is_active']
+    search_fields = ['name', 'social_network']
+    ordering = ['social_network', 'order', 'name']
+    
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('social_network', 'name', 'is_active', 'order')
+        }),
+        ('Dimensões', {
+            'fields': ('width', 'height', 'aspect_ratio')
         }),
     )

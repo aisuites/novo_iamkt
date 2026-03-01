@@ -166,6 +166,71 @@ def generate_image(request, post_id):
         except Exception as exc:
             logger.warning(f'Erro ao enviar email de solicitação: {exc}')
         
+        # Enviar para N8N (webhook de geração de imagem)
+        if hasattr(settings, 'N8N_WEBHOOK_GERAR_IMAGEM') and settings.N8N_WEBHOOK_GERAR_IMAGEM:
+            try:
+                from .utils import _resolve_post_format
+                from django.urls import reverse
+                
+                logger.info(f"Enviando solicitação de geração de imagem do post {post.id} para N8N...")
+                
+                # Resolver formato da imagem
+                format_data = _resolve_post_format(post)
+                
+                # Montar payload para N8N
+                n8n_payload = {
+                    'callback_url': f"{settings.APP_BASE_URL}{reverse('posts:n8n_post_callback')}",
+                    'post_id': post.id,
+                    'thread_id': post.thread_id or '',
+                    'rede_social': post.social_network or 'instagram',
+                    'formato_px': format_data['formato_px'],
+                    'aspect_ratio': format_data['aspect_ratio'],
+                    'quantidade': post.image_count or 1,
+                    'titulo': post.title or '',
+                    'subtitulo': post.subtitle or '',
+                    'cta': post.cta or '',
+                    'prompt': post.image_prompt or '',
+                }
+                
+                # Adicionar mensagem de alteração se houver
+                if message:
+                    n8n_payload['mensagem_alteracao'] = message
+                
+                logger.debug(f"Payload N8N (gerar imagem): {n8n_payload}")
+                
+                # Enviar para N8N
+                timeout = getattr(settings, 'N8N_WEBHOOK_TIMEOUT', 30)
+                headers = {
+                    'Content-Type': 'application/json',
+                }
+                if hasattr(settings, 'N8N_WEBHOOK_SECRET') and settings.N8N_WEBHOOK_SECRET:
+                    headers['X-Webhook-Secret'] = settings.N8N_WEBHOOK_SECRET
+                
+                response = requests.post(
+                    settings.N8N_WEBHOOK_GERAR_IMAGEM,
+                    json=n8n_payload,
+                    headers=headers,
+                    timeout=timeout
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"N8N respondeu com sucesso para post {post.id}")
+                    # Atualizar thread_id se N8N retornar
+                    try:
+                        n8n_response = response.json()
+                        if 'thread_id' in n8n_response and n8n_response['thread_id']:
+                            post.thread_id = n8n_response['thread_id']
+                            post.save(update_fields=['thread_id'])
+                    except:
+                        pass
+                else:
+                    logger.warning(f"N8N retornou status {response.status_code} para post {post.id}")
+                    
+            except requests.exceptions.Timeout:
+                logger.error(f"Timeout ao chamar N8N para post {post.id}")
+            except Exception as n8n_exc:
+                logger.error(f"Erro ao chamar N8N para post {post.id}: {n8n_exc}", exc_info=True)
+        
         return JsonResponse({
             'success': True,
             'id': post.id,

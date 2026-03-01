@@ -163,6 +163,17 @@ class Post(models.Model):
         help_text='URLs S3 das imagens de referência enviadas pelo usuário'
     )
     
+    # Formato da imagem (derivado automaticamente se None)
+    post_format = models.ForeignKey(
+        'PostFormat',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='posts',
+        verbose_name='Formato da Imagem',
+        help_text='Formato específico (derivado automaticamente da rede social + tipo de formato se não especificado)'
+    )
+    
     # Imagem gerada (S3)
     has_image = models.BooleanField(default=False, verbose_name='Tem Imagem')
     image_file = models.ImageField(
@@ -332,3 +343,65 @@ class PostChangeRequest(models.Model):
         tipo = self.get_change_type_display()
         inicial = " (inicial)" if self.is_initial else ""
         return f"{tipo}{inicial} - Post #{self.post.id}"
+
+
+class PostFormat(models.Model):
+    """
+    Formatos padrão de imagem por rede social
+    Tabela global (não vinculada a organização)
+    """
+    NETWORK_CHOICES = [
+        ('instagram', 'Instagram'),
+        ('facebook', 'Facebook'),
+        ('linkedin', 'LinkedIn'),
+        ('twitter', 'Twitter/X'),
+        ('tiktok', 'TikTok'),
+        ('whatsapp', 'WhatsApp'),
+    ]
+    
+    social_network = models.CharField(
+        max_length=20,
+        choices=NETWORK_CHOICES,
+        verbose_name='Rede Social'
+    )
+    name = models.CharField(
+        max_length=100,
+        verbose_name='Nome do Formato',
+        help_text='Ex: Feed Retrato, Stories, Reels'
+    )
+    width = models.IntegerField(
+        verbose_name='Largura (px)',
+        help_text='Ex: 1080'
+    )
+    height = models.IntegerField(
+        verbose_name='Altura (px)',
+        help_text='Ex: 1350'
+    )
+    aspect_ratio = models.CharField(
+        max_length=10,
+        verbose_name='Aspect Ratio',
+        help_text='Ex: 4:5, 9:16, 1:1'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name='Ativo'
+    )
+    order = models.IntegerField(
+        default=0,
+        verbose_name='Ordem',
+        help_text='Ordem de prioridade (menor = maior prioridade)'
+    )
+    
+    class Meta:
+        verbose_name = 'Formato de Post'
+        verbose_name_plural = 'Formatos de Post'
+        unique_together = [['social_network', 'name']]
+        ordering = ['social_network', 'order', 'name']
+    
+    @property
+    def dimensions(self):
+        """Retorna dimensões no formato WxH"""
+        return f"{self.width}x{self.height}"
+    
+    def __str__(self):
+        return f"{self.get_social_network_display()} - {self.name} ({self.dimensions})"

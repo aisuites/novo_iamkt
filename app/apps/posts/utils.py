@@ -340,3 +340,88 @@ def _resolve_user_name(payload_data, user, organization):
         return user.email
     
     return 'Usuário'
+
+
+def _resolve_post_format(post):
+    """
+    Resolve o formato da imagem para um post baseado na rede social e tipo de formato.
+    
+    Lógica:
+    1. Se post.post_format já existe → usa
+    2. Senão, busca PostFormat por (rede_social + formato do post)
+    3. Retorna dict com formato_px e aspect_ratio
+    
+    Args:
+        post: Instância de Post
+    
+    Returns:
+        dict: {
+            'format_obj': PostFormat ou None,
+            'formato_px': str (ex: "1080x1350"),
+            'aspect_ratio': str (ex: "4:5"),
+            'width': int,
+            'height': int
+        }
+    """
+    from .models import PostFormat
+    
+    # Mapeamento de formato do post → nomes de PostFormat (em ordem de prioridade)
+    FORMATO_MAP = {
+        'feed':      ['Feed Retrato', 'Feed', 'Feed Quadrado', 'Imagem'],
+        'stories':   ['Stories', 'Status'],
+        'reels':     ['Reels', 'Vídeo/Reels', 'Stories'],
+        'both':      ['Feed Retrato', 'Feed', 'Feed Quadrado', 'Imagem'],
+        'story':     ['Stories', 'Status'],
+        'carrossel': ['Feed Retrato', 'Feed', 'Feed Quadrado', 'Imagem'],
+        'post':      ['Feed Retrato', 'Feed', 'Feed Quadrado', 'Imagem'],
+    }
+    
+    # Prioridade 1: FK post.post_format (se preenchido manualmente)
+    pf = post.post_format
+    
+    # Prioridade 2: busca na tabela PostFormat por rede_social + formato
+    if not pf:
+        # Determinar formato a partir de post.formats ou post.content_type
+        formato_post = None
+        if post.formats and len(post.formats) > 0:
+            formato_post = post.formats[0]  # Pega o primeiro formato
+        elif post.content_type:
+            formato_post = post.content_type
+        
+        # Buscar PostFormat correspondente
+        if formato_post:
+            for nome in FORMATO_MAP.get(formato_post, ['Feed', 'Feed Retrato']):
+                pf = PostFormat.objects.filter(
+                    social_network=post.social_network,
+                    name=nome,
+                    is_active=True,
+                ).first()
+                if pf:
+                    break
+    
+    # Fallback: buscar qualquer formato ativo da rede social
+    if not pf and post.social_network:
+        pf = PostFormat.objects.filter(
+            social_network=post.social_network,
+            is_active=True,
+        ).order_by('order').first()
+    
+    # Retornar dados do formato
+    if pf:
+        return {
+            'format_obj': pf,
+            'formato_px': f"{pf.width}x{pf.height}",
+            'aspect_ratio': pf.aspect_ratio,
+            'width': pf.width,
+            'height': pf.height,
+        }
+    
+    # Fallback final: valores padrão
+    logger.warning(f'Post {post.id}: Nenhum PostFormat encontrado para {post.social_network}. Usando padrão 1080x1080.')
+    return {
+        'format_obj': None,
+        'formato_px': '1080x1080',
+        'aspect_ratio': '1:1',
+        'width': 1080,
+        'height': 1080,
+    }
