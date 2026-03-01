@@ -47,6 +47,8 @@ def send_registration_confirmation(user, organization):
         'user_name': user.first_name or user.email.split('@')[0],
         'user_email': user.email,
         'organization_name': organization.name,
+        'support_email': settings.NOTIFICATION_EMAIL_SUPORTE,
+        'site_url': settings.SITE_URL,
     }
     
     # Renderizar template HTML
@@ -140,6 +142,7 @@ def send_organization_approved_email(organization):
         'quota_pautas': organization.quota_pautas_dia,
         'quota_posts_dia': organization.quota_posts_dia,
         'quota_posts_mes': organization.quota_posts_mes,
+        'support_email': settings.NOTIFICATION_EMAIL_SUPORTE,
     }
     
     # Renderizar template HTML
@@ -232,6 +235,7 @@ def send_organization_reactivated_email(organization):
         'user_name': user.first_name or user.email.split('@')[0],
         'organization_name': organization.name,
         'login_url': f"{settings.SITE_URL}/login/",
+        'support_email': settings.NOTIFICATION_EMAIL_SUPORTE,
     }
     
     # Renderizar template HTML
