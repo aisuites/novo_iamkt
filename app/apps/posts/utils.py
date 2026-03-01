@@ -8,6 +8,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from apps.core.emails import get_notification_emails
+from apps.utils.s3 import get_signed_url
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +31,11 @@ def _get_organization_logos(organization):
         logos = kb.logos.all().order_by('-is_primary', '-created_at')
         return [
             {
-                'url': logo.s3_url,
+                'url': get_signed_url(logo.s3_key, expiration=86400),  # 24 horas
                 'name': logo.name,
             }
             for logo in logos
+            if get_signed_url(logo.s3_key, expiration=86400)  # Só inclui se conseguir gerar URL
         ]
     except Exception as e:
         logger.warning(f'Erro ao buscar logos da organização {organization.id}: {e}')
@@ -58,10 +60,11 @@ def _get_kb_reference_images(organization):
         images = kb.reference_images.all().order_by('-created_at')
         return [
             {
-                'url': img.s3_url,
+                'url': get_signed_url(img.s3_key, expiration=86400),  # 24 horas
                 'name': img.title,
             }
             for img in images
+            if get_signed_url(img.s3_key, expiration=86400)  # Só inclui se conseguir gerar URL
         ]
     except Exception as e:
         logger.warning(f'Erro ao buscar imagens de referência da KB {organization.id}: {e}')
@@ -83,15 +86,18 @@ def _get_post_reference_images(post):
             return []
         
         # reference_images é um JSONField com lista de objetos
-        # Formato esperado: [{'url': '...', 'name': '...', ...}, ...]
-        return [
-            {
-                'url': img.get('url', ''),
-                'name': img.get('name', f'Imagem {idx + 1}'),
-            }
-            for idx, img in enumerate(post.reference_images)
-            if img.get('url')
-        ]
+        # Formato esperado: [{'url': '...', 's3_key': '...', 'name': '...', ...}, ...]
+        result = []
+        for idx, img in enumerate(post.reference_images):
+            s3_key = img.get('s3_key') or img.get('key')
+            if s3_key:
+                signed_url = get_signed_url(s3_key, expiration=86400)  # 24 horas
+                if signed_url:
+                    result.append({
+                        'url': signed_url,
+                        'name': img.get('name', f'Imagem {idx + 1}'),
+                    })
+        return result
     except Exception as e:
         logger.warning(f'Erro ao buscar imagens de referência do post {post.id}: {e}')
         return []
