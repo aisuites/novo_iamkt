@@ -4,130 +4,88 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cadastro Realizado - IAMKT</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f4f4f4;
-        }
-        .container {
-            background-color: #ffffff;
-            border-radius: 8px;
-            padding: 40px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .logo {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 20px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 20%, #ffb7c9 0, #8b5cf6 45%, #4c1f63 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            font-weight: 700;
-            color: white;
-        }
-        h1 {
-            color: #8b5cf6;
-            font-size: 24px;
-            margin: 0;
-        }
-        .content {
-            margin: 30px 0;
-        }
-        .info-box {
-            background-color: #f8f5ff;
-            border-left: 4px solid #8b5cf6;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
-        }
-        .info-box p {
-            margin: 5px 0;
-        }
-        .info-label {
-            font-weight: 600;
-            color: #8b5cf6;
-        }
-        .status-badge {
-            display: inline-block;
-            background-color: #fbbf24;
-            color: #78350f;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 14px;
-            margin: 20px 0;
-        }
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-            text-align: center;
-            font-size: 14px;
-            color: #6b7280;
-        }
-        .footer a {
-            color: #8b5cf6;
-            text-decoration: none;
-        }
-    </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">IA</div>
-            <h1>Cadastro Realizado com Sucesso!</h1>
-        </div>
-
-        <div class="content">
-            <p>Olá <strong>{{ user_name }}</strong>,</p>
-            
-            <p>Seu cadastro foi realizado com sucesso! 🎉</p>
-
-            <div class="info-box">
-                <p><span class="info-label">Empresa:</span> {{ organization_name }}</p>
-                <p><span class="info-label">Email:</span> {{ user_email }}</p>
-            </div>
-
-            <div style="text-align: center;">
-                <span class="status-badge">⏳ Aguardando Aprovação</span>
-            </div>
-
-            <p>
-                Sua conta está aguardando aprovação pela nossa equipe. 
-                Você receberá um email assim que sua conta for liberada para uso.
-            </p>
-
-            <p>
-                Enquanto isso, fique à vontade para conhecer mais sobre o IAMKT e suas funcionalidades.
-            </p>
-
-            <p style="margin-top: 30px;">
-                Qualquer dúvida, entre em contato conosco através do email 
-                <a href="mailto:{{ support_email }}">{{ support_email }}</a>
-            </p>
-        </div>
-
-        <div class="footer">
-            <p>
-                <strong>IAMKT</strong> - Inteligência Artificial para Marketing<br>
-                <a href="{{ site_url }}">{{ site_url }}</a>
-            </p>
-            <p style="font-size: 12px; color: #9ca3af; margin-top: 10px;">
-                Este é um email automático. Por favor, não responda.
-            </p>
-        </div>
-    </div>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 40px 40px 30px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
+                                Cadastro Realizado com Sucesso!
+                            </h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Olá, <strong>{{ user_name }}</strong>!
+                            </p>
+                            
+                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Seu cadastro foi realizado com sucesso! 🎉
+                            </p>
+                            
+                            <!-- Info Box -->
+                            <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 30px 0; background-color: #f8f9fa; border-radius: 6px; border-left: 4px solid #667eea;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="margin: 0 0 10px; color: #667eea; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                            Empresa
+                                        </p>
+                                        <p style="margin: 0 0 15px; color: #333333; font-size: 18px; font-weight: 600;">
+                                            {{ organization_name }}
+                                        </p>
+                                        <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.5;">
+                                            <strong>Email:</strong> {{ user_email }}
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Status Badge -->
+                            <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <span style="display: inline-block; padding: 12px 24px; background-color: #fbbf24; color: #78350f; border-radius: 20px; font-size: 14px; font-weight: 600;">
+                                            ⏳ Aguardando Aprovação
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Sua conta está aguardando aprovação pela nossa equipe. Você receberá um email assim que sua conta for liberada para uso.
+                            </p>
+                            
+                            <p style="margin: 0 0 30px; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Enquanto isso, fique à vontade para conhecer mais sobre o IAMKT e suas funcionalidades.
+                            </p>
+                            
+                            <p style="margin: 30px 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                Qualquer dúvida, entre em contato conosco através do email <a href="mailto:{{ support_email }}" style="color: #667eea; text-decoration: none;">{{ support_email }}</a>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+                            <p style="margin: 0 0 10px; color: #999999; font-size: 14px;">
+                                <strong>IAMKT</strong> - Inteligência Artificial para Marketing
+                            </p>
+                            <p style="margin: 0; color: #999999; font-size: 12px;">
+                                Suporte: {{ support_email }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
