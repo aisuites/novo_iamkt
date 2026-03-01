@@ -87,7 +87,7 @@ services:
     environment:
       POSTGRES_DB: iamkt_db
       POSTGRES_USER: iamkt_user
-      POSTGRES_PASSWORD: dev_password_change_me
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     deploy:
       resources:
         limits:
