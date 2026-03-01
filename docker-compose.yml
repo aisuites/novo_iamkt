@@ -17,10 +17,8 @@ services:
     networks:
       - iamkt_internal
       - traefik_proxy
-    environment:
-      - ENV_FILE=${ENV_FILE:-development}
     env_file:
-      - .env.${ENV_FILE:-development}
+      - .env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
       interval: 30s
@@ -58,10 +56,8 @@ services:
       - iamkt_media:/app/media
     networks:
       - iamkt_internal
-    environment:
-      - ENV_FILE=${ENV_FILE:-development}
     env_file:
-      - .env.${ENV_FILE:-development}
+      - .env
     healthcheck:
       test: ["CMD-SHELL", "celery -A sistema inspect ping -d celery@$$HOSTNAME || exit 1"]
       interval: 30s
