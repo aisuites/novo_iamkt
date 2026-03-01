@@ -721,7 +721,7 @@ class Organization(TimeStampedModel):
         """Verifica se pode criar pauta. Retorna: (bool, str|None, str|None)"""
         if not self.is_active:
             if self.approved_at:
-                return False, 'suspended', 'Essa empresa está suspensa no momento. Para mais detalhes entre em contato com o nosso suporte suporte@aisuites.com.br'
+                return False, 'suspended', f'Essa empresa está suspensa no momento. Para mais detalhes entre em contato com o nosso suporte {settings.NOTIFICATION_EMAIL_SUPORTE}'
             else:
                 return False, 'pending', 'Organização aguardando aprovação'
         
@@ -738,7 +738,7 @@ class Organization(TimeStampedModel):
         """Verifica se pode criar post (valida dia E mês). Retorna: (bool, str|None, str|None)"""
         if not self.is_active:
             if self.approved_at:
-                return False, 'suspended', 'Essa empresa está suspensa no momento. Para mais detalhes entre em contato com o nosso suporte suporte@aisuites.com.br'
+                return False, 'suspended', f'Essa empresa está suspensa no momento. Para mais detalhes entre em contato com o nosso suporte {settings.NOTIFICATION_EMAIL_SUPORTE}'
             else:
                 return False, 'pending', 'Organização aguardando aprovação'
         

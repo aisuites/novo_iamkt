@@ -190,7 +190,7 @@ def send_organization_suspended_email(organization):
         'organization_name': organization.name,
         'suspension_reason': organization.get_suspension_reason_display(),
         'reason_message': reason_messages.get(organization.suspension_reason, 'Sua conta foi suspensa.'),
-        'support_email': 'suporte@aisuites.com.br',
+        'support_email': settings.NOTIFICATION_EMAIL_SUPORTE,
     }
     
     # Renderizar template HTML

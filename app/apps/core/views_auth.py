@@ -46,7 +46,7 @@ def login_view(request):
                 print(f"❌ [LOGIN] Organização inativa: {org.name}", flush=True)
                 if org.approved_at:
                     # Organização foi suspensa
-                    messages.error(request, 'Sua organização está suspensa. Para mais detalhes, entre em contato com o suporte: suporte@aisuites.com.br')
+                    messages.error(request, f'Sua organização está suspensa. Para mais detalhes, entre em contato com o suporte: {settings.NOTIFICATION_EMAIL_SUPORTE}')
                 else:
                     # Organização aguardando aprovação
                     messages.warning(request, 'Sua organização está aguardando aprovação. Você será notificado por e-mail quando for aprovada.')
