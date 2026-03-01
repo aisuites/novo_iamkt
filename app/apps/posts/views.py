@@ -67,6 +67,9 @@ def posts_list(request):
                 is_initial=False
             ).count()
             
+            # Obter limite de alterações da organização
+            max_image_revisions = post.organization.max_image_revisions if post.organization else 1
+            
             posts_json.append({
                 'id': post.id,
                 'title': post.title or '',
@@ -86,6 +89,7 @@ def posts_list(request):
                 'imagens': imagens_keys,
                 'imageStatus': image_status,
                 'imageChanges': image_changes,
+                'maxImageRevisions': max_image_revisions,
                 'revisoesRestantes': 3,
             })
         except Exception:

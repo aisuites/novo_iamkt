@@ -243,8 +243,9 @@
       }
     }
     
-    // Garantir imageChanges
+    // Garantir imageChanges e maxImageRevisions
     if (typeof item.imageChanges !== 'number') item.imageChanges = 0;
+    if (typeof item.maxImageRevisions !== 'number') item.maxImageRevisions = 1;
     
     // Garantir statusLabel
     if (!item.statusLabel && item.status) {
@@ -985,11 +986,14 @@
       if (dom.postImageActions) {
         if (post.imageRequestOpen) return;
         
-        // Se atingiu limite de alterações
-        if (post.imageChanges >= 1) {
+        // Se atingiu limite de alterações (configurável por organização)
+        const maxRevisions = post.maxImageRevisions || 1;
+        const hasReachedLimit = maxRevisions > 0 && post.imageChanges >= maxRevisions;
+        
+        if (hasReachedLimit) {
           const badge = document.createElement('span');
           badge.className = 'badge-muted';
-          badge.textContent = 'Limite de alterações de imagem atingido';
+          badge.textContent = `Limite de ${maxRevisions} alteração(ões) de imagem atingido`;
           dom.postImageActions.appendChild(badge);
         } else {
           // Botão de solicitar alteração
@@ -1537,7 +1541,8 @@
    * Envia solicitação de alteração de imagem
    */
   async function submitImageRequest(post, text) {
-    if (post.imageChanges >= 1) return;
+    const maxRevisions = post.maxImageRevisions || 1;
+    if (maxRevisions > 0 && post.imageChanges >= maxRevisions) return;
     
     const serverId = getServerId(post);
     if (!serverId) {
