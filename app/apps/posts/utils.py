@@ -270,17 +270,16 @@ def _notify_revision_request(post, message, payload=None, user=None, request=Non
     env_prefix = '[DEV]' if settings.ENVIRONMENT == 'development' else '[PROD]'
     subject = f'{env_prefix} 🔄 Solicitação de alteração de imagem - Post #{post.id}'
     
-    # Buscar imagens atuais do post (generated_images)
+    # Buscar imagens atuais do post (relacionamento PostImage)
     current_images = []
-    if hasattr(post, 'generated_images') and post.generated_images:
-        for idx, img in enumerate(post.generated_images):
-            s3_key = img.get('s3_key') or img.get('key')
-            if s3_key:
-                signed_url = get_signed_url(s3_key, expiration=86400)  # 24 horas
+    if hasattr(post, 'images'):
+        for img in post.images.all().order_by('order'):
+            if img.s3_key:
+                signed_url = get_signed_url(img.s3_key, expiration=86400)  # 24 horas
                 if signed_url:
                     current_images.append({
                         'url': signed_url,
-                        'order': idx,
+                        'order': img.order,
                     })
     
     context = {
