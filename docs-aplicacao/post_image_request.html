@@ -209,17 +209,17 @@
             
             <div class="info-item">
                 <span class="info-label">Rede Social:</span> 
-                <span class="info-value">{{ post.get_social_network_display|default:"Não informado" }}</span>
+                <span class="info-value">{{ post.network|default:"Não informado" }}</span>
             </div>
             
             <div class="info-item">
                 <span class="info-label">Formato:</span> 
-                <span class="info-value">{{ post.get_content_type_display|default:"Não informado" }}</span>
+                <span class="info-value">{{ formats_display|default:"Não informado" }}</span>
             </div>
             
             <div class="info-item">
                 <span class="info-label">Carrossel:</span> 
-                <span class="info-value">{% if post.is_carousel %}Sim{% else %}Não{% endif %}</span>
+                <span class="info-value">{{ carousel_display }}</span>
             </div>
             
             {% if post.image_count > 1 %}
@@ -254,7 +254,7 @@
             {% endif %}
         </div>
         
-        <!-- LOGOTIPO DA ORGANIZAÇÃO -->
+        <!-- LOGOTIPO -->
         <div class="section">
             <h3>🏢 Logotipo da Organização</h3>
             {% if logos %}
@@ -324,7 +324,7 @@
             {% endif %}
         </div>
         
-        <!-- IMAGENS ANEXADAS NESTE POST -->
+        <!-- IMAGENS ANEXADAS NO POST -->
         <div class="section">
             <h3>📎 Imagens Anexadas neste Post</h3>
             {% if post_references %}
@@ -366,32 +366,14 @@
         </div>
         {% endif %}
         
-        <!-- PRAZO DE ENTREGA -->
-        <div class="section">
-            <h3>⏰ Prazo de Entrega</h3>
-            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 4px;">
-                <p style="margin: 0; font-size: 16px; font-weight: bold; color: #d97706;">
-                    {{ deadline }}
-                </p>
-                <p style="margin: 5px 0 0 0; font-size: 13px; color: #92400e;">
-                    Solicitado em: {{ requested_at|date:"d/m/Y às H:i" }}
-                </p>
-                <p style="margin: 5px 0 0 0; font-size: 12px; color: #78350f;">
-                    Prazo: 6 horas úteis (horário comercial 09:00-17:00)
-                </p>
-            </div>
-        </div>
-        
         <!-- AÇÃO RÁPIDA -->
         <div style="text-align: center; margin: 40px 0;">
             <p style="margin-bottom: 15px; color: #666;">
                 Para fazer upload da imagem gerada e atualizar o status do post:
             </p>
-            {% if post_url %}
-            <a href="{{ post_url }}" class="button">
+            <a href="{{ admin_url }}" class="button">
                 🚀 EDITAR POST NO ADMIN
             </a>
-            {% endif %}
         </div>
         
         <div class="footer">

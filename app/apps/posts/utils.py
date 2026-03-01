@@ -12,6 +12,112 @@ from apps.core.emails import get_notification_emails
 logger = logging.getLogger(__name__)
 
 
+def _get_organization_logos(organization):
+    """
+    Retorna lista de logos da organização
+    
+    Args:
+        organization: Instância de Organization
+    
+    Returns:
+        list: [{'url': str, 'name': str}, ...] ordenado por is_primary e data
+    """
+    try:
+        kb = organization.knowledge_bases.first()
+        if not kb:
+            return []
+        
+        logos = kb.logos.all().order_by('-is_primary', '-created_at')
+        return [
+            {
+                'url': logo.s3_url,
+                'name': logo.name,
+            }
+            for logo in logos
+        ]
+    except Exception as e:
+        logger.warning(f'Erro ao buscar logos da organização {organization.id}: {e}')
+        return []
+
+
+def _get_kb_reference_images(organization):
+    """
+    Retorna imagens de referência da base de conhecimento
+    
+    Args:
+        organization: Instância de Organization
+    
+    Returns:
+        list: [{'url': str, 'name': str}, ...] ordenado por data (mais recente primeiro)
+    """
+    try:
+        kb = organization.knowledge_bases.first()
+        if not kb:
+            return []
+        
+        images = kb.reference_images.all().order_by('-created_at')
+        return [
+            {
+                'url': img.s3_url,
+                'name': img.title,
+            }
+            for img in images
+        ]
+    except Exception as e:
+        logger.warning(f'Erro ao buscar imagens de referência da KB {organization.id}: {e}')
+        return []
+
+
+def _get_post_reference_images(post):
+    """
+    Retorna imagens anexadas ao post
+    
+    Args:
+        post: Instância de Post
+    
+    Returns:
+        list: [{'url': str, 'name': str}, ...]
+    """
+    try:
+        if not post.reference_images:
+            return []
+        
+        # reference_images é um JSONField com lista de objetos
+        # Formato esperado: [{'url': '...', 'name': '...', ...}, ...]
+        return [
+            {
+                'url': img.get('url', ''),
+                'name': img.get('name', f'Imagem {idx + 1}'),
+            }
+            for idx, img in enumerate(post.reference_images)
+            if img.get('url')
+        ]
+    except Exception as e:
+        logger.warning(f'Erro ao buscar imagens de referência do post {post.id}: {e}')
+        return []
+
+
+def _get_marketing_summary(organization):
+    """
+    Retorna resumo de marketing da base de conhecimento
+    
+    Args:
+        organization: Instância de Organization
+    
+    Returns:
+        str ou None: Resumo de marketing compilado pelo N8N
+    """
+    try:
+        kb = organization.knowledge_bases.first()
+        if not kb or not kb.n8n_compilation:
+            return None
+        
+        return kb.n8n_compilation.get('marketing_input_summary', '')
+    except Exception as e:
+        logger.warning(f'Erro ao buscar resumo de marketing da organização {organization.id}: {e}')
+        return None
+
+
 def _calculate_image_deadline(requested_at):
     """
     Calcula prazo de entrega da imagem (6 horas úteis)
@@ -98,6 +204,11 @@ def _notify_image_request_email(post, request=None):
         'post_url': f"{settings.SITE_URL}/admin/posts/post/{post.id}/change/" if hasattr(settings, 'SITE_URL') else '',
         'requested_at': requested_at,
         'deadline': deadline_formatted,
+        # Novos dados para seções adicionais
+        'logos': _get_organization_logos(post.organization),
+        'kb_references': _get_kb_reference_images(post.organization),
+        'post_references': _get_post_reference_images(post),
+        'marketing_summary': _get_marketing_summary(post.organization),
     }
     
     try:
