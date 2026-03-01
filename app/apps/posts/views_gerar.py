@@ -6,7 +6,7 @@ from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.conf import settings
-from apps.posts.models import Post
+from apps.posts.models import Post, PostFormat
 import json
 import requests
 import logging
@@ -44,7 +44,8 @@ def gerar_post(request):
         
         # Validações
         rede_social = data.get('rede_social')
-        formato = data.get('formato', 'feed')
+        post_format_id = data.get('post_format_id')  # NOVO: ID do PostFormat
+        formato = data.get('formato', 'feed')  # LEGADO: manter retrocompatibilidade
         cta_requested = data.get('cta_requested', True)
         is_carousel = data.get('is_carousel', False)
         image_count = data.get('image_count', 1)
@@ -72,13 +73,41 @@ def gerar_post(request):
                 'error': f'Rede social inválida. Opções: {", ".join(valid_networks)}'
             }, status=400)
         
-        # Validar formato
-        valid_formats = ['feed', 'stories', 'both']
-        if formato not in valid_formats:
-            return JsonResponse({
-                'success': False,
-                'error': f'Formato inválido. Opções: {", ".join(valid_formats)}'
-            }, status=400)
+        # Buscar PostFormat se fornecido (NOVO)
+        post_format = None
+        if post_format_id:
+            try:
+                post_format = PostFormat.objects.get(id=post_format_id, is_active=True)
+                # Derivar formato legado do PostFormat
+                formato_name = post_format.name.lower()
+                if 'stories' in formato_name or 'status' in formato_name:
+                    formato = 'stories'
+                    formats = ['stories']
+                elif 'reels' in formato_name:
+                    formato = 'reels'
+                    formats = ['reels']
+                else:
+                    formato = 'feed'
+                    formats = ['feed']
+            except PostFormat.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Formato selecionado não encontrado'
+                }, status=400)
+        else:
+            # LEGADO: validar formato string (retrocompatibilidade)
+            valid_formats = ['feed', 'stories', 'both']
+            if formato not in valid_formats:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Formato inválido. Opções: {", ".join(valid_formats)}'
+                }, status=400)
+            
+            # Preparar formatos (lista)
+            if formato == 'both':
+                formats = ['feed', 'stories']
+            else:
+                formats = [formato]
         
         # Validar quantidade de imagens
         if is_carousel:
@@ -87,12 +116,6 @@ def gerar_post(request):
                     'success': False,
                     'error': 'Quantidade de imagens deve ser entre 2 e 5'
                 }, status=400)
-        
-        # Preparar formatos (lista)
-        if formato == 'both':
-            formats = ['feed', 'stories']
-        else:
-            formats = [formato]
         
         # Determinar content_type baseado no formato
         if is_carousel:
@@ -114,6 +137,7 @@ def gerar_post(request):
                 social_network=rede_social,
                 content_type=content_type,
                 formats=formats,
+                post_format=post_format,  # NOVO: FK para PostFormat
                 cta_requested=cta_requested,
                 is_carousel=is_carousel,
                 image_count=image_count if is_carousel else 1,

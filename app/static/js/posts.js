@@ -272,6 +272,8 @@
     temaPost: document.getElementById('temaPost'),
     temaContador: document.getElementById('temaContador'),
     formatOptions: document.getElementById('formatOptions'),
+    formatoSelect: null, // Será criado dinamicamente
+    formatoDimensions: null, // Será criado dinamicamente
     carrosselToggle: document.getElementById('carrosselToggle'),
     carrosselQtyField: document.getElementById('carrosselQtyField'),
     carrosselQtyInput: document.getElementById('qtdImagens'),
@@ -346,6 +348,94 @@
   }
 
   // ============================================================================
+  // SELECT DINÂMICO DE FORMATOS
+  // ============================================================================
+
+  /**
+   * Substitui pills de formato por select dinâmico
+   */
+  function initFormatoSelect() {
+    if (!dom.formatOptions) return;
+    
+    // Criar select e campo de dimensões
+    const selectHTML = `
+      <select id="formatoSelect" name="post_format_id" class="form-select" required>
+        <option value="">Selecione a rede social primeiro...</option>
+      </select>
+      <small class="help-text mt-2" style="display: block; color: #666;">
+        Dimensões: <span id="formatoDimensions">-</span>
+      </small>
+    `;
+    
+    // Substituir conteúdo
+    dom.formatOptions.innerHTML = selectHTML;
+    
+    // Atualizar referências DOM
+    dom.formatoSelect = document.getElementById('formatoSelect');
+    dom.formatoDimensions = document.getElementById('formatoDimensions');
+    
+    // Desabilitar select inicialmente
+    if (dom.formatoSelect) {
+      dom.formatoSelect.disabled = true;
+    }
+  }
+
+  /**
+   * Carrega formatos disponíveis para uma rede social
+   */
+  async function loadPostFormats(redeSocial) {
+    if (!dom.formatoSelect) return;
+    
+    if (!redeSocial) {
+      dom.formatoSelect.innerHTML = '<option value="">Selecione a rede social primeiro...</option>';
+      dom.formatoSelect.disabled = true;
+      if (dom.formatoDimensions) dom.formatoDimensions.textContent = '-';
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/posts/api/formatos/?rede_social=${redeSocial}`);
+      const data = await response.json();
+      
+      if (data.success && data.formatos && data.formatos.length > 0) {
+        const options = data.formatos.map(f => 
+          `<option value="${f.id}" data-dimensions="${f.dimensions}" data-aspect="${f.aspect_ratio}">
+            ${f.name} (${f.aspect_ratio})
+          </option>`
+        ).join('');
+        
+        dom.formatoSelect.innerHTML = options;
+        dom.formatoSelect.disabled = false;
+        
+        // Selecionar primeiro formato e mostrar dimensões
+        if (data.formatos[0]) {
+          if (dom.formatoDimensions) {
+            dom.formatoDimensions.textContent = data.formatos[0].dimensions;
+          }
+        }
+      } else {
+        dom.formatoSelect.innerHTML = '<option value="">Nenhum formato disponível</option>';
+        dom.formatoSelect.disabled = true;
+      }
+    } catch (error) {
+      console.error('Erro ao carregar formatos:', error);
+      dom.formatoSelect.innerHTML = '<option value="">Erro ao carregar formatos</option>';
+      dom.formatoSelect.disabled = true;
+    }
+  }
+
+  /**
+   * Atualiza dimensões quando formato é alterado
+   */
+  function updateFormatoDimensions() {
+    if (!dom.formatoSelect || !dom.formatoDimensions) return;
+    
+    const selected = dom.formatoSelect.selectedOptions[0];
+    const dimensions = selected?.dataset.dimensions || '-';
+    dom.formatoDimensions.textContent = dimensions;
+  }
+
+  // ============================================================================
   // GERENCIAMENTO DE MODAIS
   // ============================================================================
 
@@ -379,10 +469,27 @@
       if (id === 'modalGerarPost') {
         resetGerarPostForm();
         updateTemaCounter();
+        initFormatoSelect(); // Inicializar select dinâmico
       }
       
       openModal(id);
     });
+  });
+
+  // Event listener para mudança de rede social (carregar formatos)
+  if (dom.redePost) {
+    dom.redePost.addEventListener('change', async (e) => {
+      const redeSocial = e.target.value;
+      await loadPostFormats(redeSocial);
+    });
+  }
+
+  // Event listener para mudança de formato (atualizar dimensões)
+  // Será adicionado dinamicamente após criar o select
+  document.addEventListener('change', (e) => {
+    if (e.target && e.target.id === 'formatoSelect') {
+      updateFormatoDimensions();
+    }
   });
 
   // Event listeners para fechar modais
@@ -609,10 +716,14 @@
     // O Django cria o post e envia para N8N com todos os dados necessários (knowledge_base, etc)
     const endpoint = '/posts/gerar/';
     
+    // Obter post_format_id do select (NOVO)
+    const postFormatId = dom.formatoSelect?.value || null;
+    
     // Preparar payload JSON para Django
     const jsonPayload = {
       rede_social: payload.rede?.toLowerCase() || 'instagram',
-      formato: payload.formatos?.[0] || 'feed',
+      post_format_id: postFormatId, // NOVO: ID do PostFormat
+      formato: payload.formatos?.[0] || 'feed', // LEGADO: manter para retrocompatibilidade
       cta_requested: payload.ctaRequested || false,
       is_carousel: payload.carrossel || false,
       image_count: payload.qtdImagens || 1,

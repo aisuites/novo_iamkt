@@ -1,10 +1,13 @@
 from django.urls import path
-from . import views, views_upload, views_gerar, views_actions, views_webhook
+from . import views, views_upload, views_gerar, views_actions, views_webhook, views_api
 
 app_name = 'posts'
 
 urlpatterns = [
     path('', views.posts_list, name='list'),
+    
+    # API
+    path('api/formatos/', views_api.get_post_formats, name='api_formatos'),
     
     # Gerar Post
     path('gerar/', views_gerar.gerar_post, name='gerar'),
