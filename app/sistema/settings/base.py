@@ -11,6 +11,9 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv())
 
+# ENVIRONMENT
+ENVIRONMENT = config('ENVIRONMENT', default='production')
+
 # APPLICATION DEFINITION
 DJANGO_APPS = [
     'django.contrib.admin',

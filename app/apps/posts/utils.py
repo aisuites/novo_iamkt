@@ -202,7 +202,9 @@ def _notify_image_request_email(post, request=None):
     deadline = _calculate_image_deadline(requested_at)
     deadline_formatted = deadline.strftime('%d/%m/%y às %H:%M')
     
-    subject = f'🎨 Nova solicitação de imagem - Post #{post.id}'
+    # Adicionar prefixo [DEV] ou [PROD] baseado no ambiente
+    env_prefix = '[DEV]' if settings.ENVIRONMENT == 'development' else '[PROD]'
+    subject = f'{env_prefix} 🎨 Nova solicitação de imagem - Post #{post.id}'
     
     context = {
         'post': post,
@@ -264,7 +266,9 @@ def _notify_revision_request(post, message, payload=None, user=None, request=Non
     deadline = _calculate_image_deadline(requested_at)
     deadline_formatted = deadline.strftime('%d/%m/%y às %H:%M')
     
-    subject = f'🔄 Solicitação de alteração de imagem - Post #{post.id}'
+    # Adicionar prefixo [DEV] ou [PROD] baseado no ambiente
+    env_prefix = '[DEV]' if settings.ENVIRONMENT == 'development' else '[PROD]'
+    subject = f'{env_prefix} 🔄 Solicitação de alteração de imagem - Post #{post.id}'
     
     context = {
         'post': post,
