@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
+from django.urls import reverse
 import requests
 from apps.core.models import Organization
 from django.utils import timezone
@@ -65,7 +66,7 @@ def gerar_pauta_n8n(request):
             'marketing_input_summary': marketing_input_summary,
             'timestamp': timezone.now().isoformat(),
             'source': 'pautas_gerar_form',
-            'webhook_return_url': f'https://iamkt-femmeintegra.aisuites.com.br/pautas/webhook/n8n/?organization_id={organization.id}&user_id={request.user.id}&rede_social={rede_social}'
+            'webhook_return_url': f"{settings.SITE_URL}{reverse('pautas:n8n_webhook')}?organization_id={organization.id}&user_id={request.user.id}&rede_social={rede_social}"
         }
         
         # Enviar para N8N
