@@ -103,17 +103,21 @@ def generate_image(request, post_id):
         
         message = (payload_data.get('mensagem') or payload_data.get('message') or '').strip()
         
-        # Verificar limite de alterações de imagem
-        image_change_count = post.change_requests.filter(
-            change_type=PostChangeRequest.ChangeType.IMAGE,
-            is_initial=False
-        ).count()
+        # Verificar limite de alterações de imagem (configurável por organização)
+        max_revisions = post.organization.max_image_revisions
         
-        if message and image_change_count >= 1:
-            return JsonResponse({
-                'success': False,
-                'error': 'Limite de solicitações de imagem atingido.'
-            }, status=400)
+        # Se max_revisions = 0, permite ilimitado
+        if max_revisions > 0:
+            image_change_count = post.change_requests.filter(
+                change_type=PostChangeRequest.ChangeType.IMAGE,
+                is_initial=False
+            ).count()
+            
+            if message and image_change_count >= max_revisions:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Limite de {max_revisions} alteração(ões) de imagem atingido para esta organização.'
+                }, status=400)
         
         # Atualizar status para image_generating se necessário
         if post.status != 'image_generating':

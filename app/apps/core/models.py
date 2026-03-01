@@ -450,6 +450,13 @@ class Organization(TimeStampedModel):
         verbose_name='Vídeos Avatar Habilitados'
     )
     
+    # Limite de Alterações de Imagem
+    max_image_revisions = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Número máximo de alterações de imagem permitidas por post (0 = ilimitado)",
+        verbose_name='Máx. Alterações de Imagem'
+    )
+    
     # Módulos/Ferramentas Contratadas
     pautas_enabled = models.BooleanField(
         default=True,  # Habilitado por padrão

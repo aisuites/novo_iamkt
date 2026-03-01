@@ -162,8 +162,10 @@ class OrganizationAdmin(admin.ModelAdmin):
             'fields': (
                 'quota_pautas_dia',
                 'quota_posts_dia',
-                'quota_posts_mes'
-            )
+                'quota_posts_mes',
+                'max_image_revisions'
+            ),
+            'description': 'Limites de criação de conteúdo e alterações de imagem'
         }),
         ('Quotas de Vídeos Avatar', {
             'fields': (
