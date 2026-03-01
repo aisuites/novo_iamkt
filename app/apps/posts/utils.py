@@ -270,14 +270,33 @@ def _notify_revision_request(post, message, payload=None, user=None, request=Non
     env_prefix = '[DEV]' if settings.ENVIRONMENT == 'development' else '[PROD]'
     subject = f'{env_prefix} 🔄 Solicitação de alteração de imagem - Post #{post.id}'
     
+    # Buscar imagens atuais do post (generated_images)
+    current_images = []
+    if hasattr(post, 'generated_images') and post.generated_images:
+        for idx, img in enumerate(post.generated_images):
+            s3_key = img.get('s3_key') or img.get('key')
+            if s3_key:
+                signed_url = get_signed_url(s3_key, expiration=86400)  # 24 horas
+                if signed_url:
+                    current_images.append({
+                        'url': signed_url,
+                        'order': idx,
+                    })
+    
     context = {
         'post': post,
         'message': message,
         'organization': post.organization,
         'requester_name': user.get_full_name() if user else 'Usuário',
         'post_url': f"{settings.SITE_URL}/admin/posts/post/{post.id}/change/" if hasattr(settings, 'SITE_URL') else '',
+        'admin_url': f"{settings.SITE_URL}/admin/posts/post/{post.id}/change/" if hasattr(settings, 'SITE_URL') else '',
         'requested_at': requested_at,
         'deadline': deadline_formatted,
+        # Dados adicionais (mesmos da solicitação de imagem)
+        'current_images': current_images,
+        'logos': _get_organization_logos(post.organization),
+        'kb_references': _get_kb_reference_images(post.organization),
+        'post_references': _get_post_reference_images(post),
     }
     
     try:
