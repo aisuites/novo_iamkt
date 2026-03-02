@@ -197,20 +197,28 @@ def create_reference_image(request):
         }
     """
     try:
+        import logging
+        logger = logging.getLogger(__name__)
+        
         organization = request.organization
         
         data = json.loads(request.body)
         name = data.get('name')
         s3_key = data.get('s3Key')
         
+        logger.info(f"🔍 [CREATE_REFERENCE] Recebido - name: {name}, s3_key: {s3_key}, org_id: {organization.id}")
+        
         if not all([name, s3_key]):
+            logger.warning(f"❌ [CREATE_REFERENCE] Parâmetros faltando - name: {name}, s3_key: {s3_key}")
             return JsonResponse({
                 'success': False,
                 'error': 'Parâmetros obrigatórios: name, s3Key'
             }, status=400)
         
         # Validar que s3_key pertence à organização
+        logger.debug(f"🔍 [CREATE_REFERENCE] Validando acesso - s3_key: {s3_key}, org_id: {organization.id}")
         S3Service.validate_organization_access(s3_key, organization.id)
+        logger.debug(f"✅ [CREATE_REFERENCE] Validação OK")
         
         # Gerar URL pública
         s3_url = S3Service.get_public_url(s3_key)
