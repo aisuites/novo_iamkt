@@ -1,14 +1,75 @@
 """
-Views para upload de imagens de referência para Posts usando S3 Presigned URLs
+Views para upload de arquivos usando S3 Presigned URLs
+Versão 2.0 - Seguindo guia Django S3 completo
 """
 
 from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
-from django_ratelimit.decorators import ratelimit
-from apps.core.services import S3Service
-from apps.core.utils.upload_validators import FileUploadValidator
+from django.views.decorators.http import require_http_methods
+from apps.core.services.s3_service import S3Service
+from apps.core.validators.file_validator import FileUploadValidator
 import json
+
+
+# ============================================
+# PREVIEW DE IMAGENS
+# ============================================
+
+@login_required
+@require_http_methods(["GET"])
+def get_preview_url(request):
+    """
+    Gera Presigned URL para preview de imagens de posts
+    
+    GET params:
+        - s3_key: Chave do arquivo no S3
+    
+    Returns:
+        {
+            'success': bool,
+            'data': {
+                'previewUrl': str,
+                'expiresIn': int
+            }
+        }
+    """
+    try:
+        s3_key = request.GET.get('s3_key')
+        
+        if not s3_key:
+            return JsonResponse({
+                'success': False,
+                'error': 'Parâmetro s3_key obrigatório'
+            }, status=400)
+        
+        # Validar que arquivo pertence à organização do usuário
+        organization = request.organization
+        S3Service.validate_organization_access(s3_key, organization.id)
+        
+        # Gerar Presigned URL
+        preview_url = S3Service.generate_presigned_download_url(s3_key)
+        
+        return JsonResponse({
+            'success': True,
+            'data': {
+                'previewUrl': preview_url,
+                'expiresIn': S3Service.DOWNLOAD_URL_EXPIRATION
+            }
+        })
+        
+    except ValueError as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=403)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Erro ao gerar preview URL: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': 'Erro ao gerar URL de preview'
+        }, status=500)
 
 
 @login_required

@@ -1143,8 +1143,8 @@
       dom.postImageFrame.appendChild(img);
       
       // Ativar lazyload para a imagem
-      if (window.imagePreviewLoader) {
-        window.imagePreviewLoader.observe(img);
+      if (window.postsImageLoader) {
+        window.postsImageLoader.observe(img);
       }
       
       // Galeria de miniaturas (se houver múltiplas imagens)
@@ -1163,8 +1163,8 @@
           btn.appendChild(thumb);
           
           // Ativar lazyload para miniatura
-          if (window.imagePreviewLoader) {
-            window.imagePreviewLoader.observe(thumb);
+          if (window.postsImageLoader) {
+            window.postsImageLoader.observe(thumb);
           }
           
           btn.addEventListener('click', () => {

@@ -454,19 +454,25 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 </script>
 
 {% load static %}
+<script src="{% static 'js/image-preview-loader.js' %}"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260302-1505"></script>
+<script src="{% static 'js/posts.js' %}?v=20260302-1510"></script>
 <!-- Temporariamente desabilitados para debug -->
 <!-- <script src="{% static 'js/posts-modal.js' %}?v=20260203-0129"></script> -->
 <!-- <script src="{% static 'js/posts-gallery.js' %}?v=20260203-0129"></script> -->
 
 <script>
-// Inicializar lazyload para imagens dos posts
+// Inicializar lazyload para imagens dos posts com endpoint correto
 document.addEventListener('DOMContentLoaded', function() {
-    if (window.imagePreviewLoader) {
-        const postImages = document.querySelectorAll('img[data-lazy-load]');
-        postImages.forEach(img => window.imagePreviewLoader.observe(img));
-    }
+    // Criar ImagePreviewLoader para posts (não usar o global de knowledge)
+    const postsImageLoader = new ImagePreviewLoader('/posts/preview-url/');
+    
+    // Observar todas as imagens de posts
+    const postImages = document.querySelectorAll('img[data-lazy-load]');
+    postImages.forEach(img => postsImageLoader.observe(img));
+    
+    // Expor globalmente para uso dinâmico em posts.js
+    window.postsImageLoader = postsImageLoader;
     
     // Verificar se veio da página de pautas com dados pré-preenchidos
     const params = new URLSearchParams(window.location.search);

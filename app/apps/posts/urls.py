@@ -15,6 +15,9 @@ urlpatterns = [
     # N8N Webhook - Receber post processado
     path('webhook/callback/', views_webhook.n8n_post_callback, name='n8n_post_callback'),
     
+    # Preview de Imagens
+    path('preview-url/', views_upload.get_preview_url, name='preview_url'),
+    
     # Upload S3 - Imagens de Referência
     path('reference/upload-url/', views_upload.generate_reference_upload_url, name='reference_upload_url'),
     path('reference/create/', views_upload.create_reference_image, name='reference_create'),
