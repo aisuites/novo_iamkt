@@ -744,33 +744,69 @@
   async function uploadReferenceImages(files) {
     if (!files || files.length === 0) return [];
     
-    // Verificar se uploadFileToS3 está disponível (de uploads-simple.js)
-    if (typeof uploadFileToS3 !== 'function') {
-      logger.error('[POSTS] uploadFileToS3 não encontrada. Certifique-se de que uploads-simple.js está carregado.');
-      throw new Error('Função de upload não disponível');
+    const uploadedImages = [];
+    
+    for (const file of files) {
+      try {
+        // 1. Obter Presigned URL
+        const urlResponse = await fetch('/knowledge/reference/upload-url/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': CSRF_TOKEN
+          },
+          body: new URLSearchParams({
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size
+          })
+        });
+        
+        if (!urlResponse.ok) {
+          throw new Error('Erro ao obter URL de upload');
+        }
+        
+        const urlData = await urlResponse.json();
+        if (!urlData.success) {
+          throw new Error(urlData.error || 'Erro ao obter URL de upload');
+        }
+        
+        // 2. Upload para S3
+        const uploadHeaders = {
+          'Content-Type': file.type,
+          'x-amz-server-side-encryption': 'AES256',
+          'x-amz-storage-class': 'INTELLIGENT_TIERING',
+          'x-amz-meta-original-name': file.name,
+          'x-amz-meta-organization-id': String(urlData.data.organization_id || '0'),
+          'x-amz-meta-category': 'references',
+          'x-amz-meta-upload-timestamp': Math.floor(Date.now() / 1000).toString()
+        };
+        
+        const s3Response = await fetch(urlData.data.upload_url, {
+          method: 'PUT',
+          body: file,
+          headers: uploadHeaders
+        });
+        
+        if (!s3Response.ok) {
+          throw new Error('Erro ao enviar arquivo para S3');
+        }
+        
+        // 3. NÃO chamar /create/ - apenas retornar dados
+        // Será salvo em PostReferenceImage quando criar o Post
+        uploadedImages.push({
+          s3_key: urlData.data.s3_key,
+          url: urlData.data.upload_url.split('?')[0], // URL sem query params
+          name: file.name
+        });
+        
+      } catch (error) {
+        logger.error('[POSTS] Erro ao fazer upload de imagem:', error);
+        throw error;
+      }
     }
     
-    // Upload de cada arquivo usando função existente
-    // IMPORTANTE: Usar endpoints de knowledge que já funcionam
-    const uploadPromises = files.map(file => 
-      uploadFileToS3(
-        file,
-        'reference',
-        '/knowledge/reference/upload-url/',
-        '/knowledge/reference/create/'
-      )
-    );
-    
-    const results = await Promise.all(uploadPromises);
-    
-    // Retornar array com s3_key e previewUrl (presigned)
-    // IMPORTANTE: Usar previewUrl (presigned) ao invés de s3_url (pública)
-    // porque o bucket S3 é privado
-    return results.map(result => ({
-      s3_key: result.s3_key,
-      url: result.previewUrl,  // URL presigned (válida por 1 hora)
-      name: result.name
-    }));
+    return uploadedImages;
   }
 
   /**

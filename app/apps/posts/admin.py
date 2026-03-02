@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Post, PostImage, PostChangeRequest, PostFormat
+from .models import Post, PostImage, PostReferenceImage, PostChangeRequest, PostFormat
 
 
 class PostImageInline(admin.TabularInline):
@@ -11,9 +11,18 @@ class PostImageInline(admin.TabularInline):
     verbose_name_plural = 'Imagens do Post'
 
 
+class PostReferenceImageInline(admin.TabularInline):
+    model = PostReferenceImage
+    extra = 0
+    fields = ('order', 'original_name', 's3_url', 'created_at')
+    readonly_fields = ('s3_url', 's3_key', 'original_name', 'created_at')
+    verbose_name = 'Imagem de Referência'
+    verbose_name_plural = 'Imagens de Referência'
+
+
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
-    inlines = [PostImageInline]
+    inlines = [PostReferenceImageInline, PostImageInline]
     list_display = [
         'id',
         'title',

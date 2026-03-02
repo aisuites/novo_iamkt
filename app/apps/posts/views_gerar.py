@@ -152,6 +152,19 @@ def gerar_post(request):
                 ia_provider='openai',
                 ia_model_text='gpt-4',
             )
+            
+            # Salvar imagens de referência em PostReferenceImage
+            from apps.posts.models import PostReferenceImage
+            for idx, ref_img in enumerate(reference_images):
+                PostReferenceImage.objects.create(
+                    post=post,
+                    s3_key=ref_img.get('s3_key', ''),
+                    s3_url=ref_img.get('url', ''),
+                    original_name=ref_img.get('name', ''),
+                    order=idx
+                )
+            
+            logger.info(f"Post {post.id} criado com {len(reference_images)} imagens de referência")
         
         # Enviar para N8N (se configurado)
         n8n_success = False

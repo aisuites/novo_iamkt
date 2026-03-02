@@ -293,6 +293,50 @@ class PostImage(models.Model):
         return f"Imagem {self.order} - Post #{self.post.id}"
 
 
+class PostReferenceImage(models.Model):
+    """
+    Imagens de referência anexadas ao solicitar geração de um Post.
+    Diferentes de PostImage (imagens geradas pelo N8N) e ReferenceImage (base de conhecimento).
+    """
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name='reference_image_files',
+        verbose_name='Post'
+    )
+    s3_key = models.CharField(
+        max_length=500,
+        blank=True,
+        verbose_name='Chave S3'
+    )
+    s3_url = models.URLField(
+        max_length=1000,
+        blank=True,
+        verbose_name='URL S3'
+    )
+    original_name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name='Nome Original'
+    )
+    order = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name='Ordem'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Criado em'
+    )
+    
+    class Meta:
+        verbose_name = 'Imagem de Referência do Post'
+        verbose_name_plural = 'Imagens de Referência do Post'
+        ordering = ['order', 'created_at']
+    
+    def __str__(self):
+        return f"Ref {self.order} - Post #{self.post.id} - {self.original_name}"
+
+
 class PostChangeRequest(models.Model):
     """
     Solicitações de alteração de posts (texto ou imagem)
