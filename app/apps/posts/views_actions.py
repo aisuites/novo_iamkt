@@ -272,7 +272,7 @@ def generate_image(request, post_id):
                 
                 # Montar payload para N8N
                 n8n_payload = {
-                    'callback_url': f"{settings.APP_BASE_URL}{reverse('posts:n8n_post_callback')}",
+                    'callback_url': f"{settings.SITE_URL}{reverse('posts:n8n_post_callback')}",
                     'post_id': post.id,
                     'thread_id': post.thread_id or '',
                     'rede_social': post.social_network or 'instagram',
