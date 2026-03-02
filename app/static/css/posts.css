@@ -1617,6 +1617,7 @@
     font-weight: 600;
     color: #374151;
     min-width: 100px;
+    margin-top: 8px;
 }
 
 .chip:hover:not(.chip-disabled) {
