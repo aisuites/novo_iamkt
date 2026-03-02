@@ -74,7 +74,7 @@ def get_preview_url(request):
 
 
 @login_required
-@ratelimit(key='user', rate='20/m', method='POST', block=True)
+# @ratelimit(key='user', rate='20/m', method='POST', block=True)  # Temporariamente desabilitado para debug
 @require_http_methods(["POST"])
 def generate_reference_upload_url(request):
     """
@@ -110,14 +110,15 @@ def generate_reference_upload_url(request):
         organization = request.organization
         
         # Debug: ver o que está chegando
-        logger.info(f"Content-Type: {request.content_type}")
-        logger.info(f"Recebendo requisição de upload de imagem")
+        logger.info(f"🔍 [UPLOAD_URL] Content-Type: {request.content_type}")
+        logger.info(f"🔍 [UPLOAD_URL] request.POST: {dict(request.POST)}")
+        logger.info(f"🔍 [UPLOAD_URL] request.body: {request.body[:200] if request.body else 'empty'}")
         
         file_name = request.POST.get('fileName')
         file_type = request.POST.get('fileType')
         file_size = request.POST.get('fileSize')
         
-        logger.info(f"Parsed - fileName: {file_name}, fileType: {file_type}, fileSize: {file_size}")
+        logger.info(f"🔍 [UPLOAD_URL] Parsed - fileName: {file_name}, fileType: {file_type}, fileSize: {file_size}")
         
         if not all([file_name, file_type, file_size]):
             return JsonResponse({
