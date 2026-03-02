@@ -6,6 +6,7 @@ Versão 2.0 - Seguindo guia Django S3 completo
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
+from django_ratelimit.decorators import ratelimit
 from apps.core.services.s3_service import S3Service
 from apps.core.utils.upload_validators import FileUploadValidator
 import json
