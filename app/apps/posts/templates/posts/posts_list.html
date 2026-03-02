@@ -296,21 +296,13 @@
                 </div>
                 
                 <div class="field">
-                    <label>Formato</label>
-                    <div class="format-options" id="formatOptions" role="radiogroup">
-                        <label class="chip-choice active">
-                            <input type="radio" name="formatOption" value="feed" checked>
-                            <span>Feed</span>
-                        </label>
-                        <label class="chip-choice">
-                            <input type="radio" name="formatOption" value="stories">
-                            <span>Stories</span>
-                        </label>
-                        <label class="chip-choice">
-                            <input type="radio" name="formatOption" value="both">
-                            <span>Feed + Stories</span>
-                        </label>
-                    </div>
+                    <label>Formato *</label>
+                    <select id="formatoSelect" name="post_format_id" class="form-select" required disabled>
+                        <option value="">Selecione a rede social primeiro...</option>
+                    </select>
+                    <small class="help-text" style="display: block; margin-top: 0.5rem; color: #666; font-size: 0.875rem;">
+                        Dimensões: <span id="formatoDimensions">-</span>
+                    </small>
                 </div>
             </div>
             

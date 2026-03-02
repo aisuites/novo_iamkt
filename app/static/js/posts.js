@@ -271,9 +271,8 @@
     redePost: document.getElementById('redePost'),
     temaPost: document.getElementById('temaPost'),
     temaContador: document.getElementById('temaContador'),
-    formatOptions: document.getElementById('formatOptions'),
-    formatoSelect: null, // Será criado dinamicamente
-    formatoDimensions: null, // Será criado dinamicamente
+    formatoSelect: document.getElementById('formatoSelect'),
+    formatoDimensions: document.getElementById('formatoDimensions'),
     carrosselToggle: document.getElementById('carrosselToggle'),
     carrosselQtyField: document.getElementById('carrosselQtyField'),
     carrosselQtyInput: document.getElementById('qtdImagens'),
@@ -350,35 +349,6 @@
   // ============================================================================
   // SELECT DINÂMICO DE FORMATOS
   // ============================================================================
-
-  /**
-   * Substitui pills de formato por select dinâmico
-   */
-  function initFormatoSelect() {
-    if (!dom.formatOptions) return;
-    
-    // Criar select e campo de dimensões
-    const selectHTML = `
-      <select id="formatoSelect" name="post_format_id" class="form-select" required>
-        <option value="">Selecione a rede social primeiro...</option>
-      </select>
-      <small class="help-text mt-2" style="display: block; color: #666;">
-        Dimensões: <span id="formatoDimensions">-</span>
-      </small>
-    `;
-    
-    // Substituir conteúdo
-    dom.formatOptions.innerHTML = selectHTML;
-    
-    // Atualizar referências DOM
-    dom.formatoSelect = document.getElementById('formatoSelect');
-    dom.formatoDimensions = document.getElementById('formatoDimensions');
-    
-    // Desabilitar select inicialmente
-    if (dom.formatoSelect) {
-      dom.formatoSelect.disabled = true;
-    }
-  }
 
   /**
    * Carrega formatos disponíveis para uma rede social
@@ -469,7 +439,6 @@
       if (id === 'modalGerarPost') {
         resetGerarPostForm();
         updateTemaCounter();
-        initFormatoSelect(); // Inicializar select dinâmico
       }
       
       openModal(id);
