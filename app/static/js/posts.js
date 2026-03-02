@@ -822,10 +822,12 @@
     const uploadPromises = files.map(file => uploadReferenceImage(file));
     const results = await Promise.all(uploadPromises);
     
-    // Retornar array com s3_key e s3_url
+    // Retornar array com s3_key e previewUrl (presigned)
+    // IMPORTANTE: Usar previewUrl (presigned) ao invés de s3_url (pública)
+    // porque o bucket S3 é privado
     return results.map(result => ({
       s3_key: result.s3_key,
-      url: result.s3_url,
+      url: result.previewUrl,  // URL presigned (válida por 1 hora)
       name: result.name
     }));
   }
