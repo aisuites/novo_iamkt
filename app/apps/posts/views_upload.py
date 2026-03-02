@@ -7,7 +7,7 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from apps.core.services.s3_service import S3Service
-from apps.core.validators.file_validator import FileUploadValidator
+from apps.core.utils.upload_validators import FileUploadValidator
 import json
 
 
