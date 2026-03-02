@@ -204,8 +204,8 @@ def generate_image(request, post_id):
                         marketing_input_summary = kb.n8n_compilation.get('marketing_input_summary', '')
                     
                     # Público Alvo
-                    if kb.publico_alvo:
-                        publico_alvo = kb.publico_alvo
+                    if kb.publico_externo:
+                        publico_alvo = kb.publico_externo
                     
                     # Paleta de Cores
                     try:
