@@ -1491,7 +1491,18 @@
     grid-template-columns: 1fr 1fr 1fr;
     gap: 20px;
     margin-bottom: 20px;
-    align-items: end;
+    align-items: start;
+}
+
+.modal-row-grid-3 .field {
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-row-grid-3 .field label {
+    min-height: 24px;
+    margin-bottom: 8px;
+    display: block;
 }
 
 /* Formato - Chips */
