@@ -751,12 +751,13 @@
     }
     
     // Upload de cada arquivo usando função existente
+    // IMPORTANTE: Usar endpoints de knowledge que já funcionam
     const uploadPromises = files.map(file => 
       uploadFileToS3(
         file,
         'reference',
-        '/posts/reference/upload-url/',
-        '/posts/reference/create/'
+        '/knowledge/reference/upload-url/',
+        '/knowledge/reference/create/'
       )
     );
     
