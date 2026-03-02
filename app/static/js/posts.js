@@ -738,88 +738,28 @@
   }
 
   /**
-   * Faz upload de uma imagem de referência para S3
-   */
-  async function uploadReferenceImage(file) {
-    try {
-      // 1. Solicitar presigned URL (usando padrão de uploads-simple.js)
-      const urlResponse = await fetch('/posts/reference/upload-url/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'X-CSRFToken': CSRF_TOKEN
-        },
-        body: new URLSearchParams({
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size
-        })
-      });
-      
-      if (!urlResponse.ok) {
-        const error = await urlResponse.json();
-        throw new Error(error.error || 'Erro ao gerar URL de upload');
-      }
-      
-      const urlData = await urlResponse.json();
-      
-      if (!urlData.success) {
-        throw new Error(urlData.error || 'Erro ao obter URL de upload');
-      }
-      
-      const { upload_url, s3_key, signed_headers } = urlData.data;
-      
-      // 2. Upload direto para S3
-      // Usar signed_headers retornados pelo backend (padrão de uploads-simple.js)
-      const uploadHeaders = {
-        'Content-Type': file.type,
-        ...(signed_headers || {})
-      };
-      
-      const uploadResponse = await fetch(upload_url, {
-        method: 'PUT',
-        headers: uploadHeaders,
-        body: file
-      });
-      
-      if (!uploadResponse.ok) {
-        throw new Error('Erro ao fazer upload da imagem');
-      }
-      
-      // 3. Confirmar upload
-      const confirmResponse = await fetch('/posts/reference/create/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': CSRF_TOKEN
-        },
-        body: JSON.stringify({
-          name: file.name,
-          s3Key: s3_key
-        })
-      });
-      
-      if (!confirmResponse.ok) {
-        const error = await confirmResponse.json();
-        throw new Error(error.error || 'Erro ao confirmar upload');
-      }
-      
-      const confirmData = await confirmResponse.json();
-      return confirmData.data;
-      
-    } catch (error) {
-      logger.error('[POSTS] Erro ao fazer upload de imagem:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Faz upload de múltiplas imagens de referência
+   * Reutiliza função uploadFileToS3 de uploads-simple.js que já funciona
    */
   async function uploadReferenceImages(files) {
     if (!files || files.length === 0) return [];
     
-    const uploadPromises = files.map(file => uploadReferenceImage(file));
+    // Verificar se uploadFileToS3 está disponível (de uploads-simple.js)
+    if (typeof uploadFileToS3 !== 'function') {
+      logger.error('[POSTS] uploadFileToS3 não encontrada. Certifique-se de que uploads-simple.js está carregado.');
+      throw new Error('Função de upload não disponível');
+    }
+    
+    // Upload de cada arquivo usando função existente
+    const uploadPromises = files.map(file => 
+      uploadFileToS3(
+        file,
+        'reference',
+        '/posts/reference/upload-url/',
+        '/posts/reference/create/'
+      )
+    );
+    
     const results = await Promise.all(uploadPromises);
     
     // Retornar array com s3_key e previewUrl (presigned)
