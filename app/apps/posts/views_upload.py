@@ -37,6 +37,14 @@ def generate_reference_upload_url(request):
         import logging
         logger = logging.getLogger(__name__)
         
+        # Verificar se organization existe
+        if not hasattr(request, 'organization') or not request.organization:
+            logger.error("request.organization não encontrado")
+            return JsonResponse({
+                'success': False,
+                'error': 'Organização não encontrada'
+            }, status=400)
+        
         organization = request.organization
         
         # Debug: ver o que está chegando
@@ -88,14 +96,20 @@ def generate_reference_upload_url(request):
         })
         
     except ValueError as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"ValueError em generate_reference_upload_url: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
             'error': str(e)
         }, status=400)
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Exception em generate_reference_upload_url: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
-            'error': 'Erro ao gerar URL de upload'
+            'error': f'Erro ao gerar URL de upload: {str(e)}'
         }, status=500)
 
 
