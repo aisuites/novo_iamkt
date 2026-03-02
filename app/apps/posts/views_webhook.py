@@ -186,23 +186,48 @@ def n8n_post_callback(request):
         
         # Atualizar imagens (se fornecidas)
         if 'imagens' in data and isinstance(data['imagens'], list):
-            # Extrair URLs das imagens
-            image_urls = []
-            for img in data['imagens']:
-                if isinstance(img, dict) and 'url' in img:
-                    image_urls.append(img['url'])
-                elif isinstance(img, str):
-                    image_urls.append(img)
+            from apps.posts.models import PostImage
             
-            if image_urls:
-                # Usar primeira imagem como principal
-                post.image_s3_url = image_urls[0]
-                post.has_image = True
-                logger.debug(f"✏️ [N8N_POST_CALLBACK] Imagem principal atualizada")
+            # Limpar imagens antigas (se houver)
+            post.images.all().delete()
+            
+            # Criar registros de PostImage para cada imagem
+            for idx, img in enumerate(data['imagens']):
+                s3_url = None
+                s3_key = None
                 
-                # Se tiver s3_key, salvar também
-                if isinstance(data['imagens'][0], dict) and 's3_key' in data['imagens'][0]:
-                    post.image_s3_key = data['imagens'][0]['s3_key']
+                if isinstance(img, dict):
+                    s3_url = img.get('url', '')
+                    s3_key = img.get('s3_key', '')
+                elif isinstance(img, str):
+                    s3_url = img
+                    # Tentar extrair s3_key da URL
+                    if 's3.amazonaws.com/' in s3_url or 's3.' in s3_url:
+                        # Extrair key da URL S3
+                        parts = s3_url.split('.com/')
+                        if len(parts) > 1:
+                            s3_key = parts[1].split('?')[0]  # Remover query params
+                            # Decodificar URL encoding
+                            import urllib.parse
+                            s3_key = urllib.parse.unquote(s3_key)
+                
+                if s3_url:
+                    PostImage.objects.create(
+                        post=post,
+                        s3_url=s3_url,
+                        s3_key=s3_key,
+                        order=idx
+                    )
+                    logger.debug(f"✏️ [N8N_POST_CALLBACK] PostImage {idx} criada: {s3_key}")
+            
+            # Atualizar flags do post
+            if post.images.exists():
+                post.has_image = True
+                # Salvar primeira imagem como principal (retrocompatibilidade)
+                first_img = post.images.first()
+                post.image_s3_url = first_img.s3_url
+                post.image_s3_key = first_img.s3_key
+                logger.debug(f"✏️ [N8N_POST_CALLBACK] {post.images.count()} imagens criadas")
         
         # Salvar alterações
         post.save()
