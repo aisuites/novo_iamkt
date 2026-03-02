@@ -12,6 +12,7 @@ import logging
 import requests
 
 from .models import Post
+from apps.core.services.s3_service import S3Service
 
 logger = logging.getLogger(__name__)
 
@@ -171,11 +172,103 @@ def generate_image(request, post_id):
             try:
                 from .utils import _resolve_post_format
                 from django.urls import reverse
+                from apps.knowledge.models import KnowledgeBase
                 
                 logger.info(f"Enviando solicitação de geração de imagem do post {post.id} para N8N...")
                 
                 # Resolver formato da imagem
                 format_data = _resolve_post_format(post)
+                
+                # Buscar Knowledge Base da organização
+                kb = None
+                try:
+                    kb = KnowledgeBase.objects.filter(
+                        organization=request.user.organization
+                    ).first()
+                except Exception as kb_error:
+                    logger.warning(f"Erro ao buscar KB: {kb_error}")
+                
+                # Buscar dados de design da KB
+                kb_data = {}
+                paleta = []
+                tipografia = []
+                referencias = {'logos': [], 'kb_images': [], 'post_images': []}
+                
+                if kb:
+                    # Marketing Input Summary
+                    kb_data = {
+                        'kb_id': kb.id,
+                        'company_name': kb.nome_empresa or '',
+                        'marketing_input_summary': ''
+                    }
+                    
+                    if kb.n8n_compilation and isinstance(kb.n8n_compilation, dict):
+                        kb_data['marketing_input_summary'] = kb.n8n_compilation.get('marketing_input_summary', '')
+                    
+                    # Paleta de Cores
+                    try:
+                        colors = kb.colors.filter(is_active=True).order_by('order')
+                        for color in colors:
+                            paleta.append({
+                                'name': color.name,
+                                'hex_code': color.hex_code,
+                                'color_type': color.color_type or 'primary'
+                            })
+                    except Exception as color_error:
+                        logger.warning(f"Erro ao buscar cores: {color_error}")
+                    
+                    # Tipografia
+                    try:
+                        fonts = kb.typography_settings.all().order_by('order')
+                        for font in fonts:
+                            tipografia.append({
+                                'usage': font.usage,
+                                'font_name': font.font_name,
+                                'font_variant': font.font_variant or 'regular',
+                                'font_source': font.font_source or 'google'
+                            })
+                    except Exception as font_error:
+                        logger.warning(f"Erro ao buscar fontes: {font_error}")
+                    
+                    # Referências - Logos (com URLs presigned)
+                    try:
+                        logos = kb.logos.filter(is_active=True).order_by('-is_primary', 'logo_type')
+                        for logo in logos:
+                            if logo.s3_key:
+                                try:
+                                    # Gerar URL presigned (válida por 1 hora)
+                                    presigned_url = S3Service.get_download_url(logo.s3_key, expires_in=3600)
+                                    referencias['logos'].append({
+                                        'logo_type': logo.logo_type,
+                                        'url': presigned_url,
+                                        'is_primary': logo.is_primary
+                                    })
+                                except Exception as url_error:
+                                    logger.warning(f"Erro ao gerar URL presigned para logo {logo.id}: {url_error}")
+                    except Exception as logo_error:
+                        logger.warning(f"Erro ao buscar logos: {logo_error}")
+                    
+                    # Referências - Imagens KB (com URLs presigned)
+                    try:
+                        kb_images = kb.reference_images.filter(is_active=True).order_by('order')
+                        for img in kb_images:
+                            if img.s3_key:
+                                try:
+                                    # Gerar URL presigned (válida por 1 hora)
+                                    presigned_url = S3Service.get_download_url(img.s3_key, expires_in=3600)
+                                    referencias['kb_images'].append({
+                                        'url': presigned_url,
+                                        'description': img.description or '',
+                                        'category': img.category or ''
+                                    })
+                                except Exception as url_error:
+                                    logger.warning(f"Erro ao gerar URL presigned para imagem KB {img.id}: {url_error}")
+                    except Exception as ref_error:
+                        logger.warning(f"Erro ao buscar imagens de referência: {ref_error}")
+                
+                # Referências do Post (se houver)
+                if post.reference_images and isinstance(post.reference_images, list):
+                    referencias['post_images'] = post.reference_images
                 
                 # Montar payload para N8N
                 n8n_payload = {
@@ -190,6 +283,12 @@ def generate_image(request, post_id):
                     'subtitulo': post.subtitle or '',
                     'cta': post.cta or '',
                     'prompt': post.image_prompt or '',
+                    
+                    # NOVO: Dados da Knowledge Base
+                    'knowledge_base': kb_data,
+                    'paleta': paleta,
+                    'tipografia': tipografia,
+                    'referencias': referencias,
                 }
                 
                 # Adicionar mensagem de alteração se houver
