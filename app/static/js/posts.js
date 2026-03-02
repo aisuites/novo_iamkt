@@ -678,6 +678,90 @@
   }
 
   /**
+   * Faz upload de uma imagem de referência para S3
+   */
+  async function uploadReferenceImage(file) {
+    try {
+      // 1. Solicitar presigned URL
+      const formData = new FormData();
+      formData.append('fileName', file.name);
+      formData.append('fileType', file.type);
+      formData.append('fileSize', file.size);
+      
+      const urlResponse = await fetch('/posts/reference/upload-url/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': CSRF_TOKEN
+        },
+        body: formData
+      });
+      
+      if (!urlResponse.ok) {
+        const error = await urlResponse.json();
+        throw new Error(error.error || 'Erro ao gerar URL de upload');
+      }
+      
+      const urlData = await urlResponse.json();
+      const { upload_url, s3_key } = urlData.data;
+      
+      // 2. Upload direto para S3
+      const uploadResponse = await fetch(upload_url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type
+        },
+        body: file
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Erro ao fazer upload da imagem');
+      }
+      
+      // 3. Confirmar upload
+      const confirmResponse = await fetch('/posts/reference/create/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF_TOKEN
+        },
+        body: JSON.stringify({
+          name: file.name,
+          s3Key: s3_key
+        })
+      });
+      
+      if (!confirmResponse.ok) {
+        const error = await confirmResponse.json();
+        throw new Error(error.error || 'Erro ao confirmar upload');
+      }
+      
+      const confirmData = await confirmResponse.json();
+      return confirmData.data;
+      
+    } catch (error) {
+      logger.error('[POSTS] Erro ao fazer upload de imagem:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Faz upload de múltiplas imagens de referência
+   */
+  async function uploadReferenceImages(files) {
+    if (!files || files.length === 0) return [];
+    
+    const uploadPromises = files.map(file => uploadReferenceImage(file));
+    const results = await Promise.all(uploadPromises);
+    
+    // Retornar array com s3_key e s3_url
+    return results.map(result => ({
+      s3_key: result.s3_key,
+      url: result.s3_url,
+      name: result.name
+    }));
+  }
+
+  /**
    * Envia requisição para gerar post
    */
   async function requestPostFromAgent(payload) {
@@ -697,7 +781,7 @@
       is_carousel: payload.carrossel || false,
       image_count: payload.qtdImagens || 1,
       tema: payload.tema || '',
-      reference_images: payload.files || []
+      reference_images: payload.referenceImages || [] // Array de {s3_key, url, name}
     };
 
     logger.debug('[POSTS] Enviando post para Django:', endpoint, jsonPayload);
@@ -747,18 +831,37 @@
       const ctaRequested = ctaRadio?.value === 'sim';
       const files = dom.refImgs?.files ? Array.from(dom.refImgs.files) : [];
 
-      const payload = {
-        rede,
-        tema,
-        usuario: CURRENT_USER,
-        formatos,
-        carrossel,
-        qtdImagens,
-        ctaRequested,
-        files
-      };
-
       try {
+        // Upload de imagens de referência (se houver)
+        let referenceImages = [];
+        if (files.length > 0) {
+          if (window.toaster) {
+            window.toaster.info(`Fazendo upload de ${files.length} ${files.length === 1 ? 'imagem' : 'imagens'}...`);
+          }
+          
+          try {
+            referenceImages = await uploadReferenceImages(files);
+            logger.debug('[POSTS] Imagens de referência enviadas:', referenceImages);
+          } catch (uploadError) {
+            logger.error('[POSTS] Erro ao fazer upload de imagens:', uploadError);
+            if (window.toaster) {
+              window.toaster.error('Erro ao fazer upload das imagens. Tente novamente.');
+            }
+            return; // Abortar envio do post
+          }
+        }
+        
+        const payload = {
+          rede,
+          tema,
+          usuario: CURRENT_USER,
+          formatos,
+          carrossel,
+          qtdImagens,
+          ctaRequested,
+          referenceImages
+        };
+
         const result = await requestPostFromAgent(payload);
         
         logger.debug('[POSTS] Post gerado com sucesso:', result);
