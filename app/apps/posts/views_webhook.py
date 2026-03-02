@@ -232,7 +232,6 @@ def n8n_post_callback(request):
                     
                     # Upload para bucket correto usando S3Service
                     import boto3
-                    from django.conf import settings
                     
                     s3_client = boto3.client(
                         's3',
