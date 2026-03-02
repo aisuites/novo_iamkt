@@ -187,38 +187,92 @@ def n8n_post_callback(request):
         # Atualizar imagens (se fornecidas)
         if 'imagens' in data and isinstance(data['imagens'], list):
             from apps.posts.models import PostImage
+            from apps.core.services.s3_service import S3Service
+            import requests
+            import time
+            from io import BytesIO
             
             # Limpar imagens antigas (se houver)
             post.images.all().delete()
             
             # Criar registros de PostImage para cada imagem
             for idx, img in enumerate(data['imagens']):
-                s3_url = None
-                s3_key = None
+                original_url = None
                 
                 if isinstance(img, dict):
-                    s3_url = img.get('url', '')
-                    s3_key = img.get('s3_key', '')
+                    original_url = img.get('url', '')
                 elif isinstance(img, str):
-                    s3_url = img
-                    # Tentar extrair s3_key da URL
-                    if 's3.amazonaws.com/' in s3_url or 's3.' in s3_url:
-                        # Extrair key da URL S3
-                        parts = s3_url.split('.com/')
-                        if len(parts) > 1:
-                            s3_key = parts[1].split('?')[0]  # Remover query params
-                            # Decodificar URL encoding
-                            import urllib.parse
-                            s3_key = urllib.parse.unquote(s3_key)
+                    original_url = img
                 
-                if s3_url:
+                if not original_url:
+                    continue
+                
+                try:
+                    # Fazer download da imagem do N8N
+                    logger.debug(f"📥 [N8N_POST_CALLBACK] Baixando imagem {idx} de: {original_url[:80]}...")
+                    response = requests.get(original_url, timeout=30)
+                    response.raise_for_status()
+                    
+                    # Detectar tipo de conteúdo
+                    content_type = response.headers.get('Content-Type', 'image/png')
+                    
+                    # Gerar extensão baseada no content-type
+                    ext_map = {
+                        'image/jpeg': '.jpg',
+                        'image/jpg': '.jpg',
+                        'image/png': '.png',
+                        'image/gif': '.gif',
+                        'image/webp': '.webp'
+                    }
+                    file_ext = ext_map.get(content_type, '.png')
+                    
+                    # Gerar s3_key no bucket correto (mesmo padrão do admin)
+                    timestamp = int(time.time() * 1000)
+                    s3_key = f"org-{post.organization.id}/posts/generated/{timestamp}-n8n-generated{file_ext}"
+                    
+                    # Upload para bucket correto usando S3Service
+                    import boto3
+                    from django.conf import settings
+                    
+                    s3_client = boto3.client(
+                        's3',
+                        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                        region_name=settings.AWS_REGION
+                    )
+                    
+                    s3_client.put_object(
+                        Bucket=settings.AWS_BUCKET_NAME,
+                        Key=s3_key,
+                        Body=response.content,
+                        ContentType=content_type,
+                        ServerSideEncryption='AES256',
+                        StorageClass='INTELLIGENT_TIERING',
+                        Metadata={
+                            'original-url': original_url[:200],
+                            'organization-id': str(post.organization.id),
+                            'category': 'posts',
+                            'source': 'n8n',
+                            'upload-timestamp': str(timestamp)
+                        }
+                    )
+                    
+                    # Gerar URL pública
+                    s3_url = S3Service.get_public_url(s3_key)
+                    
+                    # Criar PostImage
                     PostImage.objects.create(
                         post=post,
                         s3_url=s3_url,
                         s3_key=s3_key,
                         order=idx
                     )
-                    logger.debug(f"✏️ [N8N_POST_CALLBACK] PostImage {idx} criada: {s3_key}")
+                    logger.info(f"✅ [N8N_POST_CALLBACK] Imagem {idx} re-uploaded para bucket correto: {s3_key}")
+                    
+                except Exception as e:
+                    logger.error(f"❌ [N8N_POST_CALLBACK] Erro ao processar imagem {idx}: {str(e)}", exc_info=True)
+                    # Continuar com próxima imagem
+                    continue
             
             # Atualizar flags do post
             if post.images.exists():
@@ -227,7 +281,7 @@ def n8n_post_callback(request):
                 first_img = post.images.first()
                 post.image_s3_url = first_img.s3_url
                 post.image_s3_key = first_img.s3_key
-                logger.debug(f"✏️ [N8N_POST_CALLBACK] {post.images.count()} imagens criadas")
+                logger.info(f"✅ [N8N_POST_CALLBACK] {post.images.count()} imagens processadas e salvas no bucket correto")
         
         # Salvar alterações
         post.save()
