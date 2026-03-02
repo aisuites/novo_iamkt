@@ -278,6 +278,7 @@
     carrosselQtyInput: document.getElementById('qtdImagens'),
     refImgs: document.getElementById('refImgs'),
     refImgsInfo: document.getElementById('refImgsInfo'),
+    refImgsPreview: document.getElementById('refImgsPreview'),
     
     // Campos do formulário Editar Post
     editTitulo: document.getElementById('editTitulo'),
@@ -509,6 +510,65 @@
       ? `${files.length} ${files.length === 1 ? 'arquivo selecionado' : 'arquivos selecionados'}`
       : 'Nenhum arquivo selecionado';
     dom.refImgsInfo.textContent = `${label} — Máx. 5 imagens (.JPG ou .PNG)`;
+    
+    // Mostrar miniaturas
+    showImagePreviews(files);
+  }
+
+  /**
+   * Mostra miniaturas das imagens selecionadas
+   */
+  function showImagePreviews(files) {
+    if (!dom.refImgsPreview) return;
+    
+    // Limpar preview anterior
+    dom.refImgsPreview.innerHTML = '';
+    
+    if (files.length === 0) return;
+    
+    files.forEach((file, index) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        const preview = document.createElement('div');
+        preview.className = 'image-preview-item';
+        preview.style.cssText = 'display: inline-block; margin: 8px; position: relative;';
+        
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.style.cssText = 'width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd;';
+        img.alt = file.name;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.innerHTML = '×';
+        removeBtn.style.cssText = 'position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; background: #ff4444; color: white; border: none; cursor: pointer; font-size: 18px; line-height: 1; padding: 0;';
+        removeBtn.title = 'Remover imagem';
+        removeBtn.onclick = () => removeImage(index);
+        
+        preview.appendChild(img);
+        preview.appendChild(removeBtn);
+        dom.refImgsPreview.appendChild(preview);
+      };
+      
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Remove uma imagem da seleção
+   */
+  function removeImage(index) {
+    if (!dom.refImgs) return;
+    
+    const files = Array.from(dom.refImgs.files || []);
+    files.splice(index, 1);
+    
+    const dt = new DataTransfer();
+    files.forEach(file => dt.items.add(file));
+    dom.refImgs.files = dt.files;
+    
+    updateRefsInfo();
   }
 
   /**
