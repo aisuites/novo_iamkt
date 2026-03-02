@@ -192,7 +192,7 @@ def generate_image(request, post_id):
                 kb_data = {}
                 paleta = []
                 tipografia = []
-                referencias = {'logos': [], 'kb_images': [], 'post_images': []}
+                referencias = []  # Array unificado de todas as referências
                 
                 if kb:
                     # Marketing Input Summary
@@ -238,7 +238,8 @@ def generate_image(request, post_id):
                                 try:
                                     # Gerar URL presigned (válida por 1 hora)
                                     presigned_url = S3Service.get_download_url(logo.s3_key, expires_in=3600)
-                                    referencias['logos'].append({
+                                    referencias.append({
+                                        'type': 'logo',
                                         'logo_type': logo.logo_type,
                                         'url': presigned_url,
                                         'is_primary': logo.is_primary
@@ -256,7 +257,8 @@ def generate_image(request, post_id):
                                 try:
                                     # Gerar URL presigned (válida por 1 hora)
                                     presigned_url = S3Service.get_download_url(img.s3_key, expires_in=3600)
-                                    referencias['kb_images'].append({
+                                    referencias.append({
+                                        'type': 'reference_image',
                                         'url': presigned_url,
                                         'description': img.description or '',
                                         'category': img.category or ''
@@ -268,7 +270,12 @@ def generate_image(request, post_id):
                 
                 # Referências do Post (se houver)
                 if post.reference_images and isinstance(post.reference_images, list):
-                    referencias['post_images'] = post.reference_images
+                    for ref_img in post.reference_images:
+                        referencias.append({
+                            'type': 'post_image',
+                            'url': ref_img.get('url', '') if isinstance(ref_img, dict) else ref_img,
+                            'description': ref_img.get('description', '') if isinstance(ref_img, dict) else ''
+                        })
                 
                 # Montar payload para N8N
                 n8n_payload = {
