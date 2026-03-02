@@ -742,18 +742,18 @@
    */
   async function uploadReferenceImage(file) {
     try {
-      // 1. Solicitar presigned URL
-      const formData = new FormData();
-      formData.append('fileName', file.name);
-      formData.append('fileType', file.type);
-      formData.append('fileSize', file.size);
-      
+      // 1. Solicitar presigned URL (usando padrão de uploads-simple.js)
       const urlResponse = await fetch('/posts/reference/upload-url/', {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
           'X-CSRFToken': CSRF_TOKEN
         },
-        body: formData
+        body: new URLSearchParams({
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size
+        })
       });
       
       if (!urlResponse.ok) {
@@ -762,14 +762,23 @@
       }
       
       const urlData = await urlResponse.json();
-      const { upload_url, s3_key } = urlData.data;
+      
+      if (!urlData.success) {
+        throw new Error(urlData.error || 'Erro ao obter URL de upload');
+      }
+      
+      const { upload_url, s3_key, signed_headers } = urlData.data;
       
       // 2. Upload direto para S3
+      // Usar signed_headers retornados pelo backend (padrão de uploads-simple.js)
+      const uploadHeaders = {
+        'Content-Type': file.type,
+        ...(signed_headers || {})
+      };
+      
       const uploadResponse = await fetch(upload_url, {
         method: 'PUT',
-        headers: {
-          'Content-Type': file.type
-        },
+        headers: uploadHeaders,
         body: file
       });
       
