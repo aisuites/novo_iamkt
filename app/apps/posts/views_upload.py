@@ -48,9 +48,8 @@ def generate_reference_upload_url(request):
         organization = request.organization
         
         # Debug: ver o que está chegando
-        logger.info(f"POST data: {request.POST}")
         logger.info(f"Content-Type: {request.content_type}")
-        logger.info(f"Body: {request.body[:200] if request.body else 'empty'}")
+        logger.info(f"Recebendo requisição de upload de imagem")
         
         file_name = request.POST.get('fileName')
         file_type = request.POST.get('fileType')
