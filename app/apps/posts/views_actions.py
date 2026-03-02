@@ -207,7 +207,7 @@ def generate_image(request, post_id):
                     
                     # Paleta de Cores
                     try:
-                        colors = kb.colors.filter(is_active=True).order_by('order')
+                        colors = kb.colors.all().order_by('order')
                         for color in colors:
                             paleta.append({
                                 'name': color.name,
@@ -221,10 +221,12 @@ def generate_image(request, post_id):
                     try:
                         fonts = kb.typography_settings.all().order_by('order')
                         for font in fonts:
+                            font_name = font.google_font_name if font.font_source == 'google' else (font.custom_font.name if font.custom_font else '')
+                            font_weight = font.google_font_weight if font.font_source == 'google' else 'regular'
                             tipografia.append({
                                 'usage': font.usage,
-                                'font_name': font.font_name,
-                                'font_variant': font.font_variant or 'regular',
+                                'font_name': font_name,
+                                'font_weight': font_weight,
                                 'font_source': font.font_source or 'google'
                             })
                     except Exception as font_error:
@@ -232,7 +234,7 @@ def generate_image(request, post_id):
                     
                     # Referências - Logos (com URLs presigned)
                     try:
-                        logos = kb.logos.filter(is_active=True).order_by('-is_primary', 'logo_type')
+                        logos = kb.logos.all().order_by('-is_primary', 'logo_type')
                         for logo in logos:
                             if logo.s3_key:
                                 try:
@@ -251,7 +253,7 @@ def generate_image(request, post_id):
                     
                     # Referências - Imagens KB (com URLs presigned)
                     try:
-                        kb_images = kb.reference_images.filter(is_active=True).order_by('order')
+                        kb_images = kb.reference_images.all()
                         for img in kb_images:
                             if img.s3_key:
                                 try:
@@ -261,7 +263,7 @@ def generate_image(request, post_id):
                                         'type': 'reference_image',
                                         'url': presigned_url,
                                         'description': img.description or '',
-                                        'category': img.category or ''
+                                        'title': img.title or ''
                                     })
                                 except Exception as url_error:
                                     logger.warning(f"Erro ao gerar URL presigned para imagem KB {img.id}: {url_error}")
