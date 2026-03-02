@@ -189,30 +189,32 @@ def generate_image(request, post_id):
                     logger.warning(f"Erro ao buscar KB: {kb_error}")
                 
                 # Buscar dados de design da KB
-                kb_data = {}
+                kb_id = None
+                marketing_input_summary = ''
+                publico_alvo = ''
                 paleta = []
                 tipografia = []
                 referencias = []  # Array unificado de todas as referências
                 
                 if kb:
-                    # Marketing Input Summary
-                    kb_data = {
-                        'kb_id': kb.id,
-                        'company_name': kb.nome_empresa or '',
-                        'marketing_input_summary': ''
-                    }
+                    kb_id = str(kb.id)
                     
+                    # Marketing Input Summary
                     if kb.n8n_compilation and isinstance(kb.n8n_compilation, dict):
-                        kb_data['marketing_input_summary'] = kb.n8n_compilation.get('marketing_input_summary', '')
+                        marketing_input_summary = kb.n8n_compilation.get('marketing_input_summary', '')
+                    
+                    # Público Alvo
+                    if kb.publico_alvo:
+                        publico_alvo = kb.publico_alvo
                     
                     # Paleta de Cores
                     try:
                         colors = kb.colors.all().order_by('order')
                         for color in colors:
                             paleta.append({
-                                'name': color.name,
-                                'hex_code': color.hex_code,
-                                'color_type': color.color_type or 'primary'
+                                'nome': color.name,
+                                'hex': color.hex_code,
+                                'tipo': color.color_type or 'primary'
                             })
                     except Exception as color_error:
                         logger.warning(f"Erro ao buscar cores: {color_error}")
@@ -223,11 +225,13 @@ def generate_image(request, post_id):
                         for font in fonts:
                             font_name = font.google_font_name if font.font_source == 'google' else (font.custom_font.name if font.custom_font else '')
                             font_weight = font.google_font_weight if font.font_source == 'google' else 'regular'
+                            font_url = font.google_font_url if font.font_source == 'google' else ''
                             tipografia.append({
-                                'usage': font.usage,
-                                'font_name': font_name,
-                                'font_weight': font_weight,
-                                'font_source': font.font_source or 'google'
+                                'uso': font.usage,
+                                'origem': font.font_source or 'google',
+                                'nome': font_name,
+                                'peso': font_weight,
+                                'url': font_url
                             })
                     except Exception as font_error:
                         logger.warning(f"Erro ao buscar fontes: {font_error}")
@@ -241,10 +245,8 @@ def generate_image(request, post_id):
                                     # Gerar URL presigned (válida por 1 hora)
                                     presigned_url = S3Service.generate_presigned_download_url(logo.s3_key, expires_in=3600)
                                     referencias.append({
-                                        'type': 'logo',
-                                        'logo_type': logo.logo_type,
-                                        'url': presigned_url,
-                                        'is_primary': logo.is_primary
+                                        'tipo': 'logotipo',
+                                        'url': presigned_url
                                     })
                                 except Exception as url_error:
                                     logger.warning(f"Erro ao gerar URL presigned para logo {logo.id}: {url_error}")
@@ -258,12 +260,10 @@ def generate_image(request, post_id):
                             if img.s3_key:
                                 try:
                                     # Gerar URL presigned (válida por 1 hora)
-                                    presigned_url = S3Service.get_download_url(img.s3_key, expires_in=3600)
+                                    presigned_url = S3Service.generate_presigned_download_url(img.s3_key, expires_in=3600)
                                     referencias.append({
-                                        'type': 'reference_image',
-                                        'url': presigned_url,
-                                        'description': img.description or '',
-                                        'title': img.title or ''
+                                        'tipo': 'referencia',
+                                        'url': presigned_url
                                     })
                                 except Exception as url_error:
                                     logger.warning(f"Erro ao gerar URL presigned para imagem KB {img.id}: {url_error}")
@@ -274,27 +274,32 @@ def generate_image(request, post_id):
                 if post.reference_images and isinstance(post.reference_images, list):
                     for ref_img in post.reference_images:
                         referencias.append({
-                            'type': 'post_image',
-                            'url': ref_img.get('url', '') if isinstance(ref_img, dict) else ref_img,
-                            'description': ref_img.get('description', '') if isinstance(ref_img, dict) else ''
+                            'tipo': 'post_image',
+                            'url': ref_img.get('url', '') if isinstance(ref_img, dict) else ref_img
                         })
+                
+                # Configurações S3
+                s3_bucket = getattr(settings, 'AWS_BUCKET_NAME', '')
+                s3_pasta = f"/org-{request.user.organization.id}/imagensgeradas/" if request.user.organization else '/imagensgeradas/'
                 
                 # Montar payload para N8N
                 n8n_payload = {
                     'callback_url': f"{settings.SITE_URL}{reverse('posts:n8n_post_callback')}",
                     'post_id': post.id,
                     'thread_id': post.thread_id or '',
+                    'kb_id': kb_id or '',
+                    's3_bucket': s3_bucket,
+                    's3_pasta': s3_pasta,
+                    'quantidade': post.image_count or 1,
                     'rede_social': post.social_network or 'instagram',
                     'formato_px': format_data['formato_px'],
                     'aspect_ratio': format_data['aspect_ratio'],
-                    'quantidade': post.image_count or 1,
+                    'publico_alvo': publico_alvo,
                     'titulo': post.title or '',
                     'subtitulo': post.subtitle or '',
                     'cta': post.cta or '',
                     'prompt': post.image_prompt or '',
-                    
-                    # NOVO: Dados da Knowledge Base
-                    'knowledge_base': kb_data,
+                    'marketing_input_summary': marketing_input_summary,
                     'paleta': paleta,
                     'tipografia': tipografia,
                     'referencias': referencias,
