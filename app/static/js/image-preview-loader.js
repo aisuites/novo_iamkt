@@ -46,6 +46,7 @@ class ImagePreviewLoader {
             if (entry.isIntersecting) {
                 const img = entry.target;
                 const s3Key = img.getAttribute('data-lazy-load');
+                const s3Url = img.getAttribute('data-s3-url');
                 
                 // Validar s3Key
                 if (!s3Key || s3Key === 'undefined' || s3Key === '#') {
@@ -60,8 +61,8 @@ class ImagePreviewLoader {
                     // Mostrar loading
                     img.classList.add('loading');
                     
-                    // Obter URL do preview
-                    const previewUrl = await this.getPreviewUrl(s3Key);
+                    // Obter URL do preview (passando s3Url para extrair bucket)
+                    const previewUrl = await this.getPreviewUrl(s3Key, s3Url);
                     
                     // Carregar imagem
                     await this.loadImage(img, previewUrl);
@@ -89,7 +90,7 @@ class ImagePreviewLoader {
     /**
      * Obtém Presigned URL do backend (com cache)
      */
-    async getPreviewUrl(s3Key) {
+    async getPreviewUrl(s3Key, s3Url = null) {
         // Verificar cache
         if (this.cache.has(s3Key)) {
             const cached = this.cache.get(s3Key);
@@ -100,15 +101,18 @@ class ImagePreviewLoader {
             }
         }
         
+        // Construir URL com parâmetros
+        let url = `${this.previewUrlEndpoint}?s3_key=${encodeURIComponent(s3Key)}`;
+        if (s3Url) {
+            url += `&s3_url=${encodeURIComponent(s3Url)}`;
+        }
+        
         // Buscar do backend
-        const response = await fetch(
-            `${this.previewUrlEndpoint}?s3_key=${encodeURIComponent(s3Key)}`,
-            {
-                headers: {
-                    'X-CSRFToken': this.getCookie('csrftoken')
-                }
+        const response = await fetch(url, {
+            headers: {
+                'X-CSRFToken': this.getCookie('csrftoken')
             }
-        );
+        });
         
         if (!response.ok) {
             throw new Error(`Erro HTTP: ${response.status}`);

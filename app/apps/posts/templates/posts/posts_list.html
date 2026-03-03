@@ -233,7 +233,7 @@
                 <div class="post-image-frame" id="postImageFrame">
                     {% if post.images.exists %}
                         {% with first_image=post.images.first %}
-                        <img src="#" alt="Imagem do post" data-lazy-load="{{ first_image.s3_key }}" class="post-main-image">
+                        <img src="#" alt="Imagem do post" data-lazy-load="{{ first_image.s3_key }}" data-s3-url="{{ first_image.s3_url }}" class="post-main-image">
                         {% endwith %}
                     {% else %}
                     <span class="placeholder">SEM IMAGEM GERADA</span>
@@ -245,7 +245,7 @@
                     {% if post.images.count > 1 %}
                         {% for img in post.images.all %}
                         <button type="button" class="gallery-thumb {% if forloop.first %}active{% endif %}" data-image-index="{{ forloop.counter0 }}" data-s3-key="{{ img.s3_key }}">
-                            <img src="#" alt="Miniatura {{ forloop.counter }}" data-lazy-load="{{ img.s3_key }}">
+                            <img src="#" alt="Miniatura {{ forloop.counter }}" data-lazy-load="{{ img.s3_key }}" data-s3-url="{{ img.s3_url }}">
                         </button>
                         {% endfor %}
                     {% endif %}
@@ -454,7 +454,7 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 </script>
 
 {% load static %}
-<script src="{% static 'js/image-preview-loader.js' %}"></script>
+<script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
 <script src="{% static 'js/posts.js' %}?v=20260303-0334"></script>
 <!-- Temporariamente desabilitados para debug -->

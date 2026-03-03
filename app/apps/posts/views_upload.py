@@ -24,6 +24,7 @@ def get_preview_url(request):
     
     GET params:
         - s3_key: Chave do arquivo no S3
+        - s3_url: URL completa do S3 (opcional, para extrair bucket)
     
     Returns:
         {
@@ -36,6 +37,7 @@ def get_preview_url(request):
     """
     try:
         s3_key = request.GET.get('s3_key')
+        s3_url = request.GET.get('s3_url')
         
         if not s3_key:
             return JsonResponse({
@@ -47,8 +49,16 @@ def get_preview_url(request):
         organization = request.organization
         S3Service.validate_organization_access(s3_key, organization.id)
         
-        # Gerar Presigned URL
-        preview_url = S3Service.generate_presigned_download_url(s3_key)
+        # Extrair bucket da s3_url se fornecida (suporta múltiplos buckets)
+        bucket = None
+        if s3_url:
+            import re
+            match = re.search(r'https://([^.]+)\.s3', s3_url)
+            if match:
+                bucket = match.group(1)
+        
+        # Gerar Presigned URL (com bucket customizado se extraído)
+        preview_url = S3Service.generate_presigned_download_url(s3_key, bucket=bucket)
         
         return JsonResponse({
             'success': True,

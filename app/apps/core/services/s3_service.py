@@ -264,7 +264,8 @@ class S3Service:
     def generate_presigned_download_url(
         cls,
         s3_key: str,
-        expires_in: Optional[int] = None
+        expires_in: Optional[int] = None,
+        bucket: Optional[str] = None
     ) -> str:
         """
         Gera Presigned URL para download/visualização
@@ -272,6 +273,7 @@ class S3Service:
         Args:
             s3_key: Chave do arquivo no S3
             expires_in: Tempo de expiração em segundos (padrão: 1 hora)
+            bucket: Nome do bucket (opcional, usa AWS_BUCKET_NAME se não fornecido)
             
         Returns:
             URL temporária para download
@@ -282,13 +284,16 @@ class S3Service:
         if expires_in is None:
             expires_in = cls.DOWNLOAD_URL_EXPIRATION
         
+        if bucket is None:
+            bucket = settings.AWS_BUCKET_NAME
+        
         s3_client = cls._get_s3_client()
         
         try:
             return s3_client.generate_presigned_url(
                 ClientMethod='get_object',
                 Params={
-                    'Bucket': settings.AWS_BUCKET_NAME,
+                    'Bucket': bucket,
                     'Key': s3_key
                 },
                 ExpiresIn=expires_in,
