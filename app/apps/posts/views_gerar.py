@@ -227,7 +227,8 @@ def gerar_post(request):
                     'tema': tema,
                     'organization_id': post.organization.id,
                     'cta_requested': 'Sim' if cta_requested else 'Não',
-                    'knowledge_base': knowledge_base_data
+                    'knowledge_base': knowledge_base_data,
+                    'reference_images': [img.get('url') for img in reference_images] if reference_images else []
                 }
                 
                 logger.debug(f"Payload N8N: {n8n_payload}")

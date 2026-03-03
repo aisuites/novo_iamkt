@@ -792,11 +792,31 @@
           throw new Error('Erro ao enviar arquivo para S3');
         }
         
-        // 3. NÃO chamar /create/ - apenas retornar dados
+        // 3. Gerar URL presigned para GET (para enviar ao N8N)
+        const previewResponse = await fetch('/posts/preview-url/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': CSRF_TOKEN
+          },
+          body: new URLSearchParams({
+            s3_key: urlData.data.s3_key
+          })
+        });
+        
+        let previewUrl = urlData.data.upload_url.split('?')[0]; // Fallback: URL pública
+        if (previewResponse.ok) {
+          const previewData = await previewResponse.json();
+          if (previewData.success && previewData.url) {
+            previewUrl = previewData.url; // URL presigned para GET
+          }
+        }
+        
+        // 4. NÃO chamar /create/ - apenas retornar dados
         // Será salvo em PostReferenceImage quando criar o Post
         uploadedImages.push({
           s3_key: urlData.data.s3_key,
-          url: urlData.data.upload_url.split('?')[0], // URL sem query params
+          url: previewUrl, // URL presigned (válida por 1 hora)
           name: file.name
         });
         
