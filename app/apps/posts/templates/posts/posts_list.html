@@ -233,6 +233,7 @@
                 <div class="post-image-frame" id="postImageFrame">
                     {% if post.images.exists %}
                         {% with first_image=post.images.first %}
+                        <!-- DEBUG: s3_url={{ first_image.s3_url|default:"EMPTY" }} -->
                         <img src="#" alt="Imagem do post" data-lazy-load="{{ first_image.s3_key }}" data-s3-url="{{ first_image.s3_url }}" class="post-main-image">
                         {% endwith %}
                     {% else %}
