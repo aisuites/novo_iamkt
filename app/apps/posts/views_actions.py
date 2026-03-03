@@ -236,14 +236,14 @@ def generate_image(request, post_id):
                     except Exception as font_error:
                         logger.warning(f"Erro ao buscar fontes: {font_error}")
                     
-                    # Referências - Logos (com URLs presigned)
+                    # Referências - Logos (com URLs presigned - 24h)
                     try:
                         logos = kb.logos.all().order_by('-is_primary', 'logo_type')
                         for logo in logos:
                             if logo.s3_key:
                                 try:
-                                    # Gerar URL presigned (válida por 1 hora)
-                                    presigned_url = S3Service.generate_presigned_download_url(logo.s3_key, expires_in=3600)
+                                    # Gerar URL presigned (válida por 24 horas)
+                                    presigned_url = S3Service.generate_presigned_download_url(logo.s3_key, expires_in=86400)
                                     referencias.append({
                                         'tipo': 'logotipo',
                                         'url': presigned_url
@@ -253,30 +253,39 @@ def generate_image(request, post_id):
                     except Exception as logo_error:
                         logger.warning(f"Erro ao buscar logos: {logo_error}")
                     
-                    # Referências - Imagens KB (com URLs presigned)
+                    # Referências - Imagens KB (com URLs presigned - 24h)
                     try:
                         kb_images = kb.reference_images.all()
                         for img in kb_images:
                             if img.s3_key:
                                 try:
-                                    # Gerar URL presigned (válida por 1 hora)
-                                    presigned_url = S3Service.generate_presigned_download_url(img.s3_key, expires_in=3600)
+                                    # Gerar URL presigned (válida por 24 horas)
+                                    presigned_url = S3Service.generate_presigned_download_url(img.s3_key, expires_in=86400)
                                     referencias.append({
-                                        'tipo': 'referencia',
+                                        'tipo': 'referencia_kb',
                                         'url': presigned_url
                                     })
                                 except Exception as url_error:
                                     logger.warning(f"Erro ao gerar URL presigned para imagem KB {img.id}: {url_error}")
                     except Exception as ref_error:
-                        logger.warning(f"Erro ao buscar imagens de referência: {ref_error}")
+                        logger.warning(f"Erro ao buscar imagens de referência KB: {ref_error}")
                 
-                # Referências do Post (se houver)
-                if post.reference_images and isinstance(post.reference_images, list):
-                    for ref_img in post.reference_images:
-                        referencias.append({
-                            'tipo': 'post_image',
-                            'url': ref_img.get('url', '') if isinstance(ref_img, dict) else ref_img
-                        })
+                # Referências do Post (PostReferenceImage - com URLs presigned - 24h)
+                try:
+                    post_ref_images = post.reference_image_files.all()
+                    for ref_img in post_ref_images:
+                        if ref_img.s3_key:
+                            try:
+                                # Gerar URL presigned (válida por 24 horas)
+                                presigned_url = S3Service.generate_presigned_download_url(ref_img.s3_key, expires_in=86400)
+                                referencias.append({
+                                    'tipo': 'referencia_post',
+                                    'url': presigned_url
+                                })
+                            except Exception as url_error:
+                                logger.warning(f"Erro ao gerar URL presigned para imagem post {ref_img.id}: {url_error}")
+                except Exception as post_ref_error:
+                    logger.warning(f"Erro ao buscar imagens de referência do post: {post_ref_error}")
                 
                 # Configurações S3
                 s3_bucket = getattr(settings, 'AWS_BUCKET_NAME', '')
