@@ -74,7 +74,6 @@ def get_preview_url(request):
 
 
 @login_required
-# @ratelimit(key='user', rate='20/m', method='POST', block=True)  # Temporariamente desabilitado para debug
 @require_http_methods(["POST"])
 def generate_reference_upload_url(request):
     """
