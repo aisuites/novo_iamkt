@@ -178,7 +178,7 @@ class ImagePreviewLoader {
 
 // Inicialização automática
 document.addEventListener('DOMContentLoaded', function() {
-    const loader = new ImagePreviewLoader('/knowledge/preview-url/');
+    const loader = new ImagePreviewLoader('/posts/preview-url/');
     
     // Observar todas as imagens com data-lazy-load
     const images = document.querySelectorAll('img[data-lazy-load]');
