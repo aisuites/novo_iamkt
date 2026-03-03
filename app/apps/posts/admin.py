@@ -14,10 +14,14 @@ class PostImageInline(admin.TabularInline):
 class PostReferenceImageInline(admin.TabularInline):
     model = PostReferenceImage
     extra = 0
-    fields = ('order', 'original_name', 's3_url', 'created_at')
-    readonly_fields = ('s3_url', 's3_key', 'original_name', 'created_at')
+    fields = ('original_name', 's3_url', 'order')
+    readonly_fields = ('original_name', 's3_url', 's3_key')
     verbose_name = 'Imagem de Referência'
     verbose_name_plural = 'Imagens de Referência'
+    
+    def has_add_permission(self, request, obj=None):
+        # Não permitir adicionar manualmente (são criadas via modal)
+        return False
 
 
 @admin.register(Post)
@@ -102,9 +106,8 @@ class PostAdmin(admin.ModelAdmin):
                 'image_prompt',
                 'image_width',
                 'image_height',
-                'reference_images',
             ),
-            'description': 'Campos de referência da imagem principal. Para fazer upload de imagens, use a seção "POST IMAGES" abaixo.'
+            'description': 'Campos de referência da imagem principal. Para fazer upload de imagens, use a seção "IMAGENS DO POST" abaixo.'
         }),
         ('Status e Revisões', {
             'fields': (
