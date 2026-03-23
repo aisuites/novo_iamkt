@@ -43,13 +43,6 @@ def perfil_add_font(request):
                 'error': 'Base de conhecimento não encontrada'
             }, status=404)
         
-        # Verificar se já existe fonte com esse uso
-        if kb.typography_settings.filter(usage=usage).exists():
-            return JsonResponse({
-                'success': False,
-                'error': f'Já existe uma fonte cadastrada para "{usage}"'
-            }, status=400)
-        
         # Criar fonte
         with transaction.atomic():
             # Obter próxima ordem
@@ -136,6 +129,7 @@ def perfil_add_font(request):
 def perfil_remove_font(request):
     """
     Remover fonte da tipografia no Perfil
+    Se for fonte de upload, remove também o CustomFont e arquivo do S3
     """
     try:
         data = json.loads(request.body)
@@ -158,9 +152,32 @@ def perfil_remove_font(request):
         try:
             font = kb.typography_settings.get(id=font_id)
             usage = font.usage
+            font_source = font.font_source
+            
+            # Se for fonte de upload, deletar também o CustomFont e arquivo S3
+            if font_source == 'upload' and font.custom_font:
+                custom_font = font.custom_font
+                s3_key = custom_font.s3_key
+                custom_font_name = custom_font.name
+                
+                print(f"🗑️ [PERFIL_REMOVE_FONT] Deletando CustomFont: {custom_font_name} (ID: {custom_font.id})", flush=True)
+                
+                # Deletar arquivo do S3
+                try:
+                    from apps.core.services.s3_service import S3Service
+                    S3Service.delete_file(s3_key)
+                    print(f"✅ [PERFIL_REMOVE_FONT] Arquivo S3 deletado: {s3_key}", flush=True)
+                except Exception as s3_error:
+                    print(f"⚠️ [PERFIL_REMOVE_FONT] Erro ao deletar S3: {s3_error}", flush=True)
+                
+                # Deletar CustomFont
+                custom_font.delete()
+                print(f"✅ [PERFIL_REMOVE_FONT] CustomFont deletado: {custom_font_name}", flush=True)
+            
+            # Deletar Typography
             font.delete()
             
-            print(f"✅ [PERFIL_REMOVE_FONT] Fonte removida: {usage} (ID: {font_id})", flush=True)
+            print(f"✅ [PERFIL_REMOVE_FONT] Typography removido: {usage} (ID: {font_id})", flush=True)
             
             return JsonResponse({
                 'success': True,

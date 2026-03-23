@@ -963,7 +963,6 @@ class Typography(models.Model):
         verbose_name = 'Configuração de Tipografia'
         verbose_name_plural = 'Configurações de Tipografia'
         ordering = ['order', 'usage']
-        unique_together = [['knowledge_base', 'usage']]
     
     def __str__(self):
         if self.font_source == 'google':

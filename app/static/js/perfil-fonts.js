@@ -216,6 +216,17 @@ async function confirmPerfilFont() {
             }
             
             // 1. Obter Presigned URL
+            // Detectar MIME type correto baseado na extensão
+            const fontFileExt = file.name.split('.').pop().toLowerCase();
+            const mimeTypes = {
+                'ttf': 'font/ttf',
+                'otf': 'font/otf',
+                'woff': 'font/woff',
+                'woff2': 'font/woff2'
+            };
+            const detectedMimeType = mimeTypes[fontFileExt] || 'font/ttf';
+            const finalMimeType = file.type || detectedMimeType;
+            
             const urlResponse = await fetch('/knowledge/font/upload-url/', {
                 method: 'POST',
                 headers: {
@@ -224,7 +235,7 @@ async function confirmPerfilFont() {
                 },
                 body: new URLSearchParams({
                     fileName: file.name,
-                    fileType: file.type || 'font/ttf',
+                    fileType: finalMimeType,
                     fileSize: file.size
                 })
             });
@@ -238,22 +249,11 @@ async function confirmPerfilFont() {
                 throw new Error(urlData.error || 'Erro ao obter URL de upload');
             }
             
-            // Extrair organization_id do s3_key
-            let orgId = urlData.data.organization_id;
-            if (!orgId && urlData.data.s3_key) {
-                const match = urlData.data.s3_key.match(/org-(\d+)\//);
-                if (match) orgId = match[1];
-            }
-            
             // 2. Upload para S3
+            // IMPORTANTE: Usar signed_headers retornados pela API
             const uploadHeaders = {
                 'Content-Type': file.type || 'font/ttf',
-                'x-amz-server-side-encryption': 'AES256',
-                'x-amz-storage-class': 'INTELLIGENT_TIERING',
-                'x-amz-meta-original-name': file.name,
-                'x-amz-meta-organization-id': String(orgId || '0'),
-                'x-amz-meta-category': 'fonts',
-                'x-amz-meta-upload-timestamp': Math.floor(Date.now() / 1000).toString()
+                ...(urlData.data.signed_headers || {})
             };
             
             const s3Response = await fetch(urlData.data.upload_url, {
@@ -263,7 +263,13 @@ async function confirmPerfilFont() {
             });
             
             if (!s3Response.ok) {
-                throw new Error('Erro ao enviar arquivo para S3');
+                const errorText = await s3Response.text();
+                console.error('S3 Error Response:', {
+                    status: s3Response.status,
+                    statusText: s3Response.statusText,
+                    body: errorText
+                });
+                throw new Error(`Erro ao enviar arquivo para S3 (${s3Response.status}): ${s3Response.statusText}`);
             }
             
             // 3. Criar registro CustomFont no banco
