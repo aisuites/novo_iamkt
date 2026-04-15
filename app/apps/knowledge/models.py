@@ -342,7 +342,42 @@ class KnowledgeBase(models.Model):
         blank=True,
         verbose_name='Compilação Concluída em'
     )
-    
+
+    # BRAND VISUAL SPEC (Fase 1 - pipeline de brandguide)
+    brand_visual_spec = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Brand Visual Spec',
+        help_text='Especificação visual estruturada da marca (cores, tipografia, grid, grafismos)'
+    )
+    brand_visual_spec_source = models.CharField(
+        max_length=30,
+        null=True,
+        blank=True,
+        choices=[
+            ('brandguide_pdf', 'Brandguide PDF'),
+            ('reference_images', 'Imagens de Referência'),
+            ('hybrid', 'Híbrido (PDF + Referências)'),
+            ('manual', 'Preenchimento Manual'),
+        ],
+        verbose_name='Origem do Brand Visual Spec'
+    )
+    brand_visual_spec_confidence = models.CharField(
+        max_length=10,
+        null=True,
+        blank=True,
+        choices=[
+            ('high', 'Alta'),
+            ('medium', 'Média'),
+            ('low', 'Baixa'),
+        ],
+        verbose_name='Confiança do Brand Visual Spec'
+    )
+    brand_visual_spec_validated = models.BooleanField(
+        default=False,
+        verbose_name='Brand Visual Spec validado pelo usuário'
+    )
+
     # TIMESTAMPS
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
@@ -673,12 +708,46 @@ class ReferenceImage(models.Model):
         verbose_name='Enviado por'
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
-    
+
+    # INTENT (Fase 1 - pipeline de brandguide)
+    # Contexto sobre como a imagem deve ser utilizada pela IA
+    usage_description = models.TextField(
+        blank=True,
+        verbose_name='O que aproveitar desta imagem',
+        help_text='Descrição livre do que o usuário considera importante'
+    )
+    aspects_to_use = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Aspectos a aproveitar',
+        help_text='Lista de flags: paleta_cor, mood, composicao, tipografia_aplicada, uso_fotografia, estilo_ilustracao, grafismos, tratamento_cor'
+    )
+    importance = models.CharField(
+        max_length=10,
+        default='medium',
+        choices=[
+            ('high', 'Alta'),
+            ('medium', 'Média'),
+            ('low', 'Baixa'),
+        ],
+        verbose_name='Importância'
+    )
+    usage_type = models.CharField(
+        max_length=10,
+        default='inspire',
+        choices=[
+            ('inspire', 'Inspirar (referência geral)'),
+            ('mimic', 'Seguir fielmente o estilo'),
+            ('avoid', 'EVITAR (não quero parecer com isso)'),
+        ],
+        verbose_name='Tipo de uso'
+    )
+
     class Meta:
         verbose_name = 'Imagem de Referência'
         verbose_name_plural = 'Imagens de Referência'
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return self.title
 
@@ -1058,3 +1127,221 @@ class KnowledgeChangeLog(models.Model):
     
     def __str__(self):
         return f"{self.block_name} - {self.field_name} - {self.created_at}"
+
+
+# =====================================================================
+# BRANDGUIDE PIPELINE - Modelos para upload e análise de PDF brandguide
+# =====================================================================
+
+class BrandguideUpload(models.Model):
+    """
+    Upload de PDF brandguide para análise pela IA.
+    Cada KB pode ter múltiplos uploads (versões do brandguide ao longo do tempo).
+    """
+    knowledge_base = models.ForeignKey(
+        KnowledgeBase,
+        on_delete=models.CASCADE,
+        related_name='brandguide_uploads',
+        verbose_name='Base de Conhecimento'
+    )
+    original_filename = models.CharField(
+        max_length=255,
+        verbose_name='Nome original do arquivo'
+    )
+    s3_key_pdf = models.CharField(max_length=500, verbose_name='Chave S3 do PDF')
+    s3_url_pdf = models.URLField(max_length=1000, verbose_name='URL S3 do PDF')
+    total_pages = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Total de páginas'
+    )
+    file_size = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Tamanho (bytes)'
+    )
+    processing_status = models.CharField(
+        max_length=20,
+        default='uploaded',
+        choices=[
+            ('uploaded', 'Enviado'),
+            ('converting', 'Convertendo PDF'),
+            ('extracting_assets', 'Extraindo assets'),
+            ('analyzing', 'Analisando com IA'),
+            ('completed', 'Concluído'),
+            ('error', 'Erro'),
+        ],
+        verbose_name='Status do processamento'
+    )
+    error_message = models.TextField(blank=True, verbose_name='Mensagem de erro')
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='brandguide_uploads',
+        verbose_name='Enviado por'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Concluído em'
+    )
+
+    class Meta:
+        verbose_name = 'Upload de Brandguide'
+        verbose_name_plural = 'Uploads de Brandguides'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['knowledge_base', '-created_at']),
+            models.Index(fields=['processing_status']),
+        ]
+
+    def __str__(self):
+        return f"{self.original_filename} ({self.processing_status})"
+
+
+class BrandguidePage(models.Model):
+    """
+    Cada página do PDF brandguide convertida em PNG.
+    Armazena classificação feita pela IA e metadados.
+    """
+    brandguide = models.ForeignKey(
+        BrandguideUpload,
+        on_delete=models.CASCADE,
+        related_name='pages',
+        verbose_name='Brandguide'
+    )
+    page_number = models.PositiveIntegerField(verbose_name='Número da página')
+    s3_key = models.CharField(max_length=500, verbose_name='Chave S3 do PNG')
+    s3_url = models.URLField(max_length=1000, verbose_name='URL S3 do PNG')
+    width = models.PositiveIntegerField(verbose_name='Largura (px)')
+    height = models.PositiveIntegerField(verbose_name='Altura (px)')
+    extracted_text = models.TextField(
+        blank=True,
+        verbose_name='Texto extraído',
+        help_text='Texto da página extraído por pdfplumber'
+    )
+    category = models.CharField(
+        max_length=30,
+        default='outro',
+        choices=[
+            ('capa', 'Capa'),
+            ('indice', 'Índice'),
+            ('logotipo', 'Logotipo'),
+            ('tipografia', 'Tipografia'),
+            ('cores', 'Cores'),
+            ('grafismo', 'Grafismo'),
+            ('grid', 'Grid'),
+            ('aplicacoes', 'Aplicações'),
+            ('informacional', 'Informacional'),
+            ('outro', 'Outro'),
+        ],
+        verbose_name='Categoria'
+    )
+    relevance = models.CharField(
+        max_length=10,
+        default='medium',
+        choices=[
+            ('high', 'Alta'),
+            ('medium', 'Média'),
+            ('low', 'Baixa'),
+        ],
+        verbose_name='Relevância'
+    )
+
+    class Meta:
+        verbose_name = 'Página de Brandguide'
+        verbose_name_plural = 'Páginas de Brandguides'
+        ordering = ['brandguide', 'page_number']
+        unique_together = [['brandguide', 'page_number']]
+        indexes = [
+            models.Index(fields=['brandguide', 'page_number']),
+            models.Index(fields=['category', 'relevance']),
+        ]
+
+    def __str__(self):
+        return f"{self.brandguide.original_filename} - pág {self.page_number}"
+
+
+class BrandgraficModule(models.Model):
+    """
+    Grafismos/módulos visuais extraídos do PDF brandguide.
+    Serão usados como overlay nas composições de posts (Fase 7).
+    """
+    knowledge_base = models.ForeignKey(
+        KnowledgeBase,
+        on_delete=models.CASCADE,
+        related_name='grafic_modules',
+        verbose_name='Base de Conhecimento'
+    )
+    brandguide = models.ForeignKey(
+        BrandguideUpload,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='grafic_modules',
+        verbose_name='Brandguide de origem'
+    )
+    name = models.CharField(
+        max_length=100,
+        verbose_name='Nome',
+        help_text='Ex: "Módulo vertical 03"'
+    )
+    extraction_type = models.CharField(
+        max_length=30,
+        choices=[
+            ('vector_embedded', 'Vetor embutido (SVG)'),
+            ('image_embedded', 'Imagem embutida (PNG/JPG)'),
+            ('cropped_from_page', 'Recortado da página'),
+        ],
+        verbose_name='Tipo de extração'
+    )
+    source_page = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Página de origem'
+    )
+    s3_key = models.CharField(max_length=500, verbose_name='Chave S3')
+    s3_url = models.URLField(max_length=1000, verbose_name='URL S3')
+    file_format = models.CharField(
+        max_length=10,
+        choices=[('svg', 'SVG'), ('png', 'PNG')],
+        verbose_name='Formato'
+    )
+    has_transparency = models.BooleanField(
+        default=False,
+        verbose_name='Tem transparência'
+    )
+    width = models.PositiveIntegerField(default=0, verbose_name='Largura')
+    height = models.PositiveIntegerField(default=0, verbose_name='Altura')
+    orientation = models.CharField(
+        max_length=20,
+        default='both',
+        choices=[
+            ('vertical', 'Vertical'),
+            ('horizontal', 'Horizontal'),
+            ('both', 'Ambos'),
+        ],
+        verbose_name='Orientação'
+    )
+    usage_hint = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name='Sugestão de uso'
+    )
+    approved_by_user = models.BooleanField(
+        default=False,
+        verbose_name='Aprovado pelo usuário'
+    )
+    is_active = models.BooleanField(default=True, verbose_name='Ativo')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    class Meta:
+        verbose_name = 'Módulo de Grafismo'
+        verbose_name_plural = 'Módulos de Grafismos'
+        ordering = ['knowledge_base', 'name']
+        indexes = [
+            models.Index(fields=['knowledge_base', 'is_active', 'approved_by_user']),
+        ]
+
+    def __str__(self):
+        return f"{self.knowledge_base.organization} - {self.name}"

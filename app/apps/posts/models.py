@@ -210,7 +210,70 @@ class Post(models.Model):
         default='pending',
         verbose_name='Status'
     )
-    
+
+    # BRANDGUIDE PIPELINE (Fase 1)
+    # Objetivo do post - influencia o template visual selecionado
+    objetivo = models.CharField(
+        max_length=30,
+        default='institucional',
+        choices=[
+            ('evento', 'Divulgar evento'),
+            ('venda', 'Venda / Promoção'),
+            ('educacional', 'Conteúdo educacional'),
+            ('institucional', 'Institucional / Branding'),
+            ('bastidores', 'Bastidores / Cultura'),
+            ('depoimento', 'Depoimento / Case'),
+            ('datas_comemorativas', 'Datas comemorativas'),
+            ('engajamento', 'Engajamento (enquete, quiz)'),
+        ],
+        verbose_name='Objetivo do post'
+    )
+    # Método de geração de imagem (para clientes com Brand Visual Spec)
+    generation_method = models.CharField(
+        max_length=30,
+        default='free_style',
+        choices=[
+            ('free_style', 'Estilo livre (Gemini completo)'),
+            ('controlled_render', 'Renderização controlada'),
+            ('both', 'Comparar os dois'),
+        ],
+        verbose_name='Método de geração'
+    )
+    # Plano de layout decidido pelo Layout Planner (Fase 6)
+    layout_plan = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Plano de Layout',
+        help_text='JSON com áreas, restrições e template escolhido pela IA'
+    )
+    # Briefing da imagem (quando gerada pelo Copywriter ciente do layout)
+    image_brief = models.TextField(
+        blank=True,
+        verbose_name='Briefing da imagem'
+    )
+    # Imagem de comparação quando generation_method='both' (Fase 8 - A/B testing)
+    comparison_image_s3_url = models.URLField(
+        max_length=1000,
+        blank=True,
+        verbose_name='URL S3 da imagem de comparação'
+    )
+    comparison_image_s3_key = models.CharField(
+        max_length=500,
+        blank=True,
+        verbose_name='Chave S3 da imagem de comparação'
+    )
+    # Imagem raw gerada pelo Gemini antes da composição (Modo A - Fase 7)
+    raw_image_s3_url = models.URLField(
+        max_length=1000,
+        blank=True,
+        verbose_name='URL S3 da imagem raw'
+    )
+    raw_image_s3_key = models.CharField(
+        max_length=500,
+        blank=True,
+        verbose_name='Chave S3 da imagem raw'
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
@@ -327,12 +390,45 @@ class PostReferenceImage(models.Model):
         auto_now_add=True,
         verbose_name='Criado em'
     )
-    
+
+    # INTENT (Fase 1 - pipeline de brandguide)
+    # Contexto sobre como a imagem deve ser utilizada pela IA
+    usage_description = models.TextField(
+        blank=True,
+        verbose_name='O que aproveitar desta imagem'
+    )
+    aspects_to_use = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Aspectos a aproveitar',
+        help_text='paleta_cor, mood, composicao, tipografia_aplicada, uso_fotografia, estilo_ilustracao, grafismos, tratamento_cor'
+    )
+    importance = models.CharField(
+        max_length=10,
+        default='medium',
+        choices=[
+            ('high', 'Alta'),
+            ('medium', 'Média'),
+            ('low', 'Baixa'),
+        ],
+        verbose_name='Importância'
+    )
+    usage_type = models.CharField(
+        max_length=10,
+        default='inspire',
+        choices=[
+            ('inspire', 'Inspirar'),
+            ('mimic', 'Seguir fielmente'),
+            ('avoid', 'EVITAR'),
+        ],
+        verbose_name='Tipo de uso'
+    )
+
     class Meta:
         verbose_name = 'Imagem de Referência do Post'
         verbose_name_plural = 'Imagens de Referência do Post'
         ordering = ['order', 'created_at']
-    
+
     def __str__(self):
         return f"Ref {self.order} - Post #{self.post.id} - {self.original_name}"
 
@@ -446,6 +542,73 @@ class PostFormat(models.Model):
     def dimensions(self):
         """Retorna dimensões no formato WxH"""
         return f"{self.width}x{self.height}"
-    
+
     def __str__(self):
         return f"{self.get_social_network_display()} - {self.name} ({self.dimensions})"
+
+
+# =====================================================================
+# A/B TESTING (Fase 1 - base de métricas para Fase 8)
+# =====================================================================
+
+class PostGenerationMetric(models.Model):
+    """
+    Métricas de geração de posts para comparação A/B entre métodos
+    (free_style vs controlled_render).
+    """
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name='generation_metrics',
+        verbose_name='Post'
+    )
+    method_used = models.CharField(
+        max_length=30,
+        choices=[
+            ('free_style', 'Estilo livre'),
+            ('controlled_render', 'Renderização controlada'),
+        ],
+        verbose_name='Método utilizado'
+    )
+    approved = models.BooleanField(
+        null=True,
+        blank=True,
+        verbose_name='Aprovado'
+    )
+    revisions_requested = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Revisões solicitadas'
+    )
+    time_to_approval_seconds = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Tempo até aprovação (segundos)'
+    )
+    user_rating = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Avaliação do usuário (1-5)'
+    )
+    tokens_used = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Tokens consumidos'
+    )
+    cost_usd = models.DecimalField(
+        max_digits=8,
+        decimal_places=4,
+        default=0,
+        verbose_name='Custo (USD)'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    class Meta:
+        verbose_name = 'Métrica de Geração de Post'
+        verbose_name_plural = 'Métricas de Geração de Posts'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['method_used', '-created_at']),
+            models.Index(fields=['post', 'method_used']),
+        ]
+
+    def __str__(self):
+        return f"Post #{self.post_id} - {self.method_used}"
