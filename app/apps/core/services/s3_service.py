@@ -216,7 +216,11 @@ class S3Service:
         
         # Obter cliente S3
         s3_client = cls._get_s3_client()
-        
+
+        # CRITICAL: timestamp precisa ser o MESMO na assinatura e nos headers enviados.
+        # Duas chamadas separadas a time.time() podiam divergir em 1s e quebrar a assinatura (403).
+        upload_timestamp = str(int(time.time()))
+
         try:
             # Gerar Presigned URL com INTELLIGENT_TIERING
             presigned_url = s3_client.generate_presigned_url(
@@ -231,13 +235,13 @@ class S3Service:
                         'original-name': file_name,
                         'organization-id': str(organization_id),
                         'category': category,
-                        'upload-timestamp': str(int(time.time()))
+                        'upload-timestamp': upload_timestamp
                     }
                 },
                 ExpiresIn=cls.PRESIGNED_URL_EXPIRATION,
                 HttpMethod='PUT'
             )
-            
+
             # Headers que devem ser enviados no PUT request
             signed_headers = {
                 'x-amz-server-side-encryption': 'AES256',
@@ -245,7 +249,7 @@ class S3Service:
                 'x-amz-meta-original-name': file_name,
                 'x-amz-meta-organization-id': str(organization_id),
                 'x-amz-meta-category': category,
-                'x-amz-meta-upload-timestamp': str(int(time.time()))
+                'x-amz-meta-upload-timestamp': upload_timestamp
             }
             
             return {

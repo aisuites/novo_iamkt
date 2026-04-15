@@ -94,14 +94,17 @@ async function uploadPerfilLogo(file) {
         }
         
         // 2. Upload para S3
+        // Usar signed_headers do backend (timestamp sincronizado com assinatura).
         const uploadHeaders = {
             'Content-Type': file.type,
-            'x-amz-server-side-encryption': 'AES256',
-            'x-amz-storage-class': 'INTELLIGENT_TIERING',
-            'x-amz-meta-original-name': file.name,
-            'x-amz-meta-organization-id': String(orgId || '0'),
-            'x-amz-meta-category': 'logos',
-            'x-amz-meta-upload-timestamp': Math.floor(Date.now() / 1000).toString()
+            ...(urlData.data.signed_headers || {
+                'x-amz-server-side-encryption': 'AES256',
+                'x-amz-storage-class': 'INTELLIGENT_TIERING',
+                'x-amz-meta-original-name': file.name,
+                'x-amz-meta-organization-id': String(orgId || '0'),
+                'x-amz-meta-category': 'logos',
+                'x-amz-meta-upload-timestamp': Math.floor(Date.now() / 1000).toString()
+            })
         };
         
         const s3Response = await fetch(urlData.data.upload_url, {
