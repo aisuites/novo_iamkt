@@ -28,6 +28,7 @@ app.conf.task_routes = {
     'apps.knowledge.tasks.convert_pages_batch_task': {'queue': 'brandguide'},
     'apps.knowledge.tasks.finalize_brandguide_task': {'queue': 'brandguide'},
     'apps.knowledge.tasks.convert_brandguide_pdf_task': {'queue': 'brandguide'},
+    'apps.knowledge.tasks.analyze_brandguide_task': {'queue': 'brandguide'},
 }
 
 # Celery Beat Schedule - Tasks Periódicas

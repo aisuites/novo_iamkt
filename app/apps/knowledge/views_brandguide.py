@@ -1,21 +1,25 @@
 """
-Views do pipeline de Brandguide (Fase 2).
+Views do pipeline de Brandguide.
 
-Upload de PDF, consulta de status e delecao de brandguides.
-A analise por IA e feita em fases posteriores (Fase 3+).
+Fase 2: upload de PDF, consulta de status, delecao.
+Fase 3: callback do N8N com resultado da analise IA.
 """
 
+import json
 import logging
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.views.decorators.http import require_http_methods
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
 
 from apps.core.services import S3Service
-from apps.knowledge.models import BrandguideUpload, KnowledgeBase
+from apps.knowledge.models import BrandguidePage, BrandguideUpload, KnowledgeBase
 
 logger = logging.getLogger(__name__)
 
@@ -341,3 +345,180 @@ def _s3_prefix_from_pdf_key(pdf_key: str, organization_id: int) -> str:
         )
         return ''
     return directory
+
+
+# ============================================================
+# FASE 3 - WEBHOOK CALLBACK DO N8N (analise IA)
+# ============================================================
+
+@csrf_exempt
+@require_POST
+def brandguide_analysis_callback(request):
+    """
+    Webhook que recebe o resultado da analise IA do N8N.
+
+    Payload esperado:
+        {
+            "brandguide_id": int,
+            "knowledge_base_id": int,
+            "status": "completed" | "error",
+            "page_classifications": [
+                {"page_number": int, "category": str, "relevance": str}
+            ],
+            "suggested_kb_fields": {...},     # campos sugeridos para KB
+            "brand_visual_spec": {...},        # spec visual estruturado
+            "error_message": str (opcional quando status=error)
+        }
+
+    Seguranca:
+        - Token X-INTERNAL-TOKEN obrigatorio
+        - Validacao de IP (N8N_ALLOWED_IPS)
+        - Rate limit por IP
+    """
+    # CAMADA 1: Token interno
+    internal_token = request.headers.get('X-INTERNAL-TOKEN')
+    if internal_token != settings.N8N_WEBHOOK_SECRET:
+        logger.warning(
+            '[brandguide_cb] Token invalido de IP %s',
+            request.META.get('REMOTE_ADDR')
+        )
+        return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+
+    # CAMADA 2: IP permitido
+    client_ip = (
+        request.META.get('HTTP_CF_CONNECTING_IP')
+        or request.META.get('REMOTE_ADDR')
+    )
+    allowed_ips = [ip.strip() for ip in settings.N8N_ALLOWED_IPS.split(',') if ip.strip()]
+    if allowed_ips and client_ip not in allowed_ips:
+        logger.warning('[brandguide_cb] IP nao autorizado: %s', client_ip)
+        return JsonResponse({'success': False, 'error': 'Unauthorized IP'}, status=401)
+
+    # CAMADA 3: Rate limit por IP
+    cache_key = f'brandguide_cb_rate_limit_{client_ip}'
+    current = cache.get(cache_key, 0)
+    max_per_min = int(settings.N8N_RATE_LIMIT_PER_IP.split('/')[0])
+    if current >= max_per_min:
+        logger.warning('[brandguide_cb] Rate limit excedido IP=%s', client_ip)
+        return JsonResponse({'success': False, 'error': 'Rate limit exceeded'}, status=429)
+    cache.set(cache_key, current + 1, 60)
+
+    # Parse do payload
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        logger.warning('[brandguide_cb] Payload invalido: %s', exc)
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    brandguide_id = data.get('brandguide_id')
+    if not brandguide_id:
+        return JsonResponse({'success': False, 'error': 'brandguide_id obrigatorio'}, status=400)
+
+    try:
+        brandguide = BrandguideUpload.objects.select_related(
+            'knowledge_base'
+        ).get(id=brandguide_id)
+    except BrandguideUpload.DoesNotExist:
+        logger.warning('[brandguide_cb] BrandguideUpload %s nao existe', brandguide_id)
+        return JsonResponse({'success': False, 'error': 'brandguide nao encontrado'}, status=404)
+
+    status_recebido = (data.get('status') or 'completed').lower()
+
+    # Guard: nao sobrescrever 'completed' com 'error' (protege contra
+    # callbacks duplicados do Error Trigger de execucoes anteriores do N8N)
+    if brandguide.processing_status == 'completed' and status_recebido == 'error':
+        logger.warning(
+            '[brandguide_cb] Ignorando callback de erro para brandguide ja completed id=%s',
+            brandguide_id
+        )
+        return JsonResponse({'success': True, 'message': 'ignorado (ja completed)'})
+
+    # Caso de erro reportado pelo N8N
+    if status_recebido == 'error':
+        error_msg = data.get('error_message') or 'Erro na analise (sem detalhes)'
+        brandguide.processing_status = 'error'
+        brandguide.error_message = error_msg[:5000]
+        brandguide.save(update_fields=['processing_status', 'error_message'])
+        logger.error(
+            '[brandguide_cb] N8N reportou erro brandguide_id=%s: %s',
+            brandguide_id, error_msg
+        )
+        return JsonResponse({'success': True, 'message': 'erro registrado'})
+
+    # Salvar dados de consumo de tokens (se enviados pelo N8N)
+    ai_usage = data.get('ai_usage')
+    if ai_usage:
+        brandguide.ai_usage = ai_usage
+        brandguide.save(update_fields=['ai_usage'])
+
+    # Caso de sucesso: aplicar resultados
+    try:
+        _apply_analysis_result(brandguide, data)
+    except Exception:
+        logger.exception('[brandguide_cb] Falha ao aplicar resultado brandguide_id=%s', brandguide_id)
+        brandguide.processing_status = 'error'
+        brandguide.error_message = 'Falha ao processar resultado do N8N'
+        brandguide.save(update_fields=['processing_status', 'error_message'])
+        return JsonResponse({'success': False, 'error': 'internal_error'}, status=500)
+
+    brandguide.processing_status = 'completed'
+    brandguide.completed_at = timezone.now()
+    brandguide.save(update_fields=['processing_status', 'completed_at'])
+
+    logger.info(
+        '[brandguide_cb] Analise aplicada brandguide_id=%s',
+        brandguide_id
+    )
+
+    return JsonResponse({'success': True, 'brandguide_id': brandguide_id})
+
+
+def _apply_analysis_result(brandguide: BrandguideUpload, data: dict) -> None:
+    """
+    Aplica o resultado da analise vindo do N8N no banco.
+
+    - Atualiza classificacoes das BrandguidePage
+    - Salva suggested_kb_fields como sugestao pendente (kb.n8n_analysis)
+    - Salva brand_visual_spec na KB (com source=brandguide_pdf, confidence=high)
+    """
+    kb = brandguide.knowledge_base
+
+    # 1. Atualizar classificacoes das paginas
+    page_classifications = data.get('page_classifications') or []
+    for pc in page_classifications:
+        page_num = pc.get('page_number')
+        if not page_num:
+            continue
+        updates = {}
+        if pc.get('category'):
+            updates['category'] = pc['category'][:30]
+        if pc.get('relevance') in ('high', 'medium', 'low'):
+            updates['relevance'] = pc['relevance']
+        if updates:
+            BrandguidePage.objects.filter(
+                brandguide=brandguide,
+                page_number=page_num,
+            ).update(**updates)
+
+    # 2. Salvar campos sugeridos (usuario aprova depois via perfil_view)
+    suggested_fields = data.get('suggested_kb_fields') or {}
+    if suggested_fields:
+        current_analysis = kb.n8n_analysis or {}
+        # Agrupar em sub-chave para nao conflitar com analise de fundamentos
+        current_analysis['brandguide'] = {
+            'brandguide_id': brandguide.id,
+            'received_at': timezone.now().isoformat(),
+            'suggested_fields': suggested_fields,
+        }
+        kb.n8n_analysis = current_analysis
+
+    # 3. Salvar Brand Visual Spec com metadados de origem
+    brand_visual_spec = data.get('brand_visual_spec')
+    if brand_visual_spec:
+        kb.brand_visual_spec = brand_visual_spec
+        kb.brand_visual_spec_source = 'brandguide_pdf'
+        kb.brand_visual_spec_confidence = 'high'
+        # Requer aprovacao do usuario no perfil antes de ser usado em prod
+        kb.brand_visual_spec_validated = False
+
+    kb.save()

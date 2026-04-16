@@ -70,4 +70,7 @@ urlpatterns = [
     path('brandguide/status/', views_brandguide.get_brandguide_status, name='brandguide_status'),
     path('brandguide/<int:brandguide_id>/status/', views_brandguide.get_brandguide_status, name='brandguide_status_by_id'),
     path('brandguide/<int:brandguide_id>/delete/', views_brandguide.delete_brandguide, name='brandguide_delete'),
+
+    # Brandguide Pipeline (Fase 3 - callback da analise IA via N8N)
+    path('webhook/brandguide/', views_brandguide.brandguide_analysis_callback, name='brandguide_analysis_callback'),
 ]

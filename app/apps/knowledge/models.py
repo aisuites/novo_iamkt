@@ -1172,6 +1172,15 @@ class BrandguideUpload(models.Model):
         verbose_name='Status do processamento'
     )
     error_message = models.TextField(blank=True, verbose_name='Mensagem de erro')
+
+    # Rastreamento de uso de tokens da IA (preenchido pelo callback do N8N)
+    ai_usage = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Uso de tokens da IA',
+        help_text='Tokens consumidos e custo estimado por etapa (triagem + analise)'
+    )
+
     uploaded_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

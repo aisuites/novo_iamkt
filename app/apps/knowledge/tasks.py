@@ -234,8 +234,12 @@ def convert_pages_batch_task(
 @shared_task(queue='brandguide')
 def finalize_brandguide_task(batch_results: List[Dict], brandguide_id: int):
     """
-    Callback do chord. Recebe a lista de resultados dos batches e marca
-    o brandguide como completed ou error.
+    Callback do chord. Recebe a lista de resultados dos batches, valida todos
+    os lotes e decide o proximo passo:
+
+    - Todos OK + N8N configurado -> encadeia analyze_brandguide_task (status=analyzing)
+    - Todos OK + N8N nao configurado -> marca status=completed
+    - Qualquer falha -> status=error com detalhes
     """
     try:
         brandguide = BrandguideUpload.objects.get(id=brandguide_id)
@@ -263,14 +267,163 @@ def finalize_brandguide_task(batch_results: List[Dict], brandguide_id: int):
         )
         return
 
-    brandguide.processing_status = 'completed'
-    brandguide.completed_at = timezone.now()
-    brandguide.save(update_fields=['processing_status', 'completed_at'])
-
     logger.info(
-        '[brandguide] finalize OK brandguide_id=%s paginas=%s lotes=%s',
+        '[brandguide] conversao OK brandguide_id=%s paginas=%s lotes=%s',
         brandguide_id, pages_created, len(successful)
     )
+
+    # Se N8N configurado, encadeia analise por IA (Fase 3).
+    # Caso contrario, encerra como completed (funciona sem IA para testar Fase 2).
+    webhook_url = getattr(settings, 'N8N_WEBHOOK_ANALYZE_BRANDGUIDE', '')
+    if webhook_url:
+        brandguide.processing_status = 'analyzing'
+        brandguide.save(update_fields=['processing_status'])
+        logger.info(
+            '[brandguide] disparando analise IA brandguide_id=%s',
+            brandguide_id
+        )
+        analyze_brandguide_task.delay(brandguide_id)
+    else:
+        brandguide.processing_status = 'completed'
+        brandguide.completed_at = timezone.now()
+        brandguide.save(update_fields=['processing_status', 'completed_at'])
+        logger.info(
+            '[brandguide] finalize OK (sem analise IA) brandguide_id=%s',
+            brandguide_id
+        )
+
+
+# ============================================================
+# FASE 3 - ANALISE POR IA VIA N8N
+# ============================================================
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    queue='brandguide',
+)
+def analyze_brandguide_task(self, brandguide_id: int):
+    """
+    Envia paginas do brandguide processado para N8N para analise por IA.
+
+    N8N orquestra os agentes (triagem, analise profunda, brand visual spec)
+    e retorna via webhook brandguide_analysis_callback.
+
+    Payload enviado:
+        {
+            "brandguide_id": int,
+            "knowledge_base_id": int,
+            "organization_id": int,
+            "total_pages": int,
+            "pages": [{page_number, s3_url, extracted_text}],
+            "callback_url": str,   # onde o N8N deve postar o resultado
+            "existing_kb": {...}   # dados atuais da KB para contexto
+        }
+
+    A chamada para o N8N eh fire-and-forget (N8N responde via callback).
+    """
+    import requests
+
+    logger.info('[brandguide] analyze iniciado brandguide_id=%s', brandguide_id)
+
+    try:
+        brandguide = (
+            BrandguideUpload.objects
+            .select_related('knowledge_base__organization')
+            .get(id=brandguide_id)
+        )
+    except BrandguideUpload.DoesNotExist:
+        logger.error('[brandguide] analyze: BrandguideUpload %s nao existe', brandguide_id)
+        return {'success': False, 'error': 'not_found'}
+
+    webhook_url = getattr(settings, 'N8N_WEBHOOK_ANALYZE_BRANDGUIDE', '')
+    if not webhook_url:
+        _mark_error(brandguide, 'N8N_WEBHOOK_ANALYZE_BRANDGUIDE nao configurado')
+        return {'success': False, 'error': 'webhook_not_configured'}
+
+    try:
+        kb = brandguide.knowledge_base
+
+        # Gerar presigned URLs para cada pagina (as URLs publicas sao privadas no S3).
+        # OpenAI precisa acessar as imagens diretamente, entao precisam ser presigned.
+        pages_qs = brandguide.pages.all().order_by('page_number')
+        pages_payload = []
+        for page in pages_qs:
+            presigned_url = S3Service.generate_presigned_download_url(page.s3_key)
+            pages_payload.append({
+                'page_number': page.page_number,
+                's3_url': presigned_url,
+                'extracted_text': page.extracted_text,
+            })
+
+        # Callback URL: o N8N vai postar o resultado aqui
+        site_url = getattr(settings, 'SITE_URL', '').rstrip('/')
+        callback_url = f'{site_url}/knowledge/webhook/brandguide/'
+
+        payload = {
+            'brandguide_id': brandguide.id,
+            'knowledge_base_id': kb.id,
+            'organization_id': kb.organization_id,
+            'total_pages': brandguide.total_pages,
+            'pdf_url': brandguide.s3_url_pdf,
+            'pages': pages_payload,
+            'callback_url': callback_url,
+            'existing_kb': {
+                'nome_empresa': kb.nome_empresa,
+                'missao': kb.missao,
+                'visao': kb.visao,
+                'valores': kb.valores,
+                'posicionamento': kb.posicionamento,
+                'tom_voz_externo': kb.tom_voz_externo,
+                'brand_visual_spec': kb.brand_visual_spec,
+            },
+        }
+
+        headers = {
+            'Content-Type': 'application/json',
+            'X-INTERNAL-TOKEN': getattr(settings, 'N8N_WEBHOOK_SECRET', ''),
+        }
+
+        timeout = getattr(settings, 'N8N_WEBHOOK_TIMEOUT', 30)
+
+        logger.info(
+            '[brandguide] POST para N8N webhook brandguide_id=%s paginas=%s',
+            brandguide_id, len(payload['pages'])
+        )
+
+        response = requests.post(
+            webhook_url,
+            json=payload,
+            headers=headers,
+            timeout=timeout,
+        )
+        response.raise_for_status()
+
+        logger.info(
+            '[brandguide] N8N aceitou analise brandguide_id=%s status=%s',
+            brandguide_id, response.status_code
+        )
+
+        # A task termina aqui. N8N vai processar assincronamente e bater
+        # no callback com o resultado.
+        return {
+            'success': True,
+            'brandguide_id': brandguide_id,
+            'n8n_response_status': response.status_code,
+        }
+
+    except requests.exceptions.RequestException as exc:
+        logger.exception('[brandguide] analyze falha de rede brandguide_id=%s', brandguide_id)
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            _mark_error(brandguide, f'Falha ao contatar N8N apos retries: {exc}')
+            return {'success': False, 'error': str(exc)}
+    except Exception as exc:
+        logger.exception('[brandguide] analyze falhou brandguide_id=%s', brandguide_id)
+        _mark_error(brandguide, f'Erro na analise: {exc}')
+        return {'success': False, 'error': str(exc)}
 
 
 # ============================================================
