@@ -3,6 +3,7 @@ Views do pipeline de Brandguide.
 
 Fase 2: upload de PDF, consulta de status, delecao.
 Fase 3: callback do N8N com resultado da analise IA.
+Fase 4: upload de templates visuais e assets de grafismo.
 """
 
 import json
@@ -19,7 +20,11 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
 
 from apps.core.services import S3Service
-from apps.knowledge.models import BrandguidePage, BrandguideUpload, KnowledgeBase
+from apps.core.utils.upload_validators import FileUploadValidator
+from apps.knowledge.models import (
+    BrandgraficModule, BrandguidePage, BrandguideUpload,
+    KnowledgeBase, VisualTemplate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -320,6 +325,201 @@ def delete_brandguide(request, brandguide_id):
             'success': False,
             'error': 'Erro ao deletar brandguide'
         }, status=500)
+
+
+# ============================================================
+# FASE 4 - UPLOAD DE TEMPLATES VISUAIS
+# ============================================================
+
+@login_required
+@ratelimit(key='user', rate='10/m', method='POST', block=True)
+@require_http_methods(["POST"])
+def generate_template_upload_url(request):
+    """Gera presigned URL para upload de template visual (PNG/JPG/WebP, max 10MB)."""
+    try:
+        organization = request.organization
+        file_name = request.POST.get('fileName')
+        file_type = request.POST.get('fileType')
+        file_size = request.POST.get('fileSize')
+
+        if not all([file_name, file_type, file_size]):
+            return JsonResponse({'success': False, 'error': 'Parametros obrigatorios: fileName, fileType, fileSize'}, status=400)
+
+        is_valid, error_msg = FileUploadValidator.validate_image(
+            file_name=file_name, file_type=file_type, file_size=int(file_size)
+        )
+        if not is_valid:
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+
+        result = S3Service.generate_presigned_upload_url(
+            file_name=file_name, file_type=file_type, file_size=int(file_size),
+            category='templates', organization_id=organization.id,
+        )
+        result['organization_id'] = organization.id
+        return JsonResponse({'success': True, 'data': result})
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception:
+        logger.exception('Erro ao gerar URL de upload de template')
+        return JsonResponse({'success': False, 'error': 'Erro ao gerar URL de upload'}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def create_visual_template(request):
+    """Registra um VisualTemplate apos upload no S3."""
+    try:
+        organization = request.organization
+        kb, _ = KnowledgeBase.objects.get_or_create(
+            organization=organization, defaults={'nome_empresa': organization.name}
+        )
+
+        s3_key = request.POST.get('s3Key')
+        name = request.POST.get('name', 'Template')
+        template_type = request.POST.get('templateType', 'outro')
+        social_network = request.POST.get('socialNetwork', 'universal')
+        description = request.POST.get('description', '')
+
+        if not s3_key:
+            return JsonResponse({'success': False, 'error': 's3Key obrigatorio'}, status=400)
+
+        S3Service.validate_organization_access(s3_key, organization.id)
+        s3_url = S3Service.get_public_url(s3_key)
+
+        template = VisualTemplate.objects.create(
+            knowledge_base=kb,
+            name=name,
+            template_type=template_type,
+            social_network=social_network,
+            s3_key=s3_key,
+            s3_url=s3_url,
+            source='manual_upload',
+            description=description,
+            approved_by_user=True,
+            uploaded_by=request.user,
+        )
+
+        preview_url = S3Service.generate_presigned_download_url(s3_key)
+        return JsonResponse({
+            'success': True,
+            'data': {'templateId': template.id, 'previewUrl': preview_url}
+        })
+    except Exception:
+        logger.exception('Erro ao criar template visual')
+        return JsonResponse({'success': False, 'error': 'Erro ao criar template'}, status=500)
+
+
+@login_required
+@require_http_methods(["POST", "DELETE"])
+def delete_visual_template(request, template_id):
+    """Deleta um VisualTemplate + arquivo no S3."""
+    try:
+        organization = request.organization
+        template = get_object_or_404(
+            VisualTemplate, id=template_id,
+            knowledge_base__organization=organization,
+        )
+        S3Service.delete_file(template.s3_key)
+        template.delete()
+        return JsonResponse({'success': True, 'data': {'deletedId': template_id}})
+    except Exception:
+        logger.exception('Erro ao deletar template id=%s', template_id)
+        return JsonResponse({'success': False, 'error': 'Erro ao deletar template'}, status=500)
+
+
+# ============================================================
+# FASE 4 - UPLOAD DE ASSETS (GRAFISMOS)
+# ============================================================
+
+@login_required
+@ratelimit(key='user', rate='10/m', method='POST', block=True)
+@require_http_methods(["POST"])
+def generate_asset_upload_url(request):
+    """Gera presigned URL para upload de asset/grafismo (PNG/SVG, max 5MB)."""
+    try:
+        organization = request.organization
+        file_name = request.POST.get('fileName')
+        file_type = request.POST.get('fileType')
+        file_size = request.POST.get('fileSize')
+
+        if not all([file_name, file_type, file_size]):
+            return JsonResponse({'success': False, 'error': 'Parametros obrigatorios: fileName, fileType, fileSize'}, status=400)
+
+        result = S3Service.generate_presigned_upload_url(
+            file_name=file_name, file_type=file_type, file_size=int(file_size),
+            category='assets', organization_id=organization.id,
+        )
+        result['organization_id'] = organization.id
+        return JsonResponse({'success': True, 'data': result})
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception:
+        logger.exception('Erro ao gerar URL de upload de asset')
+        return JsonResponse({'success': False, 'error': 'Erro ao gerar URL de upload'}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def create_brandgrafic_module(request):
+    """Registra um BrandgraficModule (upload manual) apos upload no S3."""
+    try:
+        organization = request.organization
+        kb, _ = KnowledgeBase.objects.get_or_create(
+            organization=organization, defaults={'nome_empresa': organization.name}
+        )
+
+        s3_key = request.POST.get('s3Key')
+        name = request.POST.get('name', 'Asset')
+        orientation = request.POST.get('orientation', 'both')
+        usage_hint = request.POST.get('usageHint', '')
+        file_format = 'svg' if s3_key and s3_key.endswith('.svg') else 'png'
+
+        if not s3_key:
+            return JsonResponse({'success': False, 'error': 's3Key obrigatorio'}, status=400)
+
+        S3Service.validate_organization_access(s3_key, organization.id)
+        s3_url = S3Service.get_public_url(s3_key)
+
+        asset = BrandgraficModule.objects.create(
+            knowledge_base=kb,
+            name=name,
+            extraction_type='manual_upload',
+            s3_key=s3_key,
+            s3_url=s3_url,
+            file_format=file_format,
+            has_transparency=(file_format == 'png'),
+            orientation=orientation,
+            usage_hint=usage_hint,
+            approved_by_user=True,
+            is_active=True,
+        )
+
+        preview_url = S3Service.generate_presigned_download_url(s3_key)
+        return JsonResponse({
+            'success': True,
+            'data': {'assetId': asset.id, 'previewUrl': preview_url}
+        })
+    except Exception:
+        logger.exception('Erro ao criar asset')
+        return JsonResponse({'success': False, 'error': 'Erro ao criar asset'}, status=500)
+
+
+@login_required
+@require_http_methods(["POST", "DELETE"])
+def delete_brandgrafic_module(request, asset_id):
+    """Deleta um BrandgraficModule + arquivo no S3."""
+    try:
+        organization = request.organization
+        asset = get_object_or_404(
+            BrandgraficModule, id=asset_id,
+            knowledge_base__organization=organization,
+        )
+        S3Service.delete_file(asset.s3_key)
+        asset.delete()
+        return JsonResponse({'success': True, 'data': {'deletedId': asset_id}})
+    except Exception:
+        logger.exception('Erro ao deletar asset id=%s', asset_id)
+        return JsonResponse({'success': False, 'error': 'Erro ao deletar asset'}, status=500)
 
 
 def _s3_prefix_from_pdf_key(pdf_key: str, organization_id: int) -> str:

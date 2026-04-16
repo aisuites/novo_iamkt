@@ -41,6 +41,15 @@ class FileValidator:
         'brandguides': {
             'application/pdf': 'pdf',
         },
+        'templates': {
+            'image/jpeg': 'jpg',
+            'image/png': 'png',
+            'image/webp': 'webp',
+        },
+        'assets': {
+            'image/png': 'png',
+            'image/svg+xml': 'svg',
+        },
     }
 
     # Tamanhos máximos por categoria (em MB)
@@ -50,7 +59,9 @@ class FileValidator:
         'fonts': 2,
         'documents': 20,
         'posts': 10,
-        'brandguides': 50,  # Brandguides PDF podem ser grandes
+        'brandguides': 50,
+        'templates': 10,
+        'assets': 5,
     }
     
     @classmethod

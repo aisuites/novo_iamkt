@@ -37,8 +37,9 @@ class S3Service:
         'documents': 'org-{org_id}/{category}/{date}/{timestamp}-{random}.{ext}',
         'posts': 'org-{org_id}/posts/{date}/{random}.{ext}',
         # Brandguides: cada upload vai para uma "pasta" propria identificada por timestamp
-        # Permite multiplas versoes do brandguide e organiza as paginas geradas
         'brandguides': 'org-{org_id}/brandguides/{timestamp}/original.{ext}',
+        'templates': 'org-{org_id}/templates/{timestamp}-{random}-{name}.{ext}',
+        'assets': 'org-{org_id}/assets/{timestamp}-{random}-{name}.{ext}',
     }
     
     # Tempo de expiração das URLs (segundos)

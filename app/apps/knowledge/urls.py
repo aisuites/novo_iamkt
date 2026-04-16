@@ -73,4 +73,14 @@ urlpatterns = [
 
     # Brandguide Pipeline (Fase 3 - callback da analise IA via N8N)
     path('webhook/brandguide/', views_brandguide.brandguide_analysis_callback, name='brandguide_analysis_callback'),
+
+    # Templates Visuais (Fase 4)
+    path('template/upload-url/', views_brandguide.generate_template_upload_url, name='template_upload_url'),
+    path('template/create/', views_brandguide.create_visual_template, name='template_create'),
+    path('template/<int:template_id>/delete/', views_brandguide.delete_visual_template, name='template_delete'),
+
+    # Assets / Grafismos (Fase 4)
+    path('asset/upload-url/', views_brandguide.generate_asset_upload_url, name='asset_upload_url'),
+    path('asset/create/', views_brandguide.create_brandgrafic_module, name='asset_create'),
+    path('asset/<int:asset_id>/delete/', views_brandguide.delete_brandgrafic_module, name='asset_delete'),
 ]

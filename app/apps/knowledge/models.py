@@ -1301,6 +1301,7 @@ class BrandgraficModule(models.Model):
             ('vector_embedded', 'Vetor embutido (SVG)'),
             ('image_embedded', 'Imagem embutida (PNG/JPG)'),
             ('cropped_from_page', 'Recortado da página'),
+            ('manual_upload', 'Upload manual'),
         ],
         verbose_name='Tipo de extração'
     )
@@ -1354,3 +1355,102 @@ class BrandgraficModule(models.Model):
 
     def __str__(self):
         return f"{self.knowledge_base.organization} - {self.name}"
+
+
+class VisualTemplate(models.Model):
+    """
+    Template visual (arte pronta) usado como modelo para geracao de posts.
+    Diferente de ReferenceImage (inspiracao) e BrandgraficModule (asset isolado).
+    Quando o usuario gera um post, pode escolher um template como guia visual
+    que a IA deve seguir fielmente.
+    """
+    knowledge_base = models.ForeignKey(
+        KnowledgeBase,
+        on_delete=models.CASCADE,
+        related_name='visual_templates',
+        verbose_name='Base de Conhecimento'
+    )
+    name = models.CharField(
+        max_length=200,
+        verbose_name='Nome',
+        help_text='Ex: "Feed evento 2x3", "Story institucional"'
+    )
+    template_type = models.CharField(
+        max_length=30,
+        default='outro',
+        choices=[
+            ('feed', 'Feed'),
+            ('story', 'Story'),
+            ('quadrado', 'Quadrado'),
+            ('carrossel_slide', 'Slide de Carrossel'),
+            ('outro', 'Outro'),
+        ],
+        verbose_name='Tipo de template'
+    )
+    social_network = models.CharField(
+        max_length=20,
+        default='universal',
+        choices=[
+            ('instagram', 'Instagram'),
+            ('facebook', 'Facebook'),
+            ('linkedin', 'LinkedIn'),
+            ('twitter', 'Twitter/X'),
+            ('whatsapp', 'WhatsApp'),
+            ('universal', 'Universal'),
+        ],
+        verbose_name='Rede social'
+    )
+    s3_key = models.CharField(max_length=500, verbose_name='Chave S3')
+    s3_url = models.URLField(max_length=1000, verbose_name='URL S3')
+    width = models.PositiveIntegerField(default=0, verbose_name='Largura')
+    height = models.PositiveIntegerField(default=0, verbose_name='Altura')
+    source = models.CharField(
+        max_length=20,
+        choices=[
+            ('manual_upload', 'Upload manual'),
+            ('pdf_extracted', 'Extraído do PDF'),
+        ],
+        verbose_name='Origem'
+    )
+    source_page = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Página de origem no PDF'
+    )
+    assets = models.ManyToManyField(
+        BrandgraficModule,
+        blank=True,
+        related_name='templates',
+        verbose_name='Assets vinculados',
+        help_text='Grafismos/assets usados neste template'
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name='Descrição'
+    )
+    approved_by_user = models.BooleanField(
+        default=False,
+        verbose_name='Aprovado pelo usuário'
+    )
+    is_active = models.BooleanField(default=True, verbose_name='Ativo')
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='visual_templates_uploaded',
+        verbose_name='Enviado por'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    class Meta:
+        verbose_name = 'Template Visual'
+        verbose_name_plural = 'Templates Visuais'
+        ordering = ['knowledge_base', 'template_type', 'name']
+        indexes = [
+            models.Index(fields=['knowledge_base', 'is_active', 'approved_by_user']),
+            models.Index(fields=['template_type', 'social_network']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_template_type_display()} - {self.get_social_network_display()})"
