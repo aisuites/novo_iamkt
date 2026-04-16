@@ -591,106 +591,308 @@ curl -X POST http://localhost:8000/knowledge/webhook/brandguide/ \
 
 ---
 
-## FASE 4 - Brand Visual Spec Inferido (sem PDF)
+## FASE 4 - Templates Visuais, Assets e Brand Visual Spec Inferido
 
 ### Objetivo
-Gerar Brand Visual Spec a partir de imagens de referencia + dados cadastrados, quando nao ha PDF.
 
-### Dependencias
-- Fase 3 aprovada
-- Workflow N8N configurado: `N8N_WEBHOOK_INFER_VISUAL_SPEC`
+Permitir que o usuario gerencie **templates visuais** (artes prontas como modelo) e
+**assets** (grafismos isolados), e gerar Brand Visual Spec inferido para clientes sem PDF.
+
+### Conceitos
+
+```
+TEMPLATE VISUAL: arte pronta usada como modelo para geracao de posts.
+  Ex: layout do brandguide com grid + grafismo + texto posicionados.
+  Uso: a IA recebe o template e SEGUE a estrutura fielmente.
+
+ASSET (grafismo): elemento visual isolado com transparencia.
+  Ex: modulo geometrico extraido do brandguide.
+  Uso: overlay no Compose Engine ou referencia para a IA.
+
+REFERENCIA: imagem de inspiracao generica (mood, estilo).
+  Ex: imagem que o usuario sobe como moodboard.
+  Uso: quando NAO tem template/asset definido (fluxo atual).
+```
+
+### Hierarquia de envio ao agente de IA (ao gerar post)
+
+```
+SE tem templates:
+  → Usuario escolhe 1 template no modal "Gerar Post"
+  → Envia: template escolhido + assets vinculados ao template
+  → IA segue o modelo, usa os assets como referencia visual
+  → NÃO envia imagens de referencia (template tem prioridade)
+
+SE NAO tem templates mas tem assets:
+  → Envia: assets + brand_visual_spec
+  → IA usa grafismos nas regras do spec
+
+SE NAO tem nada disso:
+  → Envia: imagens de referencia da KB (fluxo atual preservado)
+  → IA se inspira nas referencias
+```
+
+### Como templates e assets chegam ao sistema
+
+```
+CAMINHO 1 - Upload manual (prioridade)
+  Usuario sobe:
+    - PNGs/JPGs de templates (artes prontas)
+    - PNGs/SVGs de assets (grafismos isolados com transparencia)
+  → Resultado melhor pois sao arquivos originais de alta qualidade
+
+CAMINHO 2 - Extracao do PDF (complementar, inteligente)
+  SE usuario ja subiu templates manualmente → NAO extrai templates do PDF
+  SE usuario ja subiu assets manualmente → NAO extrai assets do PDF
+  SO extrai do PDF o que ficou FALTANDO:
+    - Sem templates manuais? → Extrai paginas de "aplicacoes" como candidatos
+    - Sem assets manuais? → Extrai objetos embutidos (SVG/PNG) como candidatos
+  → Usuario revisa e aprova qualidade
+
+CAMINHO 3 - Nenhum dos dois
+  → Area fica vazia, fluxo normal com imagens de referencia
+```
+
+### Presenca nas 3 paginas
+
+```
+/knowledge/ (Bloco 5 - primeira etapa):
+  - Upload de templates (drag & drop ou selecionar arquivo)
+  - Upload de assets (drag & drop ou selecionar arquivo)
+  - Lista/grid de templates e assets ja subidos com preview + botao remover
+  - Se fez upload de PDF, mostra aviso: "templates e assets serao extraidos automaticamente
+    para os itens que voce nao subiu manualmente"
+
+/knowledge/perfil/ (segunda etapa - com sugestoes):
+  - Templates extraidos do PDF (se houver) para aprovar/rejeitar
+  - Assets extraidos do PDF para aprovar/rejeitar
+  - Templates e assets manuais listados (ja aprovados)
+  - Secao no Bloco 5 (Identidade Visual) apos imagens de referencia
+
+/knowledge/perfil-visualizacao/ (terceira etapa - read-only):
+  - Grid de thumbnails dos templates aprovados
+  - Grid de thumbnails dos assets aprovados
+  - Se nao tem nenhum: secao nao aparece (area vazia)
+```
 
 ### O que sera feito
 
-**4.1 - Settings**
+**4.1 - Modelo VisualTemplate (novo)**
+
+```python
+class VisualTemplate(models.Model):
+    knowledge_base = ForeignKey(KnowledgeBase, related_name='visual_templates')
+    name = CharField(max_length=200)
+    template_type = CharField(choices=[
+        ('feed', 'Feed'),
+        ('story', 'Story'),
+        ('quadrado', 'Quadrado'),
+        ('carrossel_slide', 'Slide de Carrossel'),
+        ('outro', 'Outro'),
+    ])
+    social_network = CharField(choices=[
+        ('instagram', 'Instagram'),
+        ('facebook', 'Facebook'),
+        ('linkedin', 'LinkedIn'),
+        ('twitter', 'Twitter/X'),
+        ('whatsapp', 'WhatsApp'),
+        ('universal', 'Universal (qualquer rede)'),
+    ], default='universal')
+    s3_key = CharField(max_length=500)
+    s3_url = URLField(max_length=1000)
+    width = PositiveIntegerField(default=0)
+    height = PositiveIntegerField(default=0)
+    source = CharField(choices=[
+        ('manual_upload', 'Upload manual'),
+        ('pdf_extracted', 'Extraido do PDF'),
+    ])
+    source_page = PositiveIntegerField(null=True, blank=True)
+    # Assets vinculados a este template
+    assets = ManyToManyField('BrandgraficModule', blank=True, related_name='templates')
+    description = TextField(blank=True)
+    approved_by_user = BooleanField(default=False)
+    is_active = BooleanField(default=True)
+    uploaded_by = ForeignKey(User, null=True, on_delete=SET_NULL)
+    created_at = DateTimeField(auto_now_add=True)
+```
+
+**Nota:** `BrandgraficModule` ja existe desde Fase 1. Precisa adicionar `manual_upload`
+ao choices de `extraction_type` (migration simples).
+
+**4.2 - Migration**
 
 ```
-Arquivo: app/sistema/settings/base.py (adicionar)
-
-N8N_WEBHOOK_INFER_VISUAL_SPEC = env('N8N_WEBHOOK_INFER_VISUAL_SPEC', default='')
+python manage.py makemigrations knowledge
+# Cria: VisualTemplate + altera BrandgraficModule.extraction_type choices
 ```
 
-**4.2 - Interface de intent nas imagens de referencia**
-
-Modificar templates e views existentes para mostrar os novos campos:
+**4.3 - Settings**
 
 ```
-Arquivo: app/apps/knowledge/views_upload.py (adaptar)
-
-create_reference_image():
-  Aceitar campos novos: usage_description, aspects_to_use, importance, usage_type
-
-Arquivo: app/templates/knowledge/partials/reference_image_upload.html
-  (criar ou adaptar existente)
-
-  Formulario expandido com:
-  - Textarea para descricao
-  - Checkboxes para aspects_to_use
-  - Radio para importance
-  - Radio para usage_type
+N8N_WEBHOOK_INFER_VISUAL_SPEC = config('N8N_WEBHOOK_INFER_VISUAL_SPEC', default='')
 ```
 
-**4.3 - Gatilho para inferencia**
-
-Quando o usuario terminar de subir imagens de referencia e solicitar analise, ou quando chamar explicitamente "Gerar Brand Visual Spec":
+**4.4 - Views de upload de templates e assets**
 
 ```
 Arquivo: app/apps/knowledge/views_brandguide.py (adicionar)
 
-def infer_visual_spec_request(request):
-    """
-    Usuario solicita inferencia do Brand Visual Spec.
-    Valida: KB deve ter pelo menos 3 imagens de referencia com intent preenchido.
-    Dispara task infer_visual_spec_task.
-    """
+- generate_template_upload_url(request)    # presigned URL para upload de template
+- create_visual_template(request)          # confirma upload e cria registro
+- delete_visual_template(request, id)      # deleta template + S3
+
+- generate_asset_upload_url(request)       # presigned URL para upload de asset
+- create_brandgrafic_module(request)       # confirma upload e cria registro (manual)
+- delete_brandgrafic_module(request, id)   # deleta asset + S3
 ```
 
-**4.4 - Task de inferencia**
+**4.5 - URLs**
 
 ```
-Arquivo: app/apps/knowledge/tasks_brandguide.py (adicionar)
+/knowledge/template/upload-url/      -> generate_template_upload_url
+/knowledge/template/create/          -> create_visual_template
+/knowledge/template/<id>/delete/     -> delete_visual_template
+/knowledge/asset/upload-url/         -> generate_asset_upload_url
+/knowledge/asset/create/             -> create_brandgrafic_module
+/knowledge/asset/<id>/delete/        -> delete_brandgrafic_module
+```
 
-@shared_task
+**4.6 - Interface no Bloco 5 (/knowledge/)**
+
+```
+Arquivo novo: app/templates/knowledge/partials/templates_upload.html
+
+Secao apos "Imagens de referencia" e "Brandguide da marca":
+- "Templates visuais (opcional)"
+  - Dropzone para upload de PNG/JPG
+  - Grid de templates ja subidos com preview + remover
+- "Assets de grafismo (opcional)"
+  - Dropzone para upload de PNG/SVG
+  - Grid de assets ja subidos com preview + remover
+
+Arquivo: app/templates/knowledge/view.html (adicionar include no Bloco 5)
+```
+
+**4.7 - Interface no Perfil (/knowledge/perfil/)**
+
+```
+Arquivo: app/templates/knowledge/perfil.html (adicionar secao)
+
+No Bloco 5 (Identidade Visual):
+- Secao "Templates visuais"
+  - Templates manuais: grid com thumbnails (ja aprovados)
+  - Templates extraidos do PDF: grid com approve/reject
+- Secao "Assets de grafismo"
+  - Assets manuais: grid com thumbnails (ja aprovados)
+  - Assets extraidos do PDF: grid com approve/reject
+```
+
+**4.8 - Interface no Perfil Visualizacao (/knowledge/perfil-visualizacao/)**
+
+```
+Arquivo: app/templates/knowledge/partials/perfil_visualizacao_linha2.html (adaptar)
+
+Adicionar apos Logos e Imagens de Referencia:
+- "Templates visuais" - grid de thumbnails (read-only)
+- "Assets de grafismo" - grid de thumbnails (read-only)
+- Se nao tem nenhum: secao nao renderiza
+```
+
+**4.9 - Logica inteligente de extracao do PDF**
+
+```
+Arquivo: app/apps/knowledge/tasks.py (adaptar finalize_brandguide_task)
+
+Apos conversao do PDF, antes de disparar analise IA:
+1. Contar templates manuais: VisualTemplate.objects.filter(kb=kb, source='manual_upload').count()
+2. Contar assets manuais: BrandgraficModule.objects.filter(kb=kb, extraction_type='manual_upload').count()
+3. Informar ao N8N no payload:
+   - has_manual_templates: bool
+   - has_manual_assets: bool
+4. N8N decide: se ja tem manuais, NAO extrai do PDF. So extrai o que falta.
+```
+
+**4.10 - Task de inferencia do Brand Visual Spec (sem PDF)**
+
+```
+Arquivo: app/apps/knowledge/tasks.py (adicionar)
+
+@shared_task(queue='brandguide')
 def infer_visual_spec_task(knowledge_base_id):
     """
-    1. Coleta imagens de referencia com intent
-    2. Coleta cores cadastradas (ColorPalette)
-    3. Coleta fontes cadastradas (Typography)
-    4. Monta payload e envia para N8N_WEBHOOK_INFER_VISUAL_SPEC
+    Para clientes SEM PDF: gera Brand Visual Spec inferido a partir de:
+    - Imagens de referencia (com intent)
+    - Templates visuais (se houver)
+    - Assets (se houver)
+    - Cores cadastradas (ColorPalette)
+    - Fontes cadastradas (Typography/CustomFont)
+    Envia para N8N_WEBHOOK_INFER_VISUAL_SPEC
+    Callback reusa /knowledge/webhook/brandguide/ com source='reference_images'
     """
 ```
 
-**4.5 - Callback (reusa endpoint da Fase 3)**
+**4.11 - Validacao de categorias no FileValidator**
 
-O mesmo endpoint `/knowledge/webhook/brandguide/` processa o callback, mas salva com:
-- `source = 'reference_images'`
-- `confidence = 'medium'`
-- `requires_user_validation = True`
+```
+Arquivo: app/apps/core/utils/file_validators.py (adicionar)
+
+'templates': {
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+}  # max 10 MB
+
+'assets': {
+    'image/png': 'png', 'image/svg+xml': 'svg',
+}  # max 5 MB (transparencia obrigatoria para PNG)
+```
+
+**4.12 - S3 paths**
+
+```
+Arquivo: app/apps/core/services/s3_service.py (adicionar templates)
+
+'templates': 'org-{org_id}/templates/{timestamp}-{random}-{name}.{ext}'
+'assets': 'org-{org_id}/assets/{timestamp}-{random}-{name}.{ext}'
+```
 
 ### Arquivos tocados
 
 | Arquivo | Acao | Risco |
 |---------|------|-------|
+| `knowledge/models.py` | Novo modelo VisualTemplate + alterar BrandgraficModule choices | BAIXO (aditivo) |
+| Migration nova | Criar tabela + alterar choices | ZERO |
 | `sistema/settings/base.py` | Adicionar 1 variavel | ZERO |
-| `knowledge/views_upload.py` | Aceitar campos novos | BAIXO |
-| `knowledge/views_brandguide.py` | Adicionar 1 view | ZERO |
-| `knowledge/tasks_brandguide.py` | Adicionar 1 task | ZERO |
-| `knowledge/urls.py` | Adicionar 1 rota | BAIXO |
-| `templates/.../reference_image_upload.html` | Expandir form | BAIXO (aditivo) |
+| `core/utils/file_validators.py` | Adicionar 2 categorias | ZERO |
+| `core/services/s3_service.py` | Adicionar 2 path templates | ZERO |
+| `knowledge/views_brandguide.py` | Adicionar 6 views (upload CRUD) | ZERO |
+| `knowledge/urls.py` | Adicionar 6 rotas | BAIXO |
+| `knowledge/tasks.py` | Adicionar infer task + adaptar extracao | BAIXO |
+| `templates/knowledge/partials/templates_upload.html` | Arquivo NOVO | ZERO |
+| `templates/knowledge/view.html` | Include no Bloco 5 | BAIXO (aditivo) |
+| `templates/knowledge/perfil.html` | Secao de templates/assets | BAIXO (aditivo) |
+| `templates/knowledge/partials/perfil_visualizacao_linha2.html` | Grid read-only | BAIXO |
+| JS novo para upload de templates/assets | Arquivo NOVO | ZERO |
 
 ### Rollback
 
 ```bash
-# Endpoint de upload continua aceitando sem os campos novos (default values)
-# Feature pode ser desabilitada escondendo os campos na interface
+# Reverter migration: python manage.py migrate knowledge <migration_anterior>
+# Remover views, URLs e templates novos
+# Fluxo atual de imagens de referencia continua funcionando intacto
 ```
 
 ### Criterio de aprovacao
 
-- [ ] Imagens de referencia aceitam campos de intent
-- [ ] Campos antigos (titulo, descricao) continuam funcionando
-- [ ] Inferencia gera Brand Visual Spec com source='reference_images'
-- [ ] Spec inferido e marcado como requires_user_validation=true
+- [ ] Upload manual de templates funciona (presigned URL + create)
+- [ ] Upload manual de assets funciona
+- [ ] Templates aparecem no Bloco 5 da /knowledge/
+- [ ] Templates aparecem no /knowledge/perfil/ (aprovacao)
+- [ ] Templates aparecem no /knowledge/perfil-visualizacao/ (read-only)
+- [ ] Se nao tem templates: area vazia, sem erro
+- [ ] Assets seguem mesma logica
+- [ ] Brand Visual Spec inferido funciona para KB sem PDF
+- [ ] Extracao do PDF nao extrai templates se ja tem upload manual
+- [ ] Extracao do PDF nao extrai assets se ja tem upload manual
+- [ ] Fluxo atual (sem templates, sem assets) nao foi afetado
 - [ ] Interface exibe aviso de validacao necessaria
 
 ---

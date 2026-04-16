@@ -567,3 +567,33 @@ textarea.form-input-filter {
   .lg\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* Scroll to top */
+.btn-scroll-top {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 900;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-scroll-top.visible {
+  display: flex;
+}
+
+.btn-scroll-top:hover {
+  color: #6366f1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  transform: translateY(-2px);
+}
