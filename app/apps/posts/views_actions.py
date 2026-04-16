@@ -244,6 +244,7 @@ def generate_image(request, post_id):
                                 try:
                                     # Gerar URL presigned (válida por 24 horas)
                                     presigned_url = S3Service.generate_presigned_download_url(logo.s3_key, expires_in=86400)
+                                    print(f"🔍 [DEBUG] Logo presigned URL: {presigned_url}", flush=True)
                                     referencias.append({
                                         'tipo': 'logotipo',
                                         'url': presigned_url

@@ -48,11 +48,17 @@ def n8n_webhook_fundamentos(request):
     # CAMADA 1.5: Validação de IP
     # Usar HTTP_CF_CONNECTING_IP pois requisições passam pelo Cloudflare
     client_ip = request.META.get('HTTP_CF_CONNECTING_IP') or request.META.get('REMOTE_ADDR')
-    allowed_ips = settings.N8N_ALLOWED_IPS.split(',')
+    allowed_ips = [ip.strip() for ip in settings.N8N_ALLOWED_IPS.split(',')]
+    
+    # Log detalhado para debug
+    logger.info(f"🔍 [N8N_FUNDAMENTOS] IP recebido: {client_ip}")
+    logger.info(f"🔍 [N8N_FUNDAMENTOS] HTTP_CF_CONNECTING_IP: {request.META.get('HTTP_CF_CONNECTING_IP')}")
+    logger.info(f"🔍 [N8N_FUNDAMENTOS] REMOTE_ADDR: {request.META.get('REMOTE_ADDR')}")
+    logger.info(f"🔍 [N8N_FUNDAMENTOS] IPs permitidos: {allowed_ips}")
     
     if client_ip not in allowed_ips:
         logger.warning(
-            f"Unauthorized IP attempting to access webhook: {client_ip}"
+            f"❌ [N8N_FUNDAMENTOS] IP não autorizado: {client_ip}"
         )
         return JsonResponse({
             'success': False,
@@ -404,7 +410,13 @@ def n8n_compilation_webhook(request):
     
     # CAMADA 2: Validação de IP
     client_ip = request.META.get('HTTP_CF_CONNECTING_IP') or request.META.get('REMOTE_ADDR')
-    allowed_ips = settings.N8N_ALLOWED_IPS.split(',')
+    allowed_ips = [ip.strip() for ip in settings.N8N_ALLOWED_IPS.split(',')]
+    
+    # Log detalhado para debug
+    logger.info(f"🔍 [N8N_COMPILATION_WEBHOOK] IP recebido: {client_ip}")
+    logger.info(f"🔍 [N8N_COMPILATION_WEBHOOK] HTTP_CF_CONNECTING_IP: {request.META.get('HTTP_CF_CONNECTING_IP')}")
+    logger.info(f"🔍 [N8N_COMPILATION_WEBHOOK] REMOTE_ADDR: {request.META.get('REMOTE_ADDR')}")
+    logger.info(f"🔍 [N8N_COMPILATION_WEBHOOK] IPs permitidos: {allowed_ips}")
     
     if client_ip not in allowed_ips:
         logger.warning(

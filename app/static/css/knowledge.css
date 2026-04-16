@@ -1339,6 +1339,8 @@ input[type="number"]:focus {
   gap: 12px;
   padding: 10px 14px;
   background: white;
+  flex: 1;
+  min-width: 0;
   border: 1px solid rgba(122, 61, 138, 0.18);
   border-radius: var(--radius-sm);
   transition: border-color 0.15s ease;

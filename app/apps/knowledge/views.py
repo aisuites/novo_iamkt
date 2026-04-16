@@ -1030,14 +1030,6 @@ def perfil_view(request):
                     status = campo_data.get('classificacao', campo_data.get('status', ''))
                     avaliacao = campo_data.get('avaliacao', '')
                     
-                    # Contar estatísticas
-                    if status == 'fraco':
-                        stats['fraco'] += 1
-                    elif status == 'médio':
-                        stats['medio'] += 1
-                    elif status == 'bom':
-                        stats['bom'] += 1
-                    
                     # Buscar 'sugestao' (após merge seletivo) ou 'sugestao_do_agente_iamkt' (primeira análise)
                     sugestao_raw = campo_data.get('sugestao', campo_data.get('sugestao_do_agente_iamkt', ''))
                     if isinstance(sugestao_raw, list):
@@ -1085,6 +1077,8 @@ def perfil_view(request):
                     'grafic_modules': lambda: kb.grafic_modules.filter(is_active=True).exists(),
                     'social_networks': lambda: kb.social_networks.filter(is_active=True).exists(),
                     'site_institucional': lambda: bool(kb.site_institucional),
+                    'typography_settings': lambda: kb.typography_settings.exists() or kb.custom_fonts.exists(),
+                    'colors': lambda: kb.colors.exists(),
                 }
                 if campo_modelo in fields_with_data_check:
                     has_data = fields_with_data_check[campo_modelo]()
@@ -1094,6 +1088,14 @@ def perfil_view(request):
                             avaliacao = 'Dados cadastrados e disponíveis para uso.'
                         if not status or status == 'fraco':
                             status = 'bom'
+
+                # 2.6 CONTAR ESTATISTICAS (apos override, para refletir status correto)
+                if status == 'fraco':
+                    stats['fraco'] += 1
+                elif status in ('médio', 'medio'):
+                    stats['medio'] += 1
+                elif status == 'bom':
+                    stats['bom'] += 1
 
                 # 3. ADICIONAR CAMPO AO BLOCO (sempre, mesmo sem dados N8N)
                 campo_data_dict = {
