@@ -453,6 +453,9 @@
 
           {# BRANDGUIDE PDF (Fase 2) - upload opcional do guia de marca #}
           {% include 'knowledge/partials/brandguide_upload.html' %}
+
+          {# TEMPLATES VISUAIS + ASSETS (Fase 4) #}
+          {% include 'knowledge/partials/templates_assets_upload.html' %}
         </div>
       </div>
     </section>
@@ -780,6 +783,7 @@ window.VALIDATION_ERRORS = {
 <script src="{% static 'js/knowledge-events.js' %}?v=20260128-1154"></script>
 <script src="{% static 'js/knowledge-validation.js' %}?v=20260211-0210"></script>
 <script src="{% static 'js/brandguide-upload.js' %}?v=20260416-0030"></script>
+<script src="{% static 'js/templates-assets-upload.js' %}?v=20260416-1600"></script>
 <!-- Logs de debug movidos para knowledge-concorrentes.js -->
 <!-- <script src="{% static 'js/uploads.js' %}"></script> --> <!-- Mock antigo - comentado para teste -->
 <script>

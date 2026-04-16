@@ -228,6 +228,35 @@
                         {% elif campo.type == 'brandguide' %}
                         {# Upload opcional de PDF brandguide - Fase 2 #}
                         {% include 'knowledge/partials/brandguide_upload.html' %}
+                        {% elif campo.type == 'visual_templates' %}
+                        {# Templates visuais - Fase 4 #}
+                        {% if campo.templates_data %}
+                        <div style="display:flex; flex-wrap:wrap; gap:12px;">
+                            {% for tmpl in campo.templates_data %}
+                            <div style="width:120px; height:120px; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; background:#f8fafc; position:relative;">
+                                <img src="#" alt="{{ tmpl.name }}" data-lazy-load="{{ tmpl.s3_key }}" style="width:100%; height:100%; object-fit:cover;">
+                                <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); padding:3px 6px;">
+                                    <span style="color:#fff; font-size:10px;">{{ tmpl.name }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p style="color:#94a3b8; font-style:italic; font-size:14px;">Nenhum template cadastrado</p>
+                        {% endif %}
+                        {% elif campo.type == 'grafic_assets' %}
+                        {# Assets de grafismo - Fase 4 #}
+                        {% if campo.assets_data %}
+                        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                            {% for asset in campo.assets_data %}
+                            <div style="width:80px; height:80px; border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; background:#f0f0f0;">
+                                <img src="#" alt="{{ asset.name }}" data-lazy-load="{{ asset.s3_key }}" style="width:100%; height:100%; object-fit:contain; padding:4px;">
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p style="color:#94a3b8; font-style:italic; font-size:14px;">Nenhum asset cadastrado</p>
+                        {% endif %}
                         {% elif campo.type == 'website' %}
                         <!-- Layout de Site Institucional - Ícone + https:// fixo -->
                         <div class="social-network-field">

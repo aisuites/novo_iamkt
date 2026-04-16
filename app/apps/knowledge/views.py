@@ -93,6 +93,14 @@ def knowledge_view(request):
         custom_fonts = CustomFont.objects.filter(
             knowledge_base=kb
         ).select_related('uploaded_by', 'knowledge_base').order_by('-created_at')
+
+        from apps.knowledge.models import VisualTemplate, BrandgraficModule
+        visual_templates = VisualTemplate.objects.filter(
+            knowledge_base=kb, is_active=True
+        ).order_by('template_type', 'name')
+        grafic_modules = BrandgraficModule.objects.filter(
+            knowledge_base=kb, is_active=True
+        ).order_by('name')
     else:
         # KB não existe ou não tem pk, inicializar vazios
         internal_segments = []
@@ -102,6 +110,8 @@ def knowledge_view(request):
         logos = []
         fonts = []
         custom_fonts = []
+        visual_templates = []
+        grafic_modules = []
     
     # Calcular completude proporcional por bloco (% de campos preenchidos)
     def calc_bloco_percent(fields_filled, total_fields):
@@ -183,6 +193,8 @@ def knowledge_view(request):
         'user_name': request.user.first_name or request.user.username,
         'kb_exists': kb is not None,
         'kb_completude': kb.completude_percentual if kb else 0,
+        'visual_templates': visual_templates,
+        'grafic_modules': grafic_modules,
     }
     
     return render(request, 'knowledge/view.html', context)
@@ -854,6 +866,8 @@ def perfil_view(request):
                     {'nome': 'logo_files', 'label': 'Logotipos', 'campo_modelo': 'logos', 'readonly': True, 'type': 'logos'},
                     {'nome': 'reference_images', 'label': 'Imagens de referência', 'campo_modelo': 'reference_images', 'readonly': True, 'type': 'references'},
                     {'nome': 'brandguide_pdf', 'label': 'Brandguide da marca', 'campo_modelo': 'brandguide_uploads', 'readonly': False, 'type': 'brandguide', 'no_suggestions': True},
+                    {'nome': 'visual_templates', 'label': 'Templates visuais', 'campo_modelo': 'visual_templates', 'readonly': True, 'type': 'visual_templates', 'no_suggestions': True},
+                    {'nome': 'grafic_assets', 'label': 'Assets de grafismo', 'campo_modelo': 'grafic_modules', 'readonly': True, 'type': 'grafic_assets', 'no_suggestions': True},
                 ]
             },
             {
@@ -880,12 +894,14 @@ def perfil_view(request):
                 
                 # 1. BUSCAR VALOR INFORMADO PELO USUÁRIO (do banco de dados)
                 informado = ''
-                colors_data = None  # Para campos de cores
-                fonts_data = None  # Para campos de fontes
-                logos_data = None  # Para campos de logos
-                references_data = None  # Para imagens de referência
-                social_networks_data = None  # Para redes sociais
-                competitors_data = None  # Para concorrentes
+                colors_data = None
+                fonts_data = None
+                logos_data = None
+                references_data = None
+                social_networks_data = None
+                competitors_data = None
+                templates_data = None
+                assets_data = None
                 
                 # Tratamento especial para campo colors (relacionamento)
                 if campo_modelo == 'colors':
@@ -951,6 +967,24 @@ def perfil_view(request):
                         references_data = list(references_queryset.values('id', 'title', 's3_key', 's3_url'))
                         informado = f"{references_queryset.count()} imagem(ns) de referência"
                 
+                # Tratamento especial para templates visuais (Fase 4)
+                elif campo_modelo == 'visual_templates':
+                    from apps.knowledge.models import VisualTemplate
+                    templates_queryset = kb.visual_templates.filter(is_active=True)
+                    templates_data = None
+                    if templates_queryset.exists():
+                        templates_data = list(templates_queryset.values('id', 'name', 's3_key', 'template_type', 'social_network'))
+                        informado = f"{templates_queryset.count()} template(s) cadastrado(s)"
+
+                # Tratamento especial para assets/grafismos (Fase 4)
+                elif campo_modelo == 'grafic_modules':
+                    from apps.knowledge.models import BrandgraficModule
+                    assets_queryset = kb.grafic_modules.filter(is_active=True)
+                    assets_data = None
+                    if assets_queryset.exists():
+                        assets_data = list(assets_queryset.values('id', 'name', 's3_key', 'file_format', 'orientation'))
+                        informado = f"{assets_queryset.count()} asset(s) cadastrado(s)"
+
                 # Tratamento especial para campo social_networks (relacionamento)
                 elif campo_modelo == 'social_networks':
                     from apps.knowledge.models import SocialNetwork
@@ -1078,7 +1112,15 @@ def perfil_view(request):
                 # Adicionar dados especiais para concorrentes
                 if competitors_data:
                     campo_data_dict['competitors_data'] = competitors_data
-                
+
+                # Adicionar dados especiais para templates visuais (Fase 4)
+                if templates_data is not None:
+                    campo_data_dict['templates_data'] = templates_data
+
+                # Adicionar dados especiais para assets/grafismos (Fase 4)
+                if assets_data is not None:
+                    campo_data_dict['assets_data'] = assets_data
+
                 campos_bloco.append(campo_data_dict)
             
             # Adicionar bloco (sempre, mesmo sem campos com sugestão)

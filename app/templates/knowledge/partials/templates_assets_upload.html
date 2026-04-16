@@ -1,0 +1,83 @@
+{% comment %}
+  Upload de Templates Visuais e Assets de Grafismo (Fase 4).
+  Insere-se dentro do Bloco 5 - Identidade Visual, apos brandguide.
+
+  Contexto esperado da view:
+    - visual_templates: queryset de VisualTemplate da KB (pode ser vazio)
+    - grafic_modules: queryset de BrandgraficModule da KB (pode ser vazio)
+{% endcomment %}
+
+{# ============================================ #}
+{# TEMPLATES VISUAIS                            #}
+{# ============================================ #}
+<div class="field" id="templates-section">
+  <div class="field-label-row">
+    <label>Templates visuais (opcional)</label>
+  </div>
+  <div class="field-hint field-hint-spaced-sm">
+    Envie artes prontas que servem como modelo para a IA gerar posts. A IA vai seguir o layout, composicao e estilo do template.
+  </div>
+
+  <div id="templates-gallery" class="templates-gallery" style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+    {% for tmpl in visual_templates %}
+    <div class="template-preview-item" data-template-id="{{ tmpl.id }}" data-s3-key="{{ tmpl.s3_key }}"
+         style="position:relative; width:120px; height:120px; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; background:#f8fafc;">
+      <img src="#" alt="{{ tmpl.name }}" data-lazy-load="{{ tmpl.s3_key }}"
+           style="width:100%; height:100%; object-fit:cover;">
+      <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); padding:3px 6px;">
+        <span style="color:#fff; font-size:10px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ tmpl.name }}</span>
+      </div>
+      <button type="button" onclick="deleteTemplate({{ tmpl.id }})"
+              style="position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%; border:none; background:rgba(0,0,0,0.5); color:#fff; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center;"
+              title="Remover template">&times;</button>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="upload-area" id="template-upload-area">
+    <input type="file" id="template-upload-input" accept="image/png,image/jpeg,image/webp" class="hidden-field">
+    <button type="button" class="btn-upload" onclick="document.getElementById('template-upload-input').click()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-3px;">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      Selecionar template
+    </button>
+    <p class="upload-hint">PNG, JPG ou WebP (max 10 MB)</p>
+  </div>
+</div>
+
+{# ============================================ #}
+{# ASSETS DE GRAFISMO                           #}
+{# ============================================ #}
+<div class="field" id="assets-section">
+  <div class="field-label-row">
+    <label>Assets de grafismo (opcional)</label>
+  </div>
+  <div class="field-hint field-hint-spaced-sm">
+    Envie elementos visuais isolados (grafismos, padronagens, icones) com fundo transparente. Serao usados como overlay nas pecas geradas.
+  </div>
+
+  <div id="assets-gallery" class="assets-gallery" style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+    {% for asset in grafic_modules %}
+    <div class="asset-preview-item" data-asset-id="{{ asset.id }}" data-s3-key="{{ asset.s3_key }}"
+         style="position:relative; width:90px; height:90px; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; background:#f0f0f0;">
+      <img src="#" alt="{{ asset.name }}" data-lazy-load="{{ asset.s3_key }}"
+           style="width:100%; height:100%; object-fit:contain; padding:4px;">
+      <button type="button" onclick="deleteAsset({{ asset.id }})"
+              style="position:absolute; top:3px; right:3px; width:20px; height:20px; border-radius:50%; border:none; background:rgba(0,0,0,0.5); color:#fff; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center;"
+              title="Remover asset">&times;</button>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="upload-area" id="asset-upload-area">
+    <input type="file" id="asset-upload-input" accept="image/png,image/svg+xml" class="hidden-field">
+    <button type="button" class="btn-upload" onclick="document.getElementById('asset-upload-input').click()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-3px;">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      Selecionar asset
+    </button>
+    <p class="upload-hint">PNG (transparente) ou SVG (max 5 MB)</p>
+  </div>
+</div>
