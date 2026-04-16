@@ -148,7 +148,29 @@ def perfil_remove_font(request):
                 'error': 'Base de conhecimento não encontrada'
             }, status=404)
         
-        # Buscar e remover fonte
+        # Buscar e remover fonte (suporta Typography ID numerico OU CustomFont 'custom_XX')
+        font_id_str = str(font_id)
+
+        # CustomFont standalone (ID como 'custom_83')
+        if font_id_str.startswith('custom_'):
+            try:
+                custom_id = int(font_id_str.replace('custom_', ''))
+                custom_font = kb.custom_fonts.get(id=custom_id)
+                s3_key = custom_font.s3_key
+                print(f"🗑️ [PERFIL_REMOVE_FONT] Deletando CustomFont standalone: {custom_font.name} (ID: {custom_id})", flush=True)
+                try:
+                    from apps.core.services.s3_service import S3Service
+                    S3Service.delete_file(s3_key)
+                except Exception as s3_error:
+                    print(f"⚠️ [PERFIL_REMOVE_FONT] Erro S3: {s3_error}", flush=True)
+                custom_font.delete()
+                return JsonResponse({'success': True, 'message': 'Fonte removida com sucesso!'})
+            except CustomFont.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Fonte não encontrada'}, status=404)
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+        # Typography (ID numerico)
         try:
             font = kb.typography_settings.get(id=font_id)
             usage = font.usage

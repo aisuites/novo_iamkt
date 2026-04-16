@@ -866,8 +866,8 @@ def perfil_view(request):
                     {'nome': 'logo_files', 'label': 'Logotipos', 'campo_modelo': 'logos', 'readonly': True, 'type': 'logos'},
                     {'nome': 'reference_images', 'label': 'Imagens de referência', 'campo_modelo': 'reference_images', 'readonly': True, 'type': 'references'},
                     {'nome': 'brandguide_pdf', 'label': 'Brandguide da marca', 'campo_modelo': 'brandguide_uploads', 'readonly': False, 'type': 'brandguide', 'no_suggestions': True},
-                    {'nome': 'visual_templates', 'label': 'Templates visuais', 'campo_modelo': 'visual_templates', 'readonly': True, 'type': 'visual_templates', 'no_suggestions': True},
-                    {'nome': 'grafic_assets', 'label': 'Assets de grafismo', 'campo_modelo': 'grafic_modules', 'readonly': True, 'type': 'grafic_assets', 'no_suggestions': True},
+                    {'nome': 'visual_templates', 'label': 'Templates visuais', 'campo_modelo': 'visual_templates', 'readonly': False, 'type': 'visual_templates', 'no_suggestions': True},
+                    {'nome': 'grafic_assets', 'label': 'Assets de grafismo', 'campo_modelo': 'grafic_modules', 'readonly': False, 'type': 'grafic_assets', 'no_suggestions': True},
                 ]
             },
             {
@@ -1076,6 +1076,22 @@ def perfil_view(request):
                     else:
                         sugestao = str(sugestao_raw) if sugestao_raw else ''
                 
+                # 2.5 OVERRIDE: campos visuais com uploads devem ter avaliacao positiva
+                # independente do que o N8N retornou (IA nao analisa imagens diretamente)
+                visual_upload_fields = {
+                    'logos': lambda: kb.logos.exists(),
+                    'reference_images': lambda: kb.reference_images.exists(),
+                    'visual_templates': lambda: kb.visual_templates.filter(is_active=True).exists(),
+                    'grafic_modules': lambda: kb.grafic_modules.filter(is_active=True).exists(),
+                }
+                if campo_modelo in visual_upload_fields:
+                    has_uploads = visual_upload_fields[campo_modelo]()
+                    if has_uploads:
+                        if not avaliacao or 'não há' in avaliacao.lower() or 'nao ha' in avaliacao.lower():
+                            avaliacao = 'Arquivos enviados e disponíveis para uso.'
+                        if not status or status == 'fraco':
+                            status = 'bom'
+
                 # 3. ADICIONAR CAMPO AO BLOCO (sempre, mesmo sem dados N8N)
                 campo_data_dict = {
                     'nome': campo_nome,
@@ -1139,6 +1155,15 @@ def perfil_view(request):
             is_primary=True
         ).first()
         
+        # Templates visuais e assets para o partial de upload (Fase 4)
+        from apps.knowledge.models import VisualTemplate, BrandgraficModule
+        visual_templates = VisualTemplate.objects.filter(
+            knowledge_base=kb, is_active=True
+        ).order_by('template_type', 'name')
+        grafic_modules = BrandgraficModule.objects.filter(
+            knowledge_base=kb, is_active=True
+        ).order_by('name')
+
         context = {
             'kb': kb,
             'analysis_status': analysis_status,
@@ -1148,10 +1173,12 @@ def perfil_view(request):
             'kb_onboarding_completed': kb.onboarding_completed if kb else False,
             'kb_suggestions_reviewed': kb.suggestions_reviewed if kb else False,
             'primary_logo': primary_logo,
+            'visual_templates': visual_templates,
+            'grafic_modules': grafic_modules,
         }
-        
+
         print(f" [PERFIL_VIEW] Contexto criado - onboarding: {context['kb_onboarding_completed']}, suggestions: {context['kb_suggestions_reviewed']}", flush=True)
-        
+
         return render(request, 'knowledge/perfil.html', context)
     
     # Outros estados: apenas passar status

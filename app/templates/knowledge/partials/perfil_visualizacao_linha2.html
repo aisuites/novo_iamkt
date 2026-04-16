@@ -49,6 +49,7 @@
                             </div>
                             {% endfor %}
                             {% for font in kb.custom_fonts.all %}
+                            {% if not font.typography_usages.exists %}
                             <div class="typography-item">
                                 <span class="typography-icon">▸</span>
                                 <div class="typography-info">
@@ -58,6 +59,7 @@
                                     </span>
                                 </div>
                             </div>
+                            {% endif %}
                             {% endfor %}
                         </div>
                     </div>
