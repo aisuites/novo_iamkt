@@ -1076,19 +1076,22 @@ def perfil_view(request):
                     else:
                         sugestao = str(sugestao_raw) if sugestao_raw else ''
                 
-                # 2.5 OVERRIDE: campos visuais com uploads devem ter avaliacao positiva
-                # independente do que o N8N retornou (IA nao analisa imagens diretamente)
-                visual_upload_fields = {
+                # 2.5 OVERRIDE: campos com dados cadastrados devem ter avaliacao positiva
+                # quando o N8N diz "nao informado" mas o usuario ja preencheu
+                fields_with_data_check = {
                     'logos': lambda: kb.logos.exists(),
                     'reference_images': lambda: kb.reference_images.exists(),
                     'visual_templates': lambda: kb.visual_templates.filter(is_active=True).exists(),
                     'grafic_modules': lambda: kb.grafic_modules.filter(is_active=True).exists(),
+                    'social_networks': lambda: kb.social_networks.filter(is_active=True).exists(),
+                    'site_institucional': lambda: bool(kb.site_institucional),
                 }
-                if campo_modelo in visual_upload_fields:
-                    has_uploads = visual_upload_fields[campo_modelo]()
-                    if has_uploads:
-                        if not avaliacao or 'não há' in avaliacao.lower() or 'nao ha' in avaliacao.lower():
-                            avaliacao = 'Arquivos enviados e disponíveis para uso.'
+                if campo_modelo in fields_with_data_check:
+                    has_data = fields_with_data_check[campo_modelo]()
+                    if has_data:
+                        neg_phrases = ['não há', 'nao ha', 'não foram', 'nao foram', 'não informad', 'nao informad']
+                        if not avaliacao or any(p in avaliacao.lower() for p in neg_phrases):
+                            avaliacao = 'Dados cadastrados e disponíveis para uso.'
                         if not status or status == 'fraco':
                             status = 'bom'
 
