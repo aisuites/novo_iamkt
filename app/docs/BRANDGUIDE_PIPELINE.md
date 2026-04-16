@@ -717,60 +717,157 @@ Usuario valida/ajusta -> spec disponivel para uso
 
 ---
 
-## 10. Extracao de Grafismos do PDF
+## 10. Grafismos - Extracao, Armazenamento e Uso
 
-### Cenarios possiveis
+O grafismo e um dos elementos mais complexos do pipeline porque envolve:
+- **Dados descritivos** (posicionamento, regras) → salvos no `brand_visual_spec` JSON
+- **Assets visuais** (PNGs/SVGs dos modulos) → salvos como `BrandgraficModule` no S3
+- **Padroes de aplicacao** (como combinar asset + posicao + cor) → usados pelo Compose Engine
 
-| Cenario | Como o grafismo esta no PDF | Extracao |
-|---------|----------------------------|----------|
-| A | Vetor embutido (SVG) | PyMuPDF extrai SVG - fidelidade 100% |
-| B | Imagem embutida (PNG/JPG) | PyMuPDF extrai imagem |
-| C | Parte do render da pagina | Recorte programatico baseado em coordenadas da IA |
+### 10.1 - Dados descritivos (capturado na Fase 3 via prompt N8N)
 
-### Pipeline
+O `brand_visual_spec.grafismo` armazena a descricao completa:
+
+```json
+{
+  "grafismo": {
+    "origem": "Abstracao das formas do logotipo",
+    "tipo": "Padronagem geometrica",
+    "descricao_visual": "Formas abertas com linhas monolineares, alto contraste",
+    "modulos": 8,
+    "repeticao": ["vertical", "horizontal"],
+    "uso": "Elemento decorativo de apoio, recortado em modulos e repetido",
+    "aplicacoes_layout": [
+      {
+        "formato": "feed_retangular",
+        "grid": "2x3",
+        "posicao_grafismo": "coluna direita, ocupando 2/3 da altura",
+        "relacao_com_texto": "ao lado do texto, nunca sobrepoe",
+        "cor_grafismo": "cor de iniciativa sobre fundo preto",
+        "exemplo_pagina": 34
+      },
+      {
+        "formato": "quadrado",
+        "grid": "2x2",
+        "posicao_grafismo": "quadrante superior direito",
+        "relacao_com_texto": "ocupa quadrante oposto ao texto",
+        "cor_grafismo": "preto sobre fundo branco",
+        "exemplo_pagina": 36
+      }
+    ],
+    "regras_aplicacao": [
+      "Grafismo sempre ocupa uma area do grid, nunca sobrepoe texto",
+      "Usar apenas 1 modulo por peca",
+      "Cor do grafismo segue a cor de iniciativa escolhida para a peca"
+    ]
+  }
+}
+```
+
+**Isso ja funciona hoje** — cabe no JSONField existente, sem migration. Basta refinar o prompt no N8N.
+
+### 10.2 - Assets visuais (Fase 7 - Compose Engine)
+
+#### Cenarios de obtencao
+
+| Cenario | Como obter | Fidelidade |
+|---------|------------|------------|
+| A - Vetor embutido | PyMuPDF extrai SVG do PDF | 100% |
+| B - Imagem embutida | PyMuPDF extrai PNG/JPG | Alta |
+| C - Parte da pagina | IA identifica coordenadas, backend recorta | Media |
+| D - Upload manual | Usuario sobe PNGs dos grafismos | 100% |
+
+#### Pipeline de extracao (a implementar na Fase 7)
 
 ```
-[1] PyMuPDF extrai TODOS os objetos embutidos
+AUTOMATICO (cenarios A/B/C):
+[1] PyMuPDF extrai objetos embutidos do PDF
     │  Salva candidatos em S3: /brandguide/assets/raw/
     ▼
 [2] IA Vision classifica cada asset:
-    │  - Logo? (descarta, ja temos upload separado)
-    │  - Grafismo/padrao? (mantem)
-    │  - Foto/ilustracao exemplo? (descarta)
+    │  - Grafismo/padrao? → mantem
+    │  - Logo? → descarta (ja temos upload separado)
+    │  - Foto/exemplo? → descarta
     ▼
-[3] Para Cenario C (grafismo nao e objeto isolado):
-    │  - IA identifica coordenadas na pagina
+[3] Para cenario C (nao e objeto isolado):
+    │  - IA identifica coordenadas (bounding box) na pagina
     │  - Backend recorta com Pillow
     │  - Aplica remocao de fundo (rembg) se aplicavel
     ▼
-[4] Usuario revisa grafismos capturados
-    │  Aprova quais usar
-    │  Ajusta nomes/categorias
+[4] Salva como BrandgraficModule (modelo ja existe desde Fase 1)
+
+MANUAL (cenario D):
+[1] Usuario faz upload de PNGs via interface (Bloco 5)
     ▼
-[5] Grafismos aprovados salvos no modelo BrandgraficModule
-    │  Disponiveis para Compose Engine usar como overlay
+[2] Cria BrandgraficModule com extraction_type='manual_upload'
 ```
 
-### Quando nao consegue extrair
+#### Modelo BrandgraficModule (ja existe)
 
-Se nenhum grafismo e extraivel com fidelidade aceitavel, o Brand Visual Spec marca `grafismos_extraidos: false` e o Compose Engine opera sem overlay decorativo.
+```python
+BrandgraficModule:
+  - knowledge_base (FK)
+  - name: "Modulo vertical 03"
+  - extraction_type: 'vector_embedded' | 'image_embedded' | 'cropped_from_page' | 'manual_upload'
+  - s3_key, s3_url
+  - file_format: 'svg' | 'png'
+  - has_transparency: bool
+  - width, height
+  - orientation: 'vertical' | 'horizontal' | 'both'
+  - usage_hint: "Repetir na coluna direita"
+  - approved_by_user: bool
+```
+
+**Nota:** 'manual_upload' precisa ser adicionado ao choices do campo `extraction_type`
+(migration simples, uma linha).
+
+### 10.3 - Link entre asset e padrao de aplicacao (Fase 7)
+
+O Compose Engine precisa saber: **qual asset PNG** colocar **em qual posicao** do layout.
+
+```
+brand_visual_spec.grafismo.aplicacoes_layout[0]
+  → formato: "feed_retangular"
+  → posicao: "coluna direita, 2/3 altura"
+  → cor: "cor de iniciativa"
+
+BrandgraficModule id=5
+  → name: "Modulo 03"
+  → s3_url: "https://s3.../modulo_03.png"
+  → orientation: "vertical"
+
+Compose Engine:
+  1. Le layout_plan do post (formato feed_retangular)
+  2. Busca aplicacao_layout que corresponde
+  3. Seleciona BrandgraficModule com orientation compativel
+  4. Aplica como overlay na posicao do grid
+  5. Coloriza conforme cor de iniciativa escolhida
+```
+
+### 10.4 - Quando nao tem grafismos
+
+Se nenhum grafismo e extraivel E o usuario nao fez upload:
+- `brand_visual_spec.grafismo.modulos = 0`
+- Compose Engine renderiza sem overlay decorativo
+- Estilo depende apenas de cores + tipografia + grid
 
 ---
 
 ## 11. Custos e Performance
 
-### Setup (1x por cliente)
+### Setup (1x por cliente) — valores validados em producao
 
-| Item | Cenario PDF | Cenario so imagens ref |
-|------|-------------|------------------------|
-| Conversao PDF->PNG | ~60s | - |
-| Extracao assets (PyMuPDF) | ~10s | - |
-| Analise IA (triagem) | ~$0.01 | - |
-| Analise IA (profunda) | ~$0.08 | ~$0.03 |
-| Brand Visual Spec | ~$0.16 | ~$0.06 |
+| Item | Cenario PDF (validado) | Cenario so imagens ref (estimado) |
+|------|------------------------|-----------------------------------|
+| Conversao PDF->PNG | ~70s | - |
+| Analise IA triagem (gpt-4.1-mini) | **$0.06** | - |
+| Analise IA profunda (gpt-4o) | **$0.14** | ~$0.05 |
 | Marketing Summary | ~$0.03 | ~$0.03 |
-| **Total setup** | **~$0.28** | **~$0.12** |
-| Tempo total | ~3 min | ~1 min |
+| **Total setup** | **~$0.20-0.25** | **~$0.08** |
+| Tempo total | ~3-4 min | ~1 min |
+| Tokens totais | ~175.000-200.000 | ~50.000 |
+
+*Valores reais medidos com PDF For Tomorrow (60 paginas) em 2026-04-16.*
 
 ### Por post
 

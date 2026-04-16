@@ -5,6 +5,115 @@
 
 ---
 
+## Status das Fases (atualizado 2026-04-16)
+
+| Fase | Status | Branch | Tag |
+|------|--------|--------|-----|
+| 1 - Modelos + Intents | ✅ Concluida | `fase-1/modelo-e-intents` | `fim-fase-1` |
+| 2 - Upload PDF + Conversao | ✅ Concluida | `fase-2/upload-pdf-e-conversao` | `fim-fase-2` |
+| 3 - Analise IA + Brand Visual Spec | ✅ Concluida | `fase-3/analise-ia-pdf` | `fim-fase-3` |
+| 4 - Brand Spec Inferido | Pendente | | |
+| 5 - Marketing Summary | Pendente | | |
+| 6 - Objetivo + Layout Planner | Pendente | | |
+| 7 - Compose Engine | Pendente | | |
+| 8 - A/B Testing | Pendente | | |
+
+### Resultados validados em producao (Fase 3)
+
+- PDF For Tomorrow (60 paginas) analisado com sucesso
+- Custo total: ~$0.20 por brandguide (triagem $0.06 + analise $0.14)
+- Tempo total (upload + conversao + analise): ~3-4 minutos
+- Tokens rastreados e salvos em `BrandguideUpload.ai_usage`
+
+### Pendencias e refinamentos (nao bloqueiam proximas fases)
+
+#### P1 - Refinamento de prompts N8N (so N8N, zero deploy Django)
+
+Ajustes no prompt de analise profunda para melhorar extracao:
+
+1. **Cores de iniciativas com hex impreciso**
+   - Problema: algumas cores HEX extraidas nao batem exatamente com os swatches
+   - Melhoria: prompt deve pedir "extraia cores APENAS dos swatches oficiais da paleta,
+     nao dos exemplos de aplicacao. Leia o HEX diretamente da imagem."
+   - Cor faltante identificada: #FF0047 (vermelho/coral, canto inferior esquerdo da paleta)
+
+2. **nome_empresa usando valor do existing_kb em vez do brandguide**
+   - Problema: IA priorizou o nome existente na KB ("teste.uso@teste.uso")
+   - Melhoria: prompt deve dizer "para nome_empresa, use o nome que aparece no
+     BRANDGUIDE, ignorando o valor existente na KB"
+
+3. **Grafismo - aplicacoes de layout nao capturadas**
+   - Problema: paginas 31-37 (exemplos de grade com grafismo) nao foram descritas
+   - Melhoria: expandir o brand_visual_spec.grafismo com `aplicacoes_layout`:
+   ```json
+   {
+     "grafismo": {
+       "origem": "...",
+       "tipo": "...",
+       "modulos": 8,
+       "aplicacoes_layout": [
+         {
+           "formato": "feed_retangular",
+           "grid": "2x3",
+           "posicao_grafismo": "coluna direita, 2/3 da altura",
+           "cor_grafismo": "cor de iniciativa sobre fundo preto",
+           "exemplo_pagina": 34
+         },
+         {
+           "formato": "quadrado",
+           "grid": "2x2",
+           "posicao_grafismo": "quadrante superior direito",
+           "cor_grafismo": "preto sobre fundo branco",
+           "exemplo_pagina": 36
+         }
+       ],
+       "regras_aplicacao": [
+         "Grafismo sempre ocupa uma area do grid, nunca sobrepoe texto",
+         "Usar apenas 1 modulo por peca",
+         "Cor do grafismo segue a cor de iniciativa escolhida"
+       ]
+     }
+   }
+   ```
+   - Cabe no JSONField existente, sem migration
+
+4. **Tipografia fallback**
+   - Corrigido na ultima execucao: IBM Plex Sans agora e capturado
+   - Monitorar para garantir consistencia
+
+#### P2 - Extracao de assets visuais do PDF (Fase 7 - Compose Engine)
+
+Implementar quando comecarmos a Fase 7:
+
+1. **Extracao automatica com PyMuPDF**
+   - Funcao no Celery que extrai objetos embutidos (vetores SVG, imagens PNG)
+   - Classificacao por IA: grafismo vs logo vs foto/exemplo
+   - Salvar como `BrandgraficModule` (modelo ja existe desde Fase 1)
+
+2. **Upload manual de assets PNG**
+   - Endpoint similar ao upload de logo
+   - Interface no Bloco 5 para o usuario subir PNGs de grafismo
+   - Criar registro `BrandgraficModule` com `extraction_type='manual_upload'`
+   - Precisa adicionar 'manual_upload' nas choices do campo (migration simples)
+
+3. **Link entre asset e padrao de aplicacao**
+   - Associar cada `BrandgraficModule` ao `aplicacoes_layout` do brand_visual_spec
+   - Compose Engine usa: spec diz "modulo 03 na coluna direita" + asset PNG do modulo 03
+
+#### P3 - Melhorias de UX (ao longo das fases)
+
+1. **Visualizacao do Brand Visual Spec para o usuario**
+   - Hoje: JSON cru salvo no banco, usuario nao ve
+   - Implementar: tela no perfil mostrando cores (swatches), fontes (previews),
+     grid (diagrama), grafismos (thumbnails)
+   - Fase sugerida: junto com Fase 4 ou 6
+
+2. **Aprovacao granular do Brand Visual Spec**
+   - Usuario valida cada secao (cores OK, tipografia OK, grid precisa ajuste)
+   - Marca `brand_visual_spec_validated = True` quando tudo aprovado
+
+---
+
 ## Estrategia de Seguranca
 
 ### Branches

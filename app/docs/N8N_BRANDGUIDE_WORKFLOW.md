@@ -613,34 +613,62 @@ VOCE DEVE RETORNAR EXATAMENTE ESTE FORMATO JSON (preencha todos os campos):
       ]
     },
     "grafismo": {
-      "origem": "De onde vem o grafismo (abstracao do logo, padrao geometrico, etc)",
+      "origem": "De onde vem o grafismo (ex: abstracao das formas do logotipo)",
       "tipo": "Tipo do grafismo (padronagem geometrica, organica, linhas, etc)",
       "modulos": 0,
       "repeticao": ["vertical", "horizontal"],
-      "uso": "Como e onde usar (overlay, fundo, moldura, etc)"
+      "uso": "Como e onde usar (overlay, fundo, moldura, etc)",
+      "descricao_visual": "Descreva visualmente como sao os modulos: formas, aberturas, espessura de linhas, estilo geometrico",
+      "aplicacoes_layout": [
+        {
+          "formato": "nome do formato (ex: feed_retangular, story, quadrado)",
+          "grid": "grid usado (ex: 2x3, 2x2)",
+          "posicao_grafismo": "Onde o grafismo fica no layout (ex: coluna direita ocupando 2/3 da altura)",
+          "relacao_com_texto": "Como grafismo se relaciona com o texto (ex: ao lado, atras, nunca sobrepoe)",
+          "cor_grafismo": "Cor usada no grafismo neste exemplo (ex: cor de iniciativa sobre fundo preto)",
+          "exemplo_pagina": 0
+        }
+      ],
+      "regras_aplicacao": [
+        "COPIE cada regra de uso do grafismo encontrada no brandguide",
+        "Ex: Grafismo sempre ocupa uma area do grid, nunca sobrepoe texto",
+        "Ex: Usar apenas 1 modulo por peca",
+        "Ex: Cor do grafismo segue a cor de iniciativa escolhida para a peca"
+      ]
     },
     "estilo_composicao": {
       "mood": "Descricao do mood/atmosfera geral: ex 'minimalista e futurista'",
       "abordagem": "Abordagem de design: ex 'espacos abertos com tipografia forte'",
       "principios": [
-        "Principio 1 de composicao encontrado no brandguide",
-        "Principio 2",
-        "Principio 3"
+        "COPIE cada principio de composicao encontrado no brandguide",
+        "Ex: Espacos vazios sao intencionais e fazem parte do design",
+        "Ex: Titulos e chamadas no topo a esquerda",
+        "Ex: Texto principal posicionado apos titulo",
+        "Ex: Texto secundario e flexivel, funciona como apoio"
       ]
     }
   }
 }
 
 REGRAS CRITICAS:
-- Retorne APENAS o JSON, sem texto antes ou depois, sem markdown
-- Extraia codigos de cor HEX exatos (#RRGGBB) — nao aproxime
-- Identifique fontes pelo nome exato como aparece no brandguide
-- Se o brandguide nao menciona algo (ex: grid), use null no campo
-- Se houver regras explicitas escritas no brandguide, COPIE elas
-- Preste atencao em NUMEROS (reducao minima em px/mm, quantidade de modulos)
-- Para disponivel_google_fonts: true se a fonte e conhecida no Google Fonts, false se e exclusiva
-- Descreva o grafismo com detalhes suficientes para um designer reproduzi-lo
-- As regras de cores sao CRITICAS para a geracao de posts futuros`
+1. CORES: Extraia TODOS os codigos HEX que aparecem nos SWATCHES OFICIAIS da paleta.
+   - NAO extraia cores de fotos, mockups ou exemplos de aplicacao
+   - Leia o HEX diretamente dos quadrados/circulos de cor da paleta
+   - Inclua TODAS: institucional (preto, branco) E iniciativas/destaque (cada cor separada)
+   - Se o brandguide mostra exemplos "Preto + Azul", "Preto + Verde", extraia CADA cor individual
+2. NOME EMPRESA: Use o nome que aparece NO BRANDGUIDE, NAO o valor de existing_kb
+3. TIPOGRAFIA: Identifique a fonte PRINCIPAL e tambem a fonte de APOIO/FALLBACK
+   - Se menciona "na impossibilidade de usar X, use Y", Y e o fallback
+4. GRID: Copie dimensoes exatas e TODAS as regras de posicionamento
+5. GRAFISMO - MUITO IMPORTANTE:
+   - Descreva visualmente como sao os modulos (formas, estilo)
+   - Para cada EXEMPLO DE LAYOUT no brandguide (paginas de "exemplos de grade"),
+     descreva: onde o grafismo fica, em qual grid, com qual cor, relacao com texto
+   - Copie TODAS as regras de aplicacao do grafismo
+   - Essas informacoes serao usadas por um agente de IA para gerar imagens de posts
+6. ESTILO COMPOSICAO: Copie os principios de composicao LITERALMENTE como escritos
+7. Retorne APENAS JSON valido, sem markdown
+8. Se nao encontrar algo, use null (nao invente)`
     },
     {
       role: "user",
