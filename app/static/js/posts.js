@@ -1178,12 +1178,47 @@
       post.activeImageIndex = index;
       
       // Mostrar imagem principal com lazyload
+      dom.postImageFrame.style.position = 'relative';
       const img = document.createElement('img');
       img.src = '#';
       img.setAttribute('data-lazy-load', post.imagens[index]);
       img.alt = `Pré-visualização da imagem ${index + 1}`;
       dom.postImageFrame.appendChild(img);
-      
+
+      // Botao de download (icone sobre a imagem, canto inferior direito)
+      const dlBtn = document.createElement('button');
+      dlBtn.type = 'button';
+      dlBtn.className = 'btn-download-image';
+      dlBtn.title = 'Baixar imagem';
+      dlBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+      dlBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const s3Key = post.imagens[post.activeImageIndex || 0];
+        try {
+          dlBtn.style.opacity = '0.5';
+          dlBtn.style.pointerEvents = 'none';
+          const resp = await fetch(`/posts/preview-url/?s3_key=${encodeURIComponent(s3Key)}`);
+          const json = await resp.json();
+          if (json.success && json.data?.previewUrl) {
+            const imgResp = await fetch(json.data.previewUrl);
+            const blob = await imgResp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `post-${post.id}-imagem.png`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          }
+        } catch(err) { console.error('Download falhou:', err); }
+        finally {
+          dlBtn.style.opacity = '';
+          dlBtn.style.pointerEvents = '';
+        }
+      });
+      dom.postImageFrame.appendChild(dlBtn);
+
       // Ativar lazyload para a imagem
       if (window.postsImageLoader) {
         window.postsImageLoader.observe(img);

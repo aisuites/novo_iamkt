@@ -705,10 +705,11 @@ select.form-input-filter:disabled {
   width: min(720px, 92vw);
   max-height: calc(100vh - 24px);
   overflow-y: auto;
-  background: linear-gradient(180deg, #17181d 0%, #121318 100%);
-  border: 1px solid var(--border);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
 
 .modal .head {
@@ -721,13 +722,13 @@ select.form-input-filter:disabled {
 .modal .head h3 {
   margin: 0;
   font-size: 1.1rem;
-  color: var(--text);
+  color: #1e293b;
 }
 
 .modal .close {
   background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
+  border: 1px solid #e2e8f0;
+  color: #64748b;
   padding: 0.5rem 1rem;
   border-radius: 8px;
   cursor: pointer;
@@ -735,8 +736,8 @@ select.form-input-filter:disabled {
 }
 
 .modal .close:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: #6366f1;
+  color: #6366f1;
 }
 
 .modal .form {
@@ -753,17 +754,17 @@ select.form-input-filter:disabled {
 
 .modal .form label span {
   font-size: 0.85rem;
-  color: var(--muted);
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .modal .form input,
 .modal .form textarea {
-  background: #0e1017;
-  border: 1px solid var(--border);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
-  color: var(--text);
+  color: #1e293b;
   padding: 0.7rem;
   font: inherit;
 }
@@ -771,7 +772,8 @@ select.form-input-filter:disabled {
 .modal .form input:focus,
 .modal .form textarea:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 .modal .form-footer {
@@ -1996,4 +1998,32 @@ select.form-input-filter:disabled {
     display: flex;
     gap: 0.5rem;
     margin-top: 0.75rem;
+}
+
+/* Botao de download da imagem do post */
+.btn-download-image {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: #475569;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  z-index: 5;
+  backdrop-filter: blur(4px);
+}
+
+.btn-download-image:hover {
+  background: #ffffff;
+  color: #6366f1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: scale(1.05);
 }

@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from django.core.cache import cache
+from django.db import models
 from django.utils import timezone
 from apps.posts.models import Post
 
@@ -59,7 +60,7 @@ def n8n_post_callback(request):
     # CAMADA 2: Validação de IP
     # Usar HTTP_CF_CONNECTING_IP pois requisições passam pelo Cloudflare
     client_ip = request.META.get('HTTP_CF_CONNECTING_IP') or request.META.get('REMOTE_ADDR')
-    allowed_ips = settings.N8N_ALLOWED_IPS.split(',')
+    allowed_ips = [ip.strip() for ip in settings.N8N_ALLOWED_IPS.split(',')]
     
     if client_ip not in allowed_ips:
         logger.warning(
@@ -185,43 +186,47 @@ def n8n_post_callback(request):
             logger.debug(f"✏️ [N8N_POST_CALLBACK] Status mudado de 'generating' para 'pending'")
         
         # Atualizar imagens (se fornecidas)
+        # IMPORTANTE: NAO deletar imagens anteriores — manter historico.
+        # Novas imagens sao adicionadas com order maior que as existentes.
+        # A imagem mais recente (maior order) vira a principal.
         if 'imagens' in data and isinstance(data['imagens'], list):
             from apps.posts.models import PostImage
-            
-            # Limpar imagens antigas (se houver)
-            post.images.all().delete()
-            
-            # Criar registros de PostImage para cada imagem retornada pelo N8N
+
+            # Determinar proximo order (apos as imagens existentes)
+            max_order = post.images.aggregate(models.Max('order'))['order__max'] or -1
+            next_order = max_order + 1
+
             for idx, img in enumerate(data['imagens']):
                 s3_url = None
                 s3_key = None
-                
+
                 if isinstance(img, dict):
                     s3_url = img.get('url', '')
                     s3_key = img.get('s3_key', '')
                 elif isinstance(img, str):
                     s3_url = img
-                
+
                 if not s3_url:
                     continue
-                
-                # Criar PostImage com URL e s3_key retornados pelo N8N
+
                 PostImage.objects.create(
                     post=post,
                     s3_url=s3_url,
                     s3_key=s3_key,
-                    order=idx
+                    order=next_order + idx
                 )
-                logger.info(f"✅ [N8N_POST_CALLBACK] Imagem {idx} salva: {s3_key or s3_url[:50]}")
-            
-            # Atualizar flags do post
+                logger.info(f"✅ [N8N_POST_CALLBACK] Imagem {next_order + idx} salva: {s3_key or s3_url[:50]}")
+
+            # Atualizar principal com a imagem mais recente
             if post.images.exists():
                 post.has_image = True
-                # Salvar primeira imagem como principal (retrocompatibilidade)
-                first_img = post.images.first()
-                post.image_s3_url = first_img.s3_url
-                post.image_s3_key = first_img.s3_key
-                logger.info(f"✅ [N8N_POST_CALLBACK] {post.images.count()} imagens salvas")
+                latest_img = post.images.order_by('-order').first()
+                post.image_s3_url = latest_img.s3_url
+                post.image_s3_key = latest_img.s3_key
+                logger.info(
+                    f"✅ [N8N_POST_CALLBACK] {post.images.count()} imagens totais "
+                    f"(principal: order={latest_img.order})"
+                )
         
         # Salvar alterações
         post.save()

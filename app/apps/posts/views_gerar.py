@@ -182,31 +182,48 @@ def gerar_post(request):
                     ).first()
                     
                     knowledge_base_data = None
-                    if kb and kb.n8n_compilation:
-                        # Extrair apenas marketing_input_summary do JSON n8n_compilation
+                    if kb:
+                        # Extrair marketing_input_summary do n8n_compilation
                         marketing_summary = ''
-                        if isinstance(kb.n8n_compilation, dict):
+                        if kb.n8n_compilation and isinstance(kb.n8n_compilation, dict):
                             marketing_summary = kb.n8n_compilation.get('marketing_input_summary', '')
-                        elif isinstance(kb.n8n_compilation, str):
+                        elif kb.n8n_compilation and isinstance(kb.n8n_compilation, str):
                             try:
                                 import json as json_lib
                                 compilation_data = json_lib.loads(kb.n8n_compilation)
                                 marketing_summary = compilation_data.get('marketing_input_summary', '')
-                            except:
+                            except Exception:
                                 marketing_summary = kb.n8n_compilation
-                        
-                        if marketing_summary:
-                            knowledge_base_data = {
-                                'kb_id': kb.id,
-                                'company_name': kb.nome_empresa or '',
-                                'marketing_input_summary': marketing_summary,
-                                'reference_images_analysis': ''
-                            }
-                            logger.debug(f"KnowledgeBase encontrado: {kb.id}")
-                        else:
-                            logger.warning(f"marketing_input_summary vazio no KB {kb.id}")
+
+                        # Fallback: se N8N nao gerou marketing_input_summary,
+                        # montar resumo basico dos campos da KB para nao enviar null
+                        if not marketing_summary:
+                            parts = []
+                            if kb.nome_empresa:
+                                parts.append(f'Empresa: {kb.nome_empresa}')
+                            if kb.missao:
+                                parts.append(f'Missao: {kb.missao}')
+                            if kb.posicionamento:
+                                parts.append(f'Posicionamento: {kb.posicionamento}')
+                            if kb.tom_voz_externo:
+                                parts.append(f'Tom de voz: {kb.tom_voz_externo}')
+                            if kb.publico_externo:
+                                parts.append(f'Publico-alvo: {kb.publico_externo}')
+                            if kb.proposta_valor:
+                                parts.append(f'Proposta de valor: {kb.proposta_valor}')
+                            if parts:
+                                marketing_summary = '. '.join(parts)
+
+                        # Montar payload com mesma estrutura original (4 campos)
+                        knowledge_base_data = {
+                            'kb_id': kb.id,
+                            'company_name': kb.nome_empresa or '',
+                            'marketing_input_summary': marketing_summary or '',
+                            'reference_images_analysis': '',
+                        }
+                        logger.debug(f"KnowledgeBase {kb.id}: summary={'compilado' if kb.n8n_compilation and kb.n8n_compilation.get('marketing_input_summary') else 'fallback'}")
                     else:
-                        logger.warning(f"KnowledgeBase não encontrado ou n8n_compilation vazio para organization {post.organization.id}")
+                        logger.warning(f"KnowledgeBase não encontrado para organization {post.organization.id}")
                 except Exception as e:
                     logger.error(f"Erro ao buscar KnowledgeBase: {e}", exc_info=True)
                     knowledge_base_data = None
