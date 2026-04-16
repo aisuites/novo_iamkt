@@ -111,8 +111,8 @@ class KnowledgeBaseAdmin(admin.ModelAdmin):
         return not KnowledgeBase.objects.exists()
     
     def has_delete_permission(self, request, obj=None):
-        return False
-    
+        return request.user.is_superuser
+
     def display_concorrentes(self, obj):
         """Exibe concorrentes de forma formatada"""
         if not obj.concorrentes:

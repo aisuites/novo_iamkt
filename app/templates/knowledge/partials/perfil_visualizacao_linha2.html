@@ -10,15 +10,13 @@
                 
                 {% if kb.colors.all %}
                     <div class="block-content">
-                        <div class="perfil-colors-wrapper">
-                            <div class="perfil-color-list">
-                                {% for color in kb.colors.all %}
-                                <div class="perfil-color-item">
-                                    <div class="perfil-color-preview" style="background-color: {{ color.hex_code }};"></div>
-                                    <span class="perfil-color-hex">{{ color.hex_code }}</span>
-                                </div>
-                                {% endfor %}
+                        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                            {% for color in kb.colors.all %}
+                            <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 999px;">
+                                <div style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.08); flex-shrink: 0; background-color: {{ color.hex_code }};"></div>
+                                <span style="font-size: 13px; font-family: 'Courier New', monospace; font-weight: 600; color: #1e293b; text-transform: uppercase;">{{ color.hex_code }}</span>
                             </div>
+                            {% endfor %}
                         </div>
                     </div>
                 {% else %}
@@ -30,24 +28,34 @@
             <div class="content-block">
                 <h2 class="block-title">🔤 Tipografias</h2>
                 
-                {% if kb.typography_settings.all %}
+                {% if kb.typography_settings.all or kb.custom_fonts.all %}
                     <div class="block-content">
                         <div class="typography-list">
                             {% for typo in kb.typography_settings.all %}
                             <div class="typography-item">
                                 <span class="typography-icon">▸</span>
                                 <div class="typography-info">
-                                    <span class="typography-label">Fonte #{{ forloop.counter }}</span>
+                                    <span class="typography-label">{{ typo.usage|default:"Uso geral" }}</span>
                                     <span class="typography-name">
                                         {% if typo.google_font_name %}
-                                            {{ typo.google_font_name }}
+                                            {{ typo.google_font_name }} <small style="color:#94a3b8">(Google Fonts)</small>
                                         {% elif typo.custom_font %}
-                                            {{ typo.custom_font.name }}
+                                            {{ typo.custom_font.name }} <small style="color:#94a3b8">(Upload)</small>
                                         {% else %}
                                             Fonte {{ forloop.counter }}
                                         {% endif %}
                                     </span>
-                                    <span class="typography-usage">{{ typo.usage_description|default:"Uso geral" }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% for font in kb.custom_fonts.all %}
+                            <div class="typography-item">
+                                <span class="typography-icon">▸</span>
+                                <div class="typography-info">
+                                    <span class="typography-label">{{ font.font_type|default:"Uso geral" }}</span>
+                                    <span class="typography-name">
+                                        {{ font.name }} <small style="color:#94a3b8">({{ font.file_format|upper }})</small>
+                                    </span>
                                 </div>
                             </div>
                             {% endfor %}

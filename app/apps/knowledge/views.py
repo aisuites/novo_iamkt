@@ -971,7 +971,9 @@ def perfil_view(request):
                     valor_banco = getattr(kb, campo_modelo, '')
                     if valor_banco:
                         if isinstance(valor_banco, list):
-                            informado = ', '.join(str(i) for i in valor_banco)
+                            # Manter como JSON string para campos de tags (palavras_recomendadas, palavras_evitar)
+                            # O JS perfil-tags.js espera JSON parseable, nao comma-separated
+                            informado = json.dumps(valor_banco, ensure_ascii=False)
                         elif isinstance(valor_banco, dict):
                             informado = json.dumps(valor_banco, ensure_ascii=False, indent=2)
                         else:
@@ -1070,11 +1072,11 @@ def perfil_view(request):
                     campo_data_dict['references'] = references_data
                 
                 # Adicionar dados especiais para redes sociais
-                if 'social_networks_data' in locals() and social_networks_data:
+                if social_networks_data:
                     campo_data_dict['social_networks_data'] = social_networks_data
-                
+
                 # Adicionar dados especiais para concorrentes
-                if 'competitors_data' in locals() and competitors_data:
+                if competitors_data:
                     campo_data_dict['competitors_data'] = competitors_data
                 
                 campos_bloco.append(campo_data_dict)

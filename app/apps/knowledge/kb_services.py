@@ -399,17 +399,22 @@ class SocialNetworkService:
         networks_updated = 0
         
         # Processar campos individuais de redes sociais
+        # Template envia como social_*_domain (sem https://)
         social_data = {
-            'instagram': request.POST.get('social_instagram', ''),
-            'facebook': request.POST.get('social_facebook', ''),
-            'linkedin': request.POST.get('social_linkedin', ''),
-            'youtube': request.POST.get('social_youtube', ''),
+            'instagram': request.POST.get('social_instagram_domain', request.POST.get('social_instagram', '')),
+            'facebook': request.POST.get('social_facebook_domain', request.POST.get('social_facebook', '')),
+            'linkedin': request.POST.get('social_linkedin_domain', request.POST.get('social_linkedin', '')),
+            'youtube': request.POST.get('social_youtube_domain', request.POST.get('social_youtube', '')),
         }
         
         # Atualizar ou criar redes sociais
         for network_type, url in social_data.items():
             url = url.strip() if url else ''
-            
+
+            # Adicionar https:// se o template enviou sem
+            if url and not url.startswith(('http://', 'https://')):
+                url = f'https://{url}'
+
             if url:
                 # Validar URL
                 is_valid, error_msg = SocialNetworkService.validate_social_network_url(url, network_type)
@@ -481,7 +486,18 @@ class KnowledgeBaseService:
                     kb = form.save(commit=False)
                     kb.last_updated_by = request.user
                     kb.save()
-                
+
+                # Processar site_institucional (Bloco 6)
+                # Template envia 'site_institucional_domain' (sem https://),
+                # mas o form espera 'site_institucional' (URL completa).
+                site_domain = request.POST.get('site_institucional_domain', '').strip()
+                if site_domain:
+                    if not site_domain.startswith(('http://', 'https://')):
+                        kb.site_institucional = f'https://{site_domain}'
+                    else:
+                        kb.site_institucional = site_domain
+                    kb.save(update_fields=['site_institucional'])
+
                 # Processar cores da paleta (Bloco 5)
                 colors_created, color_errors = ColorService.process_colors(request, kb)
                 if color_errors:
