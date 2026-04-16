@@ -208,6 +208,12 @@ AWS_QUERYSTRING_EXPIRE = 604800  # 7 dias
 AWS_REGION = config('AWS_REGION', default='us-east-1')  # Alias para compatibilidade
 AWS_BUCKET_NAME = config('AWS_BUCKET_NAME', default='iamkt-uploads')  # Bucket único para toda aplicação
 
+# BRANDGUIDE PIPELINE (Fase 2+)
+BRANDGUIDE_MAX_FILE_SIZE = config('BRANDGUIDE_MAX_FILE_SIZE', default=50 * 1024 * 1024, cast=int)  # 50 MB
+BRANDGUIDE_MAX_PAGES = config('BRANDGUIDE_MAX_PAGES', default=200, cast=int)
+BRANDGUIDE_DPI = config('BRANDGUIDE_DPI', default=200, cast=int)  # 200 DPI otimo para analise IA
+BRANDGUIDE_BATCH_SIZE = config('BRANDGUIDE_BATCH_SIZE', default=5, cast=int)  # paginas por lote (evita OOM)
+
 # IA CACHE
 IA_CACHE_TTL = config('IA_CACHE_TTL', default=2592000, cast=int)  # 30 dias
 

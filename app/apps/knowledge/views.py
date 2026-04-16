@@ -853,6 +853,7 @@ def perfil_view(request):
                     {'nome': 'fonts', 'label': 'Tipografia', 'campo_modelo': 'typography_settings', 'readonly': True, 'type': 'fonts'},
                     {'nome': 'logo_files', 'label': 'Logotipos', 'campo_modelo': 'logos', 'readonly': True, 'type': 'logos'},
                     {'nome': 'reference_images', 'label': 'Imagens de referência', 'campo_modelo': 'reference_images', 'readonly': True, 'type': 'references'},
+                    {'nome': 'brandguide_pdf', 'label': 'Brandguide da marca', 'campo_modelo': 'brandguide_uploads', 'readonly': False, 'type': 'brandguide', 'no_suggestions': True},
                 ]
             },
             {

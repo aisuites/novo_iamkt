@@ -1539,3 +1539,202 @@ input.hidden-field {
 .toast-info {
   border-left: 4px solid #1565c0;
 }
+
+/* =============================================================
+   BRANDGUIDE UPLOAD (Fase 2)
+   ============================================================= */
+
+.brandguide-field {
+  margin-top: 24px;
+}
+
+.brandguide-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.brandguide-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.brandguide-icon {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.brandguide-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.brandguide-filename {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e293b;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.brandguide-filename:hover:not([aria-disabled="true"]) {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.brandguide-filename[aria-disabled="true"] {
+  pointer-events: none;
+  cursor: default;
+}
+
+.brandguide-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.brandguide-status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brandguide-status-label::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: brandguide-pulse 1.6s ease-in-out infinite;
+}
+
+.brandguide-card.is-completed .brandguide-status-label::before {
+  background: #10b981;
+  animation: none;
+}
+
+.brandguide-card.is-error .brandguide-status-label::before {
+  background: #ef4444;
+  animation: none;
+}
+
+@keyframes brandguide-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.brandguide-pages {
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.brandguide-pages::before {
+  content: "•";
+  margin-right: 6px;
+}
+
+.brandguide-remove-btn {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.brandguide-remove-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.brandguide-progress {
+  padding: 0 16px 14px;
+}
+
+.brandguide-progress-bar {
+  height: 4px;
+  background: #f1f5f9;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.brandguide-progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  transition: width 0.5s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Shimmer sutil SOBRE a largura real (indica que esta processando, sem mentir no progresso) */
+.brandguide-card.is-processing .brandguide-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  animation: brandguide-progress-shimmer 1.8s linear infinite;
+}
+
+@keyframes brandguide-progress-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.brandguide-progress-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.brandguide-progress-hint strong {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.brandguide-upload-area {
+  margin-top: 8px;
+}
+
+.brandguide-error-msg {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #b91c1c;
+  font-size: 13px;
+}

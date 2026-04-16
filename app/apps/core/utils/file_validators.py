@@ -38,8 +38,11 @@ class FileValidator:
             'image/png': 'png',
             'image/webp': 'webp',
         },
+        'brandguides': {
+            'application/pdf': 'pdf',
+        },
     }
-    
+
     # Tamanhos máximos por categoria (em MB)
     MAX_FILE_SIZES = {
         'logos': 5,
@@ -47,6 +50,7 @@ class FileValidator:
         'fonts': 2,
         'documents': 20,
         'posts': 10,
+        'brandguides': 50,  # Brandguides PDF podem ser grandes
     }
     
     @classmethod

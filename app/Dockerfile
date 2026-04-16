@@ -42,11 +42,13 @@ RUN pip install --upgrade pip && \
 FROM python-base as runtime
 
 # Instalar dependências de runtime
+# poppler-utils: necessário para pdf2image (conversão PDF -> PNG no pipeline de brandguide)
 RUN apt-get update && apt-get install -y \
     libpq5 \
     netcat-traditional \
     postgresql-client \
     curl \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 

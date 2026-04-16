@@ -10,6 +10,7 @@ from . import views_n8n
 from . import views_perfil
 from . import views_perfil_colors
 from . import views_perfil_fonts
+from . import views_brandguide
 
 app_name = 'knowledge'
 
@@ -62,4 +63,11 @@ urlpatterns = [
     # N8N Webhooks
     path('webhook/fundamentos/', views_n8n.n8n_webhook_fundamentos, name='n8n_webhook_fundamentos'),
     path('webhook/compilation/', views_n8n.n8n_compilation_webhook, name='n8n_compilation_webhook'),
+
+    # Brandguide Pipeline (Fase 2 - upload e conversao PDF)
+    path('brandguide/upload-url/', views_brandguide.generate_brandguide_upload_url, name='brandguide_upload_url'),
+    path('brandguide/create/', views_brandguide.create_brandguide, name='brandguide_create'),
+    path('brandguide/status/', views_brandguide.get_brandguide_status, name='brandguide_status'),
+    path('brandguide/<int:brandguide_id>/status/', views_brandguide.get_brandguide_status, name='brandguide_status_by_id'),
+    path('brandguide/<int:brandguide_id>/delete/', views_brandguide.delete_brandguide, name='brandguide_delete'),
 ]

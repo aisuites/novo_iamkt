@@ -221,10 +221,13 @@
                                 </div>
                                 {% endfor %}
                             </div>
-                            <button type="button" 
-                                    class="perfil-btn-add-reference" 
+                            <button type="button"
+                                    class="perfil-btn-add-reference"
                                     onclick="addPerfilReference()">Adicionar imagem</button>
                         </div>
+                        {% elif campo.type == 'brandguide' %}
+                        {# Upload opcional de PDF brandguide - Fase 2 #}
+                        {% include 'knowledge/partials/brandguide_upload.html' %}
                         {% elif campo.type == 'website' %}
                         <!-- Layout de Site Institucional - Ícone + https:// fixo -->
                         <div class="social-network-field">
@@ -459,6 +462,7 @@
 <script src="{% static 'js/perfil-fonts.js' %}?v=20260131-1616"></script>
 <script src="{% static 'js/perfil-logos.js' %}?v=20260131-1629"></script>
 <script src="{% static 'js/perfil-references.js' %}?v=20260131-1649"></script>
+<script src="{% static 'js/brandguide-upload.js' %}?v=20260416-0030"></script>
 <script src="{% static 'js/perfil-social.js' %}?v=20260131-1816"></script>
 <script src="{% static 'js/perfil-competitors.js' %}?v=20260131-1852"></script>
 <script src="{% static 'js/perfil.js' %}?v=20260131-1335"></script>

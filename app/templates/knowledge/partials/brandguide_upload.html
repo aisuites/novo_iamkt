@@ -1,0 +1,60 @@
+{% comment %}
+  Upload opcional de PDF brandguide (Fase 2 do pipeline de brandguide).
+  Insere-se dentro do Bloco 5 - Identidade Visual.
+{% endcomment %}
+
+<div class="field brandguide-field" id="brandguide-section">
+  <div class="field-label-row">
+    <label>Brandguide da marca (opcional)</label>
+  </div>
+  <div class="field-hint field-hint-spaced-sm">
+    Envie o PDF do guia de marca para que a IA analise cores, tipografia, grids e grafismos automaticamente.
+    <strong>Arquivo maximo: 50 MB. Apenas PDF.</strong>
+  </div>
+
+  <div id="brandguide-current" class="brandguide-card" style="display:none;">
+    <div class="brandguide-card-header">
+      <div class="brandguide-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+      </div>
+      <div class="brandguide-info">
+        <a class="brandguide-filename" id="brandguide-filename" href="#" target="_blank" rel="noopener noreferrer" aria-disabled="true">—</a>
+        <div class="brandguide-status-row">
+          <span class="brandguide-status-label" id="brandguide-status-label">Processando</span>
+          <span class="brandguide-pages" id="brandguide-pages-count" style="display:none;"></span>
+        </div>
+      </div>
+      <button type="button" class="brandguide-remove-btn" id="btn-remove-brandguide" title="Remover brandguide" aria-label="Remover">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="brandguide-progress" id="brandguide-progress" style="display:none;">
+      <div class="brandguide-progress-bar">
+        <div class="brandguide-progress-fill" id="brandguide-progress-fill"></div>
+      </div>
+      <p class="brandguide-progress-hint">Este processo pode levar <strong>2 a 3 minutos</strong>. Voce pode continuar preenchendo os outros blocos enquanto isso.</p>
+    </div>
+  </div>
+
+  <div class="upload-area brandguide-upload-area" id="brandguide-upload-area">
+    <input type="file" id="brandguide-upload-input" accept="application/pdf" class="hidden-field">
+    <button type="button" class="btn-upload" id="btn-trigger-brandguide-upload">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-3px;">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      Selecionar PDF
+    </button>
+    <p class="upload-hint">ou arraste o PDF aqui</p>
+  </div>
+
+  <div id="brandguide-error" class="brandguide-error-msg" style="display:none;"></div>
+</div>

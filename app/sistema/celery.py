@@ -16,6 +16,20 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 # Load task modules from all registered Django apps.
 app.autodiscover_tasks()
 
+# -----------------------------------------------------------------
+# ROTEAMENTO DE TASKS POR FILA
+# -----------------------------------------------------------------
+# Brandguide: conversao PDF->PNG eh pesada (CPU + memoria). Isolar em fila
+# dedicada para que um upload nao bloqueie workers principais (posts, pautas).
+# O service iamkt_celery_brandguide consome essa fila; iamkt_celery (default)
+# processa tudo mais.
+app.conf.task_routes = {
+    'apps.knowledge.tasks.setup_brandguide_task': {'queue': 'brandguide'},
+    'apps.knowledge.tasks.convert_pages_batch_task': {'queue': 'brandguide'},
+    'apps.knowledge.tasks.finalize_brandguide_task': {'queue': 'brandguide'},
+    'apps.knowledge.tasks.convert_brandguide_pdf_task': {'queue': 'brandguide'},
+}
+
 # Celery Beat Schedule - Tasks Periódicas
 app.conf.beat_schedule = {
     'monitor-trends-daily': {

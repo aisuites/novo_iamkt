@@ -18,13 +18,16 @@ class OnboardingRequiredMiddleware(MiddlewareMixin):
     """
     
     # URLs permitidas sem onboarding completo
+    # Inclui endpoints de API usados pelas proprias paginas permitidas
+    # (ex: lazy-load de imagens, preview de posts). Todos validam organization.
     ALLOWED_PATHS = [
-        '/knowledge/',           # Base de Conhecimento
-        '/accounts/logout/',     # Logout
-        '/accounts/profile/',    # Perfil do usuário
-        '/static/',              # Static files
-        '/media/',               # Media files
-        '/admin/',               # Admin (para staff)
+        '/knowledge/',               # Base de Conhecimento
+        '/accounts/logout/',         # Logout
+        '/accounts/profile/',        # Perfil do usuário
+        '/static/',                  # Static files
+        '/media/',                   # Media files
+        '/admin/',                   # Admin (para staff)
+        '/posts/preview-url/',       # Preview de imagens (usado pelo lazy-loader no Perfil)
     ]
     
     def process_request(self, request):

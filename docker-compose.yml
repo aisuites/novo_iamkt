@@ -47,7 +47,8 @@ services:
       dockerfile: Dockerfile
     container_name: iamkt_celery
     restart: unless-stopped
-    command: celery -A sistema worker -l info
+    # Consome APENAS a fila default (celery). Brandguide vai para worker separado.
+    command: celery -A sistema worker -Q celery -l info
     depends_on:
       - iamkt_postgres
       - iamkt_redis
@@ -70,6 +71,39 @@ services:
           memory: 512M
         reservations:
           memory: 128M
+
+  # Worker dedicado a processamento de brandguide (PDF -> PNGs).
+  # Isola tasks pesadas da fila principal para nao bloquear posts/pautas.
+  # concurrency=2: permite paralelizar 2 batches (de 5 paginas cada) sem estourar 512MB.
+  iamkt_celery_brandguide:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: iamkt_celery_brandguide
+    restart: unless-stopped
+    command: celery -A sistema worker -Q brandguide -l info --concurrency=2 -n brandguide@%h
+    depends_on:
+      - iamkt_postgres
+      - iamkt_redis
+    volumes:
+      - ./app:/app
+      - iamkt_media:/app/media
+    networks:
+      - iamkt_internal
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A sistema inspect ping -d brandguide@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+        reservations:
+          memory: 256M
 
   iamkt_postgres:
     image: postgres:15-alpine

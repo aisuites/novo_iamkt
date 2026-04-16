@@ -36,6 +36,9 @@ class S3Service:
         'fonts': 'org-{org_id}/{category}/{name}.{ext}',  # Sem timestamp para fontes
         'documents': 'org-{org_id}/{category}/{date}/{timestamp}-{random}.{ext}',
         'posts': 'org-{org_id}/posts/{date}/{random}.{ext}',
+        # Brandguides: cada upload vai para uma "pasta" propria identificada por timestamp
+        # Permite multiplas versoes do brandguide e organiza as paginas geradas
+        'brandguides': 'org-{org_id}/brandguides/{timestamp}/original.{ext}',
     }
     
     # Tempo de expiração das URLs (segundos)
@@ -310,15 +313,15 @@ class S3Service:
     def delete_file(cls, s3_key: str) -> bool:
         """
         Deleta arquivo do S3
-        
+
         Args:
             s3_key: Chave do arquivo no S3
-            
+
         Returns:
             True se deletado com sucesso, False caso contrário
         """
         s3_client = cls._get_s3_client()
-        
+
         try:
             s3_client.delete_object(
                 Bucket=settings.AWS_BUCKET_NAME,
@@ -327,6 +330,52 @@ class S3Service:
             return True
         except ClientError:
             return False
+
+    @classmethod
+    def delete_prefix(cls, prefix: str) -> int:
+        """
+        Deleta TODOS os objetos cujo Key comeca com o prefixo.
+
+        CUIDADO: passar um prefixo correto e restrito. Idealmente algo como
+        'org-{id}/brandguides/{timestamp}/' para evitar deletes em excesso.
+
+        Args:
+            prefix: prefixo do S3 (ex: 'org-23/brandguides/1776292563/')
+
+        Returns:
+            Numero de objetos deletados.
+        """
+        if not prefix or '/' not in prefix:
+            # Guard contra prefixos muito abertos (ex: 'org-23')
+            raise ValueError('delete_prefix requer um prefixo com pelo menos um /')
+
+        s3_client = cls._get_s3_client()
+        deleted_count = 0
+
+        paginator = s3_client.get_paginator('list_objects_v2')
+        try:
+            for page in paginator.paginate(
+                Bucket=settings.AWS_BUCKET_NAME,
+                Prefix=prefix,
+            ):
+                objects = page.get('Contents', [])
+                if not objects:
+                    continue
+
+                # delete_objects aceita ate 1000 keys por chamada
+                batch = [{'Key': obj['Key']} for obj in objects]
+                for i in range(0, len(batch), 1000):
+                    chunk = batch[i:i + 1000]
+                    resp = s3_client.delete_objects(
+                        Bucket=settings.AWS_BUCKET_NAME,
+                        Delete={'Objects': chunk, 'Quiet': True},
+                    )
+                    deleted_count += len(chunk) - len(resp.get('Errors', []))
+        except ClientError:
+            # Retornar o que foi possivel deletar; caller decide o que fazer
+            return deleted_count
+
+        return deleted_count
     
     @classmethod
     def get_public_url(cls, s3_key: str) -> str:
