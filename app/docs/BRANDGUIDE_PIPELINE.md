@@ -855,35 +855,85 @@ Se nenhum grafismo e extraivel E o usuario nao fez upload:
 
 ## 11. Custos e Performance
 
+> **Conversao cambial usada:** $1 USD = R$ 5,00. Ajustar se o cambio variar significativamente.
+
 ### Setup (1x por cliente) — valores validados em producao
 
 | Item | Cenario PDF (validado) | Cenario so imagens ref (estimado) |
 |------|------------------------|-----------------------------------|
 | Conversao PDF->PNG | ~70s | - |
-| Analise IA triagem (gpt-4.1-mini) | **$0.06** | - |
-| Analise IA profunda (gpt-4o) | **$0.14** | ~$0.05 |
-| Marketing Summary | ~$0.03 | ~$0.03 |
-| **Total setup** | **~$0.20-0.25** | **~$0.08** |
+| Analise IA triagem (gpt-4.1-mini) | **$0.06** (R$ 0,30) | - |
+| Analise IA profunda (gpt-4o) | **$0.14** (R$ 0,70) | ~$0.05 (R$ 0,25) |
+| Marketing Summary | ~$0.03 (R$ 0,15) | ~$0.03 (R$ 0,15) |
+| **Total setup** | **~$0.20-0.25 (R$ 1,00-1,25)** | **~$0.08 (R$ 0,40)** |
 | Tempo total | ~3-4 min | ~1 min |
 | Tokens totais | ~175.000-200.000 | ~50.000 |
 
 *Valores reais medidos com PDF For Tomorrow (60 paginas) em 2026-04-16.*
 
-### Por post
+### Por post — valores operacionais reais
 
-| Modo | Texto | Imagem | Composicao | **Total** |
-|------|-------|--------|------------|-----------|
-| B (estilo livre) | $0.02 | $0.04-0.08 | $0.00 | **$0.06-0.10** |
-| A (controlado) | $0.02 | $0.04 | $0.00 (local) | **$0.06** |
-| Both (comparacao) | $0.02 | $0.08-0.12 | $0.00 | **$0.10-0.14** |
+Observacao operacional: o custo real por imagem gerada (Gemini) tem ficado entre
+**R$ 0,80 e R$ 1,00 por imagem** (~$0.16-0.20 USD), acima dos pricing publicos
+estimados inicialmente. A causa provavel e o uso de Gemini 2.5 Flash Image com
+referencias multiplas e prompts longos. Revalidar com metricas reais quando a
+Fase 8 (PostGenerationMetric) estiver em producao.
 
-### Projecao mensal
+| Componente | Custo USD | Custo BRL |
+|------------|-----------|-----------|
+| Texto (GPT Copywriter) | $0.02 | R$ 0,10 |
+| Imagem (Gemini) | $0.16-0.20 | **R$ 0,80-1,00** |
+| Composicao (Pillow local) | $0.00 | R$ 0,00 |
+| **Total por post** | **$0.18-0.22** | **R$ 0,90-1,10** |
 
-| Escala | Clientes | Posts/mes | Setup | Posts | **Total** |
-|--------|----------|-----------|-------|-------|-----------|
-| Inicio | 10 | 200 | $2.80 | $20 | **~$23** |
-| Crescimento | 50 | 1.500 | $14 | $150 | **~$164** |
-| Escala | 200 | 8.000 | $56 | $800 | **~$856** |
+Para os calculos da projecao usamos **R$ 0,90 como custo medio por post**.
+
+### Plano comercial de referencia
+
+- **15 posts/cliente/mes** (volume padrao)
+- **1 alteracao por post** (reusa o texto, regera a imagem -> mesmo custo da 1a geracao)
+
+Custo por cliente conforme a taxa real de uso da alteracao:
+
+| Taxa de uso da alteracao | Geracoes/cliente/mes | Custo/cliente/mes |
+|--------------------------|----------------------|-------------------|
+| 0% (happy path) | 15 | **R$ 13,50** |
+| 50% (uso medio) | 22,5 | **R$ 20,25** |
+| 100% (pior caso) | 30 | **R$ 27,00** |
+
+### Projecao mensal total
+
+Assumindo uso medio (~50% dos posts exercem a alteracao ≈ R$ 20/cliente):
+
+| Escala | Clientes | Posts/mes | Geracoes totais | Custo posts | Setup novos | **Total mes** |
+|--------|----------|-----------|-----------------|-------------|-------------|---------------|
+| Inicio | 10 | 150 | ~225 | R$ 202,50 | ~R$ 12,50 | **~R$ 215** |
+| Crescimento | 50 | 750 | ~1.125 | R$ 1.012,50 | ~R$ 62,50 | **~R$ 1.075** |
+| Escala | 200 | 3.000 | ~4.500 | R$ 4.050,00 | ~R$ 250,00 | **~R$ 4.300** |
+
+*Setup e cobrado 1x por cliente novo. A projecao acima assume que todos os clientes
+sao novos no mes (teto conservador). Clientes ativos de meses anteriores ja tem o
+setup amortizado e consomem apenas o custo variavel de posts.*
+
+### Custo marginal por cliente ativo (sem setup)
+
+Apos o setup ja ter sido pago, o custo recorrente por cliente fica entre:
+- **R$ 13,50/mes** — cliente nao usa alteracoes
+- **R$ 20,00/mes** — uso medio (50% das alteracoes)
+- **R$ 27,00/mes** — cliente usa todas as alteracoes
+
+Para precificacao de plano, considerar alem disso: infra (S3, servidor, N8N,
+banco) + desenvolvimento/suporte + margem operacional.
+
+### Cenarios alternativos (se o custo por imagem mudar)
+
+| Custo real/imagem | Custo medio/cliente/mes (uso 50%) |
+|-------------------|-----------------------------------|
+| R$ 0,50 | R$ 11,25 |
+| R$ 0,70 | R$ 15,75 |
+| R$ 0,90 (referencia) | R$ 20,25 |
+| R$ 1,20 | R$ 27,00 |
+| R$ 1,50 | R$ 33,75 |
 
 ### Tempo percebido pelo usuario
 
