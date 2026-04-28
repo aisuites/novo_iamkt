@@ -64,6 +64,9 @@ urlpatterns = [
     path('webhook/fundamentos/', views_n8n.n8n_webhook_fundamentos, name='n8n_webhook_fundamentos'),
     path('webhook/compilation/', views_n8n.n8n_compilation_webhook, name='n8n_compilation_webhook'),
 
+    # Lista de Google Fonts (cache HTTP 24h)
+    path('google-fonts/', views_brandguide.google_fonts_list_endpoint, name='google_fonts_list'),
+
     # Brandguide Pipeline (Fase 2 - upload e conversao PDF)
     path('brandguide/upload-url/', views_brandguide.generate_brandguide_upload_url, name='brandguide_upload_url'),
     path('brandguide/create/', views_brandguide.create_brandguide, name='brandguide_create'),

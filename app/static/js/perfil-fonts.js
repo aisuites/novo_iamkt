@@ -3,12 +3,17 @@
  * Layout pills: nome da fonte + uso + botão X
  */
 
-const googleFontsPopulares = [
-    'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Oswald',
-    'Source Sans Pro', 'Raleway', 'PT Sans', 'Merriweather', 'Ubuntu',
-    'Playfair Display', 'Poppins', 'Nunito', 'Quicksand', 'Inter',
-    'Work Sans', 'Rubik', 'Mulish', 'Karla', 'DM Sans'
-];
+// Lista de Google Fonts: vem de window.GoogleFontsLoader (google-fonts-loader.js).
+// Fallback hardcoded apenas se o loader nao estiver disponivel.
+function _getGoogleFontsList() {
+    if (window.GoogleFontsLoader) return window.GoogleFontsLoader.cached();
+    return [
+        'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Oswald',
+        'Source Sans Pro', 'Raleway', 'PT Sans', 'Merriweather', 'Ubuntu',
+        'Playfair Display', 'Poppins', 'Nunito', 'Quicksand', 'Inter',
+        'Work Sans', 'Rubik', 'Mulish', 'Karla', 'DM Sans',
+    ];
+}
 
 let perfilFontModal = null;
 let currentFontSource = 'google';
@@ -50,7 +55,7 @@ function initPerfilFontModal() {
                             <label>Fonte</label>
                             <select id="perfil-font-name">
                                 <option value="">Selecione...</option>
-                                ${googleFontsPopulares.map(font => 
+                                ${_getGoogleFontsList().map(font =>
                                     `<option value="${font}">${font}</option>`
                                 ).join('')}
                             </select>
@@ -85,7 +90,13 @@ function initPerfilFontModal() {
     
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     perfilFontModal = document.getElementById('perfil-font-modal');
-    
+
+    // Repopular o select com a lista completa do Google Fonts (assincrono)
+    if (window.GoogleFontsLoader) {
+        const sel = document.getElementById('perfil-font-name');
+        if (sel) window.GoogleFontsLoader.populateSelect(sel, '');
+    }
+
     // Fechar modal ao clicar fora
     perfilFontModal.addEventListener('click', function(e) {
         if (e.target === perfilFontModal) {

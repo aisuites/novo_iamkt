@@ -15,18 +15,42 @@ from django.core.cache import cache
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.views.decorators.cache import cache_control
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
 
 from apps.core.services import S3Service
 from apps.core.utils.upload_validators import FileUploadValidator
+from apps.knowledge.google_fonts import get_google_fonts_list, get_meta
 from apps.knowledge.models import (
     BrandgraficModule, BrandguidePage, BrandguideUpload,
     KnowledgeBase, VisualTemplate,
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# GOOGLE FONTS - lista para selects do formulario
+# ============================================================
+
+@require_GET
+@cache_control(max_age=86400, public=True)
+def google_fonts_list_endpoint(request):
+    """
+    Retorna a lista canonica de Google Fonts (versionada em
+    app/apps/knowledge/data/google_fonts.json).
+
+    Cache HTTP de 24h. Usado pelos selects de tipografia no front
+    (substitui as listas hardcoded em fonts.js e perfil-fonts.js).
+    """
+    meta = get_meta()
+    return JsonResponse({
+        'count': meta.get('count'),
+        'updated_at': meta.get('updated_at'),
+        'families': get_google_fonts_list(),
+    })
 
 
 # ============================================================

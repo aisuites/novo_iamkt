@@ -3,13 +3,17 @@
  * Interface com Google Fonts + Upload TTF seguindo referência
  */
 
-// Lista de Google Fonts populares
-const googleFonts = [
-    'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Oswald',
-    'Source Sans Pro', 'Raleway', 'PT Sans', 'Merriweather', 'Ubuntu',
-    'Playfair Display', 'Poppins', 'Nunito', 'Quicksand', 'Inter',
-    'Work Sans', 'Rubik', 'Mulish', 'Karla', 'DM Sans'
-];
+// Lista de Google Fonts: carregada via window.GoogleFontsLoader
+// (ver google-fonts-loader.js). Fallback se loader nao estiver disponivel.
+function _getGoogleFontsList() {
+    if (window.GoogleFontsLoader) return window.GoogleFontsLoader.cached();
+    return [
+        'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Oswald',
+        'Source Sans Pro', 'Raleway', 'PT Sans', 'Merriweather', 'Ubuntu',
+        'Playfair Display', 'Poppins', 'Nunito', 'Quicksand', 'Inter',
+        'Work Sans', 'Rubik', 'Mulish', 'Karla', 'DM Sans',
+    ];
+}
 
 let fonteIndex = 0;
 const loadedGoogleFonts = new Set();
@@ -122,11 +126,11 @@ function addFonte(tipo = 'GOOGLE', nomeFonte = '', variante = '', uso = '', arqu
                     <label style="font-size: 12px; font-weight: 600; color: #6B7280; margin-bottom: 4px; display: block;">
                         Fonte
                     </label>
-                    <select name="fontes[${fonteIndex}][nome_fonte]" class="fonte-nome-select" 
+                    <select name="fontes[${fonteIndex}][nome_fonte]" class="fonte-nome-select"
                             onchange="updateFontePreview(${fonteIndex})"
                             style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 8px; font-size: 13px;">
                         <option value="">Selecione...</option>
-                        ${googleFonts.map(font => 
+                        ${_getGoogleFontsList().map(font =>
                             `<option value="${font}" ${nomeFonte === font ? 'selected' : ''}>${font}</option>`
                         ).join('')}
                     </select>
@@ -173,7 +177,14 @@ function addFonte(tipo = 'GOOGLE', nomeFonte = '', variante = '', uso = '', arqu
     fontesList.appendChild(fonteItem);
     const currentIndex = fonteIndex;
     fonteIndex++;
-    
+
+    // Repopular o select com a lista completa do Google Fonts (1900+ familias)
+    // assim que o loader assincrono terminar. Preserva a fonte selecionada.
+    if (window.GoogleFontsLoader) {
+        const sel = fonteItem.querySelector('.fonte-nome-select');
+        if (sel) window.GoogleFontsLoader.populateSelect(sel, nomeFonte);
+    }
+
     // Carregar fonte e atualizar preview
     if (tipo === 'GOOGLE' && nomeFonte) {
         loadGoogleFont(nomeFonte);
