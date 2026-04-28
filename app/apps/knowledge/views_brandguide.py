@@ -651,22 +651,24 @@ def brandguide_analysis_callback(request):
         brandguide.ai_usage = ai_usage
         brandguide.save(update_fields=['ai_usage'])
 
-    # Caso de sucesso: aplicar resultados
+    # Caso de sucesso: salvar resultados crus e despachar task de aplicacao
     try:
         _apply_analysis_result(brandguide, data)
     except Exception:
-        logger.exception('[brandguide_cb] Falha ao aplicar resultado brandguide_id=%s', brandguide_id)
+        logger.exception('[brandguide_cb] Falha ao salvar resultado brandguide_id=%s', brandguide_id)
         brandguide.processing_status = 'error'
         brandguide.error_message = 'Falha ao processar resultado do N8N'
         brandguide.save(update_fields=['processing_status', 'error_message'])
         return JsonResponse({'success': False, 'error': 'internal_error'}, status=500)
 
-    brandguide.processing_status = 'completed'
-    brandguide.completed_at = timezone.now()
-    brandguide.save(update_fields=['processing_status', 'completed_at'])
+    # Aplicacao nos campos da KB e criacao de ColorPalette/Typography roda
+    # em task na fila brandguide para nao segurar o gunicorn worker.
+    # A task marca status='completed' no final.
+    from apps.knowledge.tasks import apply_brandguide_to_kb_task
+    apply_brandguide_to_kb_task.delay(brandguide.id)
 
     logger.info(
-        '[brandguide_cb] Analise aplicada brandguide_id=%s',
+        '[brandguide_cb] Analise recebida, apply task despachada brandguide_id=%s',
         brandguide_id
     )
 
@@ -675,11 +677,13 @@ def brandguide_analysis_callback(request):
 
 def _apply_analysis_result(brandguide: BrandguideUpload, data: dict) -> None:
     """
-    Aplica o resultado da analise vindo do N8N no banco.
+    Persiste os dados crus do N8N no banco. A aplicacao efetiva nos campos
+    da KB e a criacao de ColorPalette/Typography acontece em
+    apply_brandguide_to_kb_task (despachada apos esta funcao).
 
     - Atualiza classificacoes das BrandguidePage
-    - Salva suggested_kb_fields como sugestao pendente (kb.n8n_analysis)
-    - Salva brand_visual_spec na KB (com source=brandguide_pdf, confidence=high)
+    - Guarda suggested_kb_fields em kb.n8n_analysis['brandguide']['suggested_fields']
+    - Guarda brand_visual_spec em kb.brand_visual_spec (source=brandguide_pdf)
     """
     kb = brandguide.knowledge_base
 

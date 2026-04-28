@@ -378,6 +378,22 @@ class KnowledgeBase(models.Model):
         verbose_name='Brand Visual Spec validado pelo usuário'
     )
 
+    # Notas de uso do logo (preenchido pela IA via brandguide ou pelo usuário)
+    logo_usage_notes = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Notas de uso do logo',
+        help_text='Variações, área de segurança, reduções mínimas e outras orientações'
+    )
+
+    # Lista de nomes de campos da KB que foram preenchidos pelo brandguide.
+    # Usado para identificar o que apagar em caso de re-upload.
+    brandguide_filled_fields = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Campos preenchidos pelo brandguide'
+    )
+
     # TIMESTAMPS
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
@@ -905,8 +921,16 @@ class ColorPalette(models.Model):
         verbose_name='Tipo'
     )
     order = models.IntegerField(default=0, verbose_name='Ordem')
+    created_from_brandguide = models.ForeignKey(
+        'BrandguideUpload',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_colors',
+        verbose_name='Criado pelo brandguide'
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
-    
+
     class Meta:
         verbose_name = 'Cor da Paleta'
         verbose_name_plural = 'Cores da Paleta'
@@ -1018,6 +1042,14 @@ class Typography(models.Model):
     
     # Metadados
     order = models.IntegerField(default=0, verbose_name='Ordem')
+    created_from_brandguide = models.ForeignKey(
+        'BrandguideUpload',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_typography',
+        verbose_name='Criado pelo brandguide'
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
     updated_by = models.ForeignKey(
@@ -1027,7 +1059,7 @@ class Typography(models.Model):
         blank=True,
         verbose_name='Atualizado por'
     )
-    
+
     class Meta:
         verbose_name = 'Configuração de Tipografia'
         verbose_name_plural = 'Configurações de Tipografia'

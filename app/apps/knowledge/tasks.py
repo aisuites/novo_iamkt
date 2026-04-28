@@ -509,3 +509,324 @@ def _mark_error(brandguide: BrandguideUpload, message: str) -> None:
     brandguide.processing_status = 'error'
     brandguide.error_message = message[:5000]
     brandguide.save(update_fields=['processing_status', 'error_message'])
+
+
+# ============================================================
+# FASE 4 - APLICACAO DOS DADOS EXTRAIDOS NA KB
+# ============================================================
+
+# Campos textuais simples da KB que podem ser preenchidos pela IA.
+# Mapeamento: chave em suggested_kb_fields -> nome do campo no model KnowledgeBase.
+_BRANDGUIDE_TEXT_FIELDS = {
+    'nome_empresa': 'nome_empresa',
+    'missao': 'missao',
+    'visao': 'visao',
+    'valores': 'valores',
+    'descricao_produto': 'descricao_produto',
+    'publico_externo': 'publico_externo',
+    'publico_interno': 'publico_interno',
+    'posicionamento': 'posicionamento',
+    'diferenciais': 'diferenciais',
+    'proposta_valor': 'proposta_valor',
+    'tom_voz_externo': 'tom_voz_externo',
+    'tom_voz_interno': 'tom_voz_interno',
+}
+
+# Campos do tipo lista (JSONField com default=list).
+_BRANDGUIDE_LIST_FIELDS = {
+    'palavras_recomendadas': 'palavras_recomendadas',
+    'palavras_evitar': 'palavras_evitar',
+    'concorrentes': 'concorrentes',
+    'fontes_confiaveis': 'fontes_confiaveis',
+    'canais_trends': 'canais_trends',
+    'palavras_chave_trends': 'palavras_chave_trends',
+}
+
+
+@shared_task(
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+    queue='brandguide',
+)
+def apply_brandguide_to_kb_task(self, brandguide_id: int):
+    """
+    Aplica os dados extraidos pelo brandguide nos campos da KB e cria
+    registros relacionados (ColorPalette, Typography). Roda na fila brandguide
+    para nao bloquear workers principais nem o gunicorn que recebeu o callback.
+
+    Idempotente: pode ser re-executada sem duplicar dados.
+    Em caso de falha, marca status='error' (nao deixa preso em 'analyzing').
+    Ao final do sucesso, marca status='completed'.
+    """
+    from apps.knowledge.models import (
+        BrandguideUpload, ColorPalette, Typography,
+    )
+
+    try:
+        brandguide = BrandguideUpload.objects.select_related(
+            'knowledge_base'
+        ).get(id=brandguide_id)
+    except BrandguideUpload.DoesNotExist:
+        logger.error('[brandguide_apply] BrandguideUpload %s nao existe', brandguide_id)
+        return {'success': False, 'error': 'not_found'}
+
+    try:
+        return _apply_brandguide_inner(brandguide)
+    except Exception as exc:
+        logger.exception(
+            '[brandguide_apply] Falha ao aplicar brandguide_id=%s', brandguide_id
+        )
+        # Tentar de novo em retries
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            pass
+        # Esgotadas as retries: marcar erro para nao deixar preso em 'analyzing'
+        brandguide.processing_status = 'error'
+        brandguide.error_message = (
+            f'Falha ao aplicar dados do brandguide na KB: {exc}'
+        )[:5000]
+        brandguide.save(update_fields=['processing_status', 'error_message'])
+        return {'success': False, 'brandguide_id': brandguide_id, 'error': str(exc)}
+
+
+def _apply_brandguide_inner(brandguide):
+    """Logica de aplicacao isolada para permitir retry/error handling limpo."""
+    from apps.knowledge.models import ColorPalette, Typography
+
+    kb = brandguide.knowledge_base
+    spec = kb.brand_visual_spec or {}
+    suggested = ((kb.n8n_analysis or {}).get('brandguide') or {}).get('suggested_fields') or {}
+
+    filled_fields: List[str] = []
+    update_fields: List[str] = []
+
+    # ----------------------------------------------------------
+    # 1. Campos textuais simples
+    # ----------------------------------------------------------
+    for src_key, dst_field in _BRANDGUIDE_TEXT_FIELDS.items():
+        value = suggested.get(src_key)
+        if not value or not isinstance(value, str):
+            continue
+        value = value.strip()
+        if not value:
+            continue
+        setattr(kb, dst_field, value)
+        filled_fields.append(dst_field)
+        update_fields.append(dst_field)
+
+    # ----------------------------------------------------------
+    # 2. Campos lista
+    # ----------------------------------------------------------
+    for src_key, dst_field in _BRANDGUIDE_LIST_FIELDS.items():
+        value = suggested.get(src_key)
+        if not isinstance(value, list) or not value:
+            continue
+        # Higieniza: remove vazios, deduplica preservando ordem
+        cleaned: List[str] = []
+        seen = set()
+        for item in value:
+            if not isinstance(item, str):
+                continue
+            item = item.strip()
+            if not item or item.lower() in seen:
+                continue
+            cleaned.append(item)
+            seen.add(item.lower())
+        if cleaned:
+            setattr(kb, dst_field, cleaned)
+            filled_fields.append(dst_field)
+            update_fields.append(dst_field)
+
+    # ----------------------------------------------------------
+    # 3. Notas de uso do logo (a partir do brand_visual_spec.logo)
+    # ----------------------------------------------------------
+    logo_data = spec.get('logo') or {}
+    notes_parts: List[str] = []
+    desc = logo_data.get('descricao_visual')
+    if desc:
+        notes_parts.append(f'Descricao: {desc}')
+    variacoes = logo_data.get('variacoes')
+    if isinstance(variacoes, list) and variacoes:
+        notes_parts.append('Variacoes: ' + ', '.join(str(v) for v in variacoes if v))
+    area = logo_data.get('area_seguranca')
+    if area:
+        notes_parts.append(f'Area de seguranca: {area}')
+    red_digital = logo_data.get('reducao_minima_digital_px')
+    if red_digital:
+        notes_parts.append(f'Reducao minima digital: {red_digital}px')
+    red_impresso = logo_data.get('reducao_minima_impresso_mm')
+    if red_impresso:
+        notes_parts.append(f'Reducao minima impresso: {red_impresso}mm')
+    if notes_parts:
+        kb.logo_usage_notes = '\n'.join(notes_parts)
+        filled_fields.append('logo_usage_notes')
+        update_fields.append('logo_usage_notes')
+
+    # ----------------------------------------------------------
+    # 4. Persistir KB com a lista de campos preenchidos
+    # ----------------------------------------------------------
+    if filled_fields:
+        kb.brandguide_filled_fields = filled_fields
+        update_fields.append('brandguide_filled_fields')
+        kb.save(update_fields=update_fields)
+
+    # ----------------------------------------------------------
+    # 5. ColorPalette: cria a partir de brand_visual_spec.cores
+    # ----------------------------------------------------------
+    cores_data = spec.get('cores') or {}
+    colors_created = 0
+    color_order_base = (
+        ColorPalette.objects.filter(knowledge_base=kb).count() * 10
+    )
+    for group_key, color_type in (
+        ('institucional', 'primary'),
+        ('iniciativas', 'accent'),
+    ):
+        for cor in (cores_data.get(group_key) or []):
+            if not isinstance(cor, dict):
+                continue
+            hex_code = (cor.get('hex') or '').strip()
+            if not hex_code or not hex_code.startswith('#'):
+                continue
+            hex_code = hex_code[:7].upper()
+            if ColorPalette.objects.filter(
+                knowledge_base=kb, hex_code__iexact=hex_code
+            ).exists():
+                continue
+            base_name = (cor.get('nome') or hex_code).strip()
+            unique_name = base_name[:100]
+            counter = 2
+            while ColorPalette.objects.filter(
+                knowledge_base=kb, name=unique_name
+            ).exists():
+                suffix = f' ({counter})'
+                unique_name = (base_name[: 100 - len(suffix)] + suffix)
+                counter += 1
+            ColorPalette.objects.create(
+                knowledge_base=kb,
+                name=unique_name,
+                hex_code=hex_code,
+                color_type=color_type,
+                order=color_order_base + colors_created * 10,
+                created_from_brandguide=brandguide,
+            )
+            colors_created += 1
+
+    # ----------------------------------------------------------
+    # 6. Typography: cria a partir de brand_visual_spec.tipografia
+    # ----------------------------------------------------------
+    tipo_data = spec.get('tipografia') or {}
+    typo_created = 0
+    typo_order_base = (
+        Typography.objects.filter(knowledge_base=kb).count() * 10
+    )
+    # Sempre usa rotulo padrao para 'usage' (ignora valor livre do prompt N8N)
+    for slot_key, default_usage in (
+        ('primaria', 'Títulos'),
+        ('secundaria', 'Texto corrido'),
+    ):
+        slot = tipo_data.get(slot_key) or {}
+        if not isinstance(slot, dict):
+            continue
+        familia = (slot.get('familia') or '').strip()
+        if not familia:
+            continue
+        if Typography.objects.filter(
+            knowledge_base=kb,
+            font_source='google',
+            google_font_name__iexact=familia,
+        ).exists():
+            continue
+        peso = (slot.get('peso_padrao') or 'Regular').strip() or 'Regular'
+        Typography.objects.create(
+            knowledge_base=kb,
+            usage=default_usage,
+            font_source='google',
+            google_font_name=familia[:200],
+            google_font_weight=peso[:20],
+            order=typo_order_base + typo_created * 10,
+            created_from_brandguide=brandguide,
+        )
+        typo_created += 1
+
+    # ----------------------------------------------------------
+    # 7. Marcar brandguide como completed
+    # ----------------------------------------------------------
+    brandguide.processing_status = 'completed'
+    brandguide.completed_at = timezone.now()
+    brandguide.save(update_fields=['processing_status', 'completed_at'])
+
+    logger.info(
+        '[brandguide_apply] OK brandguide_id=%s text/list=%s cores=%s typo=%s',
+        brandguide.id, len(filled_fields), colors_created, typo_created,
+    )
+    return {
+        'success': True,
+        'brandguide_id': brandguide.id,
+        'fields_filled': filled_fields,
+        'colors_created': colors_created,
+        'typography_created': typo_created,
+    }
+
+
+def wipe_brandguide_data_from_kb(kb, brandguide=None):
+    """
+    Remove dados aplicados pelo brandguide na KB:
+      - Limpa campos textuais listados em kb.brandguide_filled_fields
+      - Apaga ColorPalette/Typography com created_from_brandguide setado
+      - Limpa kb.brand_visual_spec e metadados
+
+    Se brandguide for fornecido, apaga apenas registros vinculados a ele.
+    Caso contrario, apaga tudo o que veio de qualquer brandguide.
+
+    Edicoes manuais do usuario (registros sem created_from_brandguide e
+    campos fora de brandguide_filled_fields) sao preservadas.
+    """
+    from apps.knowledge.models import ColorPalette, Typography
+
+    # Apagar registros relacionados
+    color_qs = ColorPalette.objects.filter(knowledge_base=kb)
+    typo_qs = Typography.objects.filter(knowledge_base=kb)
+    if brandguide is not None:
+        color_qs = color_qs.filter(created_from_brandguide=brandguide)
+        typo_qs = typo_qs.filter(created_from_brandguide=brandguide)
+    else:
+        color_qs = color_qs.filter(created_from_brandguide__isnull=False)
+        typo_qs = typo_qs.filter(created_from_brandguide__isnull=False)
+    colors_deleted, _ = color_qs.delete()
+    typos_deleted, _ = typo_qs.delete()
+
+    # Limpar campos textuais que foram preenchidos pelo brandguide
+    fields_to_clear = list(kb.brandguide_filled_fields or [])
+    update_fields: List[str] = []
+    for f in fields_to_clear:
+        if f in _BRANDGUIDE_LIST_FIELDS.values():
+            setattr(kb, f, [])
+        elif hasattr(kb, f):
+            setattr(kb, f, '')
+        else:
+            continue
+        update_fields.append(f)
+
+    # Limpar metadados do brand visual spec
+    kb.brand_visual_spec = None
+    kb.brand_visual_spec_source = None
+    kb.brand_visual_spec_confidence = None
+    kb.brand_visual_spec_validated = False
+    kb.brandguide_filled_fields = []
+    update_fields.extend([
+        'brand_visual_spec',
+        'brand_visual_spec_source',
+        'brand_visual_spec_confidence',
+        'brand_visual_spec_validated',
+        'brandguide_filled_fields',
+    ])
+    kb.save(update_fields=update_fields)
+
+    return {
+        'colors_deleted': colors_deleted,
+        'typography_deleted': typos_deleted,
+        'fields_cleared': fields_to_clear,
+    }
