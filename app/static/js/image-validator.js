@@ -11,7 +11,7 @@ class ImageValidator {
         this.config = {
             logos: {
                 minDimensions: { width: 100, height: 100 },
-                maxDimensions: { width: 5000, height: 5000 },
+                maxDimensions: { width: 10000, height: 10000 },
                 maxFileSize: 5 * 1024 * 1024,  // 5MB
                 allowedTypes: ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp']
             },

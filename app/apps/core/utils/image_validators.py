@@ -19,7 +19,7 @@ class ImageValidator:
     
     # Dimensões máximas por categoria
     MAX_DIMENSIONS = {
-        'logos': (5000, 5000),
+        'logos': (10000, 10000),
         'references': (10000, 10000),
         'posts': (10000, 10000),
     }
