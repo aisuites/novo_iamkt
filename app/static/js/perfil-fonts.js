@@ -53,12 +53,10 @@ function initPerfilFontModal() {
                     <div class="perfil-font-google-fields">
                         <div class="perfil-font-field">
                             <label>Fonte</label>
-                            <select id="perfil-font-name">
-                                <option value="">Selecione...</option>
-                                ${_getGoogleFontsList().map(font =>
-                                    `<option value="${font}">${font}</option>`
-                                ).join('')}
-                            </select>
+                            <input id="perfil-font-name"
+                                   list="google-fonts-datalist"
+                                   placeholder="Digite para filtrar (ex: Lora, Inter, Roboto)..."
+                                   autocomplete="off">
                         </div>
                         <div class="perfil-font-field">
                             <label>Peso</label>
@@ -91,10 +89,9 @@ function initPerfilFontModal() {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     perfilFontModal = document.getElementById('perfil-font-modal');
 
-    // Repopular o select com a lista completa do Google Fonts (assincrono)
+    // Garante o <datalist> compartilhado de Google Fonts para o input list=
     if (window.GoogleFontsLoader) {
-        const sel = document.getElementById('perfil-font-name');
-        if (sel) window.GoogleFontsLoader.populateSelect(sel, '');
+        window.GoogleFontsLoader.ensureSharedDatalist();
     }
 
     // Fechar modal ao clicar fora

@@ -126,14 +126,14 @@ function addFonte(tipo = 'GOOGLE', nomeFonte = '', variante = '', uso = '', arqu
                     <label style="font-size: 12px; font-weight: 600; color: #6B7280; margin-bottom: 4px; display: block;">
                         Fonte
                     </label>
-                    <select name="fontes[${fonteIndex}][nome_fonte]" class="fonte-nome-select"
-                            onchange="updateFontePreview(${fonteIndex})"
-                            style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 8px; font-size: 13px;">
-                        <option value="">Selecione...</option>
-                        ${_getGoogleFontsList().map(font =>
-                            `<option value="${font}" ${nomeFonte === font ? 'selected' : ''}>${font}</option>`
-                        ).join('')}
-                    </select>
+                    <input name="fontes[${fonteIndex}][nome_fonte]" class="fonte-nome-select"
+                           list="google-fonts-datalist"
+                           value="${nomeFonte || ''}"
+                           placeholder="Digite para filtrar (ex: Lora, Inter, Roboto)..."
+                           autocomplete="off"
+                           onchange="updateFontePreview(${fonteIndex})"
+                           oninput="updateFontePreview(${fonteIndex})"
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 8px; font-size: 13px;">
                 </div>
                 <div>
                     <label style="font-size: 12px; font-weight: 600; color: #6B7280; margin-bottom: 4px; display: block;">
@@ -178,11 +178,10 @@ function addFonte(tipo = 'GOOGLE', nomeFonte = '', variante = '', uso = '', arqu
     const currentIndex = fonteIndex;
     fonteIndex++;
 
-    // Repopular o select com a lista completa do Google Fonts (1900+ familias)
-    // assim que o loader assincrono terminar. Preserva a fonte selecionada.
+    // Garante o <datalist> compartilhado para autocomplete do <input list="...">.
+    // O input la em cima usa list="google-fonts-datalist".
     if (window.GoogleFontsLoader) {
-        const sel = fonteItem.querySelector('.fonte-nome-select');
-        if (sel) window.GoogleFontsLoader.populateSelect(sel, nomeFonte);
+        window.GoogleFontsLoader.ensureSharedDatalist();
     }
 
     // Carregar fonte e atualizar preview

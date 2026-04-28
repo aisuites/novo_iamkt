@@ -119,16 +119,53 @@
                 }).join('');
         }
 
-        // Render inicial sincrono
         render(cached());
 
-        // Se a lista atual ainda nao foi carregada de fato, dispara o fetch
-        // e repopula quando chegar (preserva o valor selecionado).
         if (!cachedList || cachedList.length <= FALLBACK.length) {
             load().then(function (families) {
                 if (families && families.length > 0) render(families);
             });
         }
+    }
+
+    /**
+     * Popula um <datalist> com a lista atual. <datalist> permite que um <input>
+     * exiba sugestoes filtradas conforme o usuario digita.
+     */
+    function populateDatalist(datalistEl) {
+        if (!datalistEl) return;
+
+        function render(families) {
+            datalistEl.innerHTML = families.map(function (f) {
+                const safe = String(f).replace(/"/g, '&quot;');
+                return '<option value="' + safe + '"></option>';
+            }).join('');
+        }
+
+        render(cached());
+
+        if (!cachedList || cachedList.length <= FALLBACK.length) {
+            load().then(function (families) {
+                if (families && families.length > 0) render(families);
+            });
+        }
+    }
+
+    /**
+     * Garante que existe um <datalist> compartilhado com a lista de Google Fonts.
+     * Cria sob demanda no <body> (id 'google-fonts-datalist') e popula.
+     * Retorna o id que pode ser usado em <input list="...">.
+     */
+    function ensureSharedDatalist() {
+        const SHARED_ID = 'google-fonts-datalist';
+        let dl = document.getElementById(SHARED_ID);
+        if (!dl) {
+            dl = document.createElement('datalist');
+            dl.id = SHARED_ID;
+            document.body.appendChild(dl);
+            populateDatalist(dl);
+        }
+        return SHARED_ID;
     }
 
     // Pre-carrega em background ao iniciar o script
@@ -138,6 +175,8 @@
         load: load,
         cached: cached,
         populateSelect: populateSelect,
+        populateDatalist: populateDatalist,
+        ensureSharedDatalist: ensureSharedDatalist,
         FALLBACK: FALLBACK,
     };
 })();
