@@ -1,17 +1,35 @@
 {% comment %}
-  Upload opcional de PDF brandguide (Fase 2 do pipeline de brandguide).
-  Insere-se dentro do Bloco 5 - Identidade Visual.
+  Card de "Preenchimento via UPLOAD" - aparece no TOPO da pagina /knowledge/,
+  acima do Bloco 1. Atalho para preencher a KB automaticamente a partir
+  de um PDF de brandguide.
+
+  IDs principais (referenciados por brandguide-upload.js):
+    #brandguide-section          container raiz
+    #brandguide-current          card do estado "tem upload" (oculto inicialmente)
+    #brandguide-filename         link do PDF
+    #brandguide-status-label     status textual (Processando, Concluido...)
+    #brandguide-pages-count      contador de paginas (X/Y)
+    #brandguide-progress         container da barra de progresso
+    #brandguide-progress-fill    fill animavel da barra
+    #brandguide-upload-area      area de drag-drop quando vazio
+    #brandguide-upload-input     input file
+    #btn-trigger-brandguide-upload  botao de selecionar arquivo
+    #btn-remove-brandguide       botao X (re-upload com modal)
+    #brandguide-error            mensagem de erro
 {% endcomment %}
 
-<div class="field brandguide-field" id="brandguide-section">
-  <div class="field-label-row">
-    <label>Brandguide da marca (opcional)</label>
-  </div>
-  <div class="field-hint field-hint-spaced-sm">
-    Envie o PDF do guia de marca para que a IA analise cores, tipografia, grids e grafismos automaticamente.
-    <strong>Arquivo maximo: 50 MB. Apenas PDF.</strong>
+<section class="brandguide-top-card" id="brandguide-section" aria-label="Preenchimento via upload">
+  <div class="brandguide-top-card-header">
+    <div class="brandguide-top-card-kicker">Atalho</div>
+    <div class="brandguide-top-card-title">Preenchimento do formulario via UPLOAD</div>
+    <p class="brandguide-top-card-subtitle">
+      Envie o PDF do guia de marca e a IA preenche automaticamente os campos da base
+      (nome da empresa, posicionamento, palavras, cores, tipografia e mais).
+      Voce pode revisar e editar tudo depois. <strong>PDF ate 50 MB.</strong>
+    </p>
   </div>
 
+  {# Estado: tem upload (em processamento, completo ou com erro) #}
   <div id="brandguide-current" class="brandguide-card" style="display:none;">
     <div class="brandguide-card-header">
       <div class="brandguide-icon">
@@ -27,7 +45,7 @@
           <span class="brandguide-pages" id="brandguide-pages-count" style="display:none;"></span>
         </div>
       </div>
-      <button type="button" class="brandguide-remove-btn" id="btn-remove-brandguide" title="Remover brandguide" aria-label="Remover">
+      <button type="button" class="brandguide-remove-btn" id="btn-remove-brandguide" title="Substituir brandguide" aria-label="Substituir brandguide">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"/>
           <line x1="6" y1="6" x2="18" y2="18"/>
@@ -39,22 +57,25 @@
       <div class="brandguide-progress-bar">
         <div class="brandguide-progress-fill" id="brandguide-progress-fill"></div>
       </div>
-      <p class="brandguide-progress-hint">Este processo pode levar <strong>2 a 3 minutos</strong>. Voce pode continuar preenchendo os outros blocos enquanto isso.</p>
+      <p class="brandguide-progress-hint">
+        Este processo pode levar <strong>2 a 3 minutos</strong>. Aguarde enquanto a IA analisa o documento.
+      </p>
     </div>
   </div>
 
-  <div class="upload-area brandguide-upload-area" id="brandguide-upload-area">
+  {# Estado vazio: botao grande de selecionar arquivo #}
+  <div class="brandguide-upload-area" id="brandguide-upload-area">
     <input type="file" id="brandguide-upload-input" accept="application/pdf" class="hidden-field">
-    <button type="button" class="btn-upload" id="btn-trigger-brandguide-upload">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-3px;">
+    <button type="button" class="brandguide-top-btn" id="btn-trigger-brandguide-upload">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
         <polyline points="17 8 12 3 7 8"/>
         <line x1="12" y1="3" x2="12" y2="15"/>
       </svg>
       Selecionar PDF
     </button>
-    <p class="upload-hint">ou arraste o PDF aqui</p>
+    <p class="brandguide-top-hint">ou arraste o PDF aqui</p>
   </div>
 
   <div id="brandguide-error" class="brandguide-error-msg" style="display:none;"></div>
-</div>
+</section>

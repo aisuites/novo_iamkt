@@ -301,22 +301,43 @@ def get_brandguide_status(request, brandguide_id=None):
 @require_http_methods(["POST", "DELETE"])
 def delete_brandguide(request, brandguide_id):
     """
-    Deleta um BrandguideUpload completamente: DB + S3.
+    Deleta um BrandguideUpload completamente: DB + S3 + dados aplicados na KB.
 
-    S3: remove todos os objetos do prefixo org-{id}/brandguides/{timestamp}/
-        (PDF original + todas as paginas PNG convertidas + assets extraidos).
+    Antes de remover o BG, executa o wipe seletivo na KB:
+      - apaga ColorPalette/Typography com created_from_brandguide=this
+      - limpa campos textuais que foram preenchidos por este brandguide
+      - limpa kb.brand_visual_spec e metadados
+    Edicoes manuais do usuario (registros sem created_from_brandguide e
+    campos fora de brandguide_filled_fields) sao preservadas.
+
+    S3: remove todos os objetos do prefixo org-{id}/brandguides/{timestamp}/.
     DB: remove BrandguideUpload (cascade em BrandguidePage e BrandgraficModule).
     """
     try:
         organization = request.organization
         brandguide = get_object_or_404(
-            BrandguideUpload,
+            BrandguideUpload.objects.select_related('knowledge_base'),
             id=brandguide_id,
             knowledge_base__organization=organization,
         )
+        kb = brandguide.knowledge_base
 
-        # Deletar do S3 primeiro. Se falhar aqui, DB ainda tem a referencia
-        # e o usuario pode tentar novamente.
+        # 1. Wipe seletivo na KB (preserva edicoes manuais)
+        try:
+            from apps.knowledge.tasks import wipe_brandguide_data_from_kb
+            wipe_result = wipe_brandguide_data_from_kb(kb, brandguide=brandguide)
+            logger.info(
+                '[brandguide] wipe KB org=%s bg=%s: %s',
+                organization.id, brandguide.id, wipe_result,
+            )
+        except Exception:
+            logger.exception(
+                '[brandguide] Falha no wipe da KB (prosseguindo com delete) bg=%s',
+                brandguide.id,
+            )
+            wipe_result = None
+
+        # 2. Deletar do S3 (pdf + paginas convertidas)
         s3_prefix = _s3_prefix_from_pdf_key(brandguide.s3_key_pdf, organization.id)
         s3_deleted = 0
         if s3_prefix:
@@ -327,12 +348,12 @@ def delete_brandguide(request, brandguide_id):
                     s3_deleted, s3_prefix
                 )
             except Exception:
-                # Log mas nao impede delete do DB - usuario quer se livrar do registro.
                 logger.exception(
                     '[brandguide] Falha ao limpar S3 prefix %s (prosseguindo com delete DB)',
                     s3_prefix
                 )
 
+        # 3. Deletar registro do DB (cascade em BrandguidePage)
         brandguide.delete()
 
         return JsonResponse({
@@ -340,6 +361,7 @@ def delete_brandguide(request, brandguide_id):
             'data': {
                 'deletedId': brandguide_id,
                 's3ObjectsDeleted': s3_deleted,
+                'kbWipe': wipe_result,
             }
         })
 

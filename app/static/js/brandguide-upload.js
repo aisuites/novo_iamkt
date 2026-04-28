@@ -1,11 +1,17 @@
 /**
- * Brandguide upload (Fase 2).
+ * Brandguide upload (Fase 2 + Etapa 2 do redesign).
  *
  * Fluxo:
  *   1. Solicita presigned URL ao backend
  *   2. Faz PUT direto no S3 usando signed_headers do backend
  *   3. Confirma upload criando BrandguideUpload no banco
  *   4. Polling do status ate completed/error
+ *   5. Quando completed: page reload (servidor renderiza com campos preenchidos)
+ *
+ * Comportamento UI:
+ *   - Durante processamento, o resto da pagina /knowledge/ fica em modo
+ *     readonly (overlay + inputs/botoes desabilitados).
+ *   - Re-upload exige confirmacao em modal (window.confirmModal).
  */
 (function () {
   'use strict';
@@ -18,6 +24,10 @@
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
   const POLL_INTERVAL_MS = 3000;
   const POLL_MAX_ATTEMPTS = 120; // ~6 min
+
+  const PROCESSING_STATUSES = [
+    'uploaded', 'converting', 'extracting_assets', 'analyzing',
+  ];
 
   // ---- Helpers -----------------------------------------------------------
 
@@ -50,6 +60,40 @@
     }
   }
 
+  /**
+   * Bloqueia/libera a interacao com os blocos do formulario enquanto o
+   * brandguide processa. NAO afeta o card de brandguide nem outras URLs.
+   */
+  function setReadonlyState(isReadonly) {
+    const form = document.getElementById('knowledge-form');
+    const overlay = $('#brandguide-processing-overlay');
+    if (!form) return;
+
+    form.classList.toggle('is-brandguide-processing', !!isReadonly);
+    if (overlay) overlay.style.display = isReadonly ? '' : 'none';
+
+    // Desabilita inputs/botoes dentro dos blocos do formulario.
+    // Mantem ativo o que estiver dentro de #brandguide-section (botao X, etc).
+    const blocks = form.querySelectorAll('section.form-block');
+    blocks.forEach((block) => {
+      block.classList.toggle('is-disabled', !!isReadonly);
+      block.querySelectorAll('input, select, textarea, button').forEach((el) => {
+        if (isReadonly) {
+          if (!el.dataset.bgPrevDisabled) {
+            el.dataset.bgPrevDisabled = el.disabled ? '1' : '0';
+          }
+          el.disabled = true;
+        } else {
+          // Restaurar somente o que foi desabilitado por nos
+          if (el.dataset.bgPrevDisabled === '0') {
+            el.disabled = false;
+          }
+          delete el.dataset.bgPrevDisabled;
+        }
+      });
+    });
+  }
+
   function updateStatusUI(data) {
     const card = $('#brandguide-current');
     const uploadArea = $('#brandguide-upload-area');
@@ -57,6 +101,7 @@
     if (!data) {
       hide(card);
       show(uploadArea);
+      setReadonlyState(false);
       return;
     }
 
@@ -71,7 +116,6 @@
 
     if (filenameEl) {
       filenameEl.textContent = data.originalFilename || '—';
-      // Link para abrir o PDF em nova aba (presigned URL do backend)
       if (data.pdfDownloadUrl) {
         filenameEl.setAttribute('href', data.pdfDownloadUrl);
         filenameEl.removeAttribute('aria-disabled');
@@ -91,11 +135,14 @@
     };
     if (statusEl) statusEl.textContent = statusLabels[data.status] || data.status;
 
-    const isProcessing = ['uploaded', 'converting', 'extracting_assets', 'analyzing'].includes(data.status);
+    const isProcessing = PROCESSING_STATUSES.includes(data.status);
 
     card.classList.toggle('is-processing', isProcessing);
     card.classList.toggle('is-completed', data.status === 'completed');
     card.classList.toggle('is-error', data.status === 'error');
+
+    // Bloqueia o restante do formulario somente durante o processamento.
+    setReadonlyState(isProcessing);
 
     // Progresso real: pagesProcessed / totalPages
     const total = data.totalPages || 0;
@@ -106,7 +153,6 @@
     } else if (total > 0) {
       percent = Math.min(99, Math.round((processed / total) * 100));
     } else if (isProcessing) {
-      // Antes de ter total_pages ainda: mostra ~5% para nao ficar zerado
       percent = 5;
     }
 
@@ -114,7 +160,6 @@
 
     if (isProcessing) show(progressEl); else hide(progressEl);
 
-    // Contador de paginas: mostra "X/Y paginas" durante processo, "Y paginas" ao fim
     if (total > 0) {
       show(pagesEl);
       if (data.status === 'completed') {
@@ -159,7 +204,6 @@
   }
 
   async function uploadToS3(file, uploadData) {
-    // Usar signed_headers do backend (timestamp sincronizado com a assinatura)
     const headers = {
       'Content-Type': file.type,
       ...(uploadData.signed_headers || {}),
@@ -212,6 +256,10 @@
     return json.data;
   }
 
+  /**
+   * Polling ate completed/error. Quando completed, recarrega a pagina para
+   * que os campos auto-preenchidos pela IA apareçam no formulario.
+   */
   async function pollUntilDone(brandguideId) {
     let attempts = 0;
     while (attempts < POLL_MAX_ATTEMPTS) {
@@ -220,11 +268,15 @@
         const data = await fetchStatus(brandguideId);
         updateStatusUI(data);
         if (!data) return null;
-        if (['completed', 'error'].includes(data.status)) {
+        if (data.status === 'completed') {
+          // Pequeno delay para o usuario ver o estado "concluido" antes do reload
+          setTimeout(() => window.location.reload(), 600);
+          return data;
+        }
+        if (data.status === 'error') {
           return data;
         }
       } catch (err) {
-        // Silenciar erros transitorios no polling
         console.warn('[brandguide] status check falhou:', err.message);
       }
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
@@ -232,8 +284,21 @@
     return null;
   }
 
-  async function deleteBrandguide(brandguideId) {
-    if (!confirm('Tem certeza? O brandguide sera removido.')) return false;
+  async function deleteBrandguideViaUI(brandguideId) {
+    const message = (
+      'Voce ja tem um brandguide processado nesta base. '
+      + 'Subir um novo PDF vai apagar os dados atuais que vieram do brandguide '
+      + '(cores, tipografia e textos preenchidos pela IA). Edicoes manuais que '
+      + 'voce fez em outros campos sao preservadas. Deseja continuar?'
+    );
+    let confirmed = true;
+    if (window.confirmModal && typeof window.confirmModal.show === 'function') {
+      confirmed = await window.confirmModal.show(message, 'Substituir brandguide');
+    } else {
+      confirmed = window.confirm(message);
+    }
+    if (!confirmed) return false;
+
     const url = DELETE_ENDPOINT_TEMPLATE.replace('{id}', brandguideId);
     const res = await fetch(url, {
       method: 'POST',
@@ -274,11 +339,11 @@
       await uploadToS3(file, uploadData);
       const record = await createBrandguideRecord(file, uploadData);
 
-      // Polling ate conclusao
       await pollUntilDone(record.brandguideId);
     } catch (err) {
       console.error('[brandguide] upload falhou:', err);
       setError(err.message || 'Erro no upload');
+      setReadonlyState(false);
     }
   }
 
@@ -302,12 +367,11 @@
         const file = e.target.files && e.target.files[0];
         if (file) {
           handleFileSelected(file);
-          input.value = ''; // permitir re-upload do mesmo arquivo depois
+          input.value = '';
         }
       });
     }
 
-    // Drag & drop
     if (uploadArea) {
       ['dragenter', 'dragover'].forEach((evt) => {
         uploadArea.addEventListener(evt, (e) => {
@@ -331,19 +395,33 @@
 
     if (removeBtn) {
       removeBtn.addEventListener('click', async () => {
-        const current = await fetchStatus().catch(() => null);
-        if (current && current.brandguideId) {
-          const ok = await deleteBrandguide(current.brandguideId);
-          if (ok) updateStatusUI(null);
-        } else {
-          updateStatusUI(null);
+        try {
+          const current = await fetchStatus();
+          if (current && current.brandguideId) {
+            const ok = await deleteBrandguideViaUI(current.brandguideId);
+            if (ok) {
+              // Ao apagar, recarrega para refletir a KB com os campos limpos
+              window.location.reload();
+            }
+          } else {
+            updateStatusUI(null);
+          }
+        } catch (e) {
+          console.error('[brandguide] erro ao remover:', e);
+          setError('Erro ao remover brandguide');
         }
       });
     }
 
-    // Carregar estado inicial (ja existe brandguide?)
+    // Estado inicial ao carregar a pagina
     fetchStatus()
-      .then((data) => updateStatusUI(data))
+      .then((data) => {
+        updateStatusUI(data);
+        // Se ja estiver processando ao carregar, retoma o polling
+        if (data && PROCESSING_STATUSES.includes(data.status)) {
+          pollUntilDone(data.brandguideId);
+        }
+      })
       .catch(() => {});
   }
 
