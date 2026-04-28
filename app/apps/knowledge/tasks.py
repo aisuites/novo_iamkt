@@ -722,7 +722,12 @@ def _apply_brandguide_inner(brandguide):
     typo_order_base = (
         Typography.objects.filter(knowledge_base=kb).count() * 10
     )
-    # Sempre usa rotulo padrao para 'usage' (ignora valor livre do prompt N8N)
+    # Sempre usa rotulo padrao para 'usage' (ignora valor livre do prompt N8N).
+    # Cria Typography apenas se a fonte for uma Google Font validada — caso
+    # contrario o slot fica em branco para o usuario preencher manualmente.
+    from apps.knowledge.google_fonts import normalize_google_font_name
+
+    typo_skipped: List[str] = []
     for slot_key, default_usage in (
         ('primaria', 'Títulos'),
         ('secundaria', 'Texto corrido'),
@@ -730,13 +735,30 @@ def _apply_brandguide_inner(brandguide):
         slot = tipo_data.get(slot_key) or {}
         if not isinstance(slot, dict):
             continue
-        familia = (slot.get('familia') or '').strip()
-        if not familia:
+        familia_raw = (slot.get('familia') or '').strip()
+        if not familia_raw:
+            continue
+        # Tenta a familia principal e o fallback se houver
+        canonical = normalize_google_font_name(familia_raw)
+        if not canonical:
+            fallback = (slot.get('fallback') or '').strip()
+            canonical = normalize_google_font_name(fallback) if fallback else None
+            if canonical:
+                logger.info(
+                    '[brandguide_apply] usando fallback %s no lugar de %s (nao e Google Font)',
+                    canonical, familia_raw,
+                )
+        if not canonical:
+            typo_skipped.append(familia_raw)
+            logger.info(
+                '[brandguide_apply] fonte %s nao e Google Font - slot ficara em branco',
+                familia_raw,
+            )
             continue
         if Typography.objects.filter(
             knowledge_base=kb,
             font_source='google',
-            google_font_name__iexact=familia,
+            google_font_name__iexact=canonical,
         ).exists():
             continue
         peso = (slot.get('peso_padrao') or 'Regular').strip() or 'Regular'
@@ -744,7 +766,7 @@ def _apply_brandguide_inner(brandguide):
             knowledge_base=kb,
             usage=default_usage,
             font_source='google',
-            google_font_name=familia[:200],
+            google_font_name=canonical[:200],
             google_font_weight=peso[:20],
             order=typo_order_base + typo_created * 10,
             created_from_brandguide=brandguide,
@@ -759,8 +781,8 @@ def _apply_brandguide_inner(brandguide):
     brandguide.save(update_fields=['processing_status', 'completed_at'])
 
     logger.info(
-        '[brandguide_apply] OK brandguide_id=%s text/list=%s cores=%s typo=%s',
-        brandguide.id, len(filled_fields), colors_created, typo_created,
+        '[brandguide_apply] OK brandguide_id=%s text/list=%s cores=%s typo=%s typo_skipped=%s',
+        brandguide.id, len(filled_fields), colors_created, typo_created, typo_skipped,
     )
     return {
         'success': True,
@@ -768,6 +790,7 @@ def _apply_brandguide_inner(brandguide):
         'fields_filled': filled_fields,
         'colors_created': colors_created,
         'typography_created': typo_created,
+        'typography_skipped': typo_skipped,
     }
 
 
