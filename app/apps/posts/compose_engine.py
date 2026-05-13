@@ -143,8 +143,63 @@ class ComposeEngine:
         h = int(self.canvas_h * float(bbox_pct.get('h', 0)) / 100)
         return x, y, w, h
 
+    def _natural_bbox(
+        self, placement: Dict[str, Any], asset_w: int, asset_h: int
+    ) -> Tuple[int, int, int, int]:
+        """
+        Calcula bbox de um asset respeitando aspect ratio nativo.
+
+        placement schema:
+        - anchor: 'top-left' | 'top-center' | 'top-right' |
+                  'center-left' | 'center' | 'center-right' |
+                  'bottom-left' | 'bottom-center' | 'bottom-right'
+        - scale_pct: numero (0-100), tamanho relativo a scale_dim do canvas
+        - scale_dim: 'width' (default) | 'height' — referencia do canvas
+        - offset_pct: {x: %, y: %} — afastamento da borda do anchor (default 0)
+        """
+        anchor = (placement.get('anchor') or 'top-left').lower()
+        scale_dim = (placement.get('scale_dim') or 'width').lower()
+        scale_pct = float(placement.get('scale_pct') or 100)
+        offset = placement.get('offset_pct') or {}
+        off_x_pct = float(offset.get('x', 0))
+        off_y_pct = float(offset.get('y', 0))
+
+        # Calcula largura final do asset (preservando aspect ratio nativo)
+        if scale_dim == 'height':
+            new_h = int(self.canvas_h * scale_pct / 100)
+            new_w = int(asset_w * (new_h / asset_h)) if asset_h else new_h
+        else:
+            new_w = int(self.canvas_w * scale_pct / 100)
+            new_h = int(asset_h * (new_w / asset_w)) if asset_w else new_w
+
+        # Calcula x baseado no anchor horizontal
+        if anchor.endswith('left'):
+            x = int(self.canvas_w * off_x_pct / 100)
+        elif anchor.endswith('right'):
+            x = self.canvas_w - new_w - int(self.canvas_w * off_x_pct / 100)
+        else:
+            x = (self.canvas_w - new_w) // 2 + int(self.canvas_w * off_x_pct / 100)
+
+        # Calcula y baseado no anchor vertical
+        if anchor.startswith('top'):
+            y = int(self.canvas_h * off_y_pct / 100)
+        elif anchor.startswith('bottom'):
+            y = self.canvas_h - new_h - int(self.canvas_h * off_y_pct / 100)
+        else:
+            y = (self.canvas_h - new_h) // 2 + int(self.canvas_h * off_y_pct / 100)
+
+        return x, y, new_w, new_h
+
     def _render_region(self, region: Dict[str, Any]) -> None:
         tipo = (region.get('tipo') or '').lower()
+
+        # Natural placement: para logo/graphic com 'placement' dict
+        # o engine pre-calcula bbox a partir do tamanho real do asset
+        placement = region.get('placement')
+        if placement and tipo in ('logo', 'graphic'):
+            self._render_asset_natural(region, tipo, placement)
+            return
+
         bbox = region.get('bbox_pct') or {}
         if not bbox:
             return
@@ -162,6 +217,45 @@ class ComposeEngine:
             self._render_graphic_placeholder(region, x, y, w, h)
         else:
             logger.info('Tipo de region nao suportado: %r', tipo)
+
+    def _render_asset_natural(
+        self, region: Dict[str, Any], tipo: str, placement: Dict[str, Any]
+    ) -> None:
+        """
+        Renderiza logo ou graphic respeitando dimensoes nativas do asset.
+        Usa placement.anchor + placement.scale_pct para posicionar.
+        Fallback: se asset nao carrega, desenha placeholder com bbox calculada.
+        """
+        # Tenta carregar asset
+        if tipo == 'logo':
+            asset = self.asset_resolver.resolve_logo(
+                variant=region.get('logo_variant') or 'preferencial'
+            )
+        else:
+            asset = self.asset_resolver.resolve_graphic_module(
+                module_number=region.get('graphic_module_number'),
+                orientation=region.get('orientation'),
+            )
+
+        if asset:
+            x, y, w, h = self._natural_bbox(placement, asset.size[0], asset.size[1])
+            # fit_mode default 'stretch' aqui pq ja calculamos w,h conforme aspect
+            self.asset_resolver.paste_fit(
+                self.canvas, asset, x, y, w, h, mode='stretch'
+            )
+            return
+
+        # Fallback: usa scale_pct para gerar uma bbox quadrada e desenha placeholder
+        fallback_pct = float(placement.get('scale_pct') or 20)
+        fake_size = (1, 1)  # 1:1 para fallback nao ter ratio absurdo
+        x, y, w, h = self._natural_bbox(placement, *fake_size)
+        # Garante minimo razoavel
+        w = max(w, int(self.canvas_w * fallback_pct / 200))
+        h = max(h, w)
+        if tipo == 'logo':
+            self._render_logo_placeholder(region, x, y, w, h)
+        else:
+            self._render_graphic_placeholder(region, x, y, w, h)
 
     # ---- Text renderer -------------------------------------------------
 
@@ -387,8 +481,30 @@ class ComposeEngine:
     def _render_graphic_placeholder(
         self, region: Dict[str, Any], x: int, y: int, w: int, h: int
     ) -> None:
-        """Renderiza BrandgraficModule real da KB; fallback: formas geometricas."""
+        """
+        Renderiza region tipo 'graphic'. Tres casos:
+        1. Sem graphic_module_number ou 'nao_aplicavel' -> retangulo solido
+           com color_token (background highlight, barra colorida etc)
+        2. graphic_module_number valido -> carrega BrandgraficModule real PNG
+        3. Falhou tudo -> fallback formas geometricas
+        """
         module_num = region.get('graphic_module_number')
+        is_color_block = (
+            not module_num or
+            str(module_num).strip().lower() in (
+                '', 'nao_aplicavel', 'na', 'none', 'indeterminado'
+            )
+        )
+
+        if is_color_block:
+            # Apenas um retangulo de destaque na cor do brand
+            draw = ImageDraw.Draw(self.canvas)
+            color = self._resolve_color(
+                region.get('color_token'), default='#FFCDD8'
+            )
+            draw.rectangle([x, y, x + w, y + h], fill=color)
+            return
+
         orientation = region.get('orientation') or self._infer_orientation(w, h)
         asset = self.asset_resolver.resolve_graphic_module(
             module_number=module_num, orientation=orientation
