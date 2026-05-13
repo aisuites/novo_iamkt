@@ -1486,6 +1486,7 @@ class VisualTemplate(models.Model):
     aspect_ratio = models.CharField(
         max_length=50,
         blank=True,
+        default='',
         verbose_name='Aspect ratio',
         help_text='Ex: 1:1, 4:5, 9:16, 16:9, produto_fisico, produto_fisico_cilindrico'
     )
