@@ -49,3 +49,4 @@ db.sqlite3-journal
 .idea/
 *.sublime-project
 *.sublime-workspace
+app/fonts_cache/
