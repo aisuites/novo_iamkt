@@ -67,6 +67,7 @@ class ComposeEngine:
         size_override: Optional[Tuple[int, int]] = None,
         kb=None,
     ):
+        from .asset_resolver import AssetResolver
         from .font_resolver import FontResolver
 
         self.spec = template_spec or {}
@@ -78,6 +79,7 @@ class ComposeEngine:
         self.canvas_w: int = 0
         self.canvas_h: int = 0
         self.font_resolver = FontResolver(brand_visual_spec=self.brand, kb=kb)
+        self.asset_resolver = AssetResolver(kb=kb)
 
     # ---- Public API -----------------------------------------------------
 
@@ -325,15 +327,23 @@ class ComposeEngine:
     def _render_image_placeholder(
         self, region: Dict[str, Any], x: int, y: int, w: int, h: int
     ) -> None:
+        # Tenta carregar imagem real do content
+        slot_id = region.get('id')
+        content_value = self.content.get(slot_id) if slot_id else None
+        asset = self.asset_resolver.resolve_image_from_content(content_value)
+        if asset:
+            mode = region.get('fit_mode') or 'cover'
+            self.asset_resolver.paste_fit(self.canvas, asset, x, y, w, h, mode=mode)
+            return
+
+        # Fallback: wireframe placeholder
         draw = ImageDraw.Draw(self.canvas)
-        # Caixa cinza com X (estilo wireframe)
         draw.rectangle(
             [x, y, x + w, y + h], fill='#D8D8D8', outline='#A0A0A0', width=2
         )
         draw.line([(x, y), (x + w, y + h)], fill='#A0A0A0', width=2)
         draw.line([(x + w, y), (x, y + h)], fill='#A0A0A0', width=2)
-        # Label
-        label = (region.get('id') or 'IMAGE').upper()
+        label = (slot_id or 'IMAGE').upper()
         try:
             font = ImageFont.truetype(SYSTEM_FONTS['regular'], 28)
         except Exception:
@@ -346,18 +356,22 @@ class ComposeEngine:
     def _render_logo_placeholder(
         self, region: Dict[str, Any], x: int, y: int, w: int, h: int
     ) -> None:
-        """Placeholder do logo: caixa preta com texto LOGO + variant."""
+        """Renderiza logo real da KB; fallback: caixa preta com label."""
+        variant = region.get('logo_variant') or 'preferencial'
+        asset = self.asset_resolver.resolve_logo(variant=variant)
+        if asset:
+            self.asset_resolver.paste_fit(self.canvas, asset, x, y, w, h, mode='contain')
+            return
+
         draw = ImageDraw.Draw(self.canvas)
         bg = self._resolve_color(
             region.get('color_token'), default='#000000'
         )
-        # Se cor do fundo do canvas e parecida com cor do logo, inverte
         canvas_bg = self.canvas.getpixel((min(x + 2, self.canvas_w - 1), min(y + 2, self.canvas_h - 1)))
         if isinstance(canvas_bg, tuple) and self._is_dark(bg) == self._is_dark_rgb(canvas_bg):
             bg = '#FFFFFF' if self._is_dark_rgb(canvas_bg) else '#000000'
 
         draw.rectangle([x, y, x + w, y + h], fill=bg)
-        variant = region.get('logo_variant') or 'preferencial'
         label_color = '#FFFFFF' if self._is_dark(bg) else '#000000'
         font_size = max(12, min(int(h * 0.5), 40))
         try:
@@ -373,17 +387,25 @@ class ComposeEngine:
     def _render_graphic_placeholder(
         self, region: Dict[str, Any], x: int, y: int, w: int, h: int
     ) -> None:
-        """Placeholder para grafismo/asset: formas geometricas."""
+        """Renderiza BrandgraficModule real da KB; fallback: formas geometricas."""
+        module_num = region.get('graphic_module_number')
+        orientation = region.get('orientation') or self._infer_orientation(w, h)
+        asset = self.asset_resolver.resolve_graphic_module(
+            module_number=module_num, orientation=orientation
+        )
+        if asset:
+            mode = region.get('fit_mode') or 'contain'
+            self.asset_resolver.paste_fit(self.canvas, asset, x, y, w, h, mode=mode)
+            return
+
+        # Fallback: formas geometricas representativas
         draw = ImageDraw.Draw(self.canvas)
         color = self._resolve_color(
             region.get('color_token'), default='#000000'
         )
-        # Algumas formas geometricas representativas do estilo Colletivo (modular)
         cx, cy = x + w // 2, y + h // 2
         r = max(8, min(w, h) // 6)
-        # Circulo grande
         draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=color)
-        # Barras verticais nos lados
         bar_w = max(4, r // 2)
         draw.rectangle(
             [x + w // 4 - bar_w // 2, y + h // 4, x + w // 4 + bar_w // 2, y + 3 * h // 4],
@@ -393,17 +415,23 @@ class ComposeEngine:
             [x + 3 * w // 4 - bar_w // 2, y + h // 4, x + 3 * w // 4 + bar_w // 2, y + 3 * h // 4],
             fill=color,
         )
-        # Label discreto do numero do modulo
-        module = region.get('graphic_module_number')
-        if module and str(module).strip() not in ('', 'nao_aplicavel'):
+        if module_num and str(module_num).strip() not in ('', 'nao_aplicavel'):
             try:
                 font = ImageFont.truetype(SYSTEM_FONTS['regular'], 18)
             except Exception:
                 font = ImageFont.load_default()
             draw.text(
-                (x + 8, y + h - 22), f'mod {module}',
+                (x + 8, y + h - 22), f'mod {module_num}',
                 fill=color, font=font, anchor='lt'
             )
+
+    @staticmethod
+    def _infer_orientation(w: int, h: int) -> str:
+        if h > w * 1.2:
+            return 'vertical'
+        if w > h * 1.2:
+            return 'horizontal'
+        return 'both'
 
     # ---- Resolvers ----------------------------------------------------
 

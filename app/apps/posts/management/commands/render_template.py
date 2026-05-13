@@ -91,6 +91,7 @@ class Command(BaseCommand):
             template_spec=tpl_spec,
             content=content,
             brand_visual_spec=brand_spec,
+            kb=template.knowledge_base,
         )
         try:
             n_bytes = engine.render_to_file(output)
