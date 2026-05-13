@@ -12,12 +12,33 @@ import boto3
 import secrets
 import time
 import re
+import unicodedata
 from datetime import datetime
 from typing import Tuple, Optional, Dict, Any
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from django.conf import settings
 from apps.core.utils.file_validators import FileValidator
+
+
+def _ascii_safe_metadata(value: str, max_len: int = 200) -> str:
+    """
+    Sanitiza um valor para uso em metadata S3 (header HTTP).
+    HTTP headers exigem US-ASCII; nomes com acentos compostos
+    (ex.: 'o' + U+0300) ou caracteres unicode quebram botocore.
+
+    - Normaliza para NFKD (decompoe acentos)
+    - Remove combining marks e qualquer char nao-ASCII
+    - Trunca a max_len chars
+    """
+    if not value:
+        return ''
+    normalized = unicodedata.normalize('NFKD', str(value))
+    # Remove diacriticos (combining marks)
+    no_diacritics = ''.join(c for c in normalized if not unicodedata.combining(c))
+    # Mantem apenas ASCII imprimivel
+    ascii_only = no_diacritics.encode('ascii', 'ignore').decode('ascii')
+    return ascii_only[:max_len]
 
 
 class S3Service:
@@ -225,6 +246,12 @@ class S3Service:
         # Duas chamadas separadas a time.time() podiam divergir em 1s e quebrar a assinatura (403).
         upload_timestamp = str(int(time.time()))
 
+        # Nome original precisa ser ASCII-safe para uso em metadata S3 (header HTTP).
+        # Acentos decompostos (NFD) ou qualquer non-ASCII quebram o botocore.
+        # O s3_key real ja e gerado por generate_secure_filename (com hash) - so a
+        # metadata informativa sofre esta normalizacao.
+        safe_file_name = _ascii_safe_metadata(file_name)
+
         try:
             # Gerar Presigned URL com INTELLIGENT_TIERING
             presigned_url = s3_client.generate_presigned_url(
@@ -236,7 +263,7 @@ class S3Service:
                     'ServerSideEncryption': 'AES256',
                     'StorageClass': 'INTELLIGENT_TIERING',  # ← Economia de custos
                     'Metadata': {
-                        'original-name': file_name,
+                        'original-name': safe_file_name,
                         'organization-id': str(organization_id),
                         'category': category,
                         'upload-timestamp': upload_timestamp
@@ -250,7 +277,7 @@ class S3Service:
             signed_headers = {
                 'x-amz-server-side-encryption': 'AES256',
                 'x-amz-storage-class': 'INTELLIGENT_TIERING',
-                'x-amz-meta-original-name': file_name,
+                'x-amz-meta-original-name': safe_file_name,
                 'x-amz-meta-organization-id': str(organization_id),
                 'x-amz-meta-category': category,
                 'x-amz-meta-upload-timestamp': upload_timestamp
