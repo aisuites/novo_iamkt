@@ -65,14 +65,19 @@ class ComposeEngine:
         content: Dict[str, Any],
         brand_visual_spec: Optional[Dict[str, Any]] = None,
         size_override: Optional[Tuple[int, int]] = None,
+        kb=None,
     ):
+        from .font_resolver import FontResolver
+
         self.spec = template_spec or {}
         self.content = content or {}
         self.brand = brand_visual_spec or {}
         self.size_override = size_override
+        self.kb = kb
         self.canvas: Optional[Image.Image] = None
         self.canvas_w: int = 0
         self.canvas_h: int = 0
+        self.font_resolver = FontResolver(brand_visual_spec=self.brand, kb=kb)
 
     # ---- Public API -----------------------------------------------------
 
@@ -258,17 +263,40 @@ class ComposeEngine:
         return best
 
     def _load_text_font(self, region: Dict[str, Any], size: int):
-        """Carrega fonte do sistema (DejaVu). F6 trara Supreme/IBM Plex Sans."""
-        # Por enquanto, usa Bold para titles e tags, regular para o resto
+        """
+        Carrega fonte real via FontResolver:
+        1. Resolve font_token (ex: 'primaria.supreme') consultando brand spec
+        2. Baixa/cacheia TTF se necessario (fontsource)
+        3. Fallback DejaVu se tudo falhar
+
+        Peso e inferido do tipo de region OU do peso_aparente quando especificado.
+        """
         tipo = region.get('tipo', '')
-        if tipo in ('title', 'subtitle', 'tag'):
-            path = SYSTEM_FONTS['bold']
+        # Decide peso: title/subtitle/tag = bold, resto = regular.
+        # Se a region especificar peso explicito, usa esse.
+        peso = region.get('peso') or region.get('peso_aparente') or ''
+        if peso and peso.lower() not in ('null', 'nao_aplicavel', ''):
+            weight = peso
+        elif tipo in ('title', 'subtitle', 'tag'):
+            weight = 'bold'
         else:
-            path = SYSTEM_FONTS['regular']
+            weight = 'regular'
+
+        # Tenta resolver via FontResolver
+        font_token = region.get('font_token')
+        system_fb = SYSTEM_FONTS['bold'] if weight.lower() in ('bold', 'extrabold', 'black') else SYSTEM_FONTS['regular']
         try:
-            return ImageFont.truetype(path, size)
+            ttf_path = self.font_resolver.resolve_with_fallback(
+                font_token=font_token,
+                weight=weight,
+                system_fallback=system_fb,
+            )
+            return ImageFont.truetype(ttf_path, size)
         except Exception:
-            return ImageFont.load_default()
+            try:
+                return ImageFont.truetype(system_fb, size)
+            except Exception:
+                return ImageFont.load_default()
 
     def _text_height(self, font, sample: str) -> int:
         bbox = font.getbbox(sample)
