@@ -1,0 +1,3529 @@
+{
+  "brand_visual_spec_v2": {
+    "versao": "2.0",
+    "gerado_em": "2026-05-13",
+    "modelo_analise": "claude-sonnet-4-5",
+    "source": "brandguide_pdf",
+    "confidence": "high",
+    "logotipo": {
+      "variacoes": [
+        {
+          "nome": "preferencial_horizontal",
+          "uso": "É a forma principal da marca e deve ser usada com prioridade.",
+          "proporcoes_aproximadas": "5:1",
+          "texto_que_aparece": "INSTITUTE FOR TOMORROW"
+        },
+        {
+          "nome": "vertical",
+          "uso": "Usada em áreas com pouco espaço horizontal.",
+          "proporcoes_aproximadas": "2:3",
+          "texto_que_aparece": "INSTITUTE FOR TOMORROW"
+        },
+        {
+          "nome": "contracao_horizontal",
+          "uso": "A marca possui uma contração de assinatura. Nessa versão, não utilizamos a palavra INSTITUTE, deixando apenas For Tomorrow. Essa versão pode ser usada como assinatura principal da marca.",
+          "proporcoes_aproximadas": "5:1",
+          "texto_que_aparece": "FOR TOMORROW"
+        },
+        {
+          "nome": "contracao_vertical",
+          "uso": "Usada em áreas com pouco espaço horizontal.",
+          "proporcoes_aproximadas": "2:3",
+          "texto_que_aparece": "FOR TOMORROW"
+        },
+        {
+          "nome": "reduzida_horizontal",
+          "uso": "Ainda tem uma versão reduzida da marca, que deve ser usada apenas quando a área de aplicação é muito pequena para utilizar a versão preferencial.",
+          "proporcoes_aproximadas": "5:1",
+          "texto_que_aparece": "FOR TMRN"
+        },
+        {
+          "nome": "reduzida_vertical",
+          "uso": "Ainda tem uma versão reduzida da marca, que deve ser usada apenas quando a área de aplicação é muito pequena para utilizar a versão preferencial.",
+          "proporcoes_aproximadas": "2:3",
+          "texto_que_aparece": "FOR TMRN"
+        }
+      ],
+      "area_seguranca": {
+        "regra_literal": "Informação não presente nas páginas fornecidas",
+        "valor_relativo": "Informação não presente nas páginas fornecidas",
+        "aplicacao": "Informação não presente nas páginas fornecidas"
+      },
+      "reducao_minima": {
+        "impresso_mm": {
+          "preferencial_horizontal": null,
+          "preferencial_vertical": null,
+          "contracao_horizontal": null,
+          "contracao_vertical": null,
+          "reducao_horizontal_for_tomorrow": 20,
+          "reducao_vertical_for_tomorrow": 15,
+          "reducao_horizontal_for_tmrn": 13,
+          "reducao_vertical_for_tmrn": 7.7
+        },
+        "digital_px": {
+          "preferencial_horizontal": null,
+          "preferencial_vertical": null,
+          "contracao_horizontal": null,
+          "contracao_vertical": null,
+          "reducao_horizontal_for_tomorrow": 110,
+          "reducao_vertical_for_tomorrow": 80.6,
+          "reducao_horizontal_for_tmrn": 69,
+          "reducao_vertical_for_tmrn": 41
+        },
+        "fonte": "Informação não presente nas páginas fornecidas"
+      },
+      "construcao_visual": "Logotipo com tipografia geométrica em caixa alta, com versões reduzidas que utilizam a contração 'TMRN' em lugar de 'TOMORROW'. A letra 'O' apresenta formato circular característico. Todas as versões mantêm a mesma família tipográfica com peso bold.",
+      "regras_literais_do_pdf": [
+        "O logotipo foi desenhado com espaços abertos na estrutura das letras. Isso aumenta o contraste da forma e traz um movimento pulsante para a marca.",
+        "O logotipo pulsa em movimento.",
+        "É a forma principal da marca e deve ser usada com prioridade.",
+        "Usada em áreas com pouco espaço horizontal.",
+        "A marca possui uma contração de assinatura. Nessa versão, não utilizamos a palavra INSTITUTE, deixando apenas For Tomorrow.",
+        "Essa versão pode ser usada como assinatura principal da marca.",
+        "A versão contraída da marca também sofre alterações em seu formato para se adaptar em diferentes aplicações.",
+        "Ainda tem uma versão reduzida da marca, que deve ser usada apenas quando a área de aplicação é muito pequena para utilizar a versão preferencial.",
+        "A área de segurança é uma margem que fica ao redor da marca e funciona como uma barreira para impedir que elementos externos interfiram na legibilidade do logotipo.",
+        "Essa área é construída usando a altura da letra M do logotipo em todas as suas versões.",
+        "Quando a marca for aplicada em pequenas áreas, devemos respeitar o limite de redução para garantir que o logotipo tenha boa legibilidade, em todas as suas versões.",
+        "Devemos considerar as medidas da largura do logotipo. Para aplicações em materiais impressos, devemos considerar as medidas em milímetros; para materiais digitais, devemos considerar as medidas em pixels.",
+        "Quando a marca tem a necessidade de crescer e gerar uma nova assinatura (para um evento ou serviço), devemos incluir o nome do novo segmento junto com o logotipo de For Tomorrow.",
+        "A tipografia utilizada para criar as submarcas nessa página é de desenho exclusivo. Sua utilização só é liberada após a compra dos direitos de uso da font.",
+        "Caso não tenha a font exclusiva para usar na criação de submarcas, devemos usar a Satoshi Medium como substituta."
+      ]
+    },
+    "tipografia": {
+      "primaria": {
+        "familia": "Supreme",
+        "peso_padrao": "Regular",
+        "todos_pesos_listados": [
+          "Thin",
+          "Thin Italic",
+          "Extralight",
+          "Extralight Italic",
+          "Light",
+          "Light Italic",
+          "Regular",
+          "Italic",
+          "Medium",
+          "Medium Italic",
+          "Bold",
+          "Bold Italic",
+          "Extrabold",
+          "Extrabold Italic"
+        ],
+        "fonte": "A fonte da marca é a Supreme. Deve ser usada preferencialmente na versão Regular."
+      },
+      "fallback_ou_secundaria": {
+        "familia": "Não mencionada",
+        "uso": "Não especificado",
+        "fonte": "Nenhuma fonte secundária ou fallback mencionada no texto extraído"
+      },
+      "hierarquia_matematica": {
+        "X_baseline_descricao": "tamanho da fonte do título",
+        "X_half_descricao": "metade do tamanho do título (½ x) - para o texto principal",
+        "X_two_thirds_descricao": "dois terços do tamanho do título (⅔ x) - para textos secundários",
+        "fonte": "Para ilustrar a hierarquia, vamos dizer que o tamanho da fonte do título seja X. Para o texto principal, o tamanho da fonte deve ser metade do tamanho do título (½ x). Para textos secundários, devemos usar dois terços do tamanho do título (⅔ x)."
+      },
+      "regras_posicionamento": [
+        "Devemos nos guiar pelo tamanho da fonte dos títulos e chamadas para determinar o peso das demais informações"
+      ],
+      "regras_caixa": [
+        "Utilizamos a Supreme REGULAR em caixa alta para criarmos os títulos e chamadas das publicações",
+        "Utilizamos a Supreme REGULAR em caixa alta e baixa para criarmos os textos principais e secundários"
+      ],
+      "regras_literais_do_pdf": [
+        "A fonte da marca é a Supreme. Deve ser usada preferencialmente na versão Regular.",
+        "Suas caracteristicas retas, e com traços monolineares, entrega uma aparência muito associada a engenharia, tecnologia e organização.",
+        "Ao compor peças gráficas utilizando a tipografia, devemos seguir a hierarquia dos pesos para garantir uma boa leitura das informações.",
+        "Devemos nos guiar pelo tamanho da fonte dos títulos e chamadas para determinar o peso das demais informações.",
+        "Utilizamos a Supreme REGULAR em caixa alta para criarmos os títulos e chamadas das publicações.",
+        "Utilizamos a Supreme REGULAR em caixa alta e baixa para criarmos os textos principais e secundários.",
+        "Para ilustrar a hierarquia, vamos dizer que o tamanho da fonte do título seja X.",
+        "Para o texto principal, o tamanho da fonte deve ser metade do tamanho do título (½ x).",
+        "Para textos secundários, devemos usar dois terços do tamanho do título (⅔ x)."
+      ],
+      "links_download_detectados": [
+        "Download Gratuito"
+      ]
+    },
+    "cores": {
+      "institucional": [
+        {
+          "nome": "Preto",
+          "hex": "#000000",
+          "rgb": "0, 0, 0",
+          "cmyk": "0, 0, 0, 100",
+          "uso": "cor principal da marca"
+        },
+        {
+          "nome": "Branco",
+          "hex": "#F7F7F7",
+          "rgb": "247, 247, 247",
+          "cmyk": "2, 1, 1, 0",
+          "uso": "cor principal da marca"
+        },
+        {
+          "nome": "Vermelho",
+          "hex": "#FF0047",
+          "rgb": "255, 0, 71",
+          "cmyk": "0, 99, 66, 0",
+          "uso": "demarcar eventos, projetos e serviços da For Tomorrow"
+        }
+      ],
+      "iniciativas": [
+        {
+          "nome": "Amarelo",
+          "hex": "#FFC324",
+          "rgb": "255, 195, 36",
+          "cmyk": "0, 24, 94, 0",
+          "uso": "demarcar eventos, projetos e serviços da For Tomorrow"
+        },
+        {
+          "nome": "Roxo",
+          "hex": "#9E3ADC",
+          "rgb": "158, 58, 220",
+          "cmyk": "55, 80, 0, 0",
+          "uso": "demarcar eventos, projetos e serviços da For Tomorrow"
+        },
+        {
+          "nome": "Rosa",
+          "hex": "#E23D96",
+          "rgb": "250, 30, 165",
+          "cmyk": "5, 90, 0, 0",
+          "uso": "demarcar eventos, projetos e serviços da For Tomorrow"
+        },
+        {
+          "nome": "Verde",
+          "hex": "#F7F7F7",
+          "rgb": "247, 247, 247",
+          "cmyk": "69, 0, 71, 0",
+          "uso": "demarcar eventos, projetos e serviços da For Tomorrow"
+        },
+        {
+          "nome": "Azul Escuro",
+          "hex": "#0F0A8C",
+          "rgb": "15, 10, 140",
+          "cmyk": "100, 99, 10, 9",
+          "uso": "demarcar eventos, projetos e serviços da For Tomorrow"
+        },
+        {
+          "nome": "Azul Claro",
+          "hex": "#67DAFF",
+          "rgb": "103, 218, 255",
+          "cmyk": "100, 99, 10, 9",
+          "uso": "demarcar eventos, projetos e serviços da For Tomorrow"
+        }
+      ],
+      "regras_de_combinacao": [
+        "A paleta é dividida em dois conjuntos: institucional e iniciativas"
+      ],
+      "regras_literais_do_pdf": [
+        "A paleta de cor da identidade é minimalista e elegante. O preto e o branca são as cores principais da marca.",
+        "As demais cores são usadas para demarcar eventos, projetos e serviços da For Tomorrow.",
+        "Portanto a paleta é dividida em dois conjuntos: institucional e iniciativas."
+      ],
+      "exemplos_aplicacao_visiveis": [
+        "Páginas 36-38: Exemplos de grade mostrando uso de preto e branco com formas geométricas",
+        "Página 40: Paleta completa institucional (Preto, Branco, Vermelho) e iniciativas (Amarelo, Roxo, Rosa, Verde, Azul Escuro, Azul Claro)"
+      ]
+    },
+    "grafismo": {
+      "origem": "recortando partes da padronagem em módulos",
+      "tipo": "padronagem geométrica modular",
+      "construcao_passo_a_passo": [
+        "A padronagem da marca é construído a partir da abstração da forma do logotipo",
+        "O grafismo é feito recortando partes da padronagem em módulos",
+        "A partir deles, repetimos essas partes na vertical ou na horizontal",
+        "Selecionar módulos do sistema de grafismo",
+        "Aplicar módulos conforme grade de construção definida",
+        "Respeitar padrões de repetição vertical ou horizontal",
+        "Enquadrar textos, imagens e grafismos nas áreas do grid"
+      ],
+      "modulos": {
+        "quantidade_total": 8,
+        "numerados": true,
+        "descricao_visual": "Módulos geométricos extraídos da padronagem do logotipo, compostos por formas angulares, barras diagonais, círculos e elementos tipográficos abstratos",
+        "detalhes_por_modulo": {
+          "modulo_01": "Módulo geométrico base",
+          "modulo_02": "Módulo geométrico variação 2",
+          "modulo_03": "Módulo geométrico variação 3",
+          "modulo_04": "Módulo geométrico variação 4",
+          "modulo_05": "Módulo geométrico variação 5",
+          "modulo_06": "Módulo geométrico variação 6",
+          "modulo_07": "Módulo geométrico variação 7",
+          "modulo_08": "Módulo geométrico variação 8"
+        }
+      },
+      "repeticao": {
+        "padroes_validos": [
+          "vertical",
+          "horizontal"
+        ],
+        "regras_literais": [
+          "A partir deles, repetimos essas partes na vertical ou na horizontal",
+          "O grafismo é feito recortando partes da padronagem em módulos. A partir deles, repetimos essas partes na vertical ou na horizontal",
+          "Repetição pode ser vertical ou horizontal",
+          "Módulos devem seguir padrões estabelecidos de repetição",
+          "Aplicação sistemática conforme grade de construção"
+        ]
+      },
+      "grade_de_construcao": {
+        "regra_decisao_literal": "Módulos organizados em sistema de grid para repetição",
+        "quadrado": {
+          "colunas": 4,
+          "linhas": 1,
+          "quando_usar": "Para disposição horizontal dos módulos recortados"
+        },
+        "retangular": {
+          "colunas": 4,
+          "linhas": 2,
+          "quando_usar": "Para repetição vertical dos módulos, criando padrão contínuo"
+        },
+        "uso": "Os módulos são organizados em grades horizontais e verticais para criar padrões repetitivos"
+      },
+      "uso_no_layout": [
+        "Recortar partes da padronagem em módulos",
+        "Repetir módulos na vertical ou na horizontal",
+        "Aplicar como elemento gráfico de apoio em materiais da marca",
+        "Devemos sempre prezar pela boa leitura e legibilidade dos elementos que fazem parte de uma composição",
+        "Para isso, é necessário respeitar o posicionamento dos elementos dentro de uma grade de construção, que é feita a partir do formato da peça",
+        "A grade de construção determina as áreas de aplicação dos elementos: textos, imagens e grafismos",
+        "Enquadrá-los nessas áreas garante que as peças fiquem com uma boa legibilidade",
+        "Textos, imagens e grafismos enquadrados nas áreas do grid",
+        "Respeitar divisões modulares da grade",
+        "Aplicar módulos conforme padrões de repetição vertical ou horizontal",
+        "Utilizar grade quadrada 2x2 ou retangular 2x3 conforme necessidade",
+        "Combinar logotipo 'FOR TOMORROW' com textos como 'EM MOVIMENTO' e 'ONDE ESTAMOS E O QUE FIZEMOS'"
+      ],
+      "regras_literais_do_pdf": [
+        "A padronagem da marca é construído a partir da abstração da forma do logotipo",
+        "O grafismo é feito recortando partes da padronagem em módulos",
+        "A partir deles, repetimos essas partes na vertical ou na horizontal",
+        "O grafismo é feito recortando partes da padronagem em módulos. A partir deles, repetimos essas partes na vertical ou na horizontal",
+        "Devemos sempre prezar pela boa leitura e legibilidade dos elementos que fazem parte de uma composição",
+        "Para isso, é necessário respeitar o posicionamento dos elementos dentro de uma grade de construção, que é feita a partir do formato da peça",
+        "A grade é construída dividindo a peça gráfica em partes. O que vai determinar a quantidade de divisões, é o formato da peça que será trabalhada",
+        "Peças quadradas ou com largura e altura muito próximas, devem ser dividas em 2x2 (duas colunas e duas linhas)",
+        "Peças com formato retangular devem ser divididas de duas formas: 2x na lateral menor, e 3x na lateral maior",
+        "A divisão 2x3 garante uma grade com mais áreas de aplicação, que cobre toda a peça de forma harmonica",
+        "A grade de construção determina as áreas de aplicação dos elementos: textos, imagens e grafismos. Enquadrá-los nessas áreas garante que as peças fiquem com uma boa legibilidade",
+        "A grade pode ser quadrada 2x2 ou retangular 2x3",
+        "Textos, imagens e grafismos enquadrados nas áreas do grid",
+        "Repetição pode ser vertical ou horizontal",
+        "Sistema modular composto por 8 módulos numerados",
+        "Grafismo derivado da abstração da forma do logotipo"
+      ],
+      "exemplos_aplicacao_visiveis": [
+        "Padronagem completa com repetição horizontal do nome 'FORTOMORROM'",
+        "Módulos individuais numerados de 01 a 08 (Módulo Recortado)",
+        "Repetição vertical de módulos criando padrão contínuo (Módulo Repetido na Vertical)",
+        "Aplicação em fundos e elementos gráficos de apoio",
+        "Módulos repetidos na horizontal formando padrões contínuos",
+        "Aplicação de grafismos em áreas específicas de layouts enquadrados em grids 2x2",
+        "Aplicação de grafismos em layouts com grid 2x3 para formatos retangulares",
+        "Textos, imagens e grafismos posicionados respeitando as áreas delimitadas pelo grid",
+        "Composições com informações de eventos (SXSW 2025, LISBOA, datas) organizadas dentro das áreas do grid",
+        "Grafismos aplicados em diferentes áreas da composição mantendo legibilidade dos textos",
+        "Exemplo 01: Grade quadrada 2x2 vazia mostrando estrutura base",
+        "Exemplo 02: Grade retangular 2x3 com blocos de texto/imagem distribuídos",
+        "Exemplo 03: Grade retangular 2x3 com logotipo 'FOR TOMORROW' no topo, textos 'EM MOVIMENTO' e 'ONDE ESTAMOS E O QUE FIZEMOS' distribuídos nas células",
+        "Exemplo 04: Aplicação sem grid visível, com logotipo e textos em composição livre seguindo princípios da grade",
+        "Uso de blocos cinza representando áreas de conteúdo",
+        "Combinação de identidade verbal com elementos gráficos modulares"
+      ]
+    },
+    "regras_recorrentes_aplicacao": [
+      "Hierarquia tipográfica consistente: X (títulos) > X/2 (texto principal) > 2X/3 (texto secundário)",
+      "Supreme REGULAR em caixa alta para TÍTULOS E CHAMADAS",
+      "Supreme REGULAR em caixa alta e baixa para TEXTOS principais e secundários",
+      "Logo FOR TOMORROW sempre presente, geralmente no rodapé ou topo esquerdo",
+      "Website fortomorrow.com como elemento secundário no rodapé",
+      "Uso de fundos rosa claro (#f5d5d5) para destacar áreas de conteúdo (TÍTULOS, TEXTO PRINCIPAL, TEXTO SECUNDÁRIO)",
+      "Módulos gráficos geométricos pretos como elementos decorativos",
+      "Placeholders de imagem com cor neutra (#c4b5b0) e marcação X diagonal",
+      "Tag SPEAKER em caixa delimitada para identificar palestrantes",
+      "Grid 2x3 aplicado consistentemente para organização espacial",
+      "Cores institucionais: preto, branco, rosa claro, azul escuro",
+      "Alinhamento à esquerda predominante",
+      "Espaçamento e margens consistentes (aproximadamente 5% das bordas)",
+      "Contraste adequado entre texto e fundo para legibilidade",
+      "Formatos adaptativos: 1:1 (quadrado), 4:5 (vertical), 9:16 (stories/OOH), 16:9 (horizontal)",
+      "Paleta iniciativas: selecionar UMA cor para usar com preto/branco institucional",
+      "Logo FOR TOMORROW sempre presente em composições",
+      "Supreme UPPERCASE para títulos principais e chamadas",
+      "IBM Plex para textos secundários, nomes, descrições",
+      "Módulos gráficos (círculos, retângulos, linhas) como elementos visuais recorrentes",
+      "Grid 2x3 aparente na organização espacial",
+      "Contraste garantido entre fundo e elementos de texto",
+      "Cores de iniciativa aplicadas estrategicamente (não massivamente)",
+      "Formato quadrado 1:1 predominante para peças de evento",
+      "Minimalismo: muito espaço em branco, composições limpas",
+      "Hierarquia tipográfica clara com uso de tamanhos X, X/2, 2X",
+      "Alinhamento predominantemente à esquerda",
+      "Data/hora formatada com underscore (ex: 25_NOVEMBRO)",
+      "Horários com 'às' (ex: 08H30 às 13H)",
+      "Logo 'FOR TOMORROW' sempre em Supreme, UPPERCASE",
+      "Hierarquia tipográfica consistente: títulos em Supreme (X ou 2X), subtítulos em Supreme (X/2), textos secundários em IBM Plex",
+      "Paleta Iniciativas utiliza preto + cor específica (rosa, verde, etc) para garantir contraste",
+      "Módulos gráficos (círculos, retângulos, linhas) aplicados em cor da iniciativa",
+      "Data/hora frequentemente destacada em cor da iniciativa",
+      "Alinhamento à esquerda predominante para blocos de texto",
+      "Logo pode aparecer em variantes: preferencial, redução ou contração",
+      "Fundo institucional (preto/branco) ou cor da iniciativa",
+      "Estrutura comum em cards: logo > título > subtítulo > data/info adicional",
+      "Logos de parceiros aparecem em área específica (geralmente rodapé)",
+      "Grafismos nunca prejudicam legibilidade do texto",
+      "Speaker cards seguem formato portrait com foto centralizada",
+      "Templates adaptáveis a múltiplos formatos: 1:1, 4:5, 9:16, 16:9",
+      "Logo institucional 'FOR TOMORROW' ou 'INSTITUTE FOR TOMORROW' sempre presente em composições",
+      "Grafismos modulares geométricos (círculos, meias-luas, retângulos verticais) como elemento visual recorrente",
+      "Paleta de cores de destaque: verde, rosa/magenta, azul",
+      "Cores institucionais: preto e branco como base",
+      "Tipografia primária Supreme para títulos e logos, sempre em UPPERCASE",
+      "Tipografia secundária IBM Plex para textos corpo e secundários",
+      "Composições assimétricas com peso visual distribuído",
+      "Aplicação em múltiplos suportes: digital (slides), impresso (posters), produtos físicos (ecobags, garrafas)",
+      "Sistema modular flexível adaptável a diferentes formatos",
+      "Contraste forte entre áreas claras e escuras",
+      "Elementos gráficos funcionam como separadores e acentos visuais",
+      "Logo pode aparecer em versões: preferencial, vertical, contração, redução"
+    ]
+  },
+  "templates": [
+    {
+      "nome_inferido": "speaker_card_horizontal_landscape",
+      "source_pages": [
+        19,
+        20,
+        21,
+        22
+      ],
+      "format_aspect": "16:9",
+      "grid_aplicado": "2x3",
+      "background_color": "#f5f5f5",
+      "anotacoes_visiveis_no_brandguide": [
+        "TÍTULOS E CHAMADAS",
+        "TEXTO PRINCIPAL",
+        "TEXTO SECUNDÁRIO",
+        "X",
+        "1/2 X",
+        "2/3 X"
+      ],
+      "regions": [
+        {
+          "id": "event_name",
+          "tipo": "title",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 5,
+            "y": 8,
+            "w": 35,
+            "h": 20
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "SXSW 2025"
+        },
+        {
+          "id": "location_dates",
+          "tipo": "title",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 5,
+            "y": 30,
+            "w": 35,
+            "h": 35
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "LISBOA 10-13 NOV."
+        },
+        {
+          "id": "image_placeholder",
+          "tipo": "image",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 42,
+            "y": 8,
+            "w": 55,
+            "h": 65
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "#c4b5b0",
+          "font_token": "nao_aplicavel",
+          "content_source": "ai_generated_scene",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Placeholder image with X diagonal lines"
+        },
+        {
+          "id": "speaker_tag",
+          "tipo": "tag",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 67,
+            "w": 12,
+            "h": 4
+          },
+          "size_token": "2X/3",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "SPEAKER"
+        },
+        {
+          "id": "speaker_name",
+          "tipo": "body_text",
+          "label_anotado": "TEXTO PRINCIPAL",
+          "bbox_pct": {
+            "x": 5,
+            "y": 72,
+            "w": 35,
+            "h": 8
+          },
+          "size_token": "X/2",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Joseph Gordon-Levitt"
+        },
+        {
+          "id": "speaker_title",
+          "tipo": "secondary_text",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 5,
+            "y": 80,
+            "w": 35,
+            "h": 5
+          },
+          "size_token": "2X/3",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Ator e empreendedor"
+        },
+        {
+          "id": "logo_fortomorrow",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 88,
+            "w": 15,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW logo"
+        },
+        {
+          "id": "website",
+          "tipo": "secondary_text",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 42,
+            "y": 88,
+            "w": 20,
+            "h": 5
+          },
+          "size_token": "2X/3",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "fortomorrow.com"
+        }
+      ],
+      "regras_aplicadas": [
+        "Título (TITULOS E CHAMADAS) em Supreme REGULAR caixa alta, tamanho X",
+        "Texto principal (nome do speaker) em Supreme REGULAR, tamanho X/2",
+        "Texto secundário em Supreme REGULAR, tamanho 2X/3",
+        "Hierarquia tipográfica: X > X/2 > 2X/3",
+        "Elementos posicionados conforme grid 2x3",
+        "Logo sempre no canto inferior esquerdo",
+        "Tag SPEAKER em caixa delimitada"
+      ],
+      "thumbnail_page": 20
+    },
+    {
+      "nome_inferido": "event_card_portrait_tall",
+      "source_pages": [
+        19,
+        22
+      ],
+      "format_aspect": "9:16",
+      "grid_aplicado": "2x3",
+      "background_color": "#d4c4c4",
+      "anotacoes_visiveis_no_brandguide": [
+        "TÍTULOS E CHAMADAS",
+        "TEXTO SECUNDÁRIO"
+      ],
+      "regions": [
+        {
+          "id": "logo_fortomorrow_top",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 3,
+            "w": 35,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW logo"
+        },
+        {
+          "id": "event_title_main",
+          "tipo": "title",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 5,
+            "y": 12,
+            "w": 90,
+            "h": 20
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FUTURO DO VAREJO, CREATORS E TECNOLOGIA"
+        },
+        {
+          "id": "event_subtitle",
+          "tipo": "title",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 5,
+            "y": 35,
+            "w": 90,
+            "h": 12
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "CREATOR JOURNEY EM DECODE/CHINA"
+        },
+        {
+          "id": "event_datetime",
+          "tipo": "secondary_text",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 5,
+            "y": 50,
+            "w": 50,
+            "h": 10
+          },
+          "size_token": "2X/3",
+          "case": "misto",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "25_NOVEMBRO 08H30 às 13H"
+        },
+        {
+          "id": "website_bottom",
+          "tipo": "secondary_text",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 5,
+            "y": 93,
+            "w": 30,
+            "h": 4
+          },
+          "size_token": "2X/3",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "fortomorrow.com"
+        }
+      ],
+      "regras_aplicadas": [
+        "Background em cor neutra/rosa claro",
+        "Logo FOR TOMORROW no topo esquerdo",
+        "Títulos em Supreme REGULAR caixa alta (TÍTULOS E CHAMADAS)",
+        "Texto secundário com data/hora em tamanho 2X/3",
+        "Website no rodapé",
+        "Formato vertical 9:16"
+      ],
+      "thumbnail_page": 19
+    },
+    {
+      "nome_inferido": "event_card_square_graphics",
+      "source_pages": [
+        22
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "2x3",
+      "background_color": "#ffffff",
+      "anotacoes_visiveis_no_brandguide": [
+        "TÍTULOS E CHAMADAS",
+        "TEXTO SECUNDÁRIO"
+      ],
+      "regions": [
+        {
+          "id": "graphic_top",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 50,
+            "y": 0,
+            "w": 50,
+            "h": 30
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "right",
+          "color_token": "institucional.preto",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "indeterminado",
+          "exemplo_conteudo": "Módulos gráficos geométricos pretos no topo direito"
+        },
+        {
+          "id": "logo_fortomorrow",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 5,
+            "w": 25,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW logo"
+        },
+        {
+          "id": "event_title_pink",
+          "tipo": "title",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 5,
+            "y": 15,
+            "w": 85,
+            "h": 30
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "SXSW 2026 SPORTS"
+        },
+        {
+          "id": "date_time_top",
+          "tipo": "secondary_text",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 60,
+            "y": 15,
+            "w": 35,
+            "h": 12
+          },
+          "size_token": "2X/3",
+          "case": "misto",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "25_NOV 8h30 às 13h"
+        },
+        {
+          "id": "subtitle_description",
+          "tipo": "secondary_text",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 60,
+            "y": 28,
+            "w": 35,
+            "h": 10
+          },
+          "size_token": "2X/3",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "The Future of Sports Storytelling"
+        },
+        {
+          "id": "background_highlight_pink",
+          "tipo": "graphic",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 5,
+            "y": 15,
+            "w": 55,
+            "h": 30
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "#f5d5d5",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Fundo rosa claro destacando título"
+        }
+      ],
+      "regras_aplicadas": [
+        "Formato quadrado 1:1",
+        "Módulos gráficos geométricos como elemento visual",
+        "Fundo rosa claro destacando área de TÍTULOS E CHAMADAS",
+        "Logo no topo esquerdo",
+        "Hierarquia tipográfica mantida (X para título, 2X/3 para secundário)",
+        "Grafismos pretos contrastando com fundo claro"
+      ],
+      "thumbnail_page": 22
+    },
+    {
+      "nome_inferido": "event_card_square_vertical_layout",
+      "source_pages": [
+        22
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "2x3",
+      "background_color": "#ffffff",
+      "anotacoes_visiveis_no_brandguide": [
+        "TÍTULOS E CHAMADAS",
+        "TEXTO PRINCIPAL",
+        "TEXTO SECUNDÁRIO"
+      ],
+      "regions": [
+        {
+          "id": "graphic_bottom_left",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 0,
+            "y": 35,
+            "w": 45,
+            "h": 40
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "indeterminado",
+          "exemplo_conteudo": "Módulos gráficos geométricos pretos na lateral esquerda"
+        },
+        {
+          "id": "logo_fortomorrow_bottom",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 80,
+            "w": 20,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW logo"
+        },
+        {
+          "id": "event_title_main",
+          "tipo": "title",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 50,
+            "y": 8,
+            "w": 45,
+            "h": 25
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FUTURO DO VAREJO, CREATORS E TECNOLOGIA"
+        },
+        {
+          "id": "event_subtitle",
+          "tipo": "title",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 5,
+            "y": 38,
+            "w": 85,
+            "h": 20
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "CREATOR JOURNEY EM DECODE/CHINA"
+        },
+        {
+          "id": "event_datetime",
+          "tipo": "secondary_text",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 5,
+            "y": 63,
+            "w": 50,
+            "h": 10
+          },
+          "size_token": "2X/3",
+          "case": "misto",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "25 _ NOVEMBRO 08H30 às 13H"
+        },
+        {
+          "id": "background_highlight_pink_title",
+          "tipo": "graphic",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 5,
+            "y": 38,
+            "w": 85,
+            "h": 20
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "#f5d5d5",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Fundo rosa claro destacando área de título"
+        },
+        {
+          "id": "background_highlight_pink_datetime",
+          "tipo": "graphic",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 5,
+            "y": 63,
+            "w": 85,
+            "h": 10
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "#f5d5d5",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Fundo rosa claro destacando data/hora"
+        }
+      ],
+      "regras_aplicadas": [
+        "Formato quadrado 1:1",
+        "Módulos gráficos geométricos pretos como elemento decorativo lateral",
+        "Áreas destacadas em rosa claro para TÍTULOS E CHAMADAS e TEXTO SECUNDÁRIO",
+        "Logo posicionado no rodapé esquerdo",
+        "Layout vertical com divisão clara de blocos de informação",
+        "Hierarquia tipográfica consistente"
+      ],
+      "thumbnail_page": 22
+    },
+    {
+      "nome_inferido": "speaker_card_vertical_portrait",
+      "source_pages": [
+        22
+      ],
+      "format_aspect": "4:5",
+      "grid_aplicado": "2x3",
+      "background_color": "#f5f5f5",
+      "anotacoes_visiveis_no_brandguide": [
+        "TÍTULOS E CHAMADAS",
+        "TEXTO PRINCIPAL",
+        "TEXTO SECUNDÁRIO"
+      ],
+      "regions": [
+        {
+          "id": "event_name_dates",
+          "tipo": "title",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 5,
+            "y": 5,
+            "w": 45,
+            "h": 35
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "SXSW 2026 LISBOA 10-13 NOV."
+        },
+        {
+          "id": "image_placeholder",
+          "tipo": "image",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 52,
+            "y": 5,
+            "w": 43,
+            "h": 55
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "right",
+          "color_token": "#c4b5b0",
+          "font_token": "nao_aplicavel",
+          "content_source": "ai_generated_scene",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Placeholder image with X diagonal lines"
+        },
+        {
+          "id": "speaker_name",
+          "tipo": "body_text",
+          "label_anotado": "TEXTO PRINCIPAL",
+          "bbox_pct": {
+            "x": 5,
+            "y": 63,
+            "w": 55,
+            "h": 8
+          },
+          "size_token": "X/2",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Joseph Gordon"
+        },
+        {
+          "id": "speaker_title",
+          "tipo": "secondary_text",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 5,
+            "y": 72,
+            "w": 55,
+            "h": 5
+          },
+          "size_token": "2X/3",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Ator e empreendedor"
+        },
+        {
+          "id": "logo_fortomorrow",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 85,
+            "w": 18,
+            "h": 7
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW logo"
+        },
+        {
+          "id": "website",
+          "tipo": "secondary_text",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 52,
+            "y": 85,
+            "w": 30,
+            "h": 5
+          },
+          "size_token": "2X/3",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "fortomorrow.com"
+        },
+        {
+          "id": "background_highlight_pink_title",
+          "tipo": "graphic",
+          "label_anotado": "TÍTULOS E CHAMADAS",
+          "bbox_pct": {
+            "x": 5,
+            "y": 5,
+            "w": 45,
+            "h": 18
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "#f5d5d5",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Fundo rosa claro destacando título do evento"
+        },
+        {
+          "id": "background_highlight_pink_name",
+          "tipo": "graphic",
+          "label_anotado": "TEXTO PRINCIPAL",
+          "bbox_pct": {
+            "x": 5,
+            "y": 63,
+            "w": 90,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "#f5d5d5",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Fundo rosa claro destacando nome do speaker"
+        },
+        {
+          "id": "background_highlight_pink_website",
+          "tipo": "graphic",
+          "label_anotado": "TEXTO SECUNDÁRIO",
+          "bbox_pct": {
+            "x": 5,
+            "y": 82,
+            "w": 90,
+            "h": 10
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "#f5d5d5",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Fundo rosa claro destacando rodapé com logo e website"
+        }
+      ],
+      "regras_aplicadas": [
+        "Formato vertical 4:5",
+        "Áreas destacadas em rosa claro para diferentes níveis de informação",
+        "Título do evento no topo esquerdo em caixa alta",
+        "Imagem placeholder ocupando lado direito superior",
+        "Nome do speaker como TEXTO PRINCIPAL (X/2)",
+        "Título do speaker como TEXTO SECUNDÁRIO (2X/3)",
+        "Logo e website no rodapé",
+        "Grid 2x3 aplicado"
+      ],
+      "thumbnail_page": 22
+    },
+    {
+      "nome_inferido": "digital_signage_ooh_vertical",
+      "source_pages": [
+        44
+      ],
+      "format_aspect": "9:16",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "#004d6b",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_fortomorrow_top",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 5,
+            "w": 30,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW logo branco"
+        },
+        {
+          "id": "main_message",
+          "tipo": "body_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 16,
+            "w": 80,
+            "h": 25
+          },
+          "size_token": "nao_aplicavel",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "ESTEJA ONDE AS MAIORES TRANSFORMAÇÕES E CONVERSAS DE NEGÓCIOS ACONTECEM."
+        },
+        {
+          "id": "partner_logos",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 43,
+            "w": 40,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "nao_aplicavel",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "SXSW YPX logos"
+        },
+        {
+          "id": "main_image",
+          "tipo": "image",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 53,
+            "w": 90,
+            "h": 35
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "nao_definido",
+          "font_token": "nao_aplicavel",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Homem interagindo com robô amarelo (cena tecnológica)"
+        },
+        {
+          "id": "sponsor_logo",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 90,
+            "w": 25,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "nao_aplicavel",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "eletromidia logo"
+        }
+      ],
+      "regras_aplicadas": [
+        "Fundo em cor institucional azul escuro",
+        "Tipografia branca sobre fundo escuro para legibilidade",
+        "Logo no topo",
+        "Mensagem principal em destaque",
+        "Imagem fotográfica centralizada ocupando área significativa",
+        "Logo de patrocinador no rodapé",
+        "Formato vertical para mídia OOH/digital signage"
+      ],
+      "thumbnail_page": 44
+    },
+    {
+      "nome_inferido": "event_card_square_graphics_v1",
+      "source_pages": [
+        47,
+        49
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "2x3",
+      "background_color": "#FFFFFF (branco) | #000000 (preto) - variantes",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_top",
+          "tipo": "logo",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 5,
+            "w": 35,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto (em fundo branco) | institucional.branco (em fundo preto)",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW"
+        },
+        {
+          "id": "graphics_top",
+          "tipo": "graphic",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 12,
+            "w": 90,
+            "h": 25
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "iniciativas.azul | iniciativas.verde",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "1-8",
+          "exemplo_conteudo": "Módulos gráficos (círculos, retângulos, linhas)"
+        },
+        {
+          "id": "title_main",
+          "tipo": "title",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 40,
+            "w": 90,
+            "h": 25
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto (em fundo branco) | institucional.branco (em fundo preto/cor)",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FUTURO DO VAREJO, CREATORS E TECNOLOGIA"
+        },
+        {
+          "id": "subtitle",
+          "tipo": "subtitle",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 67,
+            "w": 90,
+            "h": 12
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto (em fundo branco) | institucional.branco (em fundo preto/cor)",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "CREATOR JOURNEY EM DECODE/CHINA"
+        },
+        {
+          "id": "date_time",
+          "tipo": "body_text",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 80,
+            "w": 45,
+            "h": 10
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto (em fundo branco) | institucional.branco (em fundo preto/cor)",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "25_NOVEMBRO 08H30 às 13H"
+        }
+      ],
+      "regras_aplicadas": [
+        "Uso de uma cor da paleta iniciativas + preto/branco institucional",
+        "Módulos gráficos no topo em cor de iniciativa",
+        "Logo FOR TOMORROW sempre presente no topo esquerdo",
+        "Tipografia Supreme em UPPERCASE para títulos e informações",
+        "Contraste garantido entre fundo e texto"
+      ],
+      "thumbnail_page": 47
+    },
+    {
+      "nome_inferido": "event_card_square_minimal_v1",
+      "source_pages": [
+        47,
+        49
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "2x3",
+      "background_color": "#FFFFFF",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_top",
+          "tipo": "logo",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 8,
+            "w": 35,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW"
+        },
+        {
+          "id": "title_main",
+          "tipo": "title",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 25,
+            "w": 84,
+            "h": 25
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FUTURO DO VAREJO, CREATORS E TECNOLOGIA"
+        },
+        {
+          "id": "subtitle",
+          "tipo": "subtitle",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 52,
+            "w": 84,
+            "h": 12
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "CREATOR JOURNEY EM DECODE/CHINA"
+        },
+        {
+          "id": "date_time",
+          "tipo": "body_text",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 66,
+            "w": 45,
+            "h": 8
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "iniciativas.verde",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "25_NOVEMBRO 08H30 às 13H"
+        },
+        {
+          "id": "website",
+          "tipo": "secondary_text",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 86,
+            "w": 40,
+            "h": 5
+          },
+          "size_token": "nao_aplicavel",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "fortomorrow.com"
+        }
+      ],
+      "regras_aplicadas": [
+        "Fundo branco minimalista",
+        "Cor de iniciativa aplicada em detalhe específico (data/hora)",
+        "Logo FOR TOMORROW no topo",
+        "Hierarquia clara de tipografia",
+        "URL em fonte secundária IBM Plex"
+      ],
+      "thumbnail_page": 47
+    },
+    {
+      "nome_inferido": "event_card_square_colorblock_v1",
+      "source_pages": [
+        47,
+        49
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "2x3",
+      "background_color": "iniciativas.azul | iniciativas.verde",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_top",
+          "tipo": "logo",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 8,
+            "w": 35,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW"
+        },
+        {
+          "id": "title_main",
+          "tipo": "title",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 20,
+            "w": 84,
+            "h": 25
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FUTURO DO VAREJO, CREATORS E TECNOLOGIA"
+        },
+        {
+          "id": "subtitle",
+          "tipo": "subtitle",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 47,
+            "w": 84,
+            "h": 12
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "CREATOR JOURNEY EM DECODE/CHINA"
+        },
+        {
+          "id": "date_time",
+          "tipo": "body_text",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 61,
+            "w": 45,
+            "h": 8
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "25_NOVEMBRO 08H30 às 13H"
+        },
+        {
+          "id": "graphics_bottom",
+          "tipo": "graphic",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 0,
+            "y": 75,
+            "w": 100,
+            "h": 25
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "right",
+          "color_token": "institucional.preto",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "1-8",
+          "exemplo_conteudo": "Módulos gráficos pretos cortados na borda inferior direita"
+        }
+      ],
+      "regras_aplicadas": [
+        "Fundo em cor vibrante da paleta iniciativas",
+        "Todos os textos em preto para contraste",
+        "Módulos gráficos pretos no rodapé",
+        "Composição com cor dominante + preto institucional"
+      ],
+      "thumbnail_page": 47
+    },
+    {
+      "nome_inferido": "event_card_square_pattern_v1",
+      "source_pages": [
+        47,
+        49
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "2x3",
+      "background_color": "#FFFFFF",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "graphics_pattern",
+          "tipo": "graphic",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "iniciativas.azul | iniciativas.verde",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "1-8",
+          "exemplo_conteudo": "Padrão de módulos gráficos (círculos, linhas, retângulos) distribuído por toda composição"
+        },
+        {
+          "id": "logo_bottom",
+          "tipo": "logo",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 5,
+            "y": 85,
+            "w": 35,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW"
+        }
+      ],
+      "regras_aplicadas": [
+        "Fundo completamente preenchido por padrão gráfico",
+        "Uso de cor única da paleta iniciativas",
+        "Logo posicionado no rodapé para máxima visibilidade",
+        "Composição puramente gráfica/abstrata"
+      ],
+      "thumbnail_page": 47
+    },
+    {
+      "nome_inferido": "speaker_card_portrait_v1",
+      "source_pages": [
+        47,
+        49
+      ],
+      "format_aspect": "4:5",
+      "grid_aplicado": "2x3",
+      "background_color": "#FFFFFF",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "event_tag",
+          "tipo": "tag",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 5,
+            "w": 25,
+            "h": 10
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "SXSW 2025"
+        },
+        {
+          "id": "image_speaker",
+          "tipo": "image",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 35,
+            "y": 35,
+            "w": 57,
+            "h": 45
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "right",
+          "color_token": "nao_definido",
+          "font_token": "nao_aplicavel",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Foto do palestrante Joseph Gordon-Levitt"
+        },
+        {
+          "id": "location_date",
+          "tipo": "body_text",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 45,
+            "w": 20,
+            "h": 18
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "iniciativas.verde | iniciativas.azul",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "LISBOA 10-13 NOV."
+        },
+        {
+          "id": "speaker_name",
+          "tipo": "secondary_text",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 35,
+            "y": 82,
+            "w": 57,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Joseph Gordon-Levitt Ator e empreendedor"
+        },
+        {
+          "id": "logo_bottom",
+          "tipo": "logo",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 88,
+            "w": 30,
+            "h": 7
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW"
+        }
+      ],
+      "regras_aplicadas": [
+        "Formato retrato para destacar foto do palestrante",
+        "Cor de iniciativa aplicada em informação de destaque (local/data)",
+        "Foto sangrada alinhada à direita",
+        "Nome e descrição em fonte secundária IBM Plex",
+        "Logo no rodapé esquerdo"
+      ],
+      "thumbnail_page": 47
+    },
+    {
+      "nome_inferido": "event_card_square_title_focused_v1",
+      "source_pages": [
+        47,
+        49
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "2x3",
+      "background_color": "#FFFFFF",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_top",
+          "tipo": "logo",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 8,
+            "w": 40,
+            "h": 10
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW"
+        },
+        {
+          "id": "title_large",
+          "tipo": "title",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 30,
+            "w": 84,
+            "h": 40
+          },
+          "size_token": "2X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "SXSW 2026 SPORTS"
+        },
+        {
+          "id": "subtitle_colored",
+          "tipo": "subtitle",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 72,
+            "w": 70,
+            "h": 12
+          },
+          "size_token": "X/2",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "iniciativas.verde | iniciativas.azul",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "The Future of Sports Storytelling"
+        }
+      ],
+      "regras_aplicadas": [
+        "Título extremamente grande ocupando área central",
+        "Subtítulo em cor de iniciativa e fonte secundária",
+        "Composição minimalista focada em tipografia",
+        "Alto contraste preto/branco com toque de cor"
+      ],
+      "thumbnail_page": 49
+    },
+    {
+      "nome_inferido": "merchandise_tote_bag_v1",
+      "source_pages": [
+        48
+      ],
+      "format_aspect": "16:9",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "nao_aplicavel",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "product_photo",
+          "tipo": "image",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 0,
+            "y": 0,
+            "w": 50,
+            "h": 100
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "nao_definido",
+          "font_token": "nao_aplicavel",
+          "content_source": "ai_generated_scene",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Ecobag branca com frase FUTUROS SÃO FEITOS DE DESEJOS"
+        },
+        {
+          "id": "product_photo_alt",
+          "tipo": "image",
+          "label_anotado": "sem anotacao",
+          "bbox_pct": {
+            "x": 50,
+            "y": 0,
+            "w": 50,
+            "h": 100
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "right",
+          "color_token": "nao_definido",
+          "font_token": "nao_aplicavel",
+          "content_source": "ai_generated_scene",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Boné azul com módulos gráficos FOR TOMORROW"
+        }
+      ],
+      "regras_aplicadas": [
+        "Aplicação de identidade em produtos merchandising",
+        "Uso de paleta iniciativas (azul) + institucional (branco/preto)",
+        "Módulos gráficos aplicados em produtos",
+        "Frases/manifestos da marca em produtos"
+      ],
+      "thumbnail_page": 48
+    },
+    {
+      "nome_inferido": "event_poster_horizontal_with_graphics",
+      "source_pages": [
+        50
+      ],
+      "format_aspect": "16:9",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "#000000",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_main",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 45,
+            "w": 25,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": null,
+          "exemplo_conteudo": "CREATORS FOR TOMORROW"
+        },
+        {
+          "id": "title_main",
+          "tipo": "title",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 54,
+            "w": 45,
+            "h": 15
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "FUTURO DO VAREJO, CREATORS E TECNOLOGIA"
+        },
+        {
+          "id": "subtitle",
+          "tipo": "subtitle",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 66,
+            "w": 35,
+            "h": 8
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "CREATOR JOURNEY EM DECODE/CHINA"
+        },
+        {
+          "id": "date_time",
+          "tipo": "secondary_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 82,
+            "w": 20,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "25_NOVEMBRO 08H30 às 13H"
+        },
+        {
+          "id": "graphic_pattern",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 25,
+            "y": 12,
+            "w": 50,
+            "h": 75
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "iniciativas.verde",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": null,
+          "graphic_module_number": "3",
+          "exemplo_conteudo": "Módulos gráficos 3 (círculos, retângulos, linhas verde neon)"
+        }
+      ],
+      "regras_aplicadas": [
+        "Fundo preto institucional",
+        "Grafismos em verde neon (iniciativas)",
+        "Hierarquia tipográfica: logo > título principal > subtítulo > data/hora",
+        "Alinhamento à esquerda para textos",
+        "Módulos gráficos distribuídos na área central-superior"
+      ],
+      "thumbnail_page": 50
+    },
+    {
+      "nome_inferido": "event_card_square_black_pink",
+      "source_pages": [
+        51
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "#000000",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_mini",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 8,
+            "w": 30,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "reducao",
+          "graphic_module_number": null,
+          "exemplo_conteudo": "FOR TOMORROW"
+        },
+        {
+          "id": "title_main",
+          "tipo": "title",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 18,
+            "w": 80,
+            "h": 15
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "FUTURO DO VAREJO, CREATORS E TECNOLOGIA"
+        },
+        {
+          "id": "subtitle",
+          "tipo": "subtitle",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 35,
+            "w": 70,
+            "h": 10
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "CREATOR JOURNEY EM DECODE/CHINA"
+        },
+        {
+          "id": "date_time",
+          "tipo": "secondary_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 48,
+            "w": 40,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "iniciativas.rosa",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "25_NOVEMBRO 08H30 às 13H"
+        },
+        {
+          "id": "graphic_pattern",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 15,
+            "y": 5,
+            "w": 70,
+            "h": 50
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "iniciativas.rosa",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": null,
+          "graphic_module_number": "3",
+          "exemplo_conteudo": "Módulos gráficos rosa (círculos, retângulos, linhas)"
+        }
+      ],
+      "regras_aplicadas": [
+        "Paleta Iniciativas: Preto + Rosa",
+        "Contraste alto para legibilidade",
+        "Data/hora em cor da iniciativa (rosa)",
+        "Grafismos em rosa sobre fundo preto"
+      ],
+      "thumbnail_page": 51
+    },
+    {
+      "nome_inferido": "event_card_square_white_black",
+      "source_pages": [
+        51
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "#FFFFFF",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_mini",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 8,
+            "w": 30,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "reducao",
+          "graphic_module_number": null,
+          "exemplo_conteudo": "FOR TOMORROW"
+        },
+        {
+          "id": "title_main",
+          "tipo": "title",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 18,
+            "w": 80,
+            "h": 15
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "FUTURO DO VAREJO, CREATORS E TECNOLOGIA"
+        },
+        {
+          "id": "subtitle",
+          "tipo": "subtitle",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 35,
+            "w": 70,
+            "h": 10
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "CREATOR JOURNEY EM DECODE/CHINA"
+        },
+        {
+          "id": "date_time",
+          "tipo": "secondary_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 48,
+            "w": 40,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "iniciativas.rosa",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "25_NOVEMBRO 8H30 às 13H"
+        },
+        {
+          "id": "url",
+          "tipo": "secondary_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 85,
+            "w": 30,
+            "h": 4
+          },
+          "size_token": "nao_aplicavel",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "fortomorrow.com"
+        }
+      ],
+      "regras_aplicadas": [
+        "Variação em fundo branco (high contrast)",
+        "Textos principais em preto",
+        "Destaque de data em cor da iniciativa",
+        "URL no rodapé"
+      ],
+      "thumbnail_page": 51
+    },
+    {
+      "nome_inferido": "event_card_square_pink_white",
+      "source_pages": [
+        51
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "#FF0066",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_mini",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 8,
+            "w": 30,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "reducao",
+          "graphic_module_number": null,
+          "exemplo_conteudo": "FOR TOMORROW"
+        },
+        {
+          "id": "title_main",
+          "tipo": "title",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 18,
+            "w": 80,
+            "h": 15
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "FUTURO DO VAREJO, CREATORS E TECNOLOGIA"
+        },
+        {
+          "id": "subtitle",
+          "tipo": "subtitle",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 35,
+            "w": 70,
+            "h": 10
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "CREATOR JOURNEY EM DECODE/CHINA"
+        },
+        {
+          "id": "date_time",
+          "tipo": "secondary_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 48,
+            "w": 40,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "25_NOVEMBRO 08H30 às 13H"
+        },
+        {
+          "id": "graphic_pattern_bottom",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 0,
+            "y": 55,
+            "w": 100,
+            "h": 45
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "institucional.branco",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": null,
+          "graphic_module_number": "3",
+          "exemplo_conteudo": "Módulos gráficos brancos sobre rosa"
+        }
+      ],
+      "regras_aplicadas": [
+        "Fundo rosa (cor da iniciativa)",
+        "Textos em branco sobre rosa",
+        "Grafismos em branco na área inferior"
+      ],
+      "thumbnail_page": 51
+    },
+    {
+      "nome_inferido": "speaker_card_portrait_with_photo",
+      "source_pages": [
+        51
+      ],
+      "format_aspect": "4:5",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "#F5F5F5",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "event_tag",
+          "tipo": "tag",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 8,
+            "w": 25,
+            "h": 10
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "SXSW 2025"
+        },
+        {
+          "id": "photo_speaker",
+          "tipo": "image",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 30,
+            "y": 25,
+            "w": 40,
+            "h": 35
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "nao_definido",
+          "font_token": "nao_aplicavel",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "Foto do palestrante Joseph Gordon-Levitt"
+        },
+        {
+          "id": "location",
+          "tipo": "body_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 68,
+            "w": 30,
+            "h": 10
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "LISBOA 10-13 NOV."
+        },
+        {
+          "id": "speaker_name",
+          "tipo": "secondary_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 30,
+            "y": 75,
+            "w": 40,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "normal",
+          "alignment": "center",
+          "color_token": "institucional.preto",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "Joseph Gordon-Levitt Ator e empreendedor"
+        },
+        {
+          "id": "logo_bottom",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 88,
+            "w": 30,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "reducao",
+          "graphic_module_number": null,
+          "exemplo_conteudo": "FOR TOMORROW"
+        }
+      ],
+      "regras_aplicadas": [
+        "Formato portrait (speaker card)",
+        "Fundo neutro claro",
+        "Foto centralizada",
+        "Informações estruturadas: tag evento > foto > localização > nome/cargo > logo"
+      ],
+      "thumbnail_page": 51
+    },
+    {
+      "nome_inferido": "event_title_card_square_logo_emphasis",
+      "source_pages": [
+        51
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "#FFFFFF",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_large",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 15,
+            "w": 80,
+            "h": 18
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": null,
+          "exemplo_conteudo": "FOR TOMORROW"
+        },
+        {
+          "id": "event_name",
+          "tipo": "title",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 38,
+            "w": 80,
+            "h": 25
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "iniciativas.rosa",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "SXSW 2026 SPORTS"
+        },
+        {
+          "id": "subtitle",
+          "tipo": "subtitle",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 68,
+            "w": 70,
+            "h": 12
+          },
+          "size_token": "X/2",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "iniciativas.rosa",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "The Future of Sports Storytelling"
+        }
+      ],
+      "regras_aplicadas": [
+        "Fundo branco clean",
+        "Logo em destaque no topo",
+        "Título principal em cor da iniciativa",
+        "Hierarquia clara: logo > título > subtítulo"
+      ],
+      "thumbnail_page": 51
+    },
+    {
+      "nome_inferido": "graphic_pattern_card_square",
+      "source_pages": [
+        51
+      ],
+      "format_aspect": "1:1",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "#FFFFFF",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "graphic_pattern_full",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "iniciativas.rosa",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": null,
+          "graphic_module_number": "3",
+          "exemplo_conteudo": "Módulos gráficos rosa ocupando toda área (círculos, retângulos, linhas)"
+        }
+      ],
+      "regras_aplicadas": [
+        "Card 100% grafismo",
+        "Uso decorativo dos módulos gráficos",
+        "Aplicável como transição ou break visual"
+      ],
+      "thumbnail_page": 51
+    },
+    {
+      "nome_inferido": "presentation_slide_horizontal_pink",
+      "source_pages": [
+        52
+      ],
+      "format_aspect": "16:9",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "#FF0066",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "title_large",
+          "tipo": "title",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 25,
+            "w": 45,
+            "h": 18
+          },
+          "size_token": "2X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "MADE IN CHINA"
+        },
+        {
+          "id": "subtitle",
+          "tipo": "subtitle",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 45,
+            "w": 35,
+            "h": 10
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "A NOVA ARQUITETURA DA INOVAÇÃO GLOBAL"
+        },
+        {
+          "id": "cta_button",
+          "tipo": "tag",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 58,
+            "w": 25,
+            "h": 5
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "REPORT DOWNLOAD CHINA"
+        },
+        {
+          "id": "logo_bottom_left",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 85,
+            "w": 20,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "reducao",
+          "graphic_module_number": null,
+          "exemplo_conteudo": "CREATORS FOR TOMORROW"
+        },
+        {
+          "id": "partner_logos",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 30,
+            "y": 85,
+            "w": 15,
+            "h": 5
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "nao_aplicavel",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "APOIADORES: IED YPX"
+        },
+        {
+          "id": "graphic_pattern",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 40,
+            "y": 18,
+            "w": 35,
+            "h": 65
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "institucional.preto",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": null,
+          "graphic_module_number": "3",
+          "exemplo_conteudo": "Módulos gráficos pretos sobre rosa"
+        },
+        {
+          "id": "photo_context",
+          "tipo": "image",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 48,
+            "y": 35,
+            "w": 25,
+            "h": 40
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "nao_definido",
+          "font_token": "nao_aplicavel",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "Foto de pessoa apresentando (contexto de palestra/evento)"
+        }
+      ],
+      "regras_aplicadas": [
+        "Slide de apresentação formato 16:9",
+        "Fundo rosa (iniciativa)",
+        "CTA em destaque (report download)",
+        "Área de logos parceiros no rodapé",
+        "Grafismos e foto integrados na composição"
+      ],
+      "thumbnail_page": 52
+    },
+    {
+      "nome_inferido": "digital_ooh_poster_vertical",
+      "source_pages": [
+        54
+      ],
+      "format_aspect": "9:16",
+      "grid_aplicado": "nao_aplicavel",
+      "background_color": "#1A5F7A",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_top",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 8,
+            "w": 35,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": null,
+          "exemplo_conteudo": "FOR TOMORROW"
+        },
+        {
+          "id": "body_text",
+          "tipo": "body_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 18,
+            "w": 80,
+            "h": 28
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "ESTEJA ONDE AS MAIORES TRANSFORMAÇÕES E CONVERSAS DE NEGÓCIOS ACONTECEM."
+        },
+        {
+          "id": "partner_logos_bottom",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 50,
+            "w": 25,
+            "h": 5
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "nao_aplicavel",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "IED YPX"
+        },
+        {
+          "id": "photo_main",
+          "tipo": "image",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 10,
+            "y": 60,
+            "w": 80,
+            "h": 35
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "nao_definido",
+          "font_token": "nao_aplicavel",
+          "content_source": "user_input",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "Foto de pessoa interagindo com tecnologia/robô amarelo"
+        },
+        {
+          "id": "footer_logo",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 35,
+            "y": 92,
+            "w": 30,
+            "h": 4
+          },
+          "size_token": "nao_aplicavel",
+          "case": "normal",
+          "alignment": "center",
+          "color_token": "institucional.branco",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "auto",
+          "logo_variant": null,
+          "graphic_module_number": null,
+          "exemplo_conteudo": "eletromidia"
+        }
+      ],
+      "regras_aplicadas": [
+        "Formato vertical 9:16 (digital OOH)",
+        "Fundo em tom azul (foto de ambiente)",
+        "Estrutura: logo > mensagem > parceiros > foto > rodapé",
+        "Adaptado para mídia externa digital"
+      ],
+      "thumbnail_page": 54
+    },
+    {
+      "nome_inferido": "presentation_slide_landscape_16_9",
+      "source_pages": [
+        55
+      ],
+      "format_aspect": "16:9",
+      "grid_aplicado": "livre",
+      "background_color": "#composicao_fotografica_com_bandeira_china",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "title_main",
+          "tipo": "title",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 28,
+            "y": 28,
+            "w": 45,
+            "h": 12
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "MADE IN CHINA"
+        },
+        {
+          "id": "subtitle_01",
+          "tipo": "subtitle",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 28,
+            "y": 42,
+            "w": 40,
+            "h": 4
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "A NOVA ARQUITETURA"
+        },
+        {
+          "id": "subtitle_02",
+          "tipo": "subtitle",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 28,
+            "y": 46,
+            "w": 40,
+            "h": 4
+          },
+          "size_token": "X/2",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "DA INOVAÇÃO GLOBAL"
+        },
+        {
+          "id": "cta_button",
+          "tipo": "tag",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 28,
+            "y": 53,
+            "w": 18,
+            "h": 3
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "center",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "REPORT DOWNLOAD CHINA"
+        },
+        {
+          "id": "logo_event",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 28,
+            "y": 62,
+            "w": 12,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "misto",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "contracao",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "CREATORS FOR TOMORROW"
+        },
+        {
+          "id": "graphic_elements_right",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 62,
+            "y": 25,
+            "w": 30,
+            "h": 50
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "right",
+          "color_token": "institucional.branco",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "variacao_modular",
+          "exemplo_conteudo": "Formas geométricas verticais e círculos em branco"
+        },
+        {
+          "id": "image_background",
+          "tipo": "image",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "nao_definido",
+          "font_token": "nao_aplicavel",
+          "content_source": "ai_generated_scene",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Palácio chinês com bandeira nacional ao fundo"
+        }
+      ],
+      "regras_aplicadas": [
+        "Slide de apresentação formato paisagem 16:9",
+        "Composição com imagem fotográfica de fundo",
+        "Título em UPPERCASE branco fonte Supreme",
+        "Subtítulo em duas linhas também UPPERCASE",
+        "CTA em botão com borda",
+        "Grafismos modulares no canto direito",
+        "Logo institucional no rodapé esquerdo"
+      ],
+      "thumbnail_page": 55
+    },
+    {
+      "nome_inferido": "ecobag_tote_branding",
+      "source_pages": [
+        56
+      ],
+      "format_aspect": "produto_fisico",
+      "grid_aplicado": "livre",
+      "background_color": "#branco",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_sxsw",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 15,
+            "y": 25,
+            "w": 35,
+            "h": 15
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "preferencial",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "SXSW"
+        },
+        {
+          "id": "logo_institutional",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 15,
+            "y": 67,
+            "w": 18,
+            "h": 8
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "contracao",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "INSTITUTE FOR TOMORROW"
+        },
+        {
+          "id": "graphic_modular_right",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 55,
+            "y": 15,
+            "w": 35,
+            "h": 70
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "right",
+          "color_token": "iniciativas.verde",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "3",
+          "exemplo_conteudo": "Formas geométricas modulares verdes: círculo, meia-lua, retângulos verticais"
+        }
+      ],
+      "regras_aplicadas": [
+        "Produto físico: ecobag tote bag tecido branco",
+        "Logo SXSW em preto posição superior esquerda",
+        "Logo institucional menor abaixo",
+        "Grafismos modulares verdes no lado direito da bolsa",
+        "Composição assimétrica com peso visual à direita"
+      ],
+      "thumbnail_page": 56
+    },
+    {
+      "nome_inferido": "bottle_branding_product",
+      "source_pages": [
+        58
+      ],
+      "format_aspect": "produto_fisico_cilindrico",
+      "grid_aplicado": "superficie_cilindrica",
+      "background_color": "#cinza_escuro_fosco",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "logo_institutional_vertical",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 35,
+            "y": 55,
+            "w": 15,
+            "h": 25
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "vertical",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "INSTITUTE FOR TOMORROW (orientação vertical)"
+        },
+        {
+          "id": "graphic_modular_pattern",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 52,
+            "y": 20,
+            "w": 30,
+            "h": 60
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "right",
+          "color_token": "iniciativas.rosa_magenta",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "5",
+          "exemplo_conteudo": "Padrão modular rosa/magenta: círculo, meia-lua, retângulos verticais"
+        }
+      ],
+      "regras_aplicadas": [
+        "Produto físico: garrafa térmica cilíndrica",
+        "Base e tampa em cor de destaque (rosa/magenta)",
+        "Corpo em cinza escuro fosco",
+        "Logo institucional em orientação vertical na lateral esquerda",
+        "Grafismos modulares rosa/magenta no lado direito",
+        "Aplicação em superfície curva/cilíndrica"
+      ],
+      "thumbnail_page": 58
+    },
+    {
+      "nome_inferido": "poster_portrait_event_speaker",
+      "source_pages": [
+        59
+      ],
+      "format_aspect": "4:5",
+      "grid_aplicado": "2x3",
+      "background_color": "#branco_cinza_claro",
+      "anotacoes_visiveis_no_brandguide": [],
+      "regions": [
+        {
+          "id": "event_identifier",
+          "tipo": "title",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 12,
+            "w": 35,
+            "h": 8
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "SXSW 2025"
+        },
+        {
+          "id": "location_dates",
+          "tipo": "subtitle",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 28,
+            "w": 35,
+            "h": 12
+          },
+          "size_token": "X",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "LISBOA 10-13 NOV."
+        },
+        {
+          "id": "speaker_photo",
+          "tipo": "image",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 45,
+            "y": 12,
+            "w": 47,
+            "h": 40
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "right",
+          "color_token": "nao_definido",
+          "font_token": "nao_aplicavel",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Foto do palestrante Joseph Gordon-Levitt"
+        },
+        {
+          "id": "logo_institutional",
+          "tipo": "logo",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 50,
+            "w": 15,
+            "h": 6
+          },
+          "size_token": "nao_aplicavel",
+          "case": "UPPER",
+          "alignment": "left",
+          "color_token": "institucional.preto",
+          "font_token": "primaria.supreme",
+          "content_source": "auto",
+          "logo_variant": "contracao",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "FOR TOMORROW"
+        },
+        {
+          "id": "speaker_name",
+          "tipo": "body_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 45,
+            "y": 50,
+            "w": 47,
+            "h": 4
+          },
+          "size_token": "X/2",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Joseph Gordon-Levitt"
+        },
+        {
+          "id": "speaker_title",
+          "tipo": "secondary_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 45,
+            "y": 54,
+            "w": 47,
+            "h": 3
+          },
+          "size_token": "X/3",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Ator e empreendedor"
+        },
+        {
+          "id": "body_copy_block",
+          "tipo": "body_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 59,
+            "w": 84,
+            "h": 24
+          },
+          "size_token": "X/3",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "Bloco de texto descritivo sobre o palestrante e sua participação"
+        },
+        {
+          "id": "social_media_handles",
+          "tipo": "secondary_text",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 8,
+            "y": 85,
+            "w": 40,
+            "h": 3
+          },
+          "size_token": "X/4",
+          "case": "normal",
+          "alignment": "left",
+          "color_token": "institucional.branco",
+          "font_token": "secundaria.ibm_plex",
+          "content_source": "user_input",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "nao_aplicavel",
+          "exemplo_conteudo": "#sxswlisboa @sxsw"
+        },
+        {
+          "id": "graphic_accent_blue",
+          "tipo": "graphic",
+          "label_anotado": "sem_anotacao",
+          "bbox_pct": {
+            "x": 45,
+            "y": 20,
+            "w": 8,
+            "h": 20
+          },
+          "size_token": "nao_aplicavel",
+          "case": "nao_aplicavel",
+          "alignment": "center",
+          "color_token": "iniciativas.azul",
+          "font_token": "nao_aplicavel",
+          "content_source": "auto",
+          "logo_variant": "nao_aplicavel",
+          "graphic_module_number": "4",
+          "exemplo_conteudo": "Barra vertical azul separando texto e foto"
+        }
+      ],
+      "regras_aplicadas": [
+        "Poster formato retrato 4:5 para speaker de evento",
+        "Grid 2x3 com coluna esquerda para info textual",
+        "Coluna direita para foto grande do palestrante",
+        "Fundo branco/cinza claro na área superior",
+        "Fundo preto na área inferior com texto corpo",
+        "Acento de cor (azul) como separador vertical",
+        "Tipografia: títulos em Supreme UPPERCASE, corpo em IBM Plex",
+        "Logo institucional reduzido no rodapé esquerdo",
+        "Hierarquia: evento > local/data > palestrante > bio > social"
+      ],
+      "thumbnail_page": 59
+    }
+  ]
+}

@@ -377,6 +377,14 @@ class KnowledgeBase(models.Model):
         default=False,
         verbose_name='Brand Visual Spec validado pelo usuário'
     )
+    # Backup do brand_visual_spec antes de substituir por v2 (Compose Engine).
+    # Permite rollback do upgrade sem perder o spec v1 gerado pelo N8N.
+    brand_visual_spec_v1_backup = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Backup do Brand Visual Spec v1 (pre-Compose Engine)',
+        help_text='Snapshot do brand_visual_spec antes da migracao para v2 estrutural'
+    )
 
     # Notas de uso do logo (preenchido pela IA via brandguide ou pelo usuário)
     logo_usage_notes = models.TextField(
@@ -1465,6 +1473,23 @@ class VisualTemplate(models.Model):
         verbose_name='Aprovado pelo usuário'
     )
     is_active = models.BooleanField(default=True, verbose_name='Ativo')
+
+    # Spec estrutural para Compose Engine (Fase 5 do redesign Colletivo).
+    # JSON com slots, bbox_pct, tokens (color_token, font_token, etc.) que
+    # permite renderizacao deterministica via Pillow.
+    template_spec = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Spec estrutural do template',
+        help_text='Slots com bbox, tipo, tokens para Compose Engine'
+    )
+    aspect_ratio = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name='Aspect ratio',
+        help_text='Ex: 1:1, 4:5, 9:16, 16:9, produto_fisico, produto_fisico_cilindrico'
+    )
+
     uploaded_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

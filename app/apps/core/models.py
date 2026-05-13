@@ -1076,3 +1076,83 @@ class PautaAuditLog(TimeStampedModel):
         elif self.organization:
             return f"{self.get_action_display()} · {self.organization.name} · {user_email}"
         return f"{self.get_action_display()} · {user_email}"
+
+
+class AIUsageLog(TimeStampedModel):
+    """
+    Log auditavel de cada chamada a modelo de IA (Claude, OpenAI, Gemini, etc).
+    Rastreia tokens, custo estimado e contexto (post, kb, etapa do pipeline)
+    para permitir relatorios de consumo por organizacao e por feature.
+    """
+    class Provider(models.TextChoices):
+        ANTHROPIC = 'anthropic', 'Anthropic'
+        OPENAI = 'openai', 'OpenAI'
+        GEMINI = 'gemini', 'Google Gemini'
+
+    class Purpose(models.TextChoices):
+        ANALYZE_BRANDGUIDE = 'analyze_brandguide', 'Brandguide - analise estrutural'
+        ANALYZE_REFERENCE = 'analyze_reference_image', 'Referencia - descritivo visual'
+        ORCHESTRATE_POST = 'orchestrate_post', 'Orquestrador - plano de geracao'
+        GENERATE_POST_TEXT = 'generate_post_text', 'Post - geracao de texto'
+        GENERATE_POST_IMAGE = 'generate_post_image', 'Post - geracao de imagem'
+        KB_COMPILATION = 'kb_compilation', 'KB - compilation summary'
+        OTHER = 'other', 'Outro'
+
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='ai_usage_logs',
+        verbose_name='Organizacao'
+    )
+    post = models.ForeignKey(
+        'posts.Post',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='ai_usage_logs',
+        verbose_name='Post relacionado'
+    )
+    knowledge_base = models.ForeignKey(
+        'knowledge.KnowledgeBase',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='ai_usage_logs',
+        verbose_name='KB relacionada'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='ai_usage_logs',
+        verbose_name='Usuario que disparou'
+    )
+
+    provider = models.CharField(max_length=20, choices=Provider.choices, verbose_name='Provider')
+    model = models.CharField(max_length=100, verbose_name='Modelo', help_text='Ex: claude-sonnet-4-5, gpt-4o, gemini-3-pro-image-preview')
+    purpose = models.CharField(max_length=40, choices=Purpose.choices, verbose_name='Proposito')
+
+    input_tokens = models.PositiveIntegerField(default=0)
+    output_tokens = models.PositiveIntegerField(default=0)
+    cached_input_tokens = models.PositiveIntegerField(default=0)
+    total_tokens = models.PositiveIntegerField(default=0)
+
+    cost_usd = models.DecimalField(max_digits=10, decimal_places=6, default=0)
+
+    duration_ms = models.PositiveIntegerField(null=True, blank=True)
+    success = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True)
+    raw_usage = models.JSONField(default=dict, blank=True, help_text='Dict bruto do response.usage para debug')
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Log de uso de IA'
+        verbose_name_plural = 'Logs de uso de IA'
+        indexes = [
+            models.Index(fields=['organization', '-created_at']),
+            models.Index(fields=['post', '-created_at']),
+            models.Index(fields=['purpose', '-created_at']),
+            models.Index(fields=['provider', 'model']),
+        ]
+
+    def __str__(self):
+        return f'{self.provider}/{self.model} {self.purpose} ${self.cost_usd:.6f}'
+

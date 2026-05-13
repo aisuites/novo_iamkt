@@ -274,6 +274,24 @@ class Post(models.Model):
         verbose_name='Chave S3 da imagem raw'
     )
 
+    # Roteamento para Compose Engine (fluxo Colletivo).
+    # Quando preenchidos, "Gerar Imagem" usa Pillow Compose Engine em vez do N8N.
+    visual_template = models.ForeignKey(
+        'knowledge.VisualTemplate',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='posts_using_template',
+        verbose_name='Template visual selecionado',
+        help_text='Template escolhido no modal Colletivo (None = fluxo N8N tradicional)'
+    )
+    execution_plan = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Plano de execução do Compose Engine',
+        help_text='Output do orquestrador: slots resolvidos para Pillow renderizar'
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
