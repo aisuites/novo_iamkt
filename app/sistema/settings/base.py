@@ -14,6 +14,14 @@ CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv())
 # ENVIRONMENT
 ENVIRONMENT = config('ENVIRONMENT', default='production')
 
+# Pipeline interna de geracao de post (Celery + Claude + Gemini) — substitui N8N.
+# Visivel apenas em ambientes nao-producao, salvo override explicito.
+ENABLE_LOCAL_PIPELINE = config(
+    'ENABLE_LOCAL_PIPELINE',
+    default=(ENVIRONMENT != 'production'),
+    cast=bool,
+)
+
 # APPLICATION DEFINITION
 DJANGO_APPS = [
     'django.contrib.admin',

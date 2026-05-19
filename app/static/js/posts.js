@@ -817,10 +817,11 @@
   /**
    * Envia requisição para gerar post
    */
-  async function requestPostFromAgent(payload) {
-    // Enviar para endpoint Django /posts/gerar/
-    // O Django cria o post e envia para N8N com todos os dados necessários (knowledge_base, etc)
-    const endpoint = '/posts/gerar/';
+  async function requestPostFromAgent(payload, pipeline = 'n8n') {
+    // Roteia para endpoint conforme pipeline escolhido pelo user no modal:
+    //   pipeline='n8n'   -> /posts/gerar/        (fluxo atual com N8N)
+    //   pipeline='local' -> /posts/gerar-local/  (Celery + Claude + Gemini, homol/dev)
+    const endpoint = pipeline === 'local' ? '/posts/gerar-local/' : '/posts/gerar/';
     
     // Obter post_format_id do select (NOVO)
     const postFormatId = dom.formatoSelect?.value || null;
@@ -875,6 +876,9 @@
     dom.formGerarPost.addEventListener('submit', async (e) => {
       e.preventDefault();
 
+      // Identifica qual botao disparou o submit (N8N ou Fluxo interno)
+      const pipeline = e.submitter?.dataset?.pipeline || 'n8n';
+
       const rede = dom.redePost?.value || 'Instagram';
       const tema = dom.temaPost?.value.trim() || '';
       const formatos = selectedFormats();
@@ -915,13 +919,16 @@
           referenceImages
         };
 
-        const result = await requestPostFromAgent(payload);
-        
-        logger.debug('[POSTS] Post gerado com sucesso:', result);
-        
+        const result = await requestPostFromAgent(payload, pipeline);
+
+        logger.debug('[POSTS] Post gerado com sucesso:', result, 'pipeline:', pipeline);
+
         // Usar toaster ao invés de alert
         if (window.toaster) {
-          window.toaster.success('Post enviado ao agente! Aguarde o processamento.');
+          const msg = pipeline === 'local'
+            ? 'Post criado no fluxo interno. Texto sendo gerado via Claude...'
+            : 'Post enviado ao agente! Aguarde o processamento.';
+          window.toaster.success(msg);
         }
         
         closeModal('modalGerarPost');

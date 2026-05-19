@@ -104,6 +104,7 @@ def posts_list(request):
         'knowledge_base': knowledge_base,
         'posts_json': posts_json,
         'posts_webhook_url': settings.N8N_WEBHOOK_GERAR_POST,
+        'enable_local_pipeline': settings.ENABLE_LOCAL_PIPELINE,
     }
     
     return render(request, 'posts/posts_list.html', context)

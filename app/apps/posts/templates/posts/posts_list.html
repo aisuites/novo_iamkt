@@ -376,9 +376,14 @@
                 <button type="button" class="btn btn-outline-secondary" onclick="closeModal('modalGerarPost')">
                     Cancelar
                 </button>
-                <button type="submit" class="btn btn-primary" id="btnEnviarPost">
-                    Enviar ao agente
+                <button type="submit" class="btn btn-primary" id="btnEnviarPost" data-pipeline="n8n">
+                    Enviar N8N
                 </button>
+                {% if enable_local_pipeline %}
+                <button type="submit" class="btn btn-warning" id="btnEnviarLocal" data-pipeline="local" title="Pipeline interna (Celery + Claude + Gemini) - disponivel apenas em homol/dev">
+                    Enviar Fluxo interno
+                </button>
+                {% endif %}
             </div>
         </form>
     </div>

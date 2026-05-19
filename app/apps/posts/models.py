@@ -93,11 +93,24 @@ class Post(models.Model):
         choices=[
             ('openai', 'OpenAI'),
             ('gemini', 'Google Gemini'),
+            ('anthropic', 'Anthropic'),
         ],
         verbose_name='Provider IA'
     )
     ia_model_text = models.CharField(max_length=50, verbose_name='Modelo IA Texto')
     ia_model_image = models.CharField(max_length=50, blank=True, verbose_name='Modelo IA Imagem')
+
+    # Pipeline usada (N8N externo ou Celery local). Permite A/B em homol.
+    pipeline_used = models.CharField(
+        max_length=10,
+        choices=[
+            ('n8n', 'N8N (workflow externo)'),
+            ('local', 'Local (Celery interno)'),
+        ],
+        default='n8n',
+        verbose_name='Pipeline usada',
+        help_text='Qual pipeline foi acionado: N8N externo (producao) ou Celery local (homol)'
+    )
     
     # Conteúdo gerado
     caption = models.TextField(verbose_name='Legenda')
@@ -194,6 +207,25 @@ class Post(models.Model):
     image_prompt = models.TextField(blank=True, verbose_name='Prompt da Imagem')
     image_width = models.IntegerField(null=True, blank=True, verbose_name='Largura')
     image_height = models.IntegerField(null=True, blank=True, verbose_name='Altura')
+
+    # Instrucao curta para o gerador de imagem (complementa image_prompt com
+    # diretrizes de marca: logo, paleta, key visual). Preenchido pelo Claude
+    # no fluxo interno; opcional na pipeline N8N.
+    visual_brief = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Visual brief',
+        help_text='Diretrizes de marca para o gerador de imagem'
+    )
+
+    # Para posts em carrossel, lista de slides com title/subtitle/image_prompt
+    # de cada slide. Vazio em post unico.
+    slides_data = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Slides (carrossel)',
+        help_text='Lista de slides com title/subtitle/image_prompt para carrossel'
+    )
     
     # Status e aprovação
     status = models.CharField(

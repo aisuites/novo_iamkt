@@ -151,6 +151,7 @@ def gerar_post(request):
                 hashtags=[],
                 ia_provider='openai',
                 ia_model_text='gpt-4',
+                pipeline_used='n8n',
             )
             
             # Salvar imagens de referência em PostReferenceImage
