@@ -6,7 +6,7 @@ quando o usuario clica em "Enviar Fluxo interno" no modal.
 
 Tasks:
     - generate_post_text_task(post_id): gera texto via Claude Sonnet 4.5
-    - generate_post_image_task(post_id): gera imagem via Gemini 3 Pro (Etapa 3)
+    - generate_post_image_task(post_id, message): gera imagem via Gemini 3 Pro
 """
 
 import logging
@@ -219,6 +219,269 @@ def _reference_images_from_post(post):
             'usage_type': getattr(ref, 'usage_type', '') or '',
         })
     return out
+
+
+@shared_task(
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def generate_post_image_task(self, post_id: int, message: str = ''):
+    """
+    Gera a imagem do post via Gemini 3 Pro Image e salva no S3.
+
+    Substitui o N8N workflow 'gerarimagem-appiamkt'. Disparada quando o user
+    clica em 'Gerar Imagem' no detalhe do post (para posts com pipeline=local).
+
+    Fluxo:
+        1. Carrega Post + KB
+        2. Coleta paleta, tipografia, referencias (logos, ref_kb, ref_post)
+        3. Gera presigned URLs (24h) para todas as referencias
+        4. Chama Gemini via service (multimodal: prompt + inline_data das refs)
+        5. Faz upload do PNG no S3
+        6. Atualiza Post (post_images, image_s3_url, status='image_ready')
+        7. Loga em AIUsageLog
+    """
+    from apps.knowledge.models import KnowledgeBase
+    from apps.posts.models import Post
+    from apps.posts.services.gemini_image_generator import generate_post_image
+
+    logger.info('[posts.local] generate_post_image_task iniciada post_id=%s', post_id)
+
+    try:
+        post = Post.objects.select_related(
+            'organization', 'post_format', 'user'
+        ).get(id=post_id)
+    except Post.DoesNotExist:
+        logger.error('[posts.local] Post %s nao existe', post_id)
+        return {'success': False, 'error': 'post_not_found'}
+
+    post.status = 'image_generating'
+    post.save(update_fields=['status'])
+
+    # KB + dados de design
+    kb = KnowledgeBase.objects.filter(organization=post.organization).first()
+    paleta = _kb_colors(kb)
+    tipografia = _kb_typography(kb)
+    references = _collect_references(kb=kb, post=post)
+    publico_alvo = (kb.publico_externo if kb else '') or ''
+    marketing_input_summary = _kb_summary_marketing(kb)
+    formato_px = _formato_px(post)
+
+    try:
+        result = generate_post_image(
+            post=post,
+            references=references,
+            paleta=paleta,
+            tipografia=tipografia,
+            publico_alvo=publico_alvo,
+            marketing_input_summary=marketing_input_summary,
+            formato_px=formato_px,
+        )
+    except Exception as exc:
+        logger.exception('[posts.local] Falha Gemini post_id=%s', post_id)
+        post.status = 'failed'
+        post.save(update_fields=['status'])
+        raise self.retry(exc=exc)
+
+    # Upload PNG no S3
+    s3_key, s3_url = _upload_image_to_s3(
+        org_id=post.organization.id,
+        post_id=post.id,
+        png_bytes=result['png_bytes'],
+        mime_type=result.get('mime_type', 'image/png'),
+    )
+
+    # Atualiza Post
+    post.image_s3_key = s3_key
+    post.image_s3_url = s3_url
+    post.ia_model_image = result['model']
+    img_entry = {
+        's3_key': s3_key,
+        'url': s3_url,
+        'width': post.image_width or None,
+        'height': post.image_height or None,
+    }
+    existing = post.generated_images if isinstance(post.generated_images, list) else []
+    existing.append(img_entry)
+    post.generated_images = existing
+    post.status = 'image_ready'
+    post.save()
+
+    # Loga custo
+    _log_usage_gemini(post, result['model'], result.get('cost_usd', 0))
+
+    logger.info(
+        '[posts.local] generate_post_image_task OK post_id=%s s3_key=%s cost=$%s',
+        post_id, s3_key, result.get('cost_usd'),
+    )
+
+    return {
+        'success': True,
+        'post_id': post_id,
+        's3_key': s3_key,
+        's3_url': s3_url,
+        'cost_usd': result.get('cost_usd'),
+    }
+
+
+def _kb_colors(kb) -> list:
+    if not kb:
+        return []
+    try:
+        return [
+            {
+                'nome': c.name,
+                'hex': c.hex_code,
+                'tipo': c.color_type or 'primary',
+            }
+            for c in kb.colors.all().order_by('order')
+        ]
+    except Exception:
+        return []
+
+
+def _kb_typography(kb) -> list:
+    if not kb:
+        return []
+    try:
+        out = []
+        for f in kb.typography_settings.all().order_by('order'):
+            nome = (
+                f.google_font_name if f.font_source == 'google'
+                else (f.custom_font.name if f.custom_font else '')
+            )
+            out.append({
+                'uso': f.usage,
+                'origem': f.font_source or 'google',
+                'nome': nome,
+                'peso': f.google_font_weight if f.font_source == 'google' else 'regular',
+            })
+        return out
+    except Exception:
+        return []
+
+
+def _kb_summary_marketing(kb) -> str:
+    """Recupera marketing_input_summary do n8n_compilation, fallback string vazia."""
+    if not kb:
+        return ''
+    compilation = getattr(kb, 'n8n_compilation', None)
+    if isinstance(compilation, dict):
+        return compilation.get('marketing_input_summary') or ''
+    return ''
+
+
+def _formato_px(post) -> str:
+    if post.post_format and post.post_format.width and post.post_format.height:
+        return f'{post.post_format.width}x{post.post_format.height}'
+    if post.image_width and post.image_height:
+        return f'{post.image_width}x{post.image_height}'
+    return '1080x1080'
+
+
+def _collect_references(kb, post) -> list:
+    """
+    Coleta logos, reference images da KB e PostReferenceImage como lista de
+    dicts {tipo, url} com presigned URLs validas por 24h.
+    """
+    from apps.core.services.s3_service import S3Service
+    out = []
+
+    if kb:
+        # Logos
+        try:
+            for logo in kb.logos.all().order_by('-is_primary', 'logo_type'):
+                if logo.s3_key:
+                    try:
+                        url = S3Service.generate_presigned_download_url(
+                            logo.s3_key, expires_in=86400
+                        )
+                        out.append({'tipo': 'logotipo', 'url': url})
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # KB references
+        try:
+            for img in kb.reference_images.all():
+                if img.s3_key:
+                    try:
+                        url = S3Service.generate_presigned_download_url(
+                            img.s3_key, expires_in=86400
+                        )
+                        out.append({'tipo': 'referencia_kb', 'url': url})
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    # Post-specific references
+    try:
+        for ref in post.reference_image_files.all():
+            if ref.s3_key:
+                try:
+                    url = S3Service.generate_presigned_download_url(
+                        ref.s3_key, expires_in=86400
+                    )
+                    out.append({'tipo': 'referencia_post', 'url': url})
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    return out
+
+
+def _upload_image_to_s3(*, org_id: int, post_id: int, png_bytes: bytes, mime_type: str):
+    """Faz upload do PNG gerado no S3 e retorna (s3_key, s3_url presigned)."""
+    from apps.core.services.s3_service import S3Service
+    from django.utils import timezone as dj_tz
+
+    ext = 'png' if mime_type == 'image/png' else 'jpg'
+    ts = int(dj_tz.now().timestamp() * 1000)
+    s3_key = f'org-{org_id}/imagensgeradas/{ts}-post{post_id}-generated.{ext}'
+
+    client = S3Service._get_s3_client()
+    bucket = S3Service._get_bucket_name() if hasattr(S3Service, '_get_bucket_name') else None
+    if not bucket:
+        from django.conf import settings as dj_settings
+        bucket = dj_settings.AWS_BUCKET_NAME
+
+    client.put_object(
+        Bucket=bucket,
+        Key=s3_key,
+        Body=png_bytes,
+        ContentType=mime_type,
+    )
+
+    s3_url = S3Service.generate_presigned_download_url(s3_key, expires_in=86400)
+    return s3_key, s3_url
+
+
+def _log_usage_gemini(post, model: str, cost_usd: float):
+    """Loga custo Gemini em AIUsageLog (defensivo)."""
+    try:
+        from apps.core.models import AIUsageLog
+    except ImportError:
+        return
+    try:
+        AIUsageLog.objects.create(
+            organization=post.organization,
+            post=post,
+            user=post.user,
+            provider=AIUsageLog.Provider.GEMINI,
+            model=model,
+            purpose=AIUsageLog.Purpose.GENERATE_POST_IMAGE,
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=0,
+            cost_usd=Decimal(str(cost_usd or 0)),
+            raw_usage={'note': 'Gemini image generation — cost flat-rate estimate'},
+        )
+    except Exception:
+        logger.exception('Falha ao salvar AIUsageLog (Gemini)')
 
 
 def _log_usage(post, model: str, usage: dict, purpose: str):

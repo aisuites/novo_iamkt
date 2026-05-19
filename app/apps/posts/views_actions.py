@@ -106,7 +106,8 @@ def generate_image(request, post_id):
         
         # Verificar limite de alterações de imagem (configurável por organização)
         max_revisions = post.organization.max_image_revisions
-        
+        image_change_count = 0  # default — evita UnboundLocalError se max_revisions==0
+
         # Se max_revisions = 0, permite ilimitado
         if max_revisions > 0:
             image_change_count = post.change_requests.filter(
@@ -167,6 +168,26 @@ def generate_image(request, post_id):
         except Exception as exc:
             logger.warning(f'Erro ao enviar email de solicitação: {exc}')
         
+        # Pipeline INTERNA (Celery + Gemini) — disparada se o post foi criado
+        # via "Enviar Fluxo interno" (pipeline_used='local')
+        if post.pipeline_used == 'local':
+            from apps.posts.tasks import generate_post_image_task
+            generate_post_image_task.delay(post.id, message or '')
+            logger.info(
+                '[posts.local] generate_post_image_task disparado post_id=%s', post.id
+            )
+            return JsonResponse({
+                'success': True,
+                'id': post.id,
+                'serverId': post.id,
+                'status': post.status,
+                'statusLabel': post.get_status_display(),
+                'imageStatus': 'generating',
+                'imageChanges': image_change_count,
+                'imageRequestedAt': change_request.created_at.isoformat(),
+                'pipeline': 'local',
+            })
+
         # Enviar para N8N (webhook de geração de imagem)
         if hasattr(settings, 'N8N_WEBHOOK_GERAR_IMAGEM') and settings.N8N_WEBHOOK_GERAR_IMAGEM:
             try:

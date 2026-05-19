@@ -248,6 +248,7 @@ Arquivo: [app/apps/posts/views_gerar.py](../app/apps/posts/views_gerar.py) (linh
 | 2026-05-19 | Sessão inicial | Mapeamento inicial do modal atual (§§1–10) |
 | 2026-05-19 | Etapa 1 (UI dos 2 botões) | Renomeado "Enviar ao agente" → "Enviar N8N". Adicionado "Enviar Fluxo interno" (visível só em homol/dev). Adicionado campo `Post.pipeline_used` + flag `settings.ENABLE_LOCAL_PIPELINE`. Ver §13. |
 | 2026-05-19 | Etapa 2 (Endpoint + Celery task texto) | Criado `/posts/gerar-local/` + Celery task `generate_post_text_task` rodando Claude Sonnet 4.5 com prompt caching. Substitui o N8N `gerar-post-appiamkt`. Custo ~$0.01 por post. Ver §14. |
+| 2026-05-19 | Etapa 3 (Celery task imagem) | Celery task `generate_post_image_task` rodando Gemini 3 Pro Image. View `generate_image` roteia para Celery quando `post.pipeline_used='local'`. Substitui N8N `gerarimagem-appiamkt`. Custo ~$0.04 por imagem. Latência ~25-60s. Ver §15. |
 
 ---
 
@@ -425,3 +426,93 @@ generate_post_text_task.delay(POST_ID)
 - [ ] Sem polling/notificação na UI: user precisa recarregar pra ver o texto pronto
 - [ ] Sem prompt customizado por org (KB compilation é genérica)
 - [ ] Sem suporte a Vision (referencias passam só como URLs textuais, Claude não analisa visualmente ainda)
+
+---
+
+## 15. Etapa 3 — Celery task imagem via Gemini (implementada)
+
+### Arquivos novos
+- [app/apps/posts/services/gemini_image_generator.py](../app/apps/posts/services/gemini_image_generator.py) — service que encapsula chamada Gemini 3 Pro Image
+
+### Arquivos modificados
+- [app/apps/posts/tasks.py](../app/apps/posts/tasks.py) — adicionada task `generate_post_image_task` + helpers
+- [app/apps/posts/views_actions.py](../app/apps/posts/views_actions.py) — view `generate_image` roteia para Celery quando `post.pipeline_used='local'` (antes do bloco N8N)
+
+### Fluxo da Etapa 3
+
+```
+[ User clica "Gerar Imagem" no detalhe do post (com pipeline_used='local') ]
+         ↓
+[ POST /posts/<id>/generate-image/ ]
+         ↓
+[ views_actions.generate_image()
+   ├─ Cria PostChangeRequest
+   ├─ status='image_generating'
+   ├─ Detecta post.pipeline_used == 'local'
+   └─ generate_post_image_task.delay(post.id, message) ]
+         ↓
+[ Celery worker iamkt_celery
+   ├─ Carrega Post + KB + paleta + tipografia
+   ├─ Coleta referências (logos + KB images + post images)
+   ├─ Gera presigned URLs (24h) para cada
+   ├─ Service gemini_image_generator:
+   │    ├─ Baixa cada referência → base64
+   │    ├─ Ordena (logos primeiro, depois refs)
+   │    ├─ Monta prompt textual com regras por tipo (replica N8N)
+   │    ├─ Monta parts multimodais: text + inline_data[]
+   │    ├─ POST gemini-3-pro-image-preview:generateContent
+   │    └─ Extrai base64 da resposta
+   ├─ Upload PNG no S3 (org-{X}/imagensgeradas/{ts}-post{id}-generated.png)
+   ├─ Atualiza Post (image_s3_key, image_s3_url, generated_images[])
+   ├─ status='image_ready'
+   └─ Loga AIUsageLog (Gemini)
+]
+```
+
+### Service Gemini — prompt textual
+
+Replica integralmente a lógica do node `Code in JavaScript4` do N8N workflow `gerarimagem-appiamkt`:
+
+- **Regras de uso por tipo** (`USAGE_RULES_BY_TYPE`):
+  - `logotipo` / `logo` → aplicar sem alteração
+  - `referencia_post` / `referencia_kb` → inspiração de estilo, fotografia, iluminação
+  - `produto` → aplicar fielmente ao original (sem reinterpretar)
+  - `icone`, `fundo`/`background`, `post_image` etc.
+- **Priorização** (`TYPE_PRIORITY`): logos antes, depois referências, depois outros
+- **Prompt completo** inclui: briefing, texto que deve aparecer, análise das referências, descrição da cena, diretrizes de marca (paleta, tipografia, visual_brief), qualidade
+
+### Custo medido
+
+| Métrica | Valor |
+|---------|-------|
+| Modelo | `gemini-3-pro-image-preview` |
+| Custo por imagem (estimado) | **~$0.04** |
+| Latência (sync direto) | ~25s |
+| Latência (async via Celery) | ~25-60s (incluindo cold start) |
+
+### Status transitions completas
+
+| Estágio | Status do Post |
+|---------|---------------|
+| Texto sendo gerado | `generating` |
+| Texto pronto, aguardando user | `pending` |
+| Imagem sendo gerada | `image_generating` |
+| Imagem pronta | `image_ready` |
+| Aprovado por user | `approved` |
+
+### Resultados validados (testes em homol)
+
+Posts gerados end-to-end (texto Claude → imagem Gemini):
+
+| Post | Tema | Resultado visual |
+|------|------|------------------|
+| 52 | 5 dicas Instagram pequenos negócios | Flat lay com café, smartphone Instagram, teclado, planta, caderno + título/subtítulo/CTA exatos + branding "ACME Corp" |
+| 54 | Workshop design thinking para times de produto | Equipe colaborativa em mesa com post-its + título/subtítulo/CTA exatos + branding "ACME Corp" |
+
+### Gaps Etapa 3
+
+- [ ] Sem polling/notificação UI: user precisa recarregar pra ver imagem
+- [ ] Aspect ratio segue `post.post_format` (Gemini interpreta livremente — pode não respeitar exato em todos os casos)
+- [ ] Sem regeneração com `message` específico (já passado, mas prompt não usa ainda)
+- [ ] AIUsageLog ainda defensivo (não existe na branch main)
+- [ ] Custo flat-rate estimado em `$0.04` — não puxa usageMetadata real do Gemini (campo `cost_usd` é placeholder)
