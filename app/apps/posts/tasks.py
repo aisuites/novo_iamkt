@@ -156,7 +156,8 @@ def generate_post_text_task(self, post_id: int):
 def _build_kb_summary(organization) -> str:
     """
     Constroi resumo textual da KB usado como contexto no prompt.
-    Prefere `n8n_compilation`; se vazio, monta string com 6 campos.
+    Prefere `n8n_compilation.marketing_input_summary`; se vazio, monta string
+    com 6 campos da KB.
     """
     from apps.knowledge.models import KnowledgeBase
 
@@ -164,10 +165,15 @@ def _build_kb_summary(organization) -> str:
     if not kb:
         return f'(Organizacao {organization.name} sem base de conhecimento)'
 
-    # n8n_compilation pode nao existir como campo dependendo da migracao
-    compilation = getattr(kb, 'n8n_compilation', None) or ''
-    if compilation and len(compilation.strip()) > 50:
-        return compilation.strip()
+    # n8n_compilation pode ser dict (atual) ou string (legado)
+    compilation = getattr(kb, 'n8n_compilation', None)
+    summary_text = ''
+    if isinstance(compilation, dict):
+        summary_text = (compilation.get('marketing_input_summary') or '').strip()
+    elif isinstance(compilation, str):
+        summary_text = compilation.strip()
+    if summary_text and len(summary_text) > 50:
+        return summary_text
 
     # Fallback manual
     parts = [
