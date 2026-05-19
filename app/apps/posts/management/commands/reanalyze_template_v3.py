@@ -62,6 +62,7 @@ PRINCIPIOS:
      a) grafismo PNG real (letterform, modulo decorativo) -> use graphic_module_number
      b) bloco de cor solida atras de texto (highlight bar) -> deixe
         graphic_module_number como "nao_aplicavel" e defina color_token
+
 3. Para LOGO e GRAPHIC PNG (nao color-block), USE PLACEMENT EM VEZ DE BBOX:
    - placement = {anchor, scale_pct, scale_dim, offset_pct}
    - anchor: top-left | top-center | top-right | center-left | center |
@@ -69,12 +70,39 @@ PRINCIPIOS:
    - scale_pct: tamanho relativo ao canvas (0-100)
    - scale_dim: 'width' (default) ou 'height'
    - offset_pct: {x, y} afastamento da borda (default 0)
-   - Isso preserva o aspect ratio nativo do asset
-4. Para TEXTOS e COLOR-BLOCKS, use bbox_pct = {x, y, w, h} em percentual
-5. Tokens de cor: use 'institucional.preto', 'iniciativas.azul' etc.
-   conforme brand_visual_spec.cores fornecido. Nunca invente token.
-6. NUNCA crie regions com bbox sobreposto a outras a menos que seja
-   intencional (ex: texto sobre fundo de cor).
+   - Preserva o aspect ratio nativo do asset
+
+4. Para TEXTOS e COLOR-BLOCKS, use bbox_pct = {x, y, w, h} em percentual.
+
+5. CORES — regras estritas:
+   a. Use tokens 'institucional.preto', 'iniciativas.rosa' etc. quando a cor
+      EXATA do template visual aparece na lista de cores do brand
+      (sera fornecida na mensagem do usuario)
+   b. Se a cor do template e uma variacao mais clara/escura que NAO existe
+      no brand (ex: rosa pastel suave em vez do rosa magenta forte),
+      use HEX direto no campo color_token (ex: "#FFD6E5") — NAO force
+      um token errado. Adicione tambem o campo color_rationale explicando
+      qual cor do brand foi a base inspirativa.
+   c. Nunca invente nome de token (ex: "iniciativas.rosa_claro" NAO existe)
+
+6. ANTI-SOBREPOSICAO — regras estritas:
+   a. NUNCA crie regions textuais com bbox sobreposto entre si. Title,
+      subtitle, body_text, secondary_text em areas DIFERENTES da bbox de
+      highlight (block colorido).
+   b. Quando um highlight_bar/color block cobre area com varios textos,
+      a bbox do color block PODE conter as bboxes dos textos (sobreposicao
+      intencional de fundo), mas os textos entre si ficam EM LINHAS/
+      COLUNAS separadas, com bboxes NAO-sobrepostas.
+   c. Verifique antes de retornar: nenhuma bbox textual sobrepoe outra
+      bbox textual (sobreposicao com graphic color block e OK).
+
+7. LOGO unico: EXATAMENTE 1 region tipo 'logo' por template, a menos que
+   o template visual tenha multiplos logos visiveis simultaneos.
+
+8. BBOX legivel para texto: garanta bbox.w >= 18 para texto com mais de
+   8 caracteres. Bbox muito estreita faz o engine quebrar palavra-por-
+   palavra (1 palavra por linha) — feio. Para titulos em multi-linha,
+   defina bbox alta o suficiente para 2-3 linhas.
 
 FORMATO DE SAIDA (JSON puro, sem markdown):
 {
@@ -104,7 +132,8 @@ FORMATO DE SAIDA (JSON puro, sem markdown):
       "id": "highlight_bar",
       "tipo": "graphic",
       "graphic_module_number": "nao_aplicavel",
-      "color_token": "iniciativas.rosa_claro",
+      "color_token": "#FFD6E5",
+      "color_rationale": "Rosa pastel claro, variacao mais suave do rosa #E23D96 do brand",
       "bbox_pct": {"x": 0, "y": 18, "w": 60, "h": 22}
     }
   ]
@@ -304,10 +333,27 @@ class Command(BaseCommand):
     ):
         cores = (brand_spec or {}).get('cores') or {}
         tipografia = (brand_spec or {}).get('tipografia') or {}
-        meta_brand = json.dumps(
-            {'cores': cores, 'tipografia': tipografia},
-            ensure_ascii=False, indent=2,
-        )[:8000]
+
+        # Lista de tokens validos como tabela legivel (Claude entende melhor)
+        tokens_lines = ['== Tokens de cor disponiveis (use exatamente esses nomes) ==']
+        for grupo, items in cores.items():
+            if isinstance(items, list):
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    nome = (item.get('nome') or '').lower().replace(' ', '_')
+                    hex_v = item.get('hex', '')
+                    if nome and hex_v:
+                        tokens_lines.append(
+                            f'  {grupo}.{nome} = {hex_v}  ({item.get("nome")})'
+                        )
+            elif isinstance(items, dict):
+                hex_v = items.get('hex', '')
+                if hex_v:
+                    tokens_lines.append(f'  {grupo} = {hex_v}')
+        tokens_text = '\n'.join(tokens_lines)
+
+        tipografia_brief = json.dumps(tipografia, ensure_ascii=False)[:2000]
 
         content = [
             {
@@ -315,13 +361,20 @@ class Command(BaseCommand):
                 'text': (
                     f'Template: {template.name} | aspect_ratio: {template.aspect_ratio}\n'
                     f'Descricao: {template.description or "(sem descricao)"}\n\n'
-                    f'== Brand spec (cores + tipografia disponiveis) ==\n{meta_brand}\n\n'
+                    f'{tokens_text}\n\n'
+                    f'== Tipografia disponivel ==\n{tipografia_brief}\n\n'
                     f'== Assets da marca disponiveis ==\n'
                     f'Logos: {[(l["name"], l["type"]) for l in logos]}\n'
                     f'Grafismos: {[g["name"] for g in grafismos]}\n\n'
                     f'IMAGEM 1 = template visual a analisar.\n'
                     f'IMAGENS seguintes = logos e grafismos disponiveis.\n\n'
-                    f'Produza JSON com regions calibradas como descrito no system prompt.'
+                    f'LEMBRE-SE das regras estritas do system prompt:\n'
+                    f'  - Se a cor do template e variacao mais clara/escura do brand,'
+                    f' use HEX direto (ex: "#FFD6E5"), nao invente token.\n'
+                    f'  - Bboxes textuais NUNCA se sobrepoem entre si.\n'
+                    f'  - EXATAMENTE 1 region tipo "logo" por template.\n'
+                    f'  - Bbox textual com w >= 18 para textos > 8 chars.\n\n'
+                    f'Produza JSON com regions calibradas.'
                 ),
             },
             {
