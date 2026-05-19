@@ -292,9 +292,23 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
         mime_type=result.get('mime_type', 'image/png'),
     )
 
-    # Atualiza Post
+    # Cria PostImage (model FK que o frontend le via post.images.all())
+    # Equivalente ao que o callback N8N faz em views_webhook.py
+    from apps.posts.models import PostImage
+    from django.db.models import Max
+    max_order = post.images.aggregate(Max('order'))['order__max']
+    next_order = (max_order if max_order is not None else -1) + 1
+    PostImage.objects.create(
+        post=post,
+        s3_key=s3_key,
+        s3_url=s3_url,
+        order=next_order,
+    )
+
+    # Atualiza Post (campos principais + lista json)
     post.image_s3_key = s3_key
     post.image_s3_url = s3_url
+    post.has_image = True
     post.ia_model_image = result['model']
     img_entry = {
         's3_key': s3_key,
