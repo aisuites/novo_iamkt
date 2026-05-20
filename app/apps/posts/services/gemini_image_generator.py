@@ -249,6 +249,94 @@ def _download_to_base64(url: str) -> Tuple[Optional[str], str]:
     return base64.b64encode(data).decode('ascii'), content_type
 
 
+def _normalize_tipo(tipo: str) -> str:
+    """Normaliza variantes do usage_type em buckets canonicos."""
+    t = (tipo or '').lower().strip()
+    if 'logo' in t:
+        return 'logo'
+    if 'produto' in t:
+        return 'produto'
+    if 'pessoa' in t or 'speaker' in t or 'palestr' in t:
+        return 'pessoa'
+    if 'cenari' in t or 'lugar' in t or 'local' in t:
+        return 'cenario'
+    if 'fundo' in t or 'background' in t or 'textura' in t:
+        return 'fundo'
+    if 'icone' in t or 'ícone' in t:
+        return 'icone'
+    if 'refer' in t:
+        return 'referencia'
+    return t or 'desconhecido'
+
+
+def _build_combination_rules(type_counts: Dict[str, int]) -> str:
+    """
+    Monta texto de regras adicionais conforme combinacao detectada.
+    Adapta o prompt para que TODAS as imagens upload das tipos 'produto',
+    'pessoa', 'cenario' apareçam juntas na arte final.
+
+    Exemplos de output:
+      - N produtos: "todos os produtos juntos na composicao"
+      - 1 produto + 1 pessoa: "a pessoa interagindo com o produto"
+      - N pessoas: "grupo de pessoas juntas"
+      - 1 produto + 1 cenario: "produto inserido no cenario fornecido"
+    """
+    n_prod = type_counts.get('produto', 0)
+    n_pess = type_counts.get('pessoa', 0)
+    n_cena = type_counts.get('cenario', 0)
+    total_must_appear = n_prod + n_pess + n_cena
+
+    if total_must_appear <= 1:
+        return ''
+
+    lines = ['', '# COMBINACAO OBRIGATORIA DE ELEMENTOS', '']
+    lines.append(
+        f'Voce recebeu {total_must_appear} elementos que DEVEM aparecer JUNTOS na '
+        f'arte final, na mesma cena:'
+    )
+    if n_prod > 0:
+        lines.append(f'  - {n_prod} produto(s) — todos devem aparecer fielmente')
+    if n_pess > 0:
+        lines.append(f'  - {n_pess} pessoa(s) — todas devem aparecer com rosto/identidade preservados')
+    if n_cena > 0:
+        lines.append(f'  - {n_cena} cenario(s) — usar como ambiente da composicao')
+
+    lines.append('')
+    lines.append('Combine-os de forma harmonica e natural:')
+
+    # Heuristicas de combinacao
+    if n_pess >= 1 and n_prod >= 1:
+        lines.append(
+            f'  - A(s) pessoa(s) deve(m) estar INTERAGINDO com o(s) produto(s) '
+            f'(segurando, usando, demonstrando) ou claramente associada(s) a ele(s).'
+        )
+    if n_prod >= 2 and n_pess == 0:
+        lines.append(
+            '  - Os produtos devem aparecer juntos como grupo (flat-lay, vitrine, '
+            'composicao em bancada, ou cena onde todos sao visiveis ao mesmo tempo).'
+        )
+    if n_pess >= 2:
+        lines.append(
+            '  - As pessoas devem aparecer juntas (grupo, painel, conversa) '
+            'mantendo identidade de cada uma.'
+        )
+    if n_cena >= 1:
+        lines.append(
+            '  - O cenario anexado define o AMBIENTE da cena — produtos e pessoas '
+            'sao posicionados dentro desse ambiente, respeitando luz, perspectiva '
+            'e atmosfera da referencia.'
+        )
+
+    lines.append('')
+    lines.append(
+        'REGRA CRITICA: NAO escolha apenas alguns elementos para destacar. TODOS '
+        'os elementos listados acima sao obrigatorios na arte final. Se nao '
+        'couber tudo na composicao, ajuste o enquadramento, escala ou angulo '
+        '— mas nao omita nenhum.'
+    )
+    return '\n'.join(lines)
+
+
 def _sanitize_brand_terms(text: str, keywords: List[str]) -> str:
     """
     Substitui termos da marca/produto em `text` por placeholders neutros.
@@ -293,24 +381,59 @@ def _build_prompt_text(
     product_analyses fica como argumento mas e ignorado nesta versao
     (mantido para compatibilidade — pode ser util em futuras iteracoes).
     """
-    # Mapeia tipo -> linha descritiva curta
+    # Conta quantos de cada tipo (para nomear "produto principal" / "produto 2" etc)
+    type_counts: Dict[str, int] = {}
+    for ref in sorted_refs:
+        t = _normalize_tipo(str(ref.get('tipo', '')).lower())
+        type_counts[t] = type_counts.get(t, 0) + 1
+
+    # Mapeia tipo -> linha descritiva curta (com numeracao quando ha varios do mesmo tipo)
+    type_running: Dict[str, int] = {}
     refs_lines: List[Tuple[int, str]] = []
     for i, ref in enumerate(sorted_refs, 1):
-        tipo = str(ref.get('tipo', 'desconhecido')).lower()
-        if 'logo' in tipo:
-            refs_lines.append((i, f'IMAGEM {i}: logotipo da marca — aplicar exatamente como aparece (sem distorcer, sem mudar cor)'))
-        elif 'produto' in tipo:
-            refs_lines.append((i, f'IMAGEM {i}: o produto principal — use exatamente como aparece (mesmas cores, mesmo formato, mesmos detalhes)'))
-        elif 'pessoa' in tipo:
-            refs_lines.append((i, f'IMAGEM {i}: pessoa — usar exatamente como aparece (mesmo rosto, mesma aparencia)'))
-        elif 'fundo' in tipo or 'background' in tipo:
-            refs_lines.append((i, f'IMAGEM {i}: textura/fundo de referencia'))
-        elif 'icone' in tipo:
-            refs_lines.append((i, f'IMAGEM {i}: elemento grafico/icone'))
+        tipo_raw = str(ref.get('tipo', 'desconhecido')).lower()
+        tipo_norm = _normalize_tipo(tipo_raw)
+        type_running[tipo_norm] = type_running.get(tipo_norm, 0) + 1
+        n = type_running[tipo_norm]
+        total = type_counts[tipo_norm]
+        usage_desc = (ref.get('usage_description') or '').strip()
+
+        if tipo_norm == 'logo':
+            line = f'IMAGEM {i}: logotipo da marca — aplicar exatamente como aparece (sem distorcer, sem mudar cor)'
+        elif tipo_norm == 'produto':
+            if total > 1:
+                line = f'IMAGEM {i}: produto #{n}/{total} — use exatamente como aparece (mesmas cores, mesmo formato, mesmos detalhes)'
+            else:
+                line = f'IMAGEM {i}: o produto principal — use exatamente como aparece (mesmas cores, mesmo formato, mesmos detalhes)'
+        elif tipo_norm == 'pessoa':
+            if total > 1:
+                line = f'IMAGEM {i}: pessoa #{n}/{total} — usar exatamente como aparece (mesmo rosto, mesma aparencia)'
+            else:
+                line = f'IMAGEM {i}: pessoa — usar exatamente como aparece (mesmo rosto, mesma aparencia)'
+        elif tipo_norm == 'cenario':
+            line = f'IMAGEM {i}: cenario/lugar — usar como ambiente da cena (manter elementos arquitetonicos)'
+        elif tipo_norm == 'fundo':
+            line = f'IMAGEM {i}: textura/fundo de referencia'
+        elif tipo_norm == 'icone':
+            line = f'IMAGEM {i}: elemento grafico/icone'
         else:
-            refs_lines.append((i, f'IMAGEM {i}: referencia visual (inspiracao de estilo, fotografia, iluminacao — nao copiar textos)'))
+            line = f'IMAGEM {i}: referencia visual (inspiracao de estilo, fotografia, iluminacao — nao copiar textos)'
+
+        # Se o user descreveu o uso da imagem, anexa
+        if usage_desc:
+            line += f'\n    Uso solicitado pelo usuario: "{usage_desc}"'
+        refs_lines.append((i, line))
 
     attachments_text = '\n'.join(line for _, line in refs_lines)
+
+    # Regra de "todas as imagens devem aparecer juntas" quando ha multiplas
+    # imagens com tipos que devem aparecer (produto/pessoa/cenario).
+    must_appear_count = (
+        type_counts.get('produto', 0)
+        + type_counts.get('pessoa', 0)
+        + type_counts.get('cenario', 0)
+    )
+    combination_rules = _build_combination_rules(type_counts)
 
     # Define o que vai no bloco "TEXTO A RENDERIZAR" conforme o modo
     raw_title = post.title or ''
@@ -339,6 +462,7 @@ def _build_prompt_text(
         '',
         '# REFERENCIAS VISUAIS (anexadas ACIMA deste texto, na ordem)',
         attachments_text,
+        combination_rules,
         '',
         '# CENA',
         post.image_prompt or '(propor um cenario adequado ao briefing)',

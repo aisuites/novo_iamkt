@@ -51,6 +51,14 @@ def gerar_post_local(request):
     is_carousel = bool(data.get('is_carousel', False))
     image_count = int(data.get('image_count') or 1)
     reference_images = data.get('reference_images') or []
+    # Sanity: limita a 5 imagens (mesmo limite da UI). Excedentes sao truncados.
+    MAX_REF_IMAGES = 5
+    if isinstance(reference_images, list) and len(reference_images) > MAX_REF_IMAGES:
+        logger.warning(
+            '[posts.local] reference_images excedeu limite (%d) — truncando para %d',
+            len(reference_images), MAX_REF_IMAGES,
+        )
+        reference_images = reference_images[:MAX_REF_IMAGES]
     post_format_id = data.get('post_format_id')
     formato_legado = (data.get('formato') or '').strip()
 

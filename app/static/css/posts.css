@@ -2265,3 +2265,18 @@ select.form-input-filter:disabled {
 .image-lightbox .lb-close:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Contador X/5 e botao desabilitado no upload multi (Etapa multi-upload) */
+.upload-counter {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+.btn-upload.disabled,
+.btn-upload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}

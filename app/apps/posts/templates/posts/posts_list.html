@@ -379,21 +379,21 @@
                 </div>
             </div>
 
-            <!-- LINHA 6: Upload de novas imagens (com descricao estruturada) -->
+            <!-- LINHA 6: Upload de novas imagens (acumulativo, com descricao estruturada) -->
             <div class="field">
-                <label for="refImgs">Adicionar novas imagens de referencia</label>
+                <label>Adicionar novas imagens de referencia <span id="refImgsCounter" class="upload-counter">(0/5)</span></label>
                 <div class="upload-area">
-                    <input type="file" id="refImgs" accept=".jpg,.jpeg,.png" multiple style="display: none;">
-                    <button type="button" class="btn-upload" onclick="document.getElementById('refImgs').click()">
-                        <i class="fas fa-cloud-upload-alt mr-2"></i>
-                        Escolher Imagens
+                    <input type="file" id="refImgs" accept=".jpg,.jpeg,.png" style="display: none;">
+                    <button type="button" id="btnAddRefImg" class="btn-upload" onclick="document.getElementById('refImgs').click()">
+                        <i class="fas fa-plus mr-2"></i>
+                        Adicionar imagem
                     </button>
                     <div id="refImgsInfo" class="upload-info">
-                        Nenhum arquivo selecionado — Max. 5 imagens (.JPG ou .PNG)
+                        Voce pode adicionar ate 5 imagens. Cada uma pode ter um uso diferente (produto, pessoa, cenario...).
                     </div>
                     <div id="refImgsPreview" class="upload-preview"></div>
                 </div>
-                <small class="asset-hint">Para cada imagem, indique o tipo de uso (produto, pessoa, cenario...) e descreva como usar.</small>
+                <small class="asset-hint">Para cada imagem, indique o tipo de uso e descreva como usar. Combinacoes mistas (ex: 2 produtos + 1 pessoa) sao suportadas.</small>
             </div>
             
             <div class="modal-footer">

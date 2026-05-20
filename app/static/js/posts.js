@@ -586,20 +586,27 @@
    */
   function resetGerarPostForm() {
     if (!dom.formGerarPost) return;
-    
+
     dom.formGerarPost.reset();
     if (dom.refImgs) dom.refImgs.value = '';
-    
+
     const feedRadio = dom.formatOptions?.querySelector('input[value="feed"]');
     if (feedRadio) feedRadio.checked = true;
-    
+
     syncFormatUI();
     setCarrossel(false);
-    
+
     if (dom.carrosselQtyInput) dom.carrosselQtyInput.value = '3';
-    
+
     updateTemaCounter();
     updateRefsInfo();
+
+    // Reseta state de uploads acumulativos (Etapa multi-upload)
+    if (typeof uploadedImagesState !== 'undefined') {
+      uploadedImagesState.length = 0;
+      if (typeof renderUploadedImages === 'function') renderUploadedImages();
+      if (typeof updateRefImgsCounter === 'function') updateRefImgsCounter();
+    }
   }
 
   /**
@@ -2572,24 +2579,29 @@
 
   function removeUploadedImage(idx) {
     uploadedImagesState.splice(idx, 1);
-    // Re-sincroniza com o input file
-    const dt = new DataTransfer();
-    uploadedImagesState.forEach((it) => dt.items.add(it.file));
-    if (dom.refImgs) dom.refImgs.files = dt.files;
     renderUploadedImages();
-    if (typeof updateRefsInfo === 'function') updateRefsInfo();
+    updateRefImgsCounter();
   }
 
-  // Substitui o showImagePreviews antigo: quando o user escolhe arquivos,
-  // populamos uploadedImagesState e renderizamos cards estruturados.
-  function ingestUploadedFiles(files) {
-    uploadedImagesState.length = 0;
-    let pending = files.length;
-    if (!pending) {
-      renderUploadedImages();
+  const MAX_REF_IMAGES = 5;
+
+  // Acumula novos files no state (NAO sobrescreve). Respeita limite MAX.
+  function appendUploadedFiles(files) {
+    const available = MAX_REF_IMAGES - uploadedImagesState.length;
+    if (available <= 0) {
+      if (window.toaster) window.toaster.warning(`Limite de ${MAX_REF_IMAGES} imagens atingido.`);
       return;
     }
-    files.forEach((file) => {
+    const filesToAdd = files.slice(0, available);
+    if (files.length > available && window.toaster) {
+      window.toaster.warning(`So foi possivel adicionar ${available} de ${files.length} imagens (limite ${MAX_REF_IMAGES}).`);
+    }
+    let pending = filesToAdd.length;
+    if (!pending) {
+      updateRefImgsCounter();
+      return;
+    }
+    filesToAdd.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         uploadedImagesState.push({
@@ -2600,17 +2612,41 @@
           usageDescription: '',
         });
         pending -= 1;
-        if (pending === 0) renderUploadedImages();
+        if (pending === 0) {
+          renderUploadedImages();
+          updateRefImgsCounter();
+        }
       };
       reader.readAsDataURL(file);
     });
   }
 
-  // Listener no input — captura mudancas e renderiza cards estruturados
+  // Atualiza contador X/5 + estado do botao "Adicionar imagem"
+  function updateRefImgsCounter() {
+    const counterEl = document.getElementById('refImgsCounter');
+    const btnAdd = document.getElementById('btnAddRefImg');
+    const count = uploadedImagesState.length;
+    if (counterEl) counterEl.textContent = `(${count}/${MAX_REF_IMAGES})`;
+    if (btnAdd) {
+      btnAdd.disabled = count >= MAX_REF_IMAGES;
+      btnAdd.classList.toggle('disabled', count >= MAX_REF_IMAGES);
+    }
+  }
+
+  // Atualiza contador apos remove (chamada de removeUploadedImage)
+  function refreshAfterRemoval() {
+    updateRefImgsCounter();
+  }
+
+  // Listener no input — captura UM arquivo por vez (input nao tem 'multiple'
+  // agora) e acumula no state. Limpa o input apos cada selecao para permitir
+  // re-selecionar o mesmo arquivo se preciso.
   if (dom.refImgs) {
     dom.refImgs.addEventListener('change', () => {
       const files = Array.from(dom.refImgs.files || []);
-      ingestUploadedFiles(files);
+      appendUploadedFiles(files);
+      // Reseta input para permitir re-selecionar arquivos
+      try { dom.refImgs.value = ''; } catch (e) { /* noop */ }
     });
   }
 
