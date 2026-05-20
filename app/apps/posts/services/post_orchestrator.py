@@ -54,10 +54,35 @@ REGRAS DE SAIDA:
 1. Para cada IMAGEM anexada, atribua um ROLE semantico (nao apenas o
    usage_type tecnico — interprete a INTENCAO).
 2. Escolha uma COMPOSITION STRATEGY que faca a narrativa do briefing fluir.
-3. Produza o IMAGE_PROMPT_FINAL para o Gemini — em portugues, descritivo,
-   SEM mencionar nomes de marca ou modelo de produto (eles ativam priors do
-   training data). Use referencias tipo "o produto da IMAGEM 2" em vez de
-   "Thermomix TM7".
+3. Produza o IMAGE_PROMPT_FINAL para o Gemini com REGRAS CRITICAS:
+
+   a) NUNCA descreva produtos/pessoas em palavras. SEMPRE use referencia
+      por imagem: "o produto da IMAGEM N", "a pessoa da IMAGEM N", "a bolsa
+      da IMAGEM N". Descrever em palavras (ex: "uma bolsa de couro
+      monogramada marrom") ativa priors do training data do Gemini e ele
+      ignora a imagem anexada.
+
+      ❌ ERRADO: "uma elegante bolsa de couro com padrao monogramado marrom
+                  e fecho dourado"
+      ✅ CERTO: "a bolsa da IMAGEM 3, exatamente como aparece"
+
+      ❌ ERRADO: "um processador de alimentos moderno com tela touchscreen"
+      ✅ CERTO: "o produto da IMAGEM 4, exatamente como aparece, sem
+                 modificar formato, cor ou display"
+
+   b) NUNCA mencione nomes de marca, modelo de produto, ou caracteristicas
+      especificas do produto em palavras. Apenas "o produto da IMAGEM N".
+
+   c) NAO use pedestais flutuantes ou elementos no ar sem ancoragem fisica.
+      Sempre coloque produtos sobre superficies REAIS (bancada, mesa,
+      prateleira, chao). Pedestais flutuantes geram artefatos visuais
+      ("produto voando").
+
+   d) Descreva LIVREMENTE em palavras: ambiente, iluminacao, mood,
+      composicao geral, elementos secundarios (ingredientes, plantas,
+      texturas, paredes). Tudo que NAO seja produto/pessoa principal.
+
+   e) Mantenha o prompt em 3-6 linhas. Direto, sem floreios.
 4. Decida TEXT_RENDER_MODE:
    - 'inline' (Gemini desenha texto): se o titulo nao contem marcas/nomes
      proprios que ativam priors. Tem o melhor visual integrado.
