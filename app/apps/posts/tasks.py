@@ -312,7 +312,8 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     product_analyses = []
 
     # text_render_mode: 'inline' (default) | 'sanitized' | 'pillow'
-    # Pode ser sobrescrito via env (testes) ou local_pipeline_context (futuro UI).
+    # Pode ser sobrescrito via env (testes), local_pipeline_context (UI),
+    # ou pelo Orchestrator (decisao inteligente abaixo).
     import os as _os
     text_render_mode = (
         ctx.get('text_render_mode')
@@ -322,6 +323,49 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     # brand_keywords: usado em mode='sanitized' para sanitizar nome
     # da empresa/produto no texto enviado ao Gemini
     brand_keywords = _brand_keywords_from_kb(kb)
+
+    # ============================================================
+    # ORCHESTRATOR — analisa briefing + imagens e produz prompt otimizado
+    # ============================================================
+    # Decisao: pula orchestrator se nao ha refs uploaded (apenas KB defaults)
+    # OU se ENV POST_DISABLE_ORCHESTRATOR=true.
+    orchestrator_disabled = _os.environ.get('POST_DISABLE_ORCHESTRATOR', '').lower() in ('1', 'true', 'yes')
+    orchestration_output = None
+    if not orchestrator_disabled and references:
+        try:
+            from apps.posts.services.post_orchestrator import orchestrate_post
+            orch_result = orchestrate_post(
+                post=post,
+                references=references,
+                kb_summary=marketing_input_summary,
+                paleta=paleta,
+                tipografia=tipografia,
+                references_usage_description=ctx.get('references_usage_description', '') or '',
+            )
+            if orch_result:
+                orchestration_output = orch_result['orchestration']
+                # Persiste para auditoria
+                ctx['orchestration'] = orchestration_output
+                ctx['orchestration_usage'] = orch_result.get('usage', {})
+                post.local_pipeline_context = ctx
+                post.save(update_fields=['local_pipeline_context'])
+
+                # Aplica decisoes do orchestrator
+                final_prompt = orchestration_output.get('image_prompt_final', '')
+                if final_prompt:
+                    # Sobrescreve image_prompt do post (Gemini usa este)
+                    post.image_prompt = final_prompt
+                    post.save(update_fields=['image_prompt'])
+                mode_decided = orchestration_output.get('text_render_mode')
+                if mode_decided in ('inline', 'sanitized', 'pillow'):
+                    text_render_mode = mode_decided
+                    logger.info(
+                        '[posts.local] orchestrator decidiu text_render_mode=%s',
+                        text_render_mode,
+                    )
+        except Exception:
+            logger.exception('[orchestrator] falhou — segue com prompt cru')
+    # ============================================================
 
     # Smart Pillow overlay — prepara layout_spec, fonts e logo se mode='pillow'
     pillow_kwargs = _prepare_pillow_overlay(post, kb, formato_px) if text_render_mode == 'pillow' else {}
