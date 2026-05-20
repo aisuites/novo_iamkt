@@ -56,6 +56,9 @@ def gerar_post_local(request):
 
     # Etapa 4 — selecoes da galeria + descricao
     selected_logo_ids = data.get('selected_logo_ids') or []
+    # Logo e UNICO por post (regra do produto): pega so o primeiro se vierem varios
+    if isinstance(selected_logo_ids, list) and len(selected_logo_ids) > 1:
+        selected_logo_ids = selected_logo_ids[:1]
     selected_reference_ids = data.get('selected_reference_ids') or []
     references_usage_description = (data.get('references_usage_description') or '').strip()
 

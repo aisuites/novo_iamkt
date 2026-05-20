@@ -52,11 +52,14 @@ USAGE_RULES_BY_TYPE = {
     'produto': 'aplicar FIELMENTE ao produto original — sem reinterpretar formas, cores ou logos.',
 }
 
-# Prioridade de ordenacao das imagens no prompt — logos primeiro.
+# Prioridade de ordenacao das imagens no prompt — logos e produtos primeiro
+# para garantir que aparecam destacados no contexto multimodal.
 TYPE_PRIORITY = {
     'logotipo': 0, 'logo': 0,
-    'referencia': 10, 'referencia_post': 10, 'referencia_kb': 10,
-    'produto': 5,
+    'produto': 1,
+    'pessoa': 2, 'cenario': 3, 'fundo': 4, 'background': 4,
+    'icone': 5,
+    'referencia': 10, 'referencia_post': 10, 'referencia_kb': 10, 'referencia_estilo': 10,
 }
 
 
@@ -203,9 +206,12 @@ def _build_prompt_text(
     """Reproduz o prompt textual do N8N Code in JavaScript4 (gerarimagem)."""
     # Conta tipos
     counts: Dict[str, int] = {}
-    for ref in sorted_refs:
+    product_positions: List[int] = []   # 1-based positions de produtos anexados
+    for i, ref in enumerate(sorted_refs, 1):
         t = str(ref.get('tipo', 'desconhecido')).lower()
         counts[t] = counts.get(t, 0) + 1
+        if 'produto' in t:
+            product_positions.append(i)
 
     running: Dict[str, int] = {}
 
@@ -223,12 +229,37 @@ def _build_prompt_text(
             attachments_lines.append(f'{i}) {label} {counter} — {rule}')
     attachments_text = '\n'.join(attachments_lines)
 
+    # Bloco extra de FIDELIDADE quando ha produtos anexados — instrucao
+    # MUITO explicita para o Gemini nao "reinterpretar" o produto.
+    product_fidelity_block = ''
+    if product_positions:
+        positions_str = ', '.join(f'#{p}' for p in product_positions)
+        product_fidelity_block = (
+            '\n\n### REGRA CRITICA — FIDELIDADE AO PRODUTO\n'
+            f'As imagens anexadas nas posicoes {positions_str} sao do PRODUTO real '
+            'que deve aparecer na arte final.\n'
+            'OBRIGATORIO — o produto na imagem gerada deve ser IDENTICO ao da '
+            'imagem anexada:\n'
+            '- Mesmo formato, mesmas proporcoes, mesma silhueta exata\n'
+            '- Mesma cor (NAO mudar tonalidade, NAO trocar cores)\n'
+            '- Mesmo display/tela (se houver, copie o que aparece nele)\n'
+            '- Mesmo logo no produto (NUNCA alterar)\n'
+            '- Mesmos detalhes mecanicos, botoes, texturas\n'
+            'NAO redesenhe o produto. NAO crie uma versao "inspirada" no produto. '
+            'A imagem do produto e LITERAL — voce so deve recontextualiza-lo no '
+            'cenario da cena (ambiente, iluminacao, composicao ao redor podem '
+            'variar conforme o briefing, mas o produto em si NAO).\n'
+            'Se houver duvida entre "ser fiel ao produto" e "seguir a descricao '
+            'da cena", PRIORIZE a fidelidade ao produto.'
+        )
+
     parts = [
         'Voce e um diretor de arte senior e designer de social media.',
         '',
         'Crie UMA imagem final (sem variacoes) para um post de rede social, '
         'pronta para publicacao.',
         attachments_text,
+        product_fidelity_block,
         '',
         '### BRIEFING',
         f'- Rede social: {post.social_network or "instagram"}',
@@ -287,9 +318,17 @@ def _build_prompt_text(
         '- Sem textos cortados',
         '- Sem marca dagua',
         '- Nao gerar mockup (e a arte final)',
+    ]
+    if product_positions:
+        parts.append(
+            '- PRODUTOS anexados devem aparecer FOTORREALISTAS e IDENTICOS ao '
+            'original anexado (verificar antes de gerar: formato, cores, '
+            'display, logos no produto, proporcao).'
+        )
+    parts.extend([
         '',
         'Gere a arte final agora.',
-    ]
+    ])
     return '\n'.join(parts)
 
 

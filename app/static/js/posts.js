@@ -2385,6 +2385,8 @@
         title: logo.name,
         badge: logo.is_primary ? 'principal' : logo.logo_type,
         selectedSet: orgAssetsState.selectedLogoIds,
+        singleSelect: true,   // logo e UNICA: seleciona 1 e deselecionou os outros
+        galleryEl: container,
       });
       container.appendChild(thumb);
     });
@@ -2413,7 +2415,7 @@
     });
   }
 
-  function buildAssetThumb({ id, url, title, badge, selectedSet }) {
+  function buildAssetThumb({ id, url, title, badge, selectedSet, singleSelect, galleryEl }) {
     const div = document.createElement('div');
     div.className = 'asset-thumb';
     div.dataset.id = String(id);
@@ -2458,6 +2460,13 @@
           selectedSet.delete(id);
           div.classList.remove('selected');
         } else {
+          // singleSelect=true: deseleciona os irmaos antes de marcar este
+          if (singleSelect && galleryEl) {
+            selectedSet.clear();
+            galleryEl.querySelectorAll('.asset-thumb.selected').forEach((el) => {
+              el.classList.remove('selected');
+            });
+          }
           selectedSet.add(id);
           div.classList.add('selected');
         }

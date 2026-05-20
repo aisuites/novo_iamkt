@@ -613,3 +613,11 @@ Post 57 (org 25 Colletivo Real):
 - [ ] View N8N atual (`gerar_post`) não aceita os campos novos — segue ignorando (compat)
 - [ ] Sem teste de lightbox em viewport mobile
 - [ ] Endpoint `get_org_assets` não paginado (assumindo KBs com < 50 logos/refs)
+
+### Refinos pós-validação (2026-05-20)
+- **Logo é single-select** (1 por post): galeria de logos agora deseleciona os outros ao escolher um novo. Backend defensivamente trunca `selected_logo_ids[:1]`. Hint atualizado no modal.
+- **Regra de fidelidade do produto reforçada** no prompt do Gemini:
+  - `TYPE_PRIORITY['produto'] = 1` (logo após o logo, antes de refs genéricas)
+  - Bloco extra `### REGRA CRITICA — FIDELIDADE AO PRODUTO` adicionado dinamicamente quando há refs `usage_type='produto'`. Lista as posições exatas das imagens-produto e exige: mesmo formato, mesma cor, mesmo display, mesmos logos no produto, sem reinterpretar.
+  - Item extra em `### QUALIDADE`: "PRODUTOS anexados devem aparecer FOTORREALISTAS e IDENTICOS ao original".
+- Limitação conhecida: Gemini 3 Pro Image **não tem fine-tuning** sobre produtos específicos. Mesmo com regras explícitas, pequenas variações de geometria/proporção podem ocorrer. Para fidelidade absoluta seria necessário Nano Banana com referência treinada ou modelo de difusão com ControlNet.
