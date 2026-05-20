@@ -897,7 +897,13 @@
       const qtdImagens = carrossel ? (Number(dom.carrosselQtyInput?.value) || 3) : 1;
       const ctaRadio = document.querySelector('input[name="ctaOption"]:checked');
       const ctaRequested = ctaRadio?.value === 'sim';
-      const files = dom.refImgs?.files ? Array.from(dom.refImgs.files) : [];
+      // Lê files do state acumulativo (window.__ETAPA4_STATE__.uploadedImagesState),
+      // nao mais do dom.refImgs.files (que e limpo apos cada selecao individual
+      // no novo fluxo cumulativo). Fallback: refImgs.files para retrocompat.
+      const _state = window.__ETAPA4_STATE__?.uploadedImagesState || [];
+      const files = _state.length
+        ? _state.map(it => it.file)
+        : (dom.refImgs?.files ? Array.from(dom.refImgs.files) : []);
 
       try {
         // Upload de imagens de referência (se houver)
