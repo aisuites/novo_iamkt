@@ -90,7 +90,32 @@ REGRAS DE SAIDA:
      CRITICOS (marca/produto/modelo) que precisam ser literais OU se ja
      ha produtos sensiveis a name-anchor.
    - 'sanitized': raramente — quase nunca melhor que pillow.
-5. WARNINGS: se o briefing tem ambiguidades importantes (ex: "faltam regras
+5. LAYOUT PLAN — defina zonas reservadas no canvas para que o gerador de
+   imagem NAO posicione elementos visuais (rostos, produtos, detalhes) sobre
+   areas que vao receber texto/logo em pos-processamento.
+
+   Por padrao, o canvas tem 4 zonas:
+   - title_zone: onde o titulo aparece (topo esquerdo ou superior)
+   - subtitle_zone: opcional, abaixo do titulo
+   - logo_zone: pequena area para logo da marca (canto)
+   - cta_zone: opcional, area do call-to-action (rodape)
+   - main_subject_zone: centro/foco principal (onde produtos+pessoas devem
+     ser concentrados)
+
+   Para cada zona, defina:
+   - position: "top-left"|"top-center"|"top-right"|"center-left"|"center"|
+     "center-right"|"bottom-left"|"bottom-center"|"bottom-right"
+   - width_pct e height_pct: tamanho relativo ao canvas (0-100)
+   - background_requirement: "uniforme/claro/desfocado/sem rostos/sem texto"
+     — instrucao para o Gemini deixar essa area visualmente "limpa"
+
+   Considere o aspect ratio do canvas (sera informado no briefing):
+   - 1:1 (feed quadrado): title topo, cta rodape, sujeito centro
+   - 9:16 (stories/reels): titulo topo, cta base, sujeito centro
+   - 4:5 (feed retrato): title topo, cta base, sujeito centro-baixo
+   - 16:9 (banner/linkedin): title left, sujeito right (lado a lado)
+
+6. WARNINGS: se o briefing tem ambiguidades importantes (ex: "faltam regras
    do sorteio", "nao esta claro qual produto e o premio"), liste em
    warnings. Nao bloqueia geracao mas registra.
 
@@ -109,8 +134,52 @@ FORMATO DE SAIDA (JSON puro, sem markdown):
   "image_prompt_final": "string final em PT-BR para o Gemini (3-6 linhas)",
   "text_render_mode": "inline" | "pillow" | "sanitized",
   "text_render_rationale": "string curta justificando a escolha",
+  "layout_plan": {
+    "title_zone": {
+      "position": "top-left",
+      "width_pct": 60,
+      "height_pct": 22,
+      "background_requirement": "uniforme/claro/sem rostos/sem texto"
+    },
+    "subtitle_zone": {
+      "position": "top-left",
+      "width_pct": 60,
+      "height_pct": 8,
+      "background_requirement": "uniforme/continuacao do titulo"
+    },
+    "logo_zone": {
+      "position": "top-right",
+      "width_pct": 12,
+      "height_pct": 8,
+      "background_requirement": "fundo limpo, sem elementos"
+    },
+    "cta_zone": {
+      "position": "bottom-center",
+      "width_pct": 50,
+      "height_pct": 10,
+      "background_requirement": "superficie uniforme — bancada, fundo simples, sem rostos"
+    },
+    "main_subject_zone": {
+      "position": "center",
+      "description": "produtos e pessoas concentrados aqui"
+    }
+  },
+  "spatial_instructions_for_gemini": "string com instrucoes explicitas para o gerador de imagem respeitar as zonas reservadas. Sera injetada como bloco separado no prompt final.",
   "warnings": ["string de cada warning"]
 }
+
+REGRAS CRITICAS para layout_plan:
+- title_zone NUNCA deve incluir rosto humano, produto principal, ou texto visivel
+- main_subject_zone deve estar AFASTADO das zonas de title/cta para nao competir
+- Aspect ratio define onde o sujeito vai: 9:16/4:5/1:1 -> sujeito CENTRO-BAIXO,
+  16:9 -> sujeito CENTRO-DIREITA (texto fica na esquerda)
+
+EXEMPLOS DE spatial_instructions_for_gemini:
+- "DEIXE LIVRE a area do topo (0-25% da altura): nenhum rosto, nenhum produto,
+   nenhum texto. Pode haver parede uniforme, ceu, fundo desfocado, mesa lisa.
+   Esta area sera coberta por titulo em pos-processamento."
+- "Posicione o sujeito principal e os produtos no terço CENTRAL e INFERIOR
+   da composicao, deixando o terço superior visualmente limpo."
 
 Retorne APENAS o JSON, sem texto antes ou depois, sem markdown."""
 
@@ -123,6 +192,8 @@ def orchestrate_post(
     paleta: List[Dict[str, Any]],
     tipografia: List[Dict[str, Any]],
     references_usage_description: str = '',
+    formato_px: str = '',
+    aspect_ratio: str = '',
 ) -> Optional[Dict[str, Any]]:
     """
     Roda o orquestrador Claude Sonnet 4.5 multimodal.
@@ -191,6 +262,8 @@ def orchestrate_post(
         tipografia=tipografia,
         references_usage_description=references_usage_description,
         image_meta_lines=image_meta_lines,
+        formato_px=formato_px,
+        aspect_ratio=aspect_ratio,
     )
     content_blocks.append({'type': 'text', 'text': user_text})
 
@@ -244,6 +317,8 @@ def _build_user_text(
     tipografia: List[Dict[str, Any]],
     references_usage_description: str,
     image_meta_lines: List[str],
+    formato_px: str = '',
+    aspect_ratio: str = '',
 ) -> str:
     lines = [
         '== Briefing do post ==',
@@ -252,6 +327,7 @@ def _build_user_text(
         f'CTA: {post.cta or "(sem CTA)"}',
         f'Tema/contexto original: {post.requested_theme or "(sem tema)"}',
         f'Rede social: {post.social_network or "instagram"}',
+        f'Formato da arte: {formato_px or "?"} (aspect_ratio: {aspect_ratio or "?"})',
         '',
         '== Marca (KB compilation) ==',
         kb_summary[:1500] if kb_summary else '(sem resumo da marca)',

@@ -91,6 +91,7 @@ def generate_post_image(
     pillow_title_font_path: Optional[str] = None,
     pillow_subtitle_font_path: Optional[str] = None,
     pillow_logo_url: Optional[str] = None,
+    spatial_instructions: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Gera UMA imagem final para o post via Gemini 3 Pro Image.
@@ -148,6 +149,7 @@ def generate_post_image(
         product_analyses=product_analyses or [],
         text_render_mode=text_render_mode,
         brand_keywords=brand_keywords or [],
+        spatial_instructions=spatial_instructions or '',
     )
 
     # 3. Monta payload Gemini — IMAGENS PRIMEIRO, depois texto (subject anchor)
@@ -371,6 +373,7 @@ def _build_prompt_text(
     product_analyses: List[Dict[str, Any]],
     text_render_mode: str = 'inline',
     brand_keywords: List[str] = None,
+    spatial_instructions: str = '',
 ) -> str:
     """
     Prompt SIMPLES — confia na dereferenciacao por imagem ("o produto da
@@ -466,6 +469,21 @@ def _build_prompt_text(
         '',
         '# CENA',
         post.image_prompt or '(propor um cenario adequado ao briefing)',
+    ]
+
+    # Bloco LAYOUT ESPACIAL — instrucoes do orchestrator para o Gemini
+    # respeitar zonas reservadas para texto/logo (evita rosto/produto sob titulo)
+    if spatial_instructions:
+        parts.extend([
+            '',
+            '# LAYOUT ESPACIAL OBRIGATORIO',
+            spatial_instructions,
+            'IMPORTANTE: respeite essas zonas reservadas. NAO posicione rostos, '
+            'produtos principais ou elementos visuais detalhados sobre as areas '
+            'que devem ficar livres para texto/logo.',
+        ])
+
+    parts.extend([
         '',
         '# BRIEFING',
         f'- Rede social: {post.social_network or "instagram"}',
@@ -483,7 +501,7 @@ def _build_prompt_text(
         '- Fotorrealista, sem artefatos, sem textos cortados, sem marca dagua.',
         '- Nao gerar mockup — esta e a arte final.',
         '- Legibilidade alta para celular.',
-    ]
+    ])
 
     # Texto a renderizar — colocado no FINAL com isolamento explicito (Fluxo A)
     if text_render_mode == 'pillow':

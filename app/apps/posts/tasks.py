@@ -326,14 +326,15 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
 
     # ============================================================
     # ORCHESTRATOR — analisa briefing + imagens e produz prompt otimizado
+    # + layout_plan + spatial_instructions
     # ============================================================
-    # Decisao: pula orchestrator se nao ha refs uploaded (apenas KB defaults)
-    # OU se ENV POST_DISABLE_ORCHESTRATOR=true.
     orchestrator_disabled = _os.environ.get('POST_DISABLE_ORCHESTRATOR', '').lower() in ('1', 'true', 'yes')
     orchestration_output = None
+    spatial_instructions = ''
     if not orchestrator_disabled and references:
         try:
             from apps.posts.services.post_orchestrator import orchestrate_post
+            aspect = (post.post_format.aspect_ratio if post.post_format else '') or ''
             orch_result = orchestrate_post(
                 post=post,
                 references=references,
@@ -341,6 +342,8 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
                 paleta=paleta,
                 tipografia=tipografia,
                 references_usage_description=ctx.get('references_usage_description', '') or '',
+                formato_px=formato_px,
+                aspect_ratio=aspect,
             )
             if orch_result:
                 orchestration_output = orch_result['orchestration']
@@ -353,22 +356,35 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
                 # Aplica decisoes do orchestrator
                 final_prompt = orchestration_output.get('image_prompt_final', '')
                 if final_prompt:
-                    # Sobrescreve image_prompt do post (Gemini usa este)
                     post.image_prompt = final_prompt
                     post.save(update_fields=['image_prompt'])
                 mode_decided = orchestration_output.get('text_render_mode')
                 if mode_decided in ('inline', 'sanitized', 'pillow'):
                     text_render_mode = mode_decided
-                    logger.info(
-                        '[posts.local] orchestrator decidiu text_render_mode=%s',
-                        text_render_mode,
-                    )
+                spatial_instructions = orchestration_output.get(
+                    'spatial_instructions_for_gemini', ''
+                ) or ''
+                logger.info(
+                    '[posts.local] orchestrator -> mode=%s, layout_plan=%s, spatial_len=%d',
+                    text_render_mode,
+                    bool(orchestration_output.get('layout_plan')),
+                    len(spatial_instructions),
+                )
         except Exception:
             logger.exception('[orchestrator] falhou — segue com prompt cru')
     # ============================================================
 
     # Smart Pillow overlay — prepara layout_spec, fonts e logo se mode='pillow'
-    pillow_kwargs = _prepare_pillow_overlay(post, kb, formato_px) if text_render_mode == 'pillow' else {}
+    # Quando o orchestrator gerou layout_plan, usa-o (preferencia ao fallback)
+    pillow_kwargs = {}
+    if text_render_mode == 'pillow':
+        pillow_kwargs = _prepare_pillow_overlay(post, kb, formato_px)
+        # Sobrescreve layout_spec com layout_plan do orchestrator (se houver)
+        layout_plan = (orchestration_output or {}).get('layout_plan') or {}
+        if layout_plan:
+            pillow_kwargs['pillow_layout_spec'] = _layout_plan_to_spec(
+                layout_plan, fallback=pillow_kwargs.get('pillow_layout_spec', {}),
+            )
 
     try:
         result = generate_post_image(
@@ -382,6 +398,7 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             product_analyses=product_analyses,
             text_render_mode=text_render_mode,
             brand_keywords=brand_keywords,
+            spatial_instructions=spatial_instructions,
             **pillow_kwargs,
         )
     except Exception as exc:
@@ -488,6 +505,66 @@ def _analyze_products_in_references(references, brand_context: str = '') -> list
             logger.exception('[posts.local] Falha em analyze_product_image')
             analyses.append({})
     return analyses
+
+
+def _layout_plan_to_spec(layout_plan: dict, fallback: dict = None) -> dict:
+    """
+    Converte layout_plan (formato do orchestrator) em layout_spec (formato
+    consumido pelo apply_text_overlay do Pillow).
+
+    Schema layout_plan (do orchestrator):
+      {
+        "title_zone": {"position": "top-left", "width_pct": 60, "height_pct": 22, ...},
+        "subtitle_zone": {...},
+        "logo_zone": {"position": "top-right", "width_pct": 12, "height_pct": 8},
+        "cta_zone": {"position": "bottom-center", ...},
+        "main_subject_zone": {...}
+      }
+
+    Schema layout_spec (do Pillow):
+      {
+        "title_position": "top-left", "title_size_pct": 8, "title_weight": "bold",
+        "subtitle_offset": "below_title", "subtitle_size_pct": 3,
+        "logo_position": "top-right", "logo_size_pct": 12,
+        "cta_style": "pill", "cta_position": "bottom-center",
+        "alignment": "left", "padding_pct": 5,
+      }
+    """
+    base = dict(fallback or {})
+
+    title_zone = layout_plan.get('title_zone') or {}
+    if title_zone:
+        base['title_position'] = title_zone.get('position', base.get('title_position', 'top-left'))
+        # height_pct da zona vira title_size_pct (proporcional, com cap)
+        h = float(title_zone.get('height_pct', 22))
+        base['title_size_pct'] = max(6, min(h * 0.35, 12))  # 35% da altura da zona = tamanho da fonte
+
+    subtitle_zone = layout_plan.get('subtitle_zone') or {}
+    if subtitle_zone:
+        h_sub = float(subtitle_zone.get('height_pct', 8))
+        base['subtitle_size_pct'] = max(2.5, min(h_sub * 0.35, 5))
+
+    logo_zone = layout_plan.get('logo_zone') or {}
+    if logo_zone:
+        base['logo_position'] = logo_zone.get('position', base.get('logo_position', 'top-right'))
+        base['logo_size_pct'] = float(logo_zone.get('width_pct', 12))
+
+    cta_zone = layout_plan.get('cta_zone') or {}
+    if cta_zone:
+        base['cta_position'] = cta_zone.get('position', base.get('cta_position', 'bottom-center'))
+
+    # Defaults pra completar
+    base.setdefault('title_weight', 'bold')
+    base.setdefault('title_color_hint', 'auto_contrast')
+    base.setdefault('subtitle_offset', 'below_title')
+    base.setdefault('subtitle_weight', 'regular')
+    base.setdefault('cta_style', 'pill')
+    base.setdefault('alignment', 'left')
+    base.setdefault('padding_pct', 5)
+    base.setdefault('background_treatment', 'none')
+
+    base['source'] = 'orchestrator_layout_plan'
+    return base
 
 
 def _prepare_pillow_overlay(post, kb, formato_px: str) -> dict:
