@@ -1,10 +1,15 @@
 """
 API endpoints para posts
 """
+import logging
+
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.contrib.auth.decorators import login_required
+
 from .models import PostFormat
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -61,4 +66,90 @@ def get_post_formats(request):
     return JsonResponse({
         'success': True,
         'formatos': formatos_data
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def get_org_assets(request):
+    """
+    Retorna logos e/ou imagens de referencia da KB da organizacao do user.
+    Usado pelas galerias do modal Gerar Post.
+
+    GET /posts/api/org-assets/?type=logos|references|all  (default: all)
+
+    Resposta:
+        {
+          'success': True,
+          'logos': [{id, name, logo_type, is_primary, url, file_format}],
+          'references': [{id, name, url, category, file_format}]
+        }
+    URLs sao presigned (validas por 24h) e adequadas para exibir em
+    thumbs no front (mesma URL pode ser usada num lightbox).
+    """
+    from apps.knowledge.models import KnowledgeBase
+    from apps.core.services.s3_service import S3Service
+
+    asset_type = (request.GET.get('type') or 'all').lower()
+    org = getattr(request.user, 'organization', None)
+    if not org:
+        return JsonResponse(
+            {'success': False, 'error': 'Usuario sem organizacao'},
+            status=400,
+        )
+
+    kb = KnowledgeBase.objects.filter(organization=org).first()
+    if not kb:
+        return JsonResponse({
+            'success': True,
+            'logos': [],
+            'references': [],
+        })
+
+    def _presign(s3_key):
+        if not s3_key:
+            return ''
+        try:
+            return S3Service.generate_presigned_download_url(s3_key, expires_in=86400)
+        except Exception as exc:
+            logger.warning('Falha ao gerar presigned para %s: %s', s3_key, exc)
+            return ''
+
+    logos_data = []
+    refs_data = []
+
+    if asset_type in ('logos', 'all'):
+        try:
+            for lg in kb.logos.all().order_by('-is_primary', 'logo_type'):
+                logos_data.append({
+                    'id': lg.id,
+                    'name': lg.name or '',
+                    'logo_type': lg.logo_type,
+                    'is_primary': bool(lg.is_primary),
+                    'file_format': lg.file_format or '',
+                    'url': _presign(lg.s3_key),
+                })
+        except Exception:
+            logger.exception('Falha ao listar logos')
+
+    if asset_type in ('references', 'all'):
+        try:
+            qs = kb.reference_images.all().order_by('-id')
+            for img in qs:
+                refs_data.append({
+                    'id': img.id,
+                    'title': img.title or '',
+                    'description': (img.description or '')[:200],
+                    'usage_description': (getattr(img, 'usage_description', '') or '')[:200],
+                    'width': img.width,
+                    'height': img.height,
+                    'url': _presign(img.s3_key),
+                })
+        except Exception:
+            logger.exception('Falha ao listar references')
+
+    return JsonResponse({
+        'success': True,
+        'logos': logos_data,
+        'references': refs_data,
     })

@@ -249,6 +249,7 @@ Arquivo: [app/apps/posts/views_gerar.py](../app/apps/posts/views_gerar.py) (linh
 | 2026-05-19 | Etapa 1 (UI dos 2 botões) | Renomeado "Enviar ao agente" → "Enviar N8N". Adicionado "Enviar Fluxo interno" (visível só em homol/dev). Adicionado campo `Post.pipeline_used` + flag `settings.ENABLE_LOCAL_PIPELINE`. Ver §13. |
 | 2026-05-19 | Etapa 2 (Endpoint + Celery task texto) | Criado `/posts/gerar-local/` + Celery task `generate_post_text_task` rodando Claude Sonnet 4.5 com prompt caching. Substitui o N8N `gerar-post-appiamkt`. Custo ~$0.01 por post. Ver §14. |
 | 2026-05-19 | Etapa 3 (Celery task imagem) | Celery task `generate_post_image_task` rodando Gemini 3 Pro Image. View `generate_image` roteia para Celery quando `post.pipeline_used='local'`. Substitui N8N `gerarimagem-appiamkt`. Custo ~$0.04 por imagem. Latência ~25-60s. Ver §15. |
+| 2026-05-20 | Etapa 4 (Galerias + lightbox + upload estruturado) | Modal ganhou 3 seções abaixo do tema: galeria de logos da KB (multi-select), galeria de references da KB (multi-select + textarea de uso), upload estruturado (cada arquivo com select de `usage_type` + textarea de `usage_description`). Lightbox global vanilla. Endpoint `GET /posts/api/org-assets/` lista assets com presigned URLs. Campo novo `Post.local_pipeline_context` (JSONField) persiste seleções. Task respeita as seleções ao montar prompts. Ver §16. |
 
 ---
 
@@ -516,3 +517,99 @@ Posts gerados end-to-end (texto Claude → imagem Gemini):
 - [ ] Sem regeneração com `message` específico (já passado, mas prompt não usa ainda)
 - [ ] AIUsageLog ainda defensivo (não existe na branch main)
 - [ ] Custo flat-rate estimado em `$0.04` — não puxa usageMetadata real do Gemini (campo `cost_usd` é placeholder)
+
+---
+
+## 16. Etapa 4 — Galerias + lightbox + upload estruturado (implementada)
+
+### Arquivos novos
+- [app/apps/posts/migrations/0017_add_local_pipeline_context.py](../app/apps/posts/migrations/0017_add_local_pipeline_context.py)
+
+### Arquivos modificados
+- [app/apps/posts/models.py](../app/apps/posts/models.py) — campo `Post.local_pipeline_context` (JSONField)
+- [app/apps/posts/views_api.py](../app/apps/posts/views_api.py) — endpoint `get_org_assets`
+- [app/apps/posts/urls.py](../app/apps/posts/urls.py) — `path('api/org-assets/', views_api.get_org_assets, ...)`
+- [app/apps/posts/views_gerar_local.py](../app/apps/posts/views_gerar_local.py) — aceita `selected_logo_ids`, `selected_reference_ids`, `references_usage_description`; persiste em `local_pipeline_context` e em `PostReferenceImage.usage_type`/`usage_description`
+- [app/apps/posts/tasks.py](../app/apps/posts/tasks.py) — `_collect_references` e `_logos_from_org` filtram por seleção; refs_usage_general é concatenado ao kb_summary (Claude) e ao marketing_input_summary (Gemini)
+- [app/apps/posts/templates/posts/posts_list.html](../app/apps/posts/templates/posts/posts_list.html) — 3 seções novas no modal + lightbox global
+- [app/static/js/posts.js](../app/static/js/posts.js) — `loadOrgAssets`, `renderLogosGallery`, `renderReferencesGallery`, lightbox, upload estruturado
+- [app/static/css/posts.css](../app/static/css/posts.css) — estilos `.asset-gallery`, `.asset-thumb`, `.uploaded-image-card`, `.image-lightbox`
+
+### Schema do `Post.local_pipeline_context`
+```json
+{
+  "selected_logo_ids": [32],
+  "selected_reference_ids": [42, 43],
+  "references_usage_description": "usar como inspiração de paleta..."
+}
+```
+
+### Fluxo da UI
+
+```
+[ User abre o modal ]
+   ↓
+[ loadOrgAssets() → GET /posts/api/org-assets/?type=all → JSON com logos+refs (presigned URLs) ]
+   ↓
+[ renderLogosGallery + renderReferencesGallery → thumbs clicáveis ]
+   ↓
+[ Click no thumb = toggle selecionado (borda roxa + ✓)
+  Double-click no thumb = abre lightbox em tela cheia ]
+   ↓
+[ Upload de novas imagens → ingestUploadedFiles → cards com select de tipo + textarea ]
+   ↓
+[ Submit → payload inclui selected_logo_ids, selected_reference_ids, references_usage_description
+  + cada reference_image[] tem usage_type + usage_description ]
+   ↓
+[ Backend persiste em Post.local_pipeline_context + PostReferenceImage ]
+   ↓
+[ Task usa apenas os logos/refs selecionados + descrição geral no prompt ]
+```
+
+### Tipos de uso disponíveis (`usage_type`)
+- `produto` — aplicar fielmente ao original (sem reinterpretar) — Gemini recebe regra especial
+- `pessoa` — speaker, retrato
+- `cenario` — lugar, ambiente
+- `referencia_estilo` — paleta, fotografia, mood
+- `icone` — elemento gráfico
+- `fundo` — textura/background
+- `outro` — fallback
+
+### Endpoint `GET /posts/api/org-assets/`
+Query params: `?type=logos|references|all` (default `all`)
+
+Response:
+```json
+{
+  "success": true,
+  "logos": [
+    {"id": 32, "name": "...", "logo_type": "principal", "is_primary": false, "file_format": "png", "url": "<presigned>"}
+  ],
+  "references": [
+    {"id": 42, "title": "...", "description": "...", "usage_description": "...", "width": 1080, "height": 1350, "url": "<presigned>"}
+  ]
+}
+```
+
+### Lightbox global
+- Elemento único `#imageLightbox` (fora dos modais)
+- `openLightbox(url)` / `closeLightbox()` JS expostos
+- Fecha com click no overlay, no botão × ou tecla ESC
+- Funciona para qualquer thumb (galerias e uploads)
+
+### UX dos thumbs
+- **Single-click**: toggle de seleção (borda roxa + checkmark)
+- **Double-click**: abre lightbox em tela cheia
+- **Shift/Alt + click**: também abre lightbox (atalho)
+- Badge no canto inferior esquerdo: tipo do logo (`principal`, `horizontal`, etc.)
+
+### Validado em homol
+Post 57 (org 25 Colletivo Real):
+- 1 logo selecionado, 2 refs selecionadas, descrição geral preenchida
+- Claude gerou texto coerente com brand ("Design que nasce da colaboração", "vozes plurais")
+- `local_pipeline_context` persistido corretamente
+
+### Gaps Etapa 4
+- [ ] View N8N atual (`gerar_post`) não aceita os campos novos — segue ignorando (compat)
+- [ ] Sem teste de lightbox em viewport mobile
+- [ ] Endpoint `get_org_assets` não paginado (assumindo KBs com < 50 logos/refs)

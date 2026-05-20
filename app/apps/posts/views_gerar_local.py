@@ -54,6 +54,11 @@ def gerar_post_local(request):
     post_format_id = data.get('post_format_id')
     formato_legado = (data.get('formato') or '').strip()
 
+    # Etapa 4 — selecoes da galeria + descricao
+    selected_logo_ids = data.get('selected_logo_ids') or []
+    selected_reference_ids = data.get('selected_reference_ids') or []
+    references_usage_description = (data.get('references_usage_description') or '').strip()
+
     # ---- Validacoes (mesmo padrao do gerar_post original) ----
     valid_redes = ['instagram', 'facebook', 'linkedin', 'whatsapp']
     if rede_social not in valid_redes:
@@ -117,6 +122,11 @@ def gerar_post_local(request):
                 ia_provider='anthropic',
                 ia_model_text='claude-sonnet-4-5',
                 pipeline_used='local',
+                local_pipeline_context={
+                    'selected_logo_ids': list(selected_logo_ids or []),
+                    'selected_reference_ids': list(selected_reference_ids or []),
+                    'references_usage_description': references_usage_description,
+                },
             )
 
             for idx, ref_img in enumerate(reference_images):
@@ -125,6 +135,8 @@ def gerar_post_local(request):
                     s3_key=ref_img.get('s3_key', ''),
                     s3_url=ref_img.get('url', ''),
                     original_name=ref_img.get('name', ''),
+                    usage_type=ref_img.get('usage_type', '') or '',
+                    usage_description=ref_img.get('usage_description', '') or '',
                     order=idx,
                 )
 

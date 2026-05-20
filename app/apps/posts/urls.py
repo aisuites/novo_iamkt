@@ -8,6 +8,7 @@ urlpatterns = [
     
     # API
     path('api/formatos/', views_api.get_post_formats, name='api_formatos'),
+    path('api/org-assets/', views_api.get_org_assets, name='api_org_assets'),
     
     # Gerar Post
     path('gerar/', views_gerar.gerar_post, name='gerar'),

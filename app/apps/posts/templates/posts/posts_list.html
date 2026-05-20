@@ -356,9 +356,32 @@
                           maxlength="3000" placeholder="Restrições, exemplos, referências..." required></textarea>
             </div>
             
-            <!-- LINHA 4: Imagens de Referência -->
+            <!-- LINHA 4: Logos da marca -->
             <div class="field">
-                <label for="refImgs">Imagens de Referência</label>
+                <label>Logos disponiveis na base de conhecimento</label>
+                <div id="orgLogosGallery" class="asset-gallery" data-empty-text="Nenhum logo cadastrado na KB.">
+                    <div class="asset-gallery-loading">Carregando logos...</div>
+                </div>
+                <small class="asset-hint">Clique para selecionar quais logos devem ser usados. Click no thumb para ampliar.</small>
+            </div>
+
+            <!-- LINHA 5: Referencias da KB -->
+            <div class="field">
+                <label>Imagens de referencia existentes</label>
+                <div id="orgRefsGallery" class="asset-gallery" data-empty-text="Nenhuma imagem de referencia na KB.">
+                    <div class="asset-gallery-loading">Carregando referencias...</div>
+                </div>
+                <div class="field" style="margin-top: 8px;">
+                    <label for="refsUsageDescription" class="small-label">Como usar essas referencias?</label>
+                    <textarea id="refsUsageDescription" name="refsUsageDescription"
+                              class="form-input-filter" rows="2" maxlength="500"
+                              placeholder="Ex: usar como inspiracao de fotografia e iluminacao, manter paleta de cores..."></textarea>
+                </div>
+            </div>
+
+            <!-- LINHA 6: Upload de novas imagens (com descricao estruturada) -->
+            <div class="field">
+                <label for="refImgs">Adicionar novas imagens de referencia</label>
                 <div class="upload-area">
                     <input type="file" id="refImgs" accept=".jpg,.jpeg,.png" multiple style="display: none;">
                     <button type="button" class="btn-upload" onclick="document.getElementById('refImgs').click()">
@@ -366,10 +389,11 @@
                         Escolher Imagens
                     </button>
                     <div id="refImgsInfo" class="upload-info">
-                        Nenhum arquivo selecionado — Máx. 5 imagens (.JPG ou .PNG)
+                        Nenhum arquivo selecionado — Max. 5 imagens (.JPG ou .PNG)
                     </div>
                     <div id="refImgsPreview" class="upload-preview"></div>
                 </div>
+                <small class="asset-hint">Para cada imagem, indique o tipo de uso (produto, pessoa, cenario...) e descreva como usar.</small>
             </div>
             
             <div class="modal-footer">
@@ -429,6 +453,12 @@
             </div>
         </form>
     </div>
+</div>
+
+<!-- Lightbox global (Etapa 4) -->
+<div id="imageLightbox" class="image-lightbox" role="dialog" aria-modal="true" aria-label="Visualizacao da imagem">
+    <button type="button" class="lb-close" aria-label="Fechar">&times;</button>
+    <img id="imageLightboxImg" src="" alt="Visualizacao ampliada">
 </div>
 {% endblock %}
 

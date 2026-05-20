@@ -835,7 +835,11 @@
       is_carousel: payload.carrossel || false,
       image_count: payload.qtdImagens || 1,
       tema: payload.tema || '',
-      reference_images: payload.referenceImages || [] // Array de {s3_key, url, name}
+      reference_images: payload.referenceImages || [], // {s3_key, url, name, usage_type, usage_description}
+      // Etapa 4 — selecionados das galerias da KB + descricao geral de uso
+      selected_logo_ids: payload.selectedLogoIds || [],
+      selected_reference_ids: payload.selectedReferenceIds || [],
+      references_usage_description: payload.refsUsageDescription || '',
     };
 
     logger.debug('[POSTS] Enviando post para Django:', endpoint, jsonPayload);
@@ -895,7 +899,7 @@
           if (window.toaster) {
             window.toaster.info(`Fazendo upload de ${files.length} ${files.length === 1 ? 'imagem' : 'imagens'}...`);
           }
-          
+
           try {
             referenceImages = await uploadReferenceImages(files);
             logger.debug('[POSTS] Imagens de referência enviadas:', referenceImages);
@@ -907,7 +911,29 @@
             return; // Abortar envio do post
           }
         }
-        
+
+        // Etapa 4 — anexa metadados estruturados (usage_type, usage_description)
+        // por imagem uploaded, casando por nome com o uploadedImagesState
+        const etapa4 = window.__ETAPA4_STATE__ || {};
+        const usMap = new Map();
+        (etapa4.uploadedImagesState || []).forEach((it) => {
+          usMap.set(it.name, {
+            usage_type: it.usageType || '',
+            usage_description: it.usageDescription || '',
+          });
+        });
+        referenceImages = referenceImages.map((r) => ({
+          ...r,
+          usage_type: (usMap.get(r.name) || {}).usage_type || '',
+          usage_description: (usMap.get(r.name) || {}).usage_description || '',
+        }));
+
+        const selectedLogoIds = Array.from(etapa4.orgAssetsState?.selectedLogoIds || []);
+        const selectedReferenceIds = Array.from(etapa4.orgAssetsState?.selectedRefIds || []);
+        const refsUsageDescription = etapa4.getRefsUsageDescription
+          ? etapa4.getRefsUsageDescription()
+          : '';
+
         const payload = {
           rede,
           tema,
@@ -916,7 +942,10 @@
           carrossel,
           qtdImagens,
           ctaRequested,
-          referenceImages
+          referenceImages,
+          selectedLogoIds,
+          selectedReferenceIds,
+          refsUsageDescription,
         };
 
         const result = await requestPostFromAgent(payload, pipeline);
@@ -2281,10 +2310,311 @@
 
   console.log('[POSTS.JS] Total de posts:', window.INITIAL_POSTS.length);
   console.log('[POSTS.JS] Chamando renderPosts()...');
-  
+
   // Renderizar posts iniciais
   renderPosts();
-  
+
   console.log('[POSTS.JS] renderPosts() executado');
+
+  // ============================================================
+  // ETAPA 4 — Galerias de assets (logos + references) + Lightbox
+  // + Upload estruturado (usage_type + usage_description por imagem)
+  // ============================================================
+
+  const orgAssetsState = {
+    logos: [],
+    references: [],
+    selectedLogoIds: new Set(),
+    selectedRefIds: new Set(),
+    loaded: false,
+  };
+
+  // Cada uploaded image: {file, dataUrl, name, usageType, usageDescription}
+  const uploadedImagesState = [];
+
+  const USAGE_TYPES = [
+    { value: '', label: 'Selecione o tipo de uso...' },
+    { value: 'produto', label: 'Produto (manter fiel ao original)' },
+    { value: 'pessoa', label: 'Pessoa / Speaker' },
+    { value: 'cenario', label: 'Cenario / Lugar' },
+    { value: 'referencia_estilo', label: 'Referencia de estilo' },
+    { value: 'icone', label: 'Icone / Elemento grafico' },
+    { value: 'fundo', label: 'Fundo / Textura' },
+    { value: 'outro', label: 'Outro' },
+  ];
+
+  async function loadOrgAssets() {
+    if (orgAssetsState.loaded) return;
+    try {
+      const resp = await fetch('/posts/api/org-assets/?type=all', {
+        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        credentials: 'same-origin',
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      orgAssetsState.logos = data.logos || [];
+      orgAssetsState.references = data.references || [];
+      orgAssetsState.loaded = true;
+      renderLogosGallery();
+      renderReferencesGallery();
+    } catch (err) {
+      console.error('[ETAPA4] Falha ao carregar org-assets:', err);
+      const containers = ['orgLogosGallery', 'orgRefsGallery'];
+      containers.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<div class="asset-gallery-loading">Erro ao carregar.</div>';
+      });
+    }
+  }
+
+  function renderLogosGallery() {
+    const container = document.getElementById('orgLogosGallery');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!orgAssetsState.logos.length) {
+      const empty = document.createElement('div');
+      empty.className = 'asset-gallery-loading';
+      empty.textContent = container.dataset.emptyText || 'Sem logos.';
+      container.appendChild(empty);
+      return;
+    }
+    orgAssetsState.logos.forEach((logo) => {
+      const thumb = buildAssetThumb({
+        id: logo.id,
+        url: logo.url,
+        title: logo.name,
+        badge: logo.is_primary ? 'principal' : logo.logo_type,
+        selectedSet: orgAssetsState.selectedLogoIds,
+      });
+      container.appendChild(thumb);
+    });
+  }
+
+  function renderReferencesGallery() {
+    const container = document.getElementById('orgRefsGallery');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!orgAssetsState.references.length) {
+      const empty = document.createElement('div');
+      empty.className = 'asset-gallery-loading';
+      empty.textContent = container.dataset.emptyText || 'Sem referencias.';
+      container.appendChild(empty);
+      return;
+    }
+    orgAssetsState.references.forEach((ref) => {
+      const thumb = buildAssetThumb({
+        id: ref.id,
+        url: ref.url,
+        title: ref.title || ref.description || 'referencia',
+        badge: '',
+        selectedSet: orgAssetsState.selectedRefIds,
+      });
+      container.appendChild(thumb);
+    });
+  }
+
+  function buildAssetThumb({ id, url, title, badge, selectedSet }) {
+    const div = document.createElement('div');
+    div.className = 'asset-thumb';
+    div.dataset.id = String(id);
+    div.title = title || '';
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = title || '';
+    img.loading = 'lazy';
+    div.appendChild(img);
+
+    if (badge) {
+      const b = document.createElement('span');
+      b.className = 'asset-badge';
+      b.textContent = badge;
+      div.appendChild(b);
+    }
+
+    const check = document.createElement('span');
+    check.className = 'asset-check';
+    check.textContent = '✓';
+    div.appendChild(check);
+
+    // Toggle selecao no click; double-click abre lightbox.
+    let clickTimer = null;
+    div.addEventListener('click', (e) => {
+      // Se o user clicou diretamente na img com shift/alt, abre lightbox
+      if (e.shiftKey || e.altKey) {
+        openLightbox(url);
+        return;
+      }
+      // Single click = toggle; dblclick = lightbox
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+        openLightbox(url);
+        return;
+      }
+      clickTimer = setTimeout(() => {
+        clickTimer = null;
+        if (selectedSet.has(id)) {
+          selectedSet.delete(id);
+          div.classList.remove('selected');
+        } else {
+          selectedSet.add(id);
+          div.classList.add('selected');
+        }
+      }, 220);
+    });
+
+    return div;
+  }
+
+  // ---- Lightbox ------------------------------------------------------
+
+  function openLightbox(url) {
+    const lb = document.getElementById('imageLightbox');
+    const img = document.getElementById('imageLightboxImg');
+    if (!lb || !img || !url) return;
+    img.src = url;
+    lb.classList.add('open');
+  }
+
+  function closeLightbox() {
+    const lb = document.getElementById('imageLightbox');
+    if (lb) lb.classList.remove('open');
+  }
+
+  function attachLightboxHandlers() {
+    const lb = document.getElementById('imageLightbox');
+    if (!lb) return;
+    const closeBtn = lb.querySelector('.lb-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeLightbox);
+    lb.addEventListener('click', (e) => {
+      if (e.target === lb) closeLightbox();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && lb.classList.contains('open')) closeLightbox();
+    });
+  }
+
+  // ---- Upload estruturado --------------------------------------------
+
+  function renderUploadedImages() {
+    const container = dom.refImgsPreview;
+    if (!container) return;
+    container.innerHTML = '';
+    uploadedImagesState.forEach((item, idx) => {
+      const card = document.createElement('div');
+      card.className = 'uploaded-image-card';
+
+      const thumb = document.createElement('div');
+      thumb.className = 'uic-thumb';
+      thumb.title = 'Click para ampliar';
+      const img = document.createElement('img');
+      img.src = item.dataUrl;
+      img.alt = item.name;
+      thumb.appendChild(img);
+      thumb.addEventListener('click', () => openLightbox(item.dataUrl));
+      card.appendChild(thumb);
+
+      const fields = document.createElement('div');
+      fields.className = 'uic-fields';
+
+      const headRow = document.createElement('div');
+      headRow.className = 'uic-row';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'uic-name';
+      nameSpan.textContent = item.name;
+      headRow.appendChild(nameSpan);
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'uic-remove';
+      removeBtn.title = 'Remover';
+      removeBtn.innerHTML = '&times;';
+      removeBtn.addEventListener('click', () => removeUploadedImage(idx));
+      headRow.appendChild(removeBtn);
+      fields.appendChild(headRow);
+
+      const typeSelect = document.createElement('select');
+      USAGE_TYPES.forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = t.value;
+        opt.textContent = t.label;
+        if (t.value === item.usageType) opt.selected = true;
+        typeSelect.appendChild(opt);
+      });
+      typeSelect.addEventListener('change', (e) => {
+        uploadedImagesState[idx].usageType = e.target.value;
+      });
+      fields.appendChild(typeSelect);
+
+      const ta = document.createElement('textarea');
+      ta.placeholder = 'Descreva como usar essa imagem (ex: produto que deve aparecer fielmente, foto do palestrante...)';
+      ta.value = item.usageDescription || '';
+      ta.rows = 2;
+      ta.maxLength = 300;
+      ta.addEventListener('input', (e) => {
+        uploadedImagesState[idx].usageDescription = e.target.value;
+      });
+      fields.appendChild(ta);
+
+      card.appendChild(fields);
+      container.appendChild(card);
+    });
+  }
+
+  function removeUploadedImage(idx) {
+    uploadedImagesState.splice(idx, 1);
+    // Re-sincroniza com o input file
+    const dt = new DataTransfer();
+    uploadedImagesState.forEach((it) => dt.items.add(it.file));
+    if (dom.refImgs) dom.refImgs.files = dt.files;
+    renderUploadedImages();
+    if (typeof updateRefsInfo === 'function') updateRefsInfo();
+  }
+
+  // Substitui o showImagePreviews antigo: quando o user escolhe arquivos,
+  // populamos uploadedImagesState e renderizamos cards estruturados.
+  function ingestUploadedFiles(files) {
+    uploadedImagesState.length = 0;
+    let pending = files.length;
+    if (!pending) {
+      renderUploadedImages();
+      return;
+    }
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        uploadedImagesState.push({
+          file,
+          dataUrl: e.target.result,
+          name: file.name,
+          usageType: '',
+          usageDescription: '',
+        });
+        pending -= 1;
+        if (pending === 0) renderUploadedImages();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Listener no input — captura mudancas e renderiza cards estruturados
+  if (dom.refImgs) {
+    dom.refImgs.addEventListener('change', () => {
+      const files = Array.from(dom.refImgs.files || []);
+      ingestUploadedFiles(files);
+    });
+  }
+
+  // Expoe state pro form submit handler ler (ver requestPostFromAgent)
+  window.__ETAPA4_STATE__ = {
+    orgAssetsState,
+    uploadedImagesState,
+    getRefsUsageDescription: () =>
+      document.getElementById('refsUsageDescription')?.value.trim() || '',
+  };
+
+  // Bootstrap: carrega galerias e ativa lightbox
+  attachLightboxHandlers();
+  loadOrgAssets();
 
 })();

@@ -226,6 +226,21 @@ class Post(models.Model):
         verbose_name='Slides (carrossel)',
         help_text='Lista de slides com title/subtitle/image_prompt para carrossel'
     )
+
+    # Contexto extra da pipeline local: logos e references selecionados da KB,
+    # descricao geral de uso. Usado por Claude (texto) e Gemini (imagem).
+    # Schema:
+    #   {
+    #     'selected_logo_ids': [1, 2],
+    #     'selected_reference_ids': [42],
+    #     'references_usage_description': 'texto livre'
+    #   }
+    local_pipeline_context = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Contexto pipeline local',
+        help_text='Logos/refs selecionados + descricao de uso (somente pipeline local)'
+    )
     
     # Status e aprovação
     status = models.CharField(

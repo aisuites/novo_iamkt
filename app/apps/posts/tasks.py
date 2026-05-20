@@ -66,11 +66,22 @@ def generate_post_text_task(self, post_id: int):
         'aspect_ratio': '1:1',
     }
 
-    # Logos da KB (passados como URLs para o prompt)
-    logo_urls = list(_logos_from_org(post.organization))
+    # Logos da KB (filtrados pelos selecionados, se houver)
+    logo_urls = list(_logos_from_org(post.organization, post=post))
 
-    # Reference images do Post (PostReferenceImage)
+    # Reference images do Post (PostReferenceImage) + descricao geral
     reference_images = list(_reference_images_from_post(post))
+    ctx = post.local_pipeline_context or {}
+    refs_usage_general = ctx.get('references_usage_description', '') or ''
+
+    # Anexa observacao geral como linha extra na primeira referencia, OU
+    # passa via knowledge_base_summary se nao houver refs (mais facil para o LLM)
+    if refs_usage_general:
+        kb_summary = (
+            f'{kb_summary}\n\n'
+            f'== Observacao sobre uso das referencias visuais ==\n'
+            f'{refs_usage_general}'
+        )
 
     try:
         result = generate_post_text(
@@ -201,13 +212,22 @@ def _format_to_dict(post_format) -> dict:
     }
 
 
-def _logos_from_org(organization):
-    """Retorna URLs dos logos cadastrados na KB da org."""
+def _logos_from_org(organization, post=None):
+    """
+    Retorna URLs dos logos cadastrados na KB da org.
+    Se post tiver local_pipeline_context.selected_logo_ids, filtra.
+    """
     from apps.knowledge.models import KnowledgeBase, Logo
     kb = KnowledgeBase.objects.filter(organization=organization).first()
     if not kb:
         return []
-    return [l.s3_url for l in Logo.objects.filter(knowledge_base=kb) if l.s3_url]
+    qs = Logo.objects.filter(knowledge_base=kb)
+    if post is not None:
+        ctx = post.local_pipeline_context or {}
+        selected_ids = ctx.get('selected_logo_ids') or []
+        if selected_ids:
+            qs = qs.filter(id__in=selected_ids)
+    return [l.s3_url for l in qs if l.s3_url]
 
 
 def _reference_images_from_post(post):
@@ -273,6 +293,17 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     publico_alvo = (kb.publico_externo if kb else '') or ''
     marketing_input_summary = _kb_summary_marketing(kb)
     formato_px = _formato_px(post)
+
+    # Etapa 4: descricao geral de uso das refs entra no resumo da marca
+    # (Gemini le como contexto adicional do briefing)
+    ctx = post.local_pipeline_context or {}
+    refs_usage_general = ctx.get('references_usage_description', '') or ''
+    if refs_usage_general:
+        marketing_input_summary = (
+            f'{marketing_input_summary}\n\n'
+            f'OBSERVACAO sobre uso das imagens de referencia anexadas: '
+            f'{refs_usage_general}'
+        )
 
     try:
         result = generate_post_image(
@@ -404,14 +435,27 @@ def _collect_references(kb, post) -> list:
     """
     Coleta logos, reference images da KB e PostReferenceImage como lista de
     dicts {tipo, url} com presigned URLs validas por 24h.
+
+    Respeita post.local_pipeline_context:
+      - selected_logo_ids: se vazio, usa todos; se preenchido, filtra
+      - selected_reference_ids: se vazio, NENHUMA ref da KB e usada (so
+        as do post); se preenchido, filtra
     """
     from apps.core.services.s3_service import S3Service
+
+    ctx = post.local_pipeline_context or {}
+    selected_logo_ids = set(ctx.get('selected_logo_ids') or [])
+    selected_ref_ids = set(ctx.get('selected_reference_ids') or [])
+
     out = []
 
     if kb:
-        # Logos
+        # Logos — filtra por selecionados (se houver selecao), senao usa todos
         try:
-            for logo in kb.logos.all().order_by('-is_primary', 'logo_type'):
+            qs_logos = kb.logos.all().order_by('-is_primary', 'logo_type')
+            for logo in qs_logos:
+                if selected_logo_ids and logo.id not in selected_logo_ids:
+                    continue
                 if logo.s3_key:
                     try:
                         url = S3Service.generate_presigned_download_url(
@@ -423,21 +467,24 @@ def _collect_references(kb, post) -> list:
         except Exception:
             pass
 
-        # KB references
-        try:
-            for img in kb.reference_images.all():
-                if img.s3_key:
-                    try:
-                        url = S3Service.generate_presigned_download_url(
-                            img.s3_key, expires_in=86400
-                        )
-                        out.append({'tipo': 'referencia_kb', 'url': url})
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        # KB references — somente as selecionadas (se nada selecionado, usa
+        # NENHUMA da KB pra evitar poluir o prompt)
+        if selected_ref_ids:
+            try:
+                qs_refs = kb.reference_images.filter(id__in=selected_ref_ids)
+                for img in qs_refs:
+                    if img.s3_key:
+                        try:
+                            url = S3Service.generate_presigned_download_url(
+                                img.s3_key, expires_in=86400
+                            )
+                            out.append({'tipo': 'referencia_kb', 'url': url})
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
-    # Post-specific references
+    # Post-specific references (uploads recentes — sempre incluidos)
     try:
         for ref in post.reference_image_files.all():
             if ref.s3_key:
@@ -445,7 +492,8 @@ def _collect_references(kb, post) -> list:
                     url = S3Service.generate_presigned_download_url(
                         ref.s3_key, expires_in=86400
                     )
-                    out.append({'tipo': 'referencia_post', 'url': url})
+                    tipo = (ref.usage_type or 'referencia_post').strip().lower() or 'referencia_post'
+                    out.append({'tipo': tipo, 'url': url})
                 except Exception:
                     pass
     except Exception:
