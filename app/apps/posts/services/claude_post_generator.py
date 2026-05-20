@@ -8,12 +8,19 @@ cta_text — mesmo schema esperado pelo callback /posts/webhook/callback/.
 
 Pricing Sonnet 4.5: $3/M input + $15/M output. Sistema usa prompt caching
 no system message para reduzir custo de input em ~90% em chamadas subsequentes.
+
+Tambem expoe analyze_product_image() que faz Claude Vision analisar a foto
+do produto e retornar descricao estruturada para alimentar o prompt do
+Gemini (tecnica de "subject preservation" — bracket-naming + negative-naming
++ lista KEEP_UNCHANGED).
 """
 
+import base64
 import json
 import logging
 import os
 import re
+import urllib.request
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -41,9 +48,21 @@ PRINCIPIOS:
 2. CTA: se cta_requested=true, gere cta_text natural (max 8 palavras). Se false, cta_text=""
 3. Hashtags: 5 a 12 hashtags relevantes EM PORTUGUES, retorne array de strings JA
    COM o caractere # no inicio. Ex: ["#produtividade", "#homeoffice", "#dicas"]
-4. image_prompt (em PORTUGUES): descricao DETALHADA da cena/composicao para o gerador.
-   - Mencione paleta, mood, iluminacao, enquadramento, presenca de pessoas/produtos
-   - NAO mencione textos a serem renderizados na imagem (isso e papel do title/subtitle)
+4. image_prompt (em PORTUGUES): descricao da CENA/AMBIENTE em volta do produto.
+   - Mencione apenas: ambiente, mood, iluminacao, enquadramento, elementos
+     secundarios (ex: ingredientes, plantas, objetos contextuais)
+   - NAO mencione o nome da marca nem o nome/modelo do produto (ex: nao escreva
+     "Thermomix em cor branca" ou "iPhone na mesa") — o produto vem da imagem
+     anexada como referencia visual; descrever ele em palavras gera conflito
+     com a imagem real (cor, modelo, formato podem nao bater)
+   - NAO descreva cores, formatos ou detalhes do produto (a imagem anexada e
+     a source of truth, vc nao tem acesso a ela)
+   - NAO mencione textos a serem renderizados na imagem (isso e papel do
+     title/subtitle)
+   - Em vez de "destaque para o Thermomix em cor branca em cozinha minimalista",
+     escreva "destaque para o produto principal em uma cozinha minimalista de
+     bancada clara, com ingredientes frescos coloridos ao redor, luz natural
+     suave"
 5. visual_brief (em PORTUGUES): instrucao curta (1-2 frases) sobre como aplicar
    a marca no visual (logo, cores, key visual). Complementa o image_prompt.
 6. title: max 60 chars, impactante, em portugues
@@ -253,3 +272,138 @@ def _extract_usage(resp: Any) -> Dict[str, Any]:
         'total_tokens': in_tokens + out_tokens,
         'cost_usd': float(cost),
     }
+
+
+# ============================================================
+# ANALISE VISUAL DE PRODUTO (Vision) — para forcar fidelidade no Gemini
+# ============================================================
+
+PRODUCT_ANALYSIS_SYSTEM = """Voce e um especialista em catalogacao visual de produtos.
+Analise a imagem anexada (uma foto de produto) e retorne JSON estruturado
+descrevendo o produto com PRECISAO. Foco em features VISUAIS distintivas
+que diferenciam este modelo especifico de outros modelos similares.
+
+REGRAS:
+1. Identifique nome/modelo se for possivel pela visualizacao (ex: "Thermomix TM7
+   modelo 2024", "iPhone 15 Pro Max", "Cafeteira Nespresso Vertuo"). Se nao
+   conseguir identificar com seguranca, descreva o tipo generico ("robot de
+   cozinha multifuncional", "smartphone premium", etc.) — nao invente.
+2. Lista de features DISTINTIVAS visuais — coisas que se vc trocasse este
+   produto por um similar antigo/novo, a pessoa NOTARIA. Ex: "display tablet
+   horizontal de ~10 polegadas SEPARADO do bowl", nao "tem display" generico.
+3. Cores observadas com precisao (hex aproximado quando possivel).
+4. Lista keep_unchanged: features que NUNCA podem mudar ao recompor o produto
+   em uma nova cena.
+5. Se reconhecer o modelo, liste em negative_examples versoes similares com as
+   quais o gerador de imagem comumente confunde (ex: TM7 vs TM6).
+
+FORMATO DE SAIDA (JSON puro, sem markdown):
+{
+  "product_name": "string — nome especifico se identificavel, senao tipo generico",
+  "product_variant_note": "string — observacao breve sobre modelo/versao",
+  "distinctive_features": ["lista de descricoes visuais detalhadas"],
+  "color_palette_observed": ["#RRGGBB descricao"],
+  "keep_unchanged_list": ["lista de features que nao podem ser alteradas"],
+  "negative_examples": ["NOT <modelo similar>: <diferenca chave>"]
+}
+
+Tudo em PORTUGUES. Retorne APENAS o JSON."""
+
+
+def analyze_product_image(
+    image_bytes: bytes,
+    mime_type: str = 'image/png',
+    brand_context: str = '',
+) -> Dict[str, Any]:
+    """
+    Analisa visualmente uma foto de produto com Claude Sonnet 4.5 Vision
+    e retorna descricao estruturada para alimentar o prompt do Gemini.
+
+    brand_context: string opcional indicando empresa/segmento da KB (ex:
+    "Thermomix — fabricante de robos de cozinha multifuncionais Vorwerk").
+    Ajuda Claude a identificar com mais precisao a versao/modelo exata
+    do produto na imagem.
+
+    Retorna dict com:
+      - structured: dict com {product_name, distinctive_features, ...}
+      - usage: dict com tokens e custo
+      - model: nome do modelo
+
+    Custo: ~$0.005 por chamada (Sonnet 4.5 com 1 imagem + ~300 tokens out).
+    """
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        raise RuntimeError('ANTHROPIC_API_KEY ausente no ambiente')
+
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+
+    b64 = base64.b64encode(image_bytes).decode('ascii')
+    if mime_type not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
+        mime_type = 'image/png'
+
+    user_intro = (
+        'Analise este produto e retorne o JSON conforme instrucoes do system '
+        'prompt.'
+    )
+    if brand_context:
+        user_intro += (
+            f'\n\nCONTEXTO DA MARCA (para ajudar na identificacao): '
+            f'{brand_context}'
+        )
+
+    resp = client.messages.create(
+        model=MODEL,
+        max_tokens=1500,
+        system=PRODUCT_ANALYSIS_SYSTEM,
+        messages=[{
+            'role': 'user',
+            'content': [
+                {
+                    'type': 'image',
+                    'source': {
+                        'type': 'base64',
+                        'media_type': mime_type,
+                        'data': b64,
+                    },
+                },
+                {
+                    'type': 'text',
+                    'text': user_intro,
+                },
+            ],
+        }, {
+            'role': 'assistant',
+            'content': '{',  # prefill para forcar JSON
+        }],
+    )
+
+    raw = '{' + ''.join(
+        blk.text for blk in resp.content if getattr(blk, 'type', None) == 'text'
+    )
+    structured = _parse_json(raw) or {}
+
+    usage = _extract_usage(resp)
+    return {
+        'structured': structured,
+        'raw_text': raw,
+        'usage': usage,
+        'model': MODEL,
+    }
+
+
+def download_image_bytes(url: str) -> tuple:
+    """Baixa imagem (presigned URL) e retorna (bytes, mime_type)."""
+    try:
+        req = urllib.request.Request(
+            url, headers={'User-Agent': 'Mozilla/5.0 IAMKT'}
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = resp.read()
+            ct = resp.headers.get('Content-Type', 'image/png').split(';')[0].strip()
+    except Exception as exc:
+        logger.warning('Falha ao baixar %s: %s', url[:80], exc)
+        return None, 'image/png'
+    if ct not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
+        ct = 'image/png'
+    return data, ct

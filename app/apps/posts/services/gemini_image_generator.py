@@ -23,6 +23,17 @@ GEMINI_ENDPOINT = (
     f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent'
 )
 
+# Override opcional do modelo via env (ex: para testar Nano Banana sem mudar
+# codigo). Settings: GEMINI_IMAGE_MODEL=gemini-2.5-flash-image-preview
+def _resolved_endpoint() -> tuple:
+    """Retorna (model, endpoint) respeitando override de env."""
+    model = os.environ.get('GEMINI_IMAGE_MODEL', GEMINI_MODEL)
+    endpoint = (
+        f'https://generativelanguage.googleapis.com/v1beta/models/'
+        f'{model}:generateContent'
+    )
+    return model, endpoint
+
 # Custo estimado (valor pode ser ajustado conforme pricing oficial).
 COST_PER_IMAGE_USD = Decimal('0.04')
 
@@ -72,11 +83,24 @@ def generate_post_image(
     publico_alvo: str,
     marketing_input_summary: str,
     formato_px: str,
+    product_analyses: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
-    Gera UMA imagem final para o post via Gemini 3 Pro Image.
+    Gera UMA imagem final para o post via Gemini 3 Pro Image, usando
+    tecnicas de subject preservation pesquisadas:
+
+      1. Imagens BEFORE text no array `contents` (modelo "ancora" visual)
+      2. Frame como EDIT, nao generate
+      3. Nome unico inventado pro produto ("THIS_PRODUCT")
+      4. Lista KEEP_UNCHANGED vs CHANGE/ADD explicita
+      5. Bracket-naming + negative-naming (do Claude Vision)
+      6. Reference + Relationship + Scenario framework
+      7. temperature=0.5
 
     references: lista de dicts {url, tipo} (urls presigned do S3)
+    product_analyses: lista de dicts vindos do Claude Vision com
+        {product_name, distinctive_features, keep_unchanged_list, ...}
+        — um por imagem com tipo='produto'. Ordem importa.
 
     Retorna:
         {
@@ -104,7 +128,7 @@ def generate_post_image(
                 'inline_data': {'mime_type': mime, 'data': b64}
             })
 
-    # 2. Monta texto do prompt (replica logica do node N8N "Code in JavaScript4")
+    # 2. Monta texto do prompt — inclui analises do produto se houver
     prompt_text = _build_prompt_text(
         post=post,
         sorted_refs=sorted_refs,
@@ -113,23 +137,26 @@ def generate_post_image(
         publico_alvo=publico_alvo,
         marketing_input_summary=marketing_input_summary,
         formato_px=formato_px,
+        product_analyses=product_analyses or [],
     )
 
-    # 3. Monta payload Gemini
+    # 3. Monta payload Gemini — IMAGENS PRIMEIRO, depois texto (subject anchor)
     payload = {
         'contents': [{
-            'parts': [{'text': prompt_text}] + image_parts,
+            'parts': image_parts + [{'text': prompt_text}],
         }],
         'generationConfig': {
             'responseModalities': ['IMAGE', 'TEXT'],
             'candidateCount': 1,
+            'temperature': 0.5,
         },
     }
 
     # 4. Chamada HTTP
+    model_used, endpoint = _resolved_endpoint()
     body = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(
-        GEMINI_ENDPOINT,
+        endpoint,
         data=body,
         method='POST',
         headers={
@@ -158,7 +185,7 @@ def generate_post_image(
         'png_bytes': png_bytes,
         'mime_type': mime_type,
         'cost_usd': float(COST_PER_IMAGE_USD),
-        'model': GEMINI_MODEL,
+        'model': model_used,
         'usage': response_json.get('usageMetadata', {}),
         'prompt_text': prompt_text,
     }
@@ -202,129 +229,72 @@ def _build_prompt_text(
     publico_alvo: str,
     marketing_input_summary: str,
     formato_px: str,
+    product_analyses: List[Dict[str, Any]],
 ) -> str:
-    """Reproduz o prompt textual do N8N Code in JavaScript4 (gerarimagem)."""
-    # Conta tipos
-    counts: Dict[str, int] = {}
-    product_positions: List[int] = []   # 1-based positions de produtos anexados
+    """
+    Prompt SIMPLES — confia na dereferenciacao por imagem ("o produto da
+    imagem N anexada"). Sem nomes, sem KEEP_UNCHANGED extenso, sem
+    bracket/negative naming. Inspirado em prompts curtos de catalogo
+    e lifestyle que funcionam bem com Gemini.
+
+    product_analyses fica como argumento mas e ignorado nesta versao
+    (mantido para compatibilidade — pode ser util em futuras iteracoes).
+    """
+    # Mapeia tipo -> linha descritiva curta
+    refs_lines: List[Tuple[int, str]] = []
     for i, ref in enumerate(sorted_refs, 1):
-        t = str(ref.get('tipo', 'desconhecido')).lower()
-        counts[t] = counts.get(t, 0) + 1
-        if 'produto' in t:
-            product_positions.append(i)
+        tipo = str(ref.get('tipo', 'desconhecido')).lower()
+        if 'logo' in tipo:
+            refs_lines.append((i, f'IMAGEM {i}: logotipo da marca — aplicar exatamente como aparece (sem distorcer, sem mudar cor)'))
+        elif 'produto' in tipo:
+            refs_lines.append((i, f'IMAGEM {i}: o produto principal — use exatamente como aparece (mesmas cores, mesmo formato, mesmos detalhes)'))
+        elif 'pessoa' in tipo:
+            refs_lines.append((i, f'IMAGEM {i}: pessoa — usar exatamente como aparece (mesmo rosto, mesma aparencia)'))
+        elif 'fundo' in tipo or 'background' in tipo:
+            refs_lines.append((i, f'IMAGEM {i}: textura/fundo de referencia'))
+        elif 'icone' in tipo:
+            refs_lines.append((i, f'IMAGEM {i}: elemento grafico/icone'))
+        else:
+            refs_lines.append((i, f'IMAGEM {i}: referencia visual (inspiracao de estilo, fotografia, iluminacao — nao copiar textos)'))
 
-    running: Dict[str, int] = {}
-
-    attachments_lines = []
-    if sorted_refs:
-        attachments_lines.append('\n\n### IMAGENS ANEXADAS (na ordem exata)')
-        for i, ref in enumerate(sorted_refs, 1):
-            tipo = str(ref.get('tipo', 'desconhecido')).lower()
-            running[tipo] = running.get(tipo, 0) + 1
-            label = tipo.replace('_', ' ').replace('-', ' ').upper()
-            n = running[tipo]
-            total = counts[tipo]
-            rule = USAGE_RULES_BY_TYPE.get(tipo) or _infer_rule(tipo)
-            counter = f'#{n}/{total}' if total > 1 else ''
-            attachments_lines.append(f'{i}) {label} {counter} — {rule}')
-    attachments_text = '\n'.join(attachments_lines)
-
-    # Bloco extra de FIDELIDADE quando ha produtos anexados — instrucao
-    # MUITO explicita para o Gemini nao "reinterpretar" o produto.
-    product_fidelity_block = ''
-    if product_positions:
-        positions_str = ', '.join(f'#{p}' for p in product_positions)
-        product_fidelity_block = (
-            '\n\n### REGRA CRITICA — FIDELIDADE AO PRODUTO\n'
-            f'As imagens anexadas nas posicoes {positions_str} sao do PRODUTO real '
-            'que deve aparecer na arte final.\n'
-            'OBRIGATORIO — o produto na imagem gerada deve ser IDENTICO ao da '
-            'imagem anexada:\n'
-            '- Mesmo formato, mesmas proporcoes, mesma silhueta exata\n'
-            '- Mesma cor (NAO mudar tonalidade, NAO trocar cores)\n'
-            '- Mesmo display/tela (se houver, copie o que aparece nele)\n'
-            '- Mesmo logo no produto (NUNCA alterar)\n'
-            '- Mesmos detalhes mecanicos, botoes, texturas\n'
-            'NAO redesenhe o produto. NAO crie uma versao "inspirada" no produto. '
-            'A imagem do produto e LITERAL — voce so deve recontextualiza-lo no '
-            'cenario da cena (ambiente, iluminacao, composicao ao redor podem '
-            'variar conforme o briefing, mas o produto em si NAO).\n'
-            'Se houver duvida entre "ser fiel ao produto" e "seguir a descricao '
-            'da cena", PRIORIZE a fidelidade ao produto.'
-        )
+    attachments_text = '\n'.join(line for _, line in refs_lines)
 
     parts = [
-        'Voce e um diretor de arte senior e designer de social media.',
+        '# TAREFA',
+        'Crie uma fotografia profissional para um post de rede social.',
         '',
-        'Crie UMA imagem final (sem variacoes) para um post de rede social, '
-        'pronta para publicacao.',
+        '# REFERENCIAS VISUAIS (anexadas ACIMA deste texto, na ordem)',
         attachments_text,
-        product_fidelity_block,
         '',
-        '### BRIEFING',
+        '# CENA',
+        post.image_prompt or '(propor um cenario adequado ao briefing)',
+        '',
+        '# TEXTO QUE DEVE APARECER NA ARTE',
+        f'- Titulo: {post.title or ""}',
+        f'- Subtitulo: {post.subtitle or ""}',
+    ]
+    if post.cta:
+        parts.append(f'- CTA: {post.cta}')
+
+    parts.extend([
+        '',
+        '# BRIEFING',
         f'- Rede social: {post.social_network or "instagram"}',
         f'- Formato (px): {formato_px}',
         f'- Publico-alvo: {publico_alvo or "geral"}',
-        f'- Perfil/identidade da empresa (resumo): {marketing_input_summary or "(sem resumo)"}',
         '',
-        '### TEXTO QUE DEVE APARECER NA ARTE (copie exatamente)',
-        f'- Titulo (principal): {post.title or ""}',
-        f'- Subtitulo (secundario): {post.subtitle or ""}',
-        f'- CTA (opcional): {post.cta or ""} (se vazio, nao usar)',
-        '',
-        '### ANALISE DAS IMAGENS DE REFERENCIA',
-        '- Analise as imagens de referencia e extraia delas quais sao os elementos '
-        'graficos utilizados como linhas, circulos ou semi-circulos e degrades. '
-        'SEJA FIEL! NAO INVENTE!',
-        '- Analise fotografia, iluminacao e enquadramento.',
-        '- Analise o estilo da tipografia utilizada.',
-        '- Analise o background e estilo das imagens.',
-        '- Analise os alinhamentos e espacamento dos textos.',
-        '- Analise o posicionamento do logotipo.',
-        '- SEGUINDO FIELMENTE OS ITENS ANALISADOS CRIE UM KEY VISUAL PARA SER '
-        'APLICADO NA GERACAO DE NOVAS IMAGENS.',
-        '',
-        '### IMAGEM / CENA',
-        post.image_prompt or '(sem prompt especifico)',
-        '',
-        'ADAPTE A DESCRICAO DA IMAGEM/CENA PARA O KEY VISUAL DESENVOLVIDO COM '
-        'BASE NAS IMAGENS DE REFERENCIA para que o resultado final seja fiel as '
-        'referencias, mantendo composicao, cores, posicionamento de textos e '
-        'logos, alinhamento de texto, utilizacao de elementos graficos como '
-        'degrades, linhas, circulos ou semi-circulos de background. Isso e uma '
-        'premissa de criacao, obrigatorio. Entao, mesmo que a descricao da imagem '
-        'seja diferente das imagens de referencia voce deve ter como regra de '
-        'ouro as imagens de referencia, pegando da descricao de imagem/cena '
-        'apenas a essencia da ideia e nada de layout. Lembre-se de manter TODOS '
-        'OS ELEMENTOS graficos que sao considerados key visual. NUNCA acrescente '
-        'nenhum elemento visual que nao faca parte das imagens de referencia.',
-        '',
-        '### DIRETRIZES DE MARCA',
-        f'- Paleta: {json.dumps(paleta, ensure_ascii=False)}',
+        '# DIRETRIZES',
+        f'- Paleta da marca para textos: {json.dumps(paleta, ensure_ascii=False)}',
         f'- Tipografia: {json.dumps(tipografia, ensure_ascii=False)}',
-        f'- Visual brief: {getattr(post, "visual_brief", "") or "(sem visual_brief)"}',
-        '- SEJA FIEL AO KEY VISUAL IDENTIFICADO NAS IMAGENS DE REFERENCIA. NAO '
-        'INVENTE ELEMENTOS. PREMISSA OBRIGATORIA.',
-        '- Legibilidade alta para celular.',
-        '- Nao inventar dados.',
-        '- Nao invente elementos graficos que nao foram apresentados nas referencias.',
-        '- Verifique se nas referencias ha pessoas; se nao houver, nao utilize.',
-        '- Nao copiar textos de imagens anexadas.',
-        '- Se houver imagens do tipo LOGO, aplicar fielmente.',
-        '- Use os posicionamentos e espacamento de texto das referencias como guia.',
+        '- Aplique paleta e tipografia somente nos textos do post — nao nos elementos anexados.',
+        '- Nao copie textos visiveis nas imagens anexadas (sao referencia visual).',
+        '- Verifique presenca de pessoas nas referencias; se nao houver, nao adicione.',
         '',
-        '### QUALIDADE',
-        '- Sem artefatos',
-        '- Sem textos cortados',
-        '- Sem marca dagua',
-        '- Nao gerar mockup (e a arte final)',
-    ]
-    if product_positions:
-        parts.append(
-            '- PRODUTOS anexados devem aparecer FOTORREALISTAS e IDENTICOS ao '
-            'original anexado (verificar antes de gerar: formato, cores, '
-            'display, logos no produto, proporcao).'
-        )
+        '# QUALIDADE',
+        '- Fotorrealista, sem artefatos, sem textos cortados, sem marca dagua.',
+        '- Nao gerar mockup — esta e a arte final.',
+        '- Legibilidade alta para celular.',
+    ])
     parts.extend([
         '',
         'Gere a arte final agora.',

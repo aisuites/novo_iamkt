@@ -616,8 +616,46 @@ Post 57 (org 25 Colletivo Real):
 
 ### Refinos pós-validação (2026-05-20)
 - **Logo é single-select** (1 por post): galeria de logos agora deseleciona os outros ao escolher um novo. Backend defensivamente trunca `selected_logo_ids[:1]`. Hint atualizado no modal.
-- **Regra de fidelidade do produto reforçada** no prompt do Gemini:
-  - `TYPE_PRIORITY['produto'] = 1` (logo após o logo, antes de refs genéricas)
-  - Bloco extra `### REGRA CRITICA — FIDELIDADE AO PRODUTO` adicionado dinamicamente quando há refs `usage_type='produto'`. Lista as posições exatas das imagens-produto e exige: mesmo formato, mesma cor, mesmo display, mesmos logos no produto, sem reinterpretar.
-  - Item extra em `### QUALIDADE`: "PRODUTOS anexados devem aparecer FOTORREALISTAS e IDENTICOS ao original".
-- Limitação conhecida: Gemini 3 Pro Image **não tem fine-tuning** sobre produtos específicos. Mesmo com regras explícitas, pequenas variações de geometria/proporção podem ocorrer. Para fidelidade absoluta seria necessário Nano Banana com referência treinada ou modelo de difusão com ControlNet.
+
+### Iteração de fidelidade de produto (2026-05-20)
+
+**Problema observado:** Gemini regredia para modelos antigos (TM6 ao invés de TM7) por "name-as-anchor failure" — o nome "Thermomix" no prompt textual ativava priors do training data mais fortes que o sinal visual.
+
+**Caminhos testados (4 versões do mesmo post):**
+
+| Versão | Estratégia | Resultado |
+|--------|-----------|-----------|
+| v1 | Prompt básico, sem regras | TM6 (modelo antigo) |
+| v2 | + Bloco "REGRA CRÍTICA FIDELIDADE" + TYPE_PRIORITY[produto]=1 | Híbrido TM6/TM7 |
+| v3 | + Claude Vision com bracket-naming, KEEP_UNCHANGED, negative-naming | TM7-like mas com formato estranho |
+| v4 | Trocar para `nano-banana-pro-preview` | Regrediu para TM5 |
+| **v5** | **SIMPLIFICAÇÃO RADICAL** — sem Claude Vision, sem listas, sem citar marca no `image_prompt`. Apenas "o produto da IMAGEM N anexada" | **TM7 fiel** ✅ |
+
+**Lição:** simplicidade venceu. Toda a engenharia anterior (Claude Vision, bracket-naming, KEEP_UNCHANGED) **introduzia ruído**. O Gemini é melhor em **dereferenciação por imagem** ("o produto da imagem 2") do que em interpretar listas longas de specs.
+
+**Mudanças aplicadas:**
+
+1. **Gemini prompt simplificado** ([gemini_image_generator.py:_build_prompt_text](../app/apps/posts/services/gemini_image_generator.py)):
+   ```
+   # REFERENCIAS VISUAIS (anexadas ACIMA deste texto, na ordem)
+   IMAGEM 1: logotipo da marca — aplicar exatamente como aparece
+   IMAGEM 2: o produto principal — use exatamente como aparece (mesmas cores,
+            mesmo formato, mesmos detalhes)
+
+   # CENA
+   {image_prompt}
+   ```
+   Sem KEEP_UNCHANGED, sem bracket-naming, sem negative-naming, sem identificar produto pelo nome.
+
+2. **Claude (texto) não menciona marca/produto no `image_prompt`** ([claude_post_generator.py:SYSTEM_PROMPT](../app/apps/posts/services/claude_post_generator.py)):
+   - Antes: "destaque para o robô de cozinha Thermomix em cor branca..."
+   - Agora: "destaque para o produto principal em uma cozinha minimalista..."
+   - Eliminado conflito entre cor textual (Claude inventava) vs cor real da imagem.
+
+3. **Claude Vision desativado** (mantida função no código pra rollback rápido): economia de $0.005/post e -5s latência. Não traz benefício mensurável vs prompt simples.
+
+4. **Modelo mantido em `gemini-3-pro-image-preview`**: Nano Banana Pro regrediu pra TM5. Override via env var `GEMINI_IMAGE_MODEL` continua disponível pra testes.
+
+**Custo final por post:** ~$0.05 (texto + imagem). **Latência:** ~25-30s.
+
+**Limitação remanescente:** mesmo com simplicidade, ~10-15% dos casos podem ainda regredir para modelo similar do training data. Mitigação atual: usuário pode clicar "Gerar Imagem" novamente — preserva histórico e gera nova candidata.

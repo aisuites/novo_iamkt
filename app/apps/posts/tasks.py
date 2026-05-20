@@ -305,6 +305,12 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             f'{refs_usage_general}'
         )
 
+    # Etapa 4.16: desativado o Claude Vision em favor de dereferenciacao
+    # simples por imagem ("o produto da IMAGEM N"). Reduz custo (-$0.005/post)
+    # e elimina conflitos de descricao textual vs visual. A funcao
+    # _analyze_products_in_references continua disponivel para roll back rapido.
+    product_analyses = []
+
     try:
         result = generate_post_image(
             post=post,
@@ -314,6 +320,7 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             publico_alvo=publico_alvo,
             marketing_input_summary=marketing_input_summary,
             formato_px=formato_px,
+            product_analyses=product_analyses,
         )
     except Exception as exc:
         logger.exception('[posts.local] Falha Gemini post_id=%s', post_id)
@@ -374,6 +381,69 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
         's3_url': s3_url,
         'cost_usd': result.get('cost_usd'),
     }
+
+
+def _analyze_products_in_references(references, brand_context: str = '') -> list:
+    """
+    Para cada referencia com tipo contendo 'produto', baixa a imagem e
+    chama Claude Vision para gerar descricao estruturada (subject preservation).
+    brand_context: string descrevendo a marca/segmento (ajuda Claude a
+        identificar modelo/versao exato do produto).
+    Retorna lista de dicts (1 por produto, na mesma ordem em que aparecem
+    nas references), cada um com:
+      {product_name, distinctive_features, keep_unchanged_list, ...}
+
+    Custo: ~$0.005 por produto. Falhas individuais nao quebram a task
+    (descricao vazia entra como fallback no prompt).
+    """
+    from apps.posts.services.claude_post_generator import (
+        analyze_product_image, download_image_bytes,
+    )
+    analyses = []
+    for ref in references:
+        tipo = str(ref.get('tipo', '')).lower()
+        if 'produto' not in tipo:
+            continue
+        url = ref.get('url')
+        if not url:
+            analyses.append({})
+            continue
+        try:
+            img_bytes, mime = download_image_bytes(url)
+            if not img_bytes:
+                analyses.append({})
+                continue
+            result = analyze_product_image(
+                img_bytes, mime_type=mime, brand_context=brand_context,
+            )
+            analyses.append(result.get('structured') or {})
+            logger.info(
+                '[posts.local] product vision analysis: %s (%s tokens)',
+                (result.get('structured') or {}).get('product_name', '?'),
+                (result.get('usage') or {}).get('total_tokens', '?'),
+            )
+        except Exception:
+            logger.exception('[posts.local] Falha em analyze_product_image')
+            analyses.append({})
+    return analyses
+
+
+def _brand_context_for_vision(post) -> str:
+    """
+    Monta uma string curta com contexto da marca para ajudar Claude Vision
+    a identificar produto especifico (ex: 'Thermomix - robos de cozinha Vorwerk').
+    Usa nome_empresa + descricao_produto da KB se disponivel.
+    """
+    from apps.knowledge.models import KnowledgeBase
+    kb = KnowledgeBase.objects.filter(organization=post.organization).first()
+    if not kb:
+        return ''
+    parts = []
+    if kb.nome_empresa:
+        parts.append(kb.nome_empresa)
+    if kb.descricao_produto:
+        parts.append(kb.descricao_produto[:200])
+    return ' — '.join(parts)
 
 
 def _kb_colors(kb) -> list:
