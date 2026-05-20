@@ -311,6 +311,21 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     # _analyze_products_in_references continua disponivel para roll back rapido.
     product_analyses = []
 
+    # text_render_mode: 'inline' (default) | 'sanitized' | 'pillow'
+    # Pode ser sobrescrito via env (testes) ou local_pipeline_context (futuro UI).
+    import os as _os
+    text_render_mode = (
+        ctx.get('text_render_mode')
+        or _os.environ.get('POST_TEXT_RENDER_MODE', 'inline')
+    ).lower()
+
+    # brand_keywords: usado em mode='sanitized' para sanitizar nome
+    # da empresa/produto no texto enviado ao Gemini
+    brand_keywords = _brand_keywords_from_kb(kb)
+
+    # Smart Pillow overlay — prepara layout_spec, fonts e logo se mode='pillow'
+    pillow_kwargs = _prepare_pillow_overlay(post, kb, formato_px) if text_render_mode == 'pillow' else {}
+
     try:
         result = generate_post_image(
             post=post,
@@ -321,6 +336,9 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             marketing_input_summary=marketing_input_summary,
             formato_px=formato_px,
             product_analyses=product_analyses,
+            text_render_mode=text_render_mode,
+            brand_keywords=brand_keywords,
+            **pillow_kwargs,
         )
     except Exception as exc:
         logger.exception('[posts.local] Falha Gemini post_id=%s', post_id)
@@ -426,6 +444,118 @@ def _analyze_products_in_references(references, brand_context: str = '') -> list
             logger.exception('[posts.local] Falha em analyze_product_image')
             analyses.append({})
     return analyses
+
+
+def _prepare_pillow_overlay(post, kb, formato_px: str) -> dict:
+    """
+    Monta os argumentos opcionais do Smart Pillow Overlay:
+      - pillow_layout_spec: kb.brand_layout_spec (cached) OU wireframe
+        fallback baseado no aspect_ratio do PostFormat.
+      - pillow_title_font_path / pillow_subtitle_font_path: fontes resolvidas
+        via FontResolver (Typography da KB -> Google Font / CustomFont -> DejaVu)
+      - pillow_logo_url: presigned URL do logo selecionado (primeiro do
+        local_pipeline_context.selected_logo_ids, ou primary da KB)
+    """
+    from apps.posts.services.brand_layout_analyzer import analyze_brand_layout_from_references
+    from apps.posts.services.layout_wireframes import wireframe_for_aspect
+    from apps.posts.services.font_resolver import (
+        resolve_font_for_kb, system_dejavu_path,
+    )
+
+    out = {}
+
+    # ---- Layout spec --------------------------------------------------
+    spec = None
+    try:
+        spec = analyze_brand_layout_from_references(kb)
+    except Exception:
+        logger.exception('[posts.local] brand_layout_analyzer falhou — fallback wireframe')
+    if not spec:
+        aspect = ''
+        if post.post_format and post.post_format.aspect_ratio:
+            aspect = post.post_format.aspect_ratio
+        spec = wireframe_for_aspect(aspect, formato_px)
+        spec['source'] = 'wireframe_fallback'
+    else:
+        spec.setdefault('source', 'analyzed_from_references')
+    out['pillow_layout_spec'] = spec
+
+    # ---- Fontes -------------------------------------------------------
+    try:
+        out['pillow_title_font_path'] = (
+            resolve_font_for_kb(kb, usage_filter='titulo', weight='bold')
+            or system_dejavu_path('bold')
+        )
+    except Exception:
+        logger.exception('Erro resolvendo title font')
+        out['pillow_title_font_path'] = system_dejavu_path('bold')
+
+    try:
+        out['pillow_subtitle_font_path'] = (
+            resolve_font_for_kb(kb, usage_filter='corpo', weight='regular')
+            or resolve_font_for_kb(kb, usage_filter='texto', weight='regular')
+            or system_dejavu_path('regular')
+        )
+    except Exception:
+        logger.exception('Erro resolvendo subtitle font')
+        out['pillow_subtitle_font_path'] = system_dejavu_path('regular')
+
+    # ---- Logo URL -----------------------------------------------------
+    out['pillow_logo_url'] = _resolve_logo_url_for_overlay(post, kb)
+
+    return out
+
+
+def _resolve_logo_url_for_overlay(post, kb):
+    """Retorna presigned URL do logo selecionado pelo user (ou primario da KB)."""
+    if not kb:
+        return None
+    from apps.core.services.s3_service import S3Service
+
+    ctx = post.local_pipeline_context or {}
+    selected_ids = ctx.get('selected_logo_ids') or []
+
+    try:
+        if selected_ids:
+            logo = kb.logos.filter(id__in=selected_ids).first()
+        else:
+            logo = kb.logos.filter(is_primary=True).first() or kb.logos.first()
+    except Exception:
+        return None
+    if not logo or not logo.s3_key:
+        return None
+    try:
+        return S3Service.generate_presigned_download_url(logo.s3_key, expires_in=3600)
+    except Exception:
+        return logo.s3_url or None
+
+
+def _brand_keywords_from_kb(kb) -> list:
+    """
+    Extrai termos da marca/produto que devem ser sanitizados no texto enviado
+    ao Gemini (modo 'sanitized'). Pega nome da empresa + palavras-chave do
+    descricao_produto (heuristica: palavras com inicial maiuscula ou
+    contendo digito — indicam modelos).
+    Funciona para qualquer empresa (le da KB dinamicamente).
+    """
+    import re as _re
+    if not kb:
+        return []
+    keywords = set()
+    # Nome da empresa (ex: "Thermomix")
+    if kb.nome_empresa:
+        for w in str(kb.nome_empresa).split():
+            w = w.strip()
+            if len(w) >= 2 and (w[0].isupper() or any(c.isdigit() for c in w)):
+                keywords.add(w)
+    # Descricao do produto — palavras com maiuscula seguida de letra/digito
+    # (ex: "TM7", "iPhone", "Vorwerk") OU sequencias tipo "Modelo XYZ"
+    desc = (kb.descricao_produto or '')[:500]
+    for match in _re.findall(r'\b[A-Z][A-Za-z0-9]{1,}\b', desc):
+        # Exclui palavras genericas curtas demais ou comuns
+        if match.lower() not in {'a', 'o', 'de', 'da', 'do', 'um', 'uma', 'que', 'para', 'com', 'em'}:
+            keywords.add(match)
+    return sorted(keywords)
 
 
 def _brand_context_for_vision(post) -> str:

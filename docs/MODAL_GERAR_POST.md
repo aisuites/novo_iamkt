@@ -659,3 +659,251 @@ Post 57 (org 25 Colletivo Real):
 **Custo final por post:** ~$0.05 (texto + imagem). **Latência:** ~25-30s.
 
 **Limitação remanescente:** mesmo com simplicidade, ~10-15% dos casos podem ainda regredir para modelo similar do training data. Mitigação atual: usuário pode clicar "Gerar Imagem" novamente — preserva histórico e gera nova candidata.
+
+---
+
+## 17. Smart Pillow Overlay — Em desenvolvimento (PARADO AQUI 2026-05-20)
+
+### Contexto e descoberta crítica
+
+Após validar que a simplificação radical (§16) trouxe ganhos, fizemos um teste decisivo no **post 62** (org Thermomix, "Conheça a Thermomix TM7"). Geramos 3 versões do mesmo post variando o `text_render_mode`:
+
+| Modo | Comportamento | Produto rendido | Texto na imagem |
+|------|---------------|----------------|-----------------|
+| `inline` (atual) | Gemini renderiza texto e imagem | TM6/TM7 híbrido | Bonito, integrado |
+| `sanitized` | Substitui "Thermomix"/"TM7" por `[produto]` no prompt | **TM5 (regrediu)** | Gemini reinventa texto |
+| `pillow` (overlay simples) | Gemini gera só cena, sem texto | **TM7 fiel** ✅ | Faixa preta no topo + pill verde (feio) |
+
+### 🎯 Descoberta chave
+
+**Quando o Gemini não recebe texto pra renderizar no prompt, o produto sai FIEL.** A razão: o texto a renderizar (que continha "Thermomix TM7") era o que ativava o **name-anchor failure** — o Gemini puxava o modelo mais conhecido do training data. Sem esse anchor textual, o modelo se ancora apenas na imagem de referência.
+
+Por isso o modo `pillow` foi a única estratégia que entregou o **TM7 correto** (display tablet horizontal separado embaixo).
+
+**Mas:** o overlay simples (faixa preta + pill verde) é esteticamente pobre — tipografia genérica, layout fixo, sem identidade da marca.
+
+### Plano Smart Pillow Overlay
+
+Combinar o melhor dos 2 mundos:
+- **Fidelidade do produto** via ausência de texto no prompt (Gemini puro)
+- **Tipografia e layout da marca** via overlay Pillow inteligente
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ INPUT: PNG da cena (Gemini) + post + KB                    │
+├────────────────────────────────────────────────────────────┤
+│ 1. Carregar FONTE da KB                                    │
+│    Typography model → CustomFont S3 (TTF) ou Google Fonts  │
+│    → FontResolver (UA Android 2.3.5 força TTF)             │
+│    → Fallback: DejaVu Bold                                 │
+│                                                            │
+│ 2. Carregar LAYOUT SPEC                                    │
+│    a. Cache em kb.brand_layout_spec (JSONField novo)      │
+│    b. Se vazio: Claude Vision analisa 1-3 references da KB │
+│       e extrai padrões (title_position, size_pct, weight,  │
+│       logo_position, cta_style, alignment, padding etc.)   │
+│    c. Se não há references: wireframe fallback por aspect  │
+│                                                            │
+│ 3. Resolver LOGO URL                                       │
+│    selected_logo_ids[0] do local_pipeline_context          │
+│    → presigned URL S3 (24h)                                │
+│                                                            │
+│ 4. Pillow render                                           │
+│    apply_text_overlay(png, title, sub, cta, layout_spec,   │
+│                      title_font, subtitle_font, logo_url) │
+│    - 9 anchors de posição (top-left até bottom-right)      │
+│    - Auto-contrast (luminância da região)                  │
+│    - CTA styles: pill | block | outline | underline | none │
+│    - Logo composite com aspect-fit                         │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Arquivos criados (não-commitados)
+
+1. [app/apps/posts/services/font_resolver.py](../app/apps/posts/services/font_resolver.py) — portado/adaptado do branch Colletivo
+   - `resolve_font_for_kb(kb, usage_filter, weight)` — entrypoint
+   - `_load_custom_font()` — baixa TTF/OTF do S3
+   - `_load_google_font()` — Google Fonts CSS API com UA Android 2.3.5
+   - `system_dejavu_path()` — fallback final
+
+2. [app/apps/posts/services/brand_layout_analyzer.py](../app/apps/posts/services/brand_layout_analyzer.py)
+   - `analyze_brand_layout_from_references(kb, force_refresh=False)` — Claude Sonnet 4.5 Vision analisa até 3 refs
+   - System prompt detalhado com valores limitados
+   - Cache em `kb.brand_layout_spec` (skippa se já analisado)
+   - Custo: ~$0.01 por análise, 1x por org
+
+3. [app/apps/posts/services/layout_wireframes.py](../app/apps/posts/services/layout_wireframes.py)
+   - `wireframe_for_aspect(aspect, formato_px)` → spec padrão
+   - Regras por aspect: 1:1, 4:5, 9:16, 16:9, 1200x630
+   - Heurística por w/h ratio quando aspect não reconhecido
+
+4. [app/apps/knowledge/migrations/0024_add_brand_layout_spec.py](../app/apps/knowledge/migrations/0024_add_brand_layout_spec.py)
+   - Aplicada ✅
+
+### Arquivos modificados (não-commitados)
+
+5. [app/apps/knowledge/models.py](../app/apps/knowledge/models.py)
+   - `KnowledgeBase.brand_layout_spec` (JSONField) — cache do layout analisado
+
+6. [app/apps/posts/services/gemini_image_generator.py](../app/apps/posts/services/gemini_image_generator.py)
+   - `apply_text_overlay()` reescrito (smart): aceita `layout_spec`, fontes resolvidas, `logo_url`
+   - Helpers novos: `_anchor_to_xy()`, `_x_for_alignment()`, `_resolve_text_color()`, `_auto_contrast_color()`, `_draw_text_backdrop()`, `_draw_cta()`, `_draw_logo_on_overlay()`
+   - `generate_post_image()` ganhou args `pillow_layout_spec`, `pillow_title_font_path`, `pillow_subtitle_font_path`, `pillow_logo_url`
+
+7. [app/apps/posts/tasks.py](../app/apps/posts/tasks.py)
+   - `_prepare_pillow_overlay(post, kb, formato_px)` — orquestra todas as 3 camadas (font + layout + logo)
+   - `_resolve_logo_url_for_overlay(post, kb)` — pega selected_logo_ids[0] ou primary
+   - Chamada de `generate_post_image()` agora passa `**pillow_kwargs`
+
+### 🐛 BUGS DESCOBERTOS NO ÚLTIMO TESTE (parar aqui)
+
+Após implementar tudo e gerar a v4 do post 62 com Smart Pillow:
+
+**Bug 1 — Gemini ignorou "não renderizar texto"**
+- A regra `# IMPORTANTE — NAO RENDERIZAR NENHUM TEXTO` foi insuficiente.
+- Resultado: Gemini AINDA escreveu "thermomix", "Conheça a Thermomix TM7", "Official Distributor", "Praticidade para toda a família" na própria imagem PNG.
+- Em cima disso, o Pillow desenhou outra camada de texto → **texto duplo sobreposto** na imagem final.
+
+**Bug 2 — Claude Vision extraiu spec ruim**
+```json
+{
+  "title_size_pct": 5,         // muito pequeno
+  "subtitle_size_pct": 4,      // QUASE IGUAL ao título (deveria ser ~50%)
+  "title_weight": "regular",   // títulos quase sempre são bold
+  "logo_position": "none",     // KB tem logo, mas Claude disse não usar
+  "cta_style": "none",
+  "alignment": "center"
+}
+```
+- Claude interpretou as references como "minimalistas" e diminuiu/zerou tudo.
+- KB org=15 (Thermomix) tem 3 references que foram analisadas — `kb.brand_layout_spec.reference_image_ids = [51, 50, 48]`.
+
+**Bug 3 — Sem sanity checks**
+- O spec extraído passou direto pro renderer sem validação.
+- Não há invariantes garantidas (title ≥ subtitle, weight bold, logo se KB tem logo, etc.).
+
+### Imagem do bug (post 62 v4 — não salva em S3 ainda)
+
+Visual mostra:
+- Texto "Conheça a Thermomix TM7" pequeno (Pillow)
+- Sobreposto com "thermomix" + "Conheça a Thermomix TM7" + "Official Distributor" do Gemini
+- Subtitle "Praticidade para toda a família na sua cozinha"
+- Produto TM6/TM7 híbrido no centro
+- Layout aspect ratio errado (parece 1200x630 mas ficou esmagado)
+
+### Plano detalhado de retomada (amanhã)
+
+**Prioridade 1 — Fix Bug 1 (Gemini renderiza texto sem permissão)**
+
+Tentativas em ordem de agressividade:
+
+a. **Repetir instrução múltiplas vezes** no prompt:
+```
+# IMPORTANTE — NAO RENDERIZAR NENHUM TEXTO
+
+# REGRA #1: NAO HÁ TEXTO NESTA TAREFA. NAO desenhe letras, palavras,
+slogans, números, símbolos textuais, marcas registradas ou QUALQUER
+caractere alfanumérico.
+
+# REGRA #2: Se você encontrar impulso de desenhar texto (mesmo no produto,
+no logo, em embalagens, em sinalização do ambiente), IGNORE.
+
+# REGRA #3: Tarefa visual pura — apenas o produto, ambiente, luz e
+composição. Textos serão adicionados depois em pós-processamento.
+```
+
+b. **Adicionar exemplo negativo**: "Output WRONG: imagem com qualquer texto visível. Output CORRECT: imagem pura sem texto."
+
+c. **Fallback de pós-processamento OCR**: se Gemini desobedecer, detectar texto via Tesseract/Pillow OCR e **borrar** essa região antes de aplicar Pillow overlay. Caro mas garantido.
+
+**Prioridade 2 — Fix Bug 2 (spec ruim)**
+
+a. **Sanity checks pós-Claude** em `analyze_brand_layout_from_references()`:
+```python
+def _sanitize_layout_spec(spec, kb):
+    # title >= 7 (legibilidade mobile)
+    spec['title_size_pct'] = max(7, float(spec.get('title_size_pct', 7)))
+    # subtitle <= title * 0.55
+    spec['subtitle_size_pct'] = min(
+        float(spec.get('subtitle_size_pct', 3)),
+        spec['title_size_pct'] * 0.55,
+    )
+    # weight: bold por default
+    if spec.get('title_weight') not in ('bold', 'extrabold', 'black'):
+        spec['title_weight'] = 'bold'
+    # logo: se KB tem logo cadastrado, força posição (não 'none')
+    if kb.logos.exists() and spec.get('logo_position', 'none') == 'none':
+        spec['logo_position'] = 'top-right'  # default
+    # cta_style: se vier 'none' mas post tem cta, força pill
+    # (decisão runtime no overlay)
+    return spec
+```
+
+b. **Melhorar prompt do brand_layout_analyzer** com exemplos numéricos:
+```
+- "minimalista" NÃO significa título pequeno. Significa POUCOS elementos.
+  Título mínimo: 7% da altura para legibilidade mobile.
+- Subtítulo SEMPRE menor que título — proporção ~1:2 ou ~1:2.5
+- Marca premium ≠ texto fino. Bold ainda é o padrão para títulos.
+```
+
+**Prioridade 3 — Validação ponta-a-ponta**
+
+1. Limpar `kb.brand_layout_spec` da org 15 (forçar re-análise)
+2. Rodar Smart Pillow no post 62 novamente
+3. Validar visualmente — title size razoável, sem texto duplo, logo presente
+
+### Estado git ao parar
+
+- Branch: `feature/novo-modal-gerar-post`
+- Working tree: **3 arquivos modificados + 4 arquivos novos não commitados**
+- Migration 0024 aplicada no DB local
+- Último commit: `64e83a8` (simplificação radical, antes do Smart Pillow)
+
+### Comandos úteis para retomar
+
+```bash
+# Ver status do trabalho não-commitado
+git status
+
+# Ver diff do que falta commitar
+git diff app/apps/posts/services/gemini_image_generator.py
+
+# Testar Smart Pillow direto
+docker compose exec -T -e POST_TEXT_RENDER_MODE=pillow iamkt_web python manage.py shell -c "
+from apps.posts.models import Post
+from apps.posts.tasks import generate_post_image_task
+p = Post.objects.get(id=62)
+p.status='pending'; p.save()
+generate_post_image_task(p.id, '')
+p.refresh_from_db()
+print(p.images.order_by('-order').first().s3_url)
+"
+
+# Forçar re-análise do layout (depois de mudar prompt)
+docker compose exec -T iamkt_web python manage.py shell -c "
+from apps.knowledge.models import KnowledgeBase
+kb = KnowledgeBase.objects.filter(organization_id=15).first()
+kb.brand_layout_spec = {}
+kb.save()
+print('cache limpado')
+"
+
+# Listar todas as imagens geradas do post 62
+docker compose exec -T iamkt_web python manage.py shell -c "
+from apps.posts.models import Post
+p = Post.objects.get(id=62)
+for img in p.images.order_by('order'):
+    print(f'order={img.order} key={img.s3_key}')
+"
+```
+
+### Posts de referência para testes
+
+| Org | Post ID | Tema | Caso de uso |
+|-----|---------|------|-------------|
+| 15 (Thermomix) | 62 | "Conheça a Thermomix TM7" | Bug histórico do TM6/TM7 — bom teste de fidelidade de produto |
+| 15 (Thermomix) | 61 | "Março é o Mês do Consumidor" | Funcionou no v5 simplificado — base de referência |
+| 15 (Thermomix) | 60 | "Jantar Romântico Sem Estresse" | Cena com produto + casal — teste de composição |
+| 25 (Colletivo) | 57 | "Workshop colaborativo Colletivo" | Org diferente, sem produto físico — teste de generalização |
+| 2 (ACME) | 54 | "Workshop design thinking" | Org de teste — sem produto físico |

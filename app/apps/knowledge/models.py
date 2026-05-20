@@ -278,6 +278,32 @@ class KnowledgeBase(models.Model):
         verbose_name='Compilação N8N',
         help_text='Compilação final retornada pelo N8N (plano de marketing, avaliações)'
     )
+    # Spec de layout extraido das ReferenceImages via Claude Vision (Smart
+    # Pillow Overlay). Cacheado por org. Schema:
+    #   {
+    #     'analyzed_at': iso datetime,
+    #     'reference_image_ids': [42, 43],
+    #     'title_position': 'top-left' | 'top-center' | 'bottom-left' | ...,
+    #     'title_size_pct': 8 (% da altura do canvas),
+    #     'title_weight': 'bold' | 'regular' | 'medium',
+    #     'title_color_hint': 'auto_contrast' | 'white' | 'black' | 'brand_primary',
+    #     'subtitle_offset': 'below_title' | 'separate',
+    #     'subtitle_size_pct': 3,
+    #     'logo_position': 'top-right' | 'top-left' | 'bottom-right' | 'none',
+    #     'logo_size_pct': 12,
+    #     'cta_style': 'pill' | 'underline' | 'block' | 'none',
+    #     'cta_position': 'bottom-center' | 'bottom-left' | 'bottom-right',
+    #     'alignment': 'left' | 'center' | 'right',
+    #     'padding_pct': 5,
+    #     'background_treatment': 'none' | 'gradient' | 'color_block',
+    #     'design_rationale': 'string descritiva curta'
+    #   }
+    brand_layout_spec = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Spec de layout da marca',
+        help_text='Cache do layout analisado das references via Claude Vision'
+    )
     accepted_suggestions = models.JSONField(
         default=dict,
         blank=True,
