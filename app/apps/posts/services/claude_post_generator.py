@@ -48,21 +48,42 @@ PRINCIPIOS:
 2. CTA: se cta_requested=true, gere cta_text natural (max 8 palavras). Se false, cta_text=""
 3. Hashtags: 5 a 12 hashtags relevantes EM PORTUGUES, retorne array de strings JA
    COM o caractere # no inicio. Ex: ["#produtividade", "#homeoffice", "#dicas"]
-4. image_prompt (em PORTUGUES): descricao da CENA/AMBIENTE em volta do produto.
-   - Mencione apenas: ambiente, mood, iluminacao, enquadramento, elementos
+4. image_prompt (em PORTUGUES): descricao da CENA/AMBIENTE em volta dos
+   elementos visuais.
+   - Mencione: ambiente, mood, iluminacao, enquadramento, paleta, elementos
      secundarios (ex: ingredientes, plantas, objetos contextuais)
-   - NAO mencione o nome da marca nem o nome/modelo do produto (ex: nao escreva
-     "Thermomix em cor branca" ou "iPhone na mesa") — o produto vem da imagem
-     anexada como referencia visual; descrever ele em palavras gera conflito
-     com a imagem real (cor, modelo, formato podem nao bater)
-   - NAO descreva cores, formatos ou detalhes do produto (a imagem anexada e
-     a source of truth, vc nao tem acesso a ela)
-   - NAO mencione textos a serem renderizados na imagem (isso e papel do
-     title/subtitle)
-   - Em vez de "destaque para o Thermomix em cor branca em cozinha minimalista",
-     escreva "destaque para o produto principal em uma cozinha minimalista de
-     bancada clara, com ingredientes frescos coloridos ao redor, luz natural
-     suave"
+   - REGRA ABSOLUTA — NUNCA cite nomes proprios de marca ou produto no
+     image_prompt (ex: NAO escreva "Thermomix", "Louis Vuitton", "iPhone",
+     "Nike"). Eles ativam priors fortes do gerador de imagem que ignoram a
+     foto anexa. Use SEMPRE descritor generico + "da foto anexa".
+     ❌ ERRADO: "o equipamento Thermomix da foto anexa"
+     ✅ CERTO: "o produto da foto anexa"
+     ❌ ERRADO: "uma bolsa Louis Vuitton classica em couro monograma"
+     ✅ CERTO: "a bolsa da foto anexa"
+   - NUNCA descreva cores/formato/material dos elementos uploadeados em
+     palavras — descreve-los gera conflito com a imagem real anexada.
+   - REFERENCIE cada imagem uploadeada como UMA UNICA referencia generica.
+     Ex: "o produto da foto anexa (seja fiel)", "a pessoa da foto anexa",
+     "a bolsa da foto anexa em destaque".
+   - Quantas imagens houver, mencione cada uma — todas DEVEM aparecer
+     juntas na cena final. Mas evite redundancia: se ha 2 imagens e ambas
+     sao tipo 'produto', use "o produto principal da foto anexa" para a
+     primeira e "o segundo objeto da foto anexa" para a segunda. Confie no
+     descritor visual do user (usage_description) para diferenciar.
+   - NAO mencione textos a serem renderizados na imagem (papel do title)
+   - EXEMPLO MULTI-IMAGEM (1 produto + 1 pessoa + 1 acessorio):
+     "Ambiente sofisticado de cozinha contemporanea com bancada de marmore
+     claro, iluminacao natural suave, atmosfera feminina e aspiracional.
+     A pessoa da foto anexa interagindo naturalmente com o produto da foto
+     anexa (seja fiel ao formato e display original) sobre a bancada, ao
+     lado o acessorio da foto anexa em destaque elegante na mesma
+     superficie. Flores frescas em tons pastel em vaso, ingredientes
+     gourmet coloridos ao redor, paleta nude e branco, mood acolhedor."
+   - EXEMPLO 1 PRODUTO SO:
+     "Cozinha minimalista clean com bancada de marmore, luz natural quente
+     entrando por janela lateral, o produto da foto anexa (seja fiel) em
+     destaque central, ingredientes frescos coloridos ao redor, atmosfera
+     acolhedora e familiar."
 5. visual_brief (em PORTUGUES): instrucao curta (1-2 frases) sobre como aplicar
    a marca no visual (logo, cores, key visual). Complementa o image_prompt.
 6. title: max 60 chars, impactante, em portugues
@@ -208,11 +229,30 @@ def _build_user_message(
 
     if reference_images:
         parts.append('')
-        parts.append('== Imagens de referencia (URLs) ==')
+        parts.append('== Imagens UPLOADEADAS pelo usuario (devem aparecer na cena) ==')
         for i, ref in enumerate(reference_images, 1):
-            url = ref.get('url') or ref.get('s3_url') or ''
-            usage = ref.get('usage_description') or ''
-            parts.append(f'  {i}. {url}' + (f' — uso: {usage}' if usage else ''))
+            usage_type = (ref.get('usage_type') or '').lower()
+            usage_desc = ref.get('usage_description') or ''
+            # Mapeia tipo para descritor curto que o Claude vai usar no image_prompt
+            if 'produto' in usage_type:
+                descriptor = 'produto/equipamento'
+            elif 'pessoa' in usage_type:
+                descriptor = 'pessoa'
+            elif 'cenari' in usage_type:
+                descriptor = 'cenario/local'
+            elif 'fundo' in usage_type or 'background' in usage_type:
+                descriptor = 'fundo/textura'
+            elif usage_type:
+                descriptor = usage_type
+            else:
+                descriptor = 'imagem de referencia'
+            extra = f' (uso indicado: "{usage_desc}")' if usage_desc else ''
+            parts.append(f'  Imagem {i}: {descriptor}{extra}')
+        parts.append(
+            '  >> IMPORTANTE: no image_prompt, referencie TODAS essas imagens '
+            'usando "da foto anexa" / "seja fiel" para que aparecam juntas na '
+            'cena final.'
+        )
 
     if logo_urls:
         parts.append('')
