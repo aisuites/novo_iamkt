@@ -289,15 +289,64 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     kb = KnowledgeBase.objects.filter(organization=post.organization).first()
     paleta = _kb_colors(kb)
     tipografia = _kb_typography(kb)
-    references = _collect_references(kb=kb, post=post)
     publico_alvo = (kb.publico_externo if kb else '') or ''
     marketing_input_summary = _kb_summary_marketing(kb)
     formato_px = _formato_px(post)
 
-    # Etapa 4: descricao geral de uso das refs entra no resumo da marca
-    # (Gemini le como contexto adicional do briefing)
     ctx = post.local_pipeline_context or {}
     refs_usage_general = ctx.get('references_usage_description', '') or ''
+
+    # text_render_mode determinado AGORA (precisa antes de _collect_references
+    # para decidir se inclui logo ou nao)
+    import os as _os
+    text_render_mode = (
+        ctx.get('text_render_mode')
+        or _os.environ.get('POST_TEXT_RENDER_MODE', 'inline')
+    ).lower()
+
+    # Coleta logos + uploads como image_parts (refs KB NAO sao mais
+    # incluidas — viram direcionamento textual pelo translator abaixo)
+    references = _collect_references(kb=kb, post=post, text_render_mode=text_render_mode)
+
+    # ============================================================
+    # KB REFERENCE TRANSLATOR — extrai directives das refs da KB
+    # ============================================================
+    # Refs selecionadas pelo user na galeria + usage_description -> Claude
+    # multimodal analisa e produz texto estruturado por categoria. Vai
+    # como bloco no prompt do Gemini, NAO como imagem.
+    # Cache em local_pipeline_context.kb_refs_translations (hash dos inputs).
+    kb_translations = []
+    kb_refs_for_translation = _collect_kb_refs_for_translation(kb=kb, post=post)
+    if kb_refs_for_translation:
+        try:
+            from apps.posts.services.kb_reference_translator import (
+                translate_kb_references, _hash_inputs as _kb_hash_inputs,
+            )
+            input_hash = _kb_hash_inputs(kb_refs_for_translation)
+            cached = ctx.get('kb_refs_translations') or {}
+            if cached.get('input_hash') == input_hash and cached.get('translations'):
+                kb_translations = cached.get('translations') or []
+                logger.info('[kb_translator] cache HIT (%d translations)', len(kb_translations))
+            else:
+                tr_result = translate_kb_references(kb_refs_for_translation)
+                if tr_result and tr_result.get('translations'):
+                    kb_translations = tr_result['translations']
+                    ctx['kb_refs_translations'] = {
+                        'analyzed_at': dj_tz_now_iso(),
+                        'input_hash': tr_result.get('input_hash'),
+                        'translations': kb_translations,
+                    }
+                    post.local_pipeline_context = ctx
+                    post.save(update_fields=['local_pipeline_context'])
+                    _record_ai_usage(
+                        post, step='kb_reference_translation',
+                        model=tr_result.get('model', 'claude-sonnet-4-5'),
+                        usage_dict=tr_result.get('usage') or {},
+                    )
+        except Exception:
+            logger.exception('[kb_translator] falhou — segue sem directives')
+
+    # Adiciona references_usage_description ao marketing_input_summary
     if refs_usage_general:
         marketing_input_summary = (
             f'{marketing_input_summary}\n\n'
@@ -306,22 +355,10 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
         )
 
     # Etapa 4.16: desativado o Claude Vision em favor de dereferenciacao
-    # simples por imagem ("o produto da IMAGEM N"). Reduz custo (-$0.005/post)
-    # e elimina conflitos de descricao textual vs visual. A funcao
-    # _analyze_products_in_references continua disponivel para roll back rapido.
+    # simples por imagem
     product_analyses = []
 
-    # text_render_mode: 'inline' (default) | 'sanitized' | 'pillow'
-    # Pode ser sobrescrito via env (testes), local_pipeline_context (UI),
-    # ou pelo Orchestrator (decisao inteligente abaixo).
-    import os as _os
-    text_render_mode = (
-        ctx.get('text_render_mode')
-        or _os.environ.get('POST_TEXT_RENDER_MODE', 'inline')
-    ).lower()
-
-    # brand_keywords: usado em mode='sanitized' para sanitizar nome
-    # da empresa/produto no texto enviado ao Gemini
+    # brand_keywords: usado em mode='sanitized'
     brand_keywords = _brand_keywords_from_kb(kb)
 
     # ============================================================
@@ -400,6 +437,7 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             brand_keywords=brand_keywords,
             spatial_instructions=spatial_instructions,
             references_usage_general=refs_usage_general,
+            kb_translations=kb_translations,
             **pillow_kwargs,
         )
     except Exception as exc:
@@ -758,26 +796,37 @@ def _formato_px(post) -> str:
     return '1080x1080'
 
 
-def _collect_references(kb, post) -> list:
+def dj_tz_now_iso() -> str:
+    """Atalho para timezone-aware ISO timestamp."""
+    from django.utils import timezone as dj_tz
+    return dj_tz.now().isoformat()
+
+
+def _collect_references(kb, post, text_render_mode: str = 'inline') -> list:
     """
-    Coleta logos, reference images da KB e PostReferenceImage como lista de
-    dicts {tipo, url} com presigned URLs validas por 24h.
+    Coleta logos + PostReferenceImage como image_parts pro Gemini.
+
+    NOVO comportamento:
+    - Logos: em modo 'pillow' o logo e desenhado via Pillow overlay, entao
+      e EXCLUIDO daqui (evita logo duplicado). Em outros modos, vai como
+      image_part pra que Gemini renderize.
+    - Refs da KB: NAO sao mais incluidas como image_parts. Em vez disso,
+      passam pelo kb_reference_translator que extrai direcionamento textual.
+      Use _collect_kb_refs_for_translation() para isso.
+    - Uploads do post: sempre incluidos com fidelidade alta.
 
     Respeita post.local_pipeline_context:
-      - selected_logo_ids: se vazio, usa todos; se preenchido, filtra
-      - selected_reference_ids: se vazio, NENHUMA ref da KB e usada (so
-        as do post); se preenchido, filtra
+      - selected_logo_ids: filtra logos
     """
     from apps.core.services.s3_service import S3Service
 
     ctx = post.local_pipeline_context or {}
     selected_logo_ids = set(ctx.get('selected_logo_ids') or [])
-    selected_ref_ids = set(ctx.get('selected_reference_ids') or [])
 
     out = []
 
-    if kb:
-        # Logos — filtra por selecionados (se houver selecao), senao usa todos
+    if kb and text_render_mode != 'pillow':
+        # Logos — apenas em modo nao-pillow (em pillow, Pillow desenha)
         try:
             qs_logos = kb.logos.all().order_by('-is_primary', 'logo_type')
             for logo in qs_logos:
@@ -794,30 +843,6 @@ def _collect_references(kb, post) -> list:
         except Exception:
             pass
 
-        # KB references — somente as selecionadas (se nada selecionado, usa
-        # NENHUMA da KB pra evitar poluir o prompt)
-        if selected_ref_ids:
-            try:
-                qs_refs = kb.reference_images.filter(id__in=selected_ref_ids)
-                for img in qs_refs:
-                    if img.s3_key:
-                        try:
-                            url = S3Service.generate_presigned_download_url(
-                                img.s3_key, expires_in=86400
-                            )
-                            out.append({
-                                'tipo': 'referencia_kb',
-                                'url': url,
-                                # Fix B: passa usage_description da ReferenceImage da KB
-                                'usage_description': (
-                                    getattr(img, 'usage_description', '') or ''
-                                ).strip(),
-                            })
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-
     # Post-specific references (uploads recentes — sempre incluidos)
     try:
         for ref in post.reference_image_files.all():
@@ -830,11 +855,50 @@ def _collect_references(kb, post) -> list:
                     out.append({
                         'tipo': tipo,
                         'url': url,
-                        # Fix A: passa usage_description que o user digitou no upload
                         'usage_description': (ref.usage_description or '').strip(),
                     })
                 except Exception:
                     pass
+    except Exception:
+        pass
+
+    return out
+
+
+def _collect_kb_refs_for_translation(kb, post) -> list:
+    """
+    Coleta refs da KB selecionadas pelo user no modal. Retorna lista
+    de dicts {id, url, usage_description} para passar ao
+    kb_reference_translator.
+
+    NAO inclui logos (logo nunca passa pelo translator — vai literal).
+    """
+    from apps.core.services.s3_service import S3Service
+
+    ctx = post.local_pipeline_context or {}
+    selected_ref_ids = set(ctx.get('selected_reference_ids') or [])
+    if not (kb and selected_ref_ids):
+        return []
+
+    out = []
+    try:
+        qs_refs = kb.reference_images.filter(id__in=selected_ref_ids)
+        for img in qs_refs:
+            if not img.s3_key:
+                continue
+            try:
+                url = S3Service.generate_presigned_download_url(
+                    img.s3_key, expires_in=86400
+                )
+                out.append({
+                    'id': img.id,
+                    'url': url,
+                    'usage_description': (
+                        getattr(img, 'usage_description', '') or ''
+                    ).strip(),
+                })
+            except Exception:
+                pass
     except Exception:
         pass
 

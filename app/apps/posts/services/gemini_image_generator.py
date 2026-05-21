@@ -93,6 +93,7 @@ def generate_post_image(
     pillow_logo_url: Optional[str] = None,
     spatial_instructions: Optional[str] = None,
     references_usage_general: str = '',
+    kb_translations: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Gera UMA imagem final para o post via Gemini 3 Pro Image.
@@ -152,6 +153,7 @@ def generate_post_image(
         brand_keywords=brand_keywords or [],
         spatial_instructions=spatial_instructions or '',
         references_usage_general=references_usage_general or '',
+        kb_translations=kb_translations or [],
     )
 
     # 3. Monta payload Gemini — IMAGENS PRIMEIRO, depois texto (subject anchor)
@@ -485,6 +487,7 @@ def _build_prompt_text(
     brand_keywords: List[str] = None,
     spatial_instructions: str = '',
     references_usage_general: str = '',
+    kb_translations: List[Dict[str, Any]] = None,
 ) -> str:
     """
     Prompt SIMPLES — confia na dereferenciacao por imagem ("o produto da
@@ -597,6 +600,38 @@ def _build_prompt_text(
             'Trate como diretriz forte de estilo, tratamento e mood.'
         )
 
+    # Bloco [REFERENCE-DERIVED DIRECTIVES] — direcionamento textual extraido
+    # pelo kb_reference_translator (Claude multimodal). Substitui o envio
+    # das imagens da KB ao Gemini.
+    kb_directives_block_en = ''
+    kb_directives_block_pt = ''
+    if kb_translations:
+        en_lines = [
+            '',
+            '[REFERENCE-DERIVED DIRECTIVES]',
+            '(extracted from brand reference images via visual analysis — '
+            'apply as directives to the generated scene)',
+        ]
+        pt_lines = [
+            '',
+            '# DIRETRIZES EXTRAIDAS DAS REFERENCIAS DA MARCA',
+            '(analisadas das imagens de referencia da KB — aplicar a cena)',
+        ]
+        for t in kb_translations:
+            category = (t.get('category') or 'general').replace('_', ' ').title()
+            directives = (t.get('directives') or '').strip()
+            user_desc = (t.get('usage_description_user') or '').strip()
+            if not directives:
+                continue
+            en_lines.append('')
+            en_lines.append(f'• {category}' + (f' (user asked: "{user_desc}")' if user_desc else '') + ':')
+            en_lines.append(f'  {directives}')
+            pt_lines.append('')
+            pt_lines.append(f'• {category}' + (f' (user pediu: "{user_desc}")' if user_desc else '') + ':')
+            pt_lines.append(f'  {directives}')
+        kb_directives_block_en = '\n'.join(en_lines)
+        kb_directives_block_pt = '\n'.join(pt_lines)
+
     if use_hybrid_en:
         parts = [
             '[TASK]',
@@ -604,6 +639,7 @@ def _build_prompt_text(
             '',
             _build_reference_roles_en_block(sorted_refs),
             user_guidance_block_en,
+            kb_directives_block_en,
             combination_rules,
             '',
             '[SCENE] (in Portuguese, on-brand)',
@@ -617,6 +653,7 @@ def _build_prompt_text(
             '# REFERENCIAS VISUAIS (anexadas ACIMA deste texto, na ordem)',
             attachments_text,
             user_guidance_block_pt,
+            kb_directives_block_pt,
             combination_rules,
             '',
             '# CENA',
@@ -686,10 +723,15 @@ def _build_prompt_text(
     if text_render_mode == 'pillow':
         parts.extend([
             '',
-            '[CRITICAL] DO NOT RENDER ANY TEXT IN THE IMAGE.',
-            'This scene must contain NO text, NO words, NO slogans, NO numbers, '
-            'NO letters, NO characters of any kind. Only the visual scene with '
-            'the referenced items. Text will be overlaid in post-processing.',
+            '[CRITICAL] DO NOT RENDER ANY TEXT OR BRAND LOGO IN THE IMAGE.',
+            'This scene must contain:',
+            '- NO text, words, slogans, numbers, letters, or characters',
+            '- NO brand logos, brand marks, or company names',
+            '- NO watermarks',
+            'Only the visual scene with the referenced subjects '
+            '(product/person/etc, EXCLUDING the logo). Both text AND the '
+            'brand logo will be overlaid in post-processing — generate '
+            'only the underlying scene.',
         ])
     elif text_render_mode == 'sanitized':
         # Sanitized mode raramente usado mas suportado
