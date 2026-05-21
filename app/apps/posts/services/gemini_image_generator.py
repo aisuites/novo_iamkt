@@ -573,13 +573,13 @@ def _build_prompt_text(
         subtitle_for_prompt = raw_subtitle
         cta_for_prompt = raw_cta
 
-    # Decide estrutura do prompt:
-    # - 'inline': PT-BR puro (Gemini renderiza texto na imagem, evita ingles
-    #             vazando no texto renderizado)
-    # - 'pillow'/'sanitized': hibrido EN headers + PT scene (headers fortes
-    #             em ingles ajudam fidelidade multi-image; cena em PT mantem
-    #             o tom on-brand do Claude texto)
-    use_hybrid_en = text_render_mode in ('pillow', 'sanitized')
+    # Estrutura hibrida EN/PT em TODOS os modos:
+    # - Headers + diretivas de fidelidade em INGLES (peso semantico forte
+    #   no training data do Gemini, padrao validado pela comunidade)
+    # - [SCENE] em PT-BR (preserva tom on-brand do Claude texto)
+    # - Bloco de texto a renderizar em PT-BR (inline) — com instrucao explicita
+    #   pro Gemini nao traduzir
+    use_hybrid_en = True  # antes: text_render_mode in ('pillow', 'sanitized')
 
     # Fix C: bloco USER GUIDANCE com o texto livre "Como usar as referencias?"
     # que o user digitou no modal. Vai destacado entre REFERENCE ROLES e SCENE.
@@ -746,18 +746,21 @@ def _build_prompt_text(
         ])
         if cta_for_prompt:
             parts.append(f'- CTA: "{cta_for_prompt}"')
-    else:  # inline (PT-BR)
+    else:  # inline — Gemini renderiza o texto na imagem
         parts.extend([
             '',
-            '# TEXTO A RENDERIZAR LITERALMENTE NA ARTE',
-            'Os textos abaixo sao APENAS para serem ESCRITOS sobre a cena. '
-            'NAO use o conteudo deles como descricao visual do produto. '
-            'O produto e exclusivamente o que aparece na IMAGEM anexada acima.',
-            f'- Titulo: "{title_for_prompt}"',
-            f'- Subtitulo: "{subtitle_for_prompt}"',
+            '[TEXT TO RENDER LITERALLY ON THE ARTWORK]',
+            'CRITICAL: Render the following texts in BRAZILIAN PORTUGUESE '
+            'exactly as written below. DO NOT TRANSLATE to English or any '
+            'other language. The texts must appear in the image visually.',
+            'These texts are for VISUAL RENDERING only — do not use them as '
+            'descriptions of the product. The product is exclusively what '
+            'appears in the referenced IMAGE above.',
+            f'- Title (render exactly): "{title_for_prompt}"',
+            f'- Subtitle (render exactly): "{subtitle_for_prompt}"',
         ])
         if cta_for_prompt:
-            parts.append(f'- CTA: "{cta_for_prompt}"')
+            parts.append(f'- CTA (render exactly): "{cta_for_prompt}"')
 
     parts.extend([
         '',
