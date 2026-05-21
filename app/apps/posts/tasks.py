@@ -871,6 +871,10 @@ def _collect_kb_refs_for_translation(kb, post) -> list:
     de dicts {id, url, usage_description} para passar ao
     kb_reference_translator.
 
+    Fallback: se a ref KB individual nao tem usage_description, usa o
+    references_usage_description geral (textarea do modal) como guia
+    para o translator. Garante que SEMPRE haja um foco indicado.
+
     NAO inclui logos (logo nunca passa pelo translator — vai literal).
     """
     from apps.core.services.s3_service import S3Service
@@ -879,6 +883,8 @@ def _collect_kb_refs_for_translation(kb, post) -> list:
     selected_ref_ids = set(ctx.get('selected_reference_ids') or [])
     if not (kb and selected_ref_ids):
         return []
+
+    general_guidance = (ctx.get('references_usage_description') or '').strip()
 
     out = []
     try:
@@ -890,12 +896,14 @@ def _collect_kb_refs_for_translation(kb, post) -> list:
                 url = S3Service.generate_presigned_download_url(
                     img.s3_key, expires_in=86400
                 )
+                individual_desc = (
+                    getattr(img, 'usage_description', '') or ''
+                ).strip()
+                effective_desc = individual_desc or general_guidance
                 out.append({
                     'id': img.id,
                     'url': url,
-                    'usage_description': (
-                        getattr(img, 'usage_description', '') or ''
-                    ).strip(),
+                    'usage_description': effective_desc,
                 })
             except Exception:
                 pass
