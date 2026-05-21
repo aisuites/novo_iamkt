@@ -339,6 +339,101 @@ def _build_combination_rules(type_counts: Dict[str, int]) -> str:
     return '\n'.join(lines)
 
 
+def _build_role_label_en(tipo_norm: str, usage_desc: str = '') -> tuple:
+    """
+    Retorna (LABEL_INGLES, FIDELITY_RULE_INGLES) baseado no tipo normalizado.
+    Usado em modos pillow/sanitized para prompt hibrido (EN + PT).
+    """
+    desc_extra = f' (user note: "{usage_desc}")' if usage_desc else ''
+    mapping = {
+        'logo': (
+            'BRAND LOGO',
+            'apply exactly as shown — no distortion, no color change, no redesign',
+        ),
+        'produto': (
+            'PRODUCT',
+            'reproduce with ABSOLUTE FIDELITY — exact shape, label, color, '
+            'display, finish, materials. No alterations, no stylization, '
+            'no merging with other elements',
+        ),
+        'pessoa': (
+            'MODEL',
+            'use this exact person — same face, hair, skin tone, expression, '
+            'body shape. Do not substitute or generate a different person',
+        ),
+        'cenario': (
+            'SETTING',
+            'use this exact environment as the scene background — preserve '
+            'architecture, lighting and atmosphere',
+        ),
+        'fundo': (
+            'BACKGROUND TEXTURE',
+            'use as reference for texture and tone — do not place subjects '
+            'on top of any text in this image',
+        ),
+        'icone': (
+            'ICON',
+            'apply as a graphic element, preserving legibility',
+        ),
+        'referencia': (
+            'STYLE REFERENCE',
+            'use as inspiration for photography style, lighting and mood ONLY '
+            '— do not copy any specific element or text',
+        ),
+    }
+    label, rule = mapping.get(tipo_norm, ('REFERENCE', 'use as visual reference'))
+    return label, rule + desc_extra
+
+
+def _build_reference_roles_en_block(sorted_refs: List[Dict[str, Any]]) -> str:
+    """
+    Bloco [REFERENCE ROLES] em ingles para modos pillow/sanitized.
+    Lista cada imagem com label forte e regra de fidelidade absoluta.
+    """
+    if not sorted_refs:
+        return ''
+    lines = ['[REFERENCE ROLES]']
+    # Conta tipos para distinguir duplicatas
+    type_counts: Dict[str, int] = {}
+    for ref in sorted_refs:
+        t = _normalize_tipo(str(ref.get('tipo', '')).lower())
+        type_counts[t] = type_counts.get(t, 0) + 1
+
+    running: Dict[str, int] = {}
+    for i, ref in enumerate(sorted_refs, 1):
+        tipo_norm = _normalize_tipo(str(ref.get('tipo', '')).lower())
+        usage_desc = (ref.get('usage_description') or '').strip()
+        label, rule = _build_role_label_en(tipo_norm, usage_desc)
+        running[tipo_norm] = running.get(tipo_norm, 0) + 1
+        suffix = ''
+        if type_counts[tipo_norm] > 1:
+            suffix = f' #{running[tipo_norm]}/{type_counts[tipo_norm]}'
+        lines.append(f'Image {i} ({label}{suffix}): {rule}.')
+    return '\n'.join(lines)
+
+
+def _build_fidelity_block_en(sorted_refs: List[Dict[str, Any]]) -> str:
+    """
+    Bloco [FIDELITY REQUIREMENTS] em ingles + EVITE/AVOID bilingue.
+    Reforco final para combater fusion failures em multi-image.
+    """
+    if not sorted_refs:
+        return ''
+    n = len(sorted_refs)
+    lines = [
+        '[FIDELITY REQUIREMENTS]',
+        f'All {n} referenced items must appear clearly and SIMULTANEOUSLY in '
+        'the final frame. Do not merge, stylize, replace, or omit any '
+        'referenced element. Product labels and brand details must remain '
+        'legible. Any human face must match the reference exactly.',
+        '',
+        'AVOID / EVITE: altered product, different bag/accessory, generated face, '
+        'similar-but-not-identical model, merged elements, stylized objects, '
+        'invented details not present in references.',
+    ]
+    return '\n'.join(lines)
+
+
 def _sanitize_brand_terms(text: str, keywords: List[str]) -> str:
     """
     Substitui termos da marca/produto em `text` por placeholders neutros.
@@ -459,17 +554,37 @@ def _build_prompt_text(
         subtitle_for_prompt = raw_subtitle
         cta_for_prompt = raw_cta
 
-    parts = [
-        '# TAREFA',
-        'Crie uma fotografia profissional para um post de rede social.',
-        '',
-        '# REFERENCIAS VISUAIS (anexadas ACIMA deste texto, na ordem)',
-        attachments_text,
-        combination_rules,
-        '',
-        '# CENA',
-        post.image_prompt or '(propor um cenario adequado ao briefing)',
-    ]
+    # Decide estrutura do prompt:
+    # - 'inline': PT-BR puro (Gemini renderiza texto na imagem, evita ingles
+    #             vazando no texto renderizado)
+    # - 'pillow'/'sanitized': hibrido EN headers + PT scene (headers fortes
+    #             em ingles ajudam fidelidade multi-image; cena em PT mantem
+    #             o tom on-brand do Claude texto)
+    use_hybrid_en = text_render_mode in ('pillow', 'sanitized')
+
+    if use_hybrid_en:
+        parts = [
+            '[TASK]',
+            'Create a professional photograph for a social media post.',
+            '',
+            _build_reference_roles_en_block(sorted_refs),
+            combination_rules,
+            '',
+            '[SCENE] (in Portuguese, on-brand)',
+            post.image_prompt or '(propor um cenario adequado ao briefing)',
+        ]
+    else:
+        parts = [
+            '# TAREFA',
+            'Crie uma fotografia profissional para um post de rede social.',
+            '',
+            '# REFERENCIAS VISUAIS (anexadas ACIMA deste texto, na ordem)',
+            attachments_text,
+            combination_rules,
+            '',
+            '# CENA',
+            post.image_prompt or '(propor um cenario adequado ao briefing)',
+        ]
 
     # Bloco LAYOUT ESPACIAL — instrucoes do orchestrator para o Gemini
     # respeitar zonas reservadas para texto/logo (evita rosto/produto sob titulo)
@@ -483,36 +598,76 @@ def _build_prompt_text(
             'que devem ficar livres para texto/logo.',
         ])
 
-    parts.extend([
-        '',
-        '# BRIEFING',
-        f'- Rede social: {post.social_network or "instagram"}',
-        f'- Formato (px): {formato_px}',
-        f'- Publico-alvo: {publico_alvo or "geral"}',
-        '',
-        '# DIRETRIZES',
-        f'- Paleta da marca para textos: {json.dumps(paleta, ensure_ascii=False)}',
-        f'- Tipografia: {json.dumps(tipografia, ensure_ascii=False)}',
-        '- Aplique paleta e tipografia somente nos textos do post — nao nos elementos anexados.',
-        '- Nao copie textos visiveis nas imagens anexadas (sao referencia visual).',
-        '- Verifique presenca de pessoas nas referencias; se nao houver, nao adicione.',
-        '',
-        '# QUALIDADE',
-        '- Fotorrealista, sem artefatos, sem textos cortados, sem marca dagua.',
-        '- Nao gerar mockup — esta e a arte final.',
-        '- Legibilidade alta para celular.',
-    ])
+    if use_hybrid_en:
+        # Briefing + diretrizes em ingles (modos pillow/sanitized)
+        parts.extend([
+            '',
+            '[BRIEFING]',
+            f'- Social network: {post.social_network or "instagram"}',
+            f'- Format (px): {formato_px}',
+            f'- Target audience: {publico_alvo or "general"}',
+            '',
+            '[BRAND GUIDELINES]',
+            f'- Brand palette: {json.dumps(paleta, ensure_ascii=False)}',
+            f'- Typography: {json.dumps(tipografia, ensure_ascii=False)}',
+            '- Apply palette and typography ONLY to post text — not to referenced items.',
+            '- Do not copy text visible inside reference images.',
+            '- If no people in references, do not add people.',
+            '',
+            '[QUALITY]',
+            '- Photorealistic, no artifacts, no cropped text, no watermark.',
+            '- Not a mockup — this is the final artwork.',
+            '- High legibility for mobile.',
+        ])
+        # Reforco final de fidelidade (combate fusion failures)
+        fidelity = _build_fidelity_block_en(sorted_refs)
+        if fidelity:
+            parts.extend(['', fidelity])
+    else:
+        # Modo inline em PT-BR (Gemini vai renderizar texto na imagem em PT)
+        parts.extend([
+            '',
+            '# BRIEFING',
+            f'- Rede social: {post.social_network or "instagram"}',
+            f'- Formato (px): {formato_px}',
+            f'- Publico-alvo: {publico_alvo or "geral"}',
+            '',
+            '# DIRETRIZES',
+            f'- Paleta da marca para textos: {json.dumps(paleta, ensure_ascii=False)}',
+            f'- Tipografia: {json.dumps(tipografia, ensure_ascii=False)}',
+            '- Aplique paleta e tipografia somente nos textos do post — nao nos elementos anexados.',
+            '- Nao copie textos visiveis nas imagens anexadas (sao referencia visual).',
+            '- Verifique presenca de pessoas nas referencias; se nao houver, nao adicione.',
+            '',
+            '# QUALIDADE',
+            '- Fotorrealista, sem artefatos, sem textos cortados, sem marca dagua.',
+            '- Nao gerar mockup — esta e a arte final.',
+            '- Legibilidade alta para celular.',
+        ])
 
-    # Texto a renderizar — colocado no FINAL com isolamento explicito (Fluxo A)
+    # Texto a renderizar — colocado no FINAL com isolamento explicito
     if text_render_mode == 'pillow':
         parts.extend([
             '',
-            '# IMPORTANTE — NAO RENDERIZAR NENHUM TEXTO',
-            'Esta cena NAO deve conter NENHUM texto, palavra, slogan, '
-            'numero, letra ou caractere. Apenas a cena visual pura com o '
-            'produto. Textos serao adicionados depois em pos-processamento.',
+            '[CRITICAL] DO NOT RENDER ANY TEXT IN THE IMAGE.',
+            'This scene must contain NO text, NO words, NO slogans, NO numbers, '
+            'NO letters, NO characters of any kind. Only the visual scene with '
+            'the referenced items. Text will be overlaid in post-processing.',
         ])
-    else:
+    elif text_render_mode == 'sanitized':
+        # Sanitized mode raramente usado mas suportado
+        parts.extend([
+            '',
+            '[TEXT TO RENDER LITERALLY ON THE ARTWORK]',
+            'The texts below should be drawn ON the scene. Do NOT use their '
+            'content as visual description of the product. The product is '
+            'exclusively what appears in the reference IMAGE above.',
+            f'- Title: "{title_for_prompt}"',
+            f'- Subtitle: "{subtitle_for_prompt}"',
+        ])
+        if cta_for_prompt:
+            parts.append(f'- CTA: "{cta_for_prompt}"')
+    else:  # inline (PT-BR)
         parts.extend([
             '',
             '# TEXTO A RENDERIZAR LITERALMENTE NA ARTE',
@@ -524,9 +679,10 @@ def _build_prompt_text(
         ])
         if cta_for_prompt:
             parts.append(f'- CTA: "{cta_for_prompt}"')
+
     parts.extend([
         '',
-        'Gere a arte final agora.',
+        'Generate the final artwork now.' if use_hybrid_en else 'Gere a arte final agora.',
     ])
     return '\n'.join(parts)
 
