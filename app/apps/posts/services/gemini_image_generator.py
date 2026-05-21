@@ -92,6 +92,7 @@ def generate_post_image(
     pillow_subtitle_font_path: Optional[str] = None,
     pillow_logo_url: Optional[str] = None,
     spatial_instructions: Optional[str] = None,
+    references_usage_general: str = '',
 ) -> Dict[str, Any]:
     """
     Gera UMA imagem final para o post via Gemini 3 Pro Image.
@@ -150,6 +151,7 @@ def generate_post_image(
         text_render_mode=text_render_mode,
         brand_keywords=brand_keywords or [],
         spatial_instructions=spatial_instructions or '',
+        references_usage_general=references_usage_general or '',
     )
 
     # 3. Monta payload Gemini — IMAGENS PRIMEIRO, depois texto (subject anchor)
@@ -482,6 +484,7 @@ def _build_prompt_text(
     text_render_mode: str = 'inline',
     brand_keywords: List[str] = None,
     spatial_instructions: str = '',
+    references_usage_general: str = '',
 ) -> str:
     """
     Prompt SIMPLES — confia na dereferenciacao por imagem ("o produto da
@@ -575,12 +578,32 @@ def _build_prompt_text(
     #             o tom on-brand do Claude texto)
     use_hybrid_en = text_render_mode in ('pillow', 'sanitized')
 
+    # Fix C: bloco USER GUIDANCE com o texto livre "Como usar as referencias?"
+    # que o user digitou no modal. Vai destacado entre REFERENCE ROLES e SCENE.
+    user_guidance_block_en = ''
+    user_guidance_block_pt = ''
+    if references_usage_general:
+        user_guidance_block_en = (
+            '\n[USER GUIDANCE ON REFERENCES]\n'
+            'The user provided explicit guidance on how the attached references '
+            'should be used:\n'
+            f'"{references_usage_general.strip()}"\n'
+            'Treat this as a strong directive on style, treatment and mood.'
+        )
+        user_guidance_block_pt = (
+            '\n# INSTRUCAO DO USUARIO SOBRE AS REFERENCIAS\n'
+            'O usuario indicou como as referencias devem ser usadas:\n'
+            f'"{references_usage_general.strip()}"\n'
+            'Trate como diretriz forte de estilo, tratamento e mood.'
+        )
+
     if use_hybrid_en:
         parts = [
             '[TASK]',
             'Create a professional photograph for a social media post.',
             '',
             _build_reference_roles_en_block(sorted_refs),
+            user_guidance_block_en,
             combination_rules,
             '',
             '[SCENE] (in Portuguese, on-brand)',
@@ -593,6 +616,7 @@ def _build_prompt_text(
             '',
             '# REFERENCIAS VISUAIS (anexadas ACIMA deste texto, na ordem)',
             attachments_text,
+            user_guidance_block_pt,
             combination_rules,
             '',
             '# CENA',

@@ -399,6 +399,7 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             text_render_mode=text_render_mode,
             brand_keywords=brand_keywords,
             spatial_instructions=spatial_instructions,
+            references_usage_general=refs_usage_general,
             **pillow_kwargs,
         )
     except Exception as exc:
@@ -804,7 +805,14 @@ def _collect_references(kb, post) -> list:
                             url = S3Service.generate_presigned_download_url(
                                 img.s3_key, expires_in=86400
                             )
-                            out.append({'tipo': 'referencia_kb', 'url': url})
+                            out.append({
+                                'tipo': 'referencia_kb',
+                                'url': url,
+                                # Fix B: passa usage_description da ReferenceImage da KB
+                                'usage_description': (
+                                    getattr(img, 'usage_description', '') or ''
+                                ).strip(),
+                            })
                         except Exception:
                             pass
             except Exception:
@@ -819,7 +827,12 @@ def _collect_references(kb, post) -> list:
                         ref.s3_key, expires_in=86400
                     )
                     tipo = (ref.usage_type or 'referencia_post').strip().lower() or 'referencia_post'
-                    out.append({'tipo': tipo, 'url': url})
+                    out.append({
+                        'tipo': tipo,
+                        'url': url,
+                        # Fix A: passa usage_description que o user digitou no upload
+                        'usage_description': (ref.usage_description or '').strip(),
+                    })
                 except Exception:
                     pass
     except Exception:
