@@ -211,14 +211,27 @@ def generate_post_image(
         except Exception:
             logger.exception('Falha ao aplicar overlay Pillow — retornando PNG raw')
 
+    # Calcula custo real combinando tokens input + cobranca flat por imagem
+    usage_meta = response_json.get('usageMetadata', {}) or {}
+    n_candidates = len(response_json.get('candidates', []) or [])
+    images_out = max(1, n_candidates)
+    input_tokens = int(usage_meta.get('promptTokenCount', 0) or 0)
+    # Gemini 3 Pro Image pricing oficial:
+    #   - Input text tokens: $0.10 / 1M
+    #   - Output image: $0.04 por imagem 1024px
+    input_cost = Decimal(input_tokens) * Decimal('0.10') / Decimal('1000000')
+    output_cost = Decimal(images_out) * Decimal('0.04')
+    real_cost = float(input_cost + output_cost)
+
     return {
         'png_bytes': png_bytes,
         'mime_type': mime_type,
-        'cost_usd': float(COST_PER_IMAGE_USD),
+        'cost_usd': real_cost,
         'model': model_used,
-        'usage': response_json.get('usageMetadata', {}),
+        'usage': usage_meta,
         'prompt_text': prompt_text,
         'text_render_mode': text_render_mode,
+        'images_generated': images_out,
     }
 
 

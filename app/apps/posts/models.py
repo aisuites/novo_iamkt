@@ -241,6 +241,34 @@ class Post(models.Model):
         verbose_name='Contexto pipeline local',
         help_text='Logos/refs selecionados + descricao de uso (somente pipeline local)'
     )
+
+    # ============================================================
+    # CUSTOS DE IA — totalizadores agregados + historico granular
+    # ============================================================
+    total_text_cost_usd = models.DecimalField(
+        max_digits=10, decimal_places=6, default=0,
+        verbose_name='Custo total texto (USD)',
+        help_text='Acumulado de todas as chamadas de IA para gerar texto'
+    )
+    total_image_cost_usd = models.DecimalField(
+        max_digits=10, decimal_places=6, default=0,
+        verbose_name='Custo total imagem (USD)',
+        help_text='Acumulado de todas as chamadas de IA para gerar imagem'
+    )
+    total_cost_usd = models.DecimalField(
+        max_digits=10, decimal_places=6, default=0,
+        verbose_name='Custo total (USD)',
+        help_text='Soma de todos os custos de IA deste post (multiplas geracoes incluidas)'
+    )
+    ai_usage_log = models.JSONField(
+        default=list, blank=True,
+        verbose_name='Log de uso de IA',
+        help_text=(
+            'Historico granular de cada chamada (Claude/Gemini). '
+            'Cada entry: {timestamp, step, model, input_tokens, output_tokens, '
+            'images_generated, cost_usd, cost_brl}'
+        )
+    )
     
     # Status e aprovação
     status = models.CharField(

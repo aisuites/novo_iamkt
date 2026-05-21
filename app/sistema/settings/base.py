@@ -22,6 +22,10 @@ ENABLE_LOCAL_PIPELINE = config(
     cast=bool,
 )
 
+# Cotacao USD -> BRL usada nos custos de IA registrados em Post.ai_usage_log
+# Atualizar via env conforme variacao do dolar. Default = 5.80 (mai/2026)
+USD_TO_BRL_RATE = config('USD_TO_BRL_RATE', default=5.80, cast=float)
+
 # APPLICATION DEFINITION
 DJANGO_APPS = [
     'django.contrib.admin',

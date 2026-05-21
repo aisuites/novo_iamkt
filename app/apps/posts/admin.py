@@ -35,6 +35,8 @@ class PostAdmin(admin.ModelAdmin):
         'status',
         'user',
         'organization',
+        'cost_usd_display',
+        'cost_brl_display',
         'created_at',
     ]
     list_filter = [
@@ -58,6 +60,11 @@ class PostAdmin(admin.ModelAdmin):
         'image_s3_url',
         'image_s3_key',
         'has_image',
+        'total_text_cost_usd',
+        'total_image_cost_usd',
+        'total_cost_usd',
+        'cost_brl_display',
+        'ai_usage_log_pretty',
     ]
     fieldsets = (
         ('Informações Básicas', {
@@ -115,6 +122,17 @@ class PostAdmin(admin.ModelAdmin):
                 'revisions_remaining',
             )
         }),
+        ('Custos de IA', {
+            'fields': (
+                'total_text_cost_usd',
+                'total_image_cost_usd',
+                'total_cost_usd',
+                'cost_brl_display',
+                'ai_usage_log_pretty',
+            ),
+            'description': 'Custos acumulados de chamadas Claude/Gemini neste post. Histórico granular abaixo.',
+            'classes': ('collapse',),
+        }),
         ('Timestamps', {
             'fields': (
                 'created_at',
@@ -122,12 +140,65 @@ class PostAdmin(admin.ModelAdmin):
             )
         }),
     )
-    
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
         return qs.filter(organization=request.user.organization)
+
+    # ---- Display helpers para custos de IA ----
+
+    def cost_usd_display(self, obj):
+        return f'${obj.total_cost_usd:.4f}' if obj.total_cost_usd else '—'
+    cost_usd_display.short_description = 'Custo USD'
+    cost_usd_display.admin_order_field = 'total_cost_usd'
+
+    def cost_brl_display(self, obj):
+        from django.conf import settings as dj_settings
+        rate = float(getattr(dj_settings, 'USD_TO_BRL_RATE', 5.80))
+        brl = float(obj.total_cost_usd or 0) * rate
+        return f'R$ {brl:.4f}' if brl else '—'
+    cost_brl_display.short_description = 'Custo BRL'
+
+    def ai_usage_log_pretty(self, obj):
+        """Renderiza ai_usage_log como tabela HTML legivel."""
+        from django.utils.html import format_html
+        log = obj.ai_usage_log or []
+        if not log:
+            return '—'
+        rows = []
+        for entry in log:
+            ts = (entry.get('timestamp') or '')[:19].replace('T', ' ')
+            rows.append(
+                f'<tr>'
+                f'<td style="padding:4px 8px">{ts}</td>'
+                f'<td style="padding:4px 8px">{entry.get("step", "?")}</td>'
+                f'<td style="padding:4px 8px">{entry.get("model", "?")}</td>'
+                f'<td style="padding:4px 8px;text-align:right">{entry.get("input_tokens", 0)}</td>'
+                f'<td style="padding:4px 8px;text-align:right">{entry.get("output_tokens", 0)}</td>'
+                f'<td style="padding:4px 8px;text-align:right">{entry.get("images_generated", 0)}</td>'
+                f'<td style="padding:4px 8px;text-align:right">${entry.get("cost_usd", 0):.4f}</td>'
+                f'<td style="padding:4px 8px;text-align:right">R$ {entry.get("cost_brl", 0):.4f}</td>'
+                f'</tr>'
+            )
+        table = (
+            '<table style="border-collapse:collapse;width:100%;font-size:12px">'
+            '<thead><tr style="background:#f0f0f0">'
+            '<th style="padding:4px 8px;text-align:left">Quando</th>'
+            '<th style="padding:4px 8px;text-align:left">Etapa</th>'
+            '<th style="padding:4px 8px;text-align:left">Modelo</th>'
+            '<th style="padding:4px 8px;text-align:right">In tokens</th>'
+            '<th style="padding:4px 8px;text-align:right">Out tokens</th>'
+            '<th style="padding:4px 8px;text-align:right">Imagens</th>'
+            '<th style="padding:4px 8px;text-align:right">USD</th>'
+            '<th style="padding:4px 8px;text-align:right">BRL</th>'
+            '</tr></thead><tbody>'
+            + ''.join(rows) +
+            '</tbody></table>'
+        )
+        return format_html(table)
+    ai_usage_log_pretty.short_description = 'Histórico de uso de IA'
 
 
 @admin.register(PostChangeRequest)

@@ -446,7 +446,12 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     post.save()
 
     # Loga custo
-    _log_usage_gemini(post, result['model'], result.get('cost_usd', 0))
+    _log_usage_gemini(
+        post,
+        result['model'],
+        result.get('cost_usd', 0),
+        usage_metadata=result.get('usage') or {},
+    )
 
     logger.info(
         '[posts.local] generate_post_image_task OK post_id=%s s3_key=%s cost=$%s',
@@ -849,51 +854,99 @@ def _upload_image_to_s3(*, org_id: int, post_id: int, png_bytes: bytes, mime_typ
     return s3_key, s3_url
 
 
-def _log_usage_gemini(post, model: str, cost_usd: float):
-    """Loga custo Gemini em AIUsageLog (defensivo)."""
-    try:
-        from apps.core.models import AIUsageLog
-    except ImportError:
-        return
-    try:
-        AIUsageLog.objects.create(
-            organization=post.organization,
-            post=post,
-            user=post.user,
-            provider=AIUsageLog.Provider.GEMINI,
-            model=model,
-            purpose=AIUsageLog.Purpose.GENERATE_POST_IMAGE,
-            input_tokens=0,
-            output_tokens=0,
-            total_tokens=0,
-            cost_usd=Decimal(str(cost_usd or 0)),
-            raw_usage={'note': 'Gemini image generation — cost flat-rate estimate'},
-        )
-    except Exception:
-        logger.exception('Falha ao salvar AIUsageLog (Gemini)')
+def _log_usage_gemini(post, model: str, cost_usd: float, usage_metadata: dict = None):
+    """
+    Loga custo Gemini no Post.ai_usage_log.
+    usage_metadata: dict do response.usageMetadata do Gemini (tokens reais)
+    """
+    meta = usage_metadata or {}
+    usage_dict = {
+        'input_tokens': int(meta.get('promptTokenCount', 0) or 0),
+        'output_tokens': int(meta.get('candidatesTokenCount', 0) or 0),
+        'total_tokens': int(meta.get('totalTokenCount', 0) or 0),
+        'cost_usd': float(cost_usd or 0),
+    }
+    _record_ai_usage(
+        post,
+        step='image_generation',
+        model=model,
+        usage_dict=usage_dict,
+        images_generated=1,
+    )
 
 
 def _log_usage(post, model: str, usage: dict, purpose: str):
-    """Salva AIUsageLog para a chamada. No-op se o model nao existir nesta branch."""
+    """Wrapper retrocompativel — apenas redireciona para _record_ai_usage."""
+    _record_ai_usage(
+        post,
+        step='text_generation',
+        model=model,
+        usage_dict=usage,
+        images_generated=0,
+    )
+
+
+def _record_ai_usage(post, *, step: str, model: str, usage_dict: dict,
+                     images_generated: int = 0):
+    """
+    Acumula custo de IA no Post + adiciona entry granular no ai_usage_log.
+
+    step: 'text_generation' | 'image_generation'
+    usage_dict: dict com input_tokens, output_tokens, cost_usd (e demais)
+    images_generated: para Gemini, quantas imagens foram geradas (cobranca flat)
+    """
+    from django.conf import settings as dj_settings
+    from django.utils import timezone as dj_tz
+
+    rate = float(getattr(dj_settings, 'USD_TO_BRL_RATE', 5.80))
+    cost_usd_dec = Decimal(str(usage_dict.get('cost_usd', 0) or 0))
+    cost_brl_dec = cost_usd_dec * Decimal(str(rate))
+
+    entry = {
+        'timestamp': dj_tz.now().isoformat(),
+        'step': step,
+        'model': model,
+        'input_tokens': int(usage_dict.get('input_tokens', 0) or 0),
+        'output_tokens': int(usage_dict.get('output_tokens', 0) or 0),
+        'cache_read_tokens': int(usage_dict.get('cache_read_input_tokens', 0) or 0),
+        'cache_creation_tokens': int(usage_dict.get('cache_creation_input_tokens', 0) or 0),
+        'total_tokens': int(usage_dict.get('total_tokens', 0) or 0),
+        'images_generated': int(images_generated or 0),
+        'cost_usd': float(cost_usd_dec),
+        'cost_brl': float(cost_brl_dec.quantize(Decimal('0.0001'))),
+        'usd_to_brl_rate': rate,
+    }
+
+    # Re-fetch para evitar race conditions (multiplas chamadas em paralelo)
     try:
-        from apps.core.models import AIUsageLog
-    except ImportError:
-        logger.debug('AIUsageLog nao disponivel nesta branch — pulando log de custo')
-        return
-    try:
-        AIUsageLog.objects.create(
-            organization=post.organization,
-            post=post,
-            user=post.user,
-            provider=AIUsageLog.Provider.ANTHROPIC,
-            model=model,
-            purpose=AIUsageLog.Purpose.GENERATE_POST_TEXT,
-            input_tokens=usage.get('input_tokens', 0),
-            output_tokens=usage.get('output_tokens', 0),
-            cached_input_tokens=usage.get('cache_read_input_tokens', 0),
-            total_tokens=usage.get('total_tokens', 0),
-            cost_usd=Decimal(str(usage.get('cost_usd', 0))),
-            raw_usage=usage,
-        )
+        from apps.posts.models import Post
+        post.refresh_from_db(fields=[
+            'ai_usage_log', 'total_text_cost_usd', 'total_image_cost_usd',
+            'total_cost_usd',
+        ])
     except Exception:
-        logger.exception('Falha ao salvar AIUsageLog')
+        pass
+
+    log = post.ai_usage_log if isinstance(post.ai_usage_log, list) else []
+    log.append(entry)
+    post.ai_usage_log = log
+
+    if step == 'text_generation':
+        post.total_text_cost_usd = (post.total_text_cost_usd or Decimal('0')) + cost_usd_dec
+    elif step == 'image_generation':
+        post.total_image_cost_usd = (post.total_image_cost_usd or Decimal('0')) + cost_usd_dec
+    post.total_cost_usd = (post.total_cost_usd or Decimal('0')) + cost_usd_dec
+
+    post.save(update_fields=[
+        'ai_usage_log',
+        'total_text_cost_usd',
+        'total_image_cost_usd',
+        'total_cost_usd',
+    ])
+
+    logger.info(
+        '[ai_cost] post=%s step=%s model=%s tokens_in=%d tokens_out=%d images=%d cost=$%s (R$%s)',
+        post.id, step, model,
+        entry['input_tokens'], entry['output_tokens'], entry['images_generated'],
+        entry['cost_usd'], entry['cost_brl'],
+    )
