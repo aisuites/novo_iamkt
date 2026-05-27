@@ -69,9 +69,21 @@ O QUE EXTRAIR (preencha tudo que for observavel)
   (dominante/secundaria/acento)}.
 - tipografia_observada: {presente (bool), estilo (serif/sans/script/display),
   peso, caixa (alta/baixa/mista), descricao}. Vazio se nao ha texto.
-- texto_x_imagem: {ha_texto (bool), posicao_texto (use as 9 ancoras:
-  top-left..bottom-right), alinhamento (left/center/right), relacao_com_sujeito
-  (sobreposto/ao_lado/area_limpa), contraste_fundo}.
+- texto_x_imagem: relacao entre texto e imagem. Campos:
+  - ha_texto (bool)
+  - posicao_texto: ONDE o bloco de texto esta no canvas (9 ancoras:
+    top-left..bottom-right). Isto e POSICAO, nao alinhamento.
+  - alinhamento_paragrafo: como as LINHAS do texto estao flushadas DENTRO do
+    bloco — "esquerda" | "centro" | "direita" | "justificado". ATENCAO: e
+    diferente de posicao. Ex: um bloco posicionado a esquerda do canvas pode
+    ter paragrafo centralizado. Olhe a borda das linhas: se as linhas comecam
+    todas na mesma margem esquerda e terminam irregulares -> "esquerda".
+  - blocos: lista de cada bloco de texto visivel, cada um com {papel
+    (titulo|subtitulo|cta|corpo|outro), texto_aprox (curto, pode resumir),
+    alinhamento_paragrafo, caixa (alta|baixa|mista), peso (bold|regular|...)}.
+    Capture o alinhamento de paragrafo de CADA bloco (titulo, subtitulo etc).
+  - relacao_com_sujeito: sobreposto | ao_lado | area_limpa
+  - contraste_fundo: descreva.
 - logo_na_referencia: {presente (bool), posicao (9 ancoras), tamanho_relativo,
   aplicacao (sobre_foto/area_solida/transparente), fundo}. Vazio se nao ha logo.
 - assets_grafismos: lista de elementos graficos (formas, faixas, padroes,
@@ -100,7 +112,7 @@ FORMATO DE SAIDA (JSON puro, sem markdown)
   "iluminacao": {"tipo": "...", "direcao": "...", "temperatura": "...", "intensidade": "...", "sombras": "...", "qualidade": "..."},
   "paleta_observada": [{"hex": "#RRGGBB", "nome": "...", "papel": "dominante"}],
   "tipografia_observada": {"presente": false, "estilo": "", "peso": "", "caixa": "", "descricao": ""},
-  "texto_x_imagem": {"ha_texto": false, "posicao_texto": "", "alinhamento": "", "relacao_com_sujeito": "", "contraste_fundo": ""},
+  "texto_x_imagem": {"ha_texto": false, "posicao_texto": "", "alinhamento_paragrafo": "", "blocos": [{"papel": "titulo", "texto_aprox": "", "alinhamento_paragrafo": "esquerda", "caixa": "mista", "peso": "bold"}], "relacao_com_sujeito": "", "contraste_fundo": ""},
   "logo_na_referencia": {"presente": false, "posicao": "", "tamanho_relativo": "", "aplicacao": "", "fundo": ""},
   "assets_grafismos": [{"tipo": "...", "posicao": "...", "cor": "...", "estilo": "...", "funcao": "..."}],
   "grid": {"colunas": 0, "zonas": [{"nome": "...", "x_pct": 0, "y_pct": 0, "largura_pct": 0, "altura_pct": 0, "conteudo": "..."}], "alinhamento_geral": "", "margens_pct": 0},
@@ -344,13 +356,30 @@ def _svg_to_png(svg_bytes: bytes) -> Optional[bytes]:
         return None
 
 
+def _sniff_mime(data: bytes, fallback: str = 'image/png') -> str:
+    """Detecta o tipo real da imagem pelos magic bytes. O Content-Type do S3
+    costuma mentir (arquivo .png que na verdade e JPEG), e a Anthropic recusa
+    quando media_type != bytes reais."""
+    allowed = ('image/png', 'image/jpeg', 'image/webp', 'image/gif')
+    if data and len(data) >= 12:
+        if data[:3] == b'\xff\xd8\xff':
+            return 'image/jpeg'
+        if data[:8] == b'\x89PNG\r\n\x1a\n':
+            return 'image/png'
+        if data[:6] in (b'GIF87a', b'GIF89a'):
+            return 'image/gif'
+        if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+            return 'image/webp'
+    return fallback if fallback in allowed else 'image/png'
+
+
 def _download_bytes(url: str) -> Tuple[Optional[bytes], str]:
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 IAMKT'})
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = resp.read()
             ct = resp.headers.get('Content-Type', 'image/png').split(';')[0].strip()
-        return data, ct
+        return data, _sniff_mime(data, ct)
     except Exception:
         return None, 'image/png'
 
@@ -365,9 +394,7 @@ def _download_to_base64(url: str) -> Tuple[Optional[str], str]:
             ct = resp.headers.get('Content-Type', 'image/png').split(';')[0].strip()
     except Exception:
         return None, 'image/png'
-    if ct not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
-        ct = 'image/png'
-    return base64.b64encode(data).decode('ascii'), ct
+    return base64.b64encode(data).decode('ascii'), _sniff_mime(data, ct)
 
 
 def _parse_json(text: str) -> Optional[Dict[str, Any]]:
