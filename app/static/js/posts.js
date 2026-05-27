@@ -847,6 +847,8 @@
       selected_logo_ids: payload.selectedLogoIds || [],
       selected_reference_ids: payload.selectedReferenceIds || [],
       references_usage_description: payload.refsUsageDescription || '',
+      reference_aspects: payload.referenceAspects || {},
+      logo_position: payload.logoPosition || '',
     };
 
     logger.debug('[POSTS] Enviando post para Django:', endpoint, jsonPayload);
@@ -946,6 +948,10 @@
         const refsUsageDescription = etapa4.getRefsUsageDescription
           ? etapa4.getRefsUsageDescription()
           : '';
+        const referenceAspects = etapa4.getReferenceAspects
+          ? etapa4.getReferenceAspects()
+          : {};
+        const logoPosition = document.getElementById('logoPosition')?.value || '';
 
         const payload = {
           rede,
@@ -959,6 +965,8 @@
           selectedLogoIds,
           selectedReferenceIds,
           refsUsageDescription,
+          referenceAspects,
+          logoPosition,
         };
 
         const result = await requestPostFromAgent(payload, pipeline);
@@ -2339,8 +2347,19 @@
     references: [],
     selectedLogoIds: new Set(),
     selectedRefIds: new Set(),
+    refAspects: {},   // { refId: 'layout_composicao' | 'iluminacao' | ... }
     loaded: false,
   };
+
+  // Aspecto a aproveitar de cada referencia (1 por imagem, exclusivo entre elas)
+  const REFERENCE_ASPECTS = [
+    { value: '', label: 'O que aproveitar...' },
+    { value: 'layout_composicao', label: 'Layout / composicao' },
+    { value: 'iluminacao', label: 'Iluminacao' },
+    { value: 'estilo_pessoas', label: 'Estilo de pessoas' },
+    { value: 'estilo_ambiente', label: 'Estilo de ambiente' },
+    { value: 'grafismos', label: 'Grafismos' },
+  ];
 
   // Cada uploaded image: {file, dataUrl, name, usageType, usageDescription}
   const uploadedImagesState = [];
@@ -2423,12 +2442,80 @@
         title: ref.title || ref.description || 'referencia',
         badge: '',
         selectedSet: orgAssetsState.selectedRefIds,
+        onToggle: renderAspectsArea,
       });
       container.appendChild(thumb);
     });
+    renderAspectsArea();
   }
 
-  function buildAssetThumb({ id, url, title, badge, selectedSet, singleSelect, galleryEl }) {
+  // Area de aspectos: 1 linha por ref SELECIONADA, com select exclusivo do
+  // que aproveitar daquela imagem.
+  function renderAspectsArea() {
+    const area = document.getElementById('refsAspectsArea');
+    if (!area) return;
+    const selectedIds = Array.from(orgAssetsState.selectedRefIds);
+
+    // Limpa aspectos de refs que foram desmarcadas
+    Object.keys(orgAssetsState.refAspects).forEach((rid) => {
+      if (!selectedIds.some((s) => String(s) === String(rid))) {
+        delete orgAssetsState.refAspects[rid];
+      }
+    });
+
+    area.innerHTML = '';
+    if (!selectedIds.length) {
+      const empty = document.createElement('div');
+      empty.className = 'refs-aspects-empty';
+      empty.textContent = area.dataset.emptyText || 'Selecione referencias acima.';
+      area.appendChild(empty);
+      return;
+    }
+
+    const used = new Set(Object.values(orgAssetsState.refAspects).filter(Boolean));
+
+    selectedIds.forEach((rid) => {
+      const ref = orgAssetsState.references.find((r) => String(r.id) === String(rid));
+      if (!ref) return;
+      const row = document.createElement('div');
+      row.className = 'refs-aspect-row';
+
+      const thumb = document.createElement('img');
+      thumb.className = 'refs-aspect-thumb';
+      thumb.src = ref.url;
+      thumb.alt = ref.title || '';
+      thumb.loading = 'lazy';
+      row.appendChild(thumb);
+
+      const name = document.createElement('span');
+      name.className = 'refs-aspect-name';
+      name.textContent = ref.title || ref.description || `Referencia ${rid}`;
+      row.appendChild(name);
+
+      const sel = document.createElement('select');
+      sel.className = 'refs-aspect-select form-input-filter';
+      const mine = orgAssetsState.refAspects[rid] || '';
+      REFERENCE_ASPECTS.forEach((o) => {
+        const opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        // exclusividade: desabilita aspectos ja usados por OUTRA ref
+        opt.disabled = !!o.value && o.value !== mine && used.has(o.value);
+        if (o.value === mine) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener('change', (e) => {
+        const v = e.target.value;
+        if (v) orgAssetsState.refAspects[rid] = v;
+        else delete orgAssetsState.refAspects[rid];
+        renderAspectsArea();
+      });
+      row.appendChild(sel);
+      area.appendChild(row);
+    });
+  }
+
+  function buildAssetThumb({ id, url, title, badge, selectedSet, singleSelect, galleryEl, onToggle }) {
     const div = document.createElement('div');
     div.className = 'asset-thumb';
     div.dataset.id = String(id);
@@ -2483,6 +2570,7 @@
           selectedSet.add(id);
           div.classList.add('selected');
         }
+        if (typeof onToggle === 'function') onToggle();
       }, 220);
     });
 
@@ -2662,6 +2750,17 @@
     uploadedImagesState,
     getRefsUsageDescription: () =>
       document.getElementById('refsUsageDescription')?.value.trim() || '',
+    // { refId: aspecto } apenas das refs efetivamente selecionadas
+    getReferenceAspects: () => {
+      const out = {};
+      const sel = orgAssetsState.selectedRefIds;
+      Object.entries(orgAssetsState.refAspects).forEach(([rid, asp]) => {
+        if (asp && Array.from(sel).some((s) => String(s) === String(rid))) {
+          out[rid] = asp;
+        }
+      });
+      return out;
+    },
   };
 
   // Bootstrap: carrega galerias e ativa lightbox

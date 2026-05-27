@@ -69,6 +69,30 @@ def gerar_post_local(request):
         selected_logo_ids = selected_logo_ids[:1]
     selected_reference_ids = data.get('selected_reference_ids') or []
     references_usage_description = (data.get('references_usage_description') or '').strip()
+    # Aspecto por ref selecionada: {ref_id: 'layout_composicao'|'iluminacao'|...}.
+    # Exclusivo/unico por imagem (validacao defensiva: 1 ref por aspecto).
+    reference_aspects = data.get('reference_aspects') or {}
+    if isinstance(reference_aspects, dict):
+        _seen_aspects = {}
+        for _rid, _asp in list(reference_aspects.items()):
+            _asp = (_asp or '').strip()
+            if _asp and _asp in _seen_aspects:
+                # conflito: mesmo aspecto em 2+ imagens — mantem a 1a, ignora demais
+                logger.warning('[posts.local] aspecto duplicado "%s" — ignorando ref %s', _asp, _rid)
+                reference_aspects[_rid] = ''
+            elif _asp:
+                _seen_aspects[_asp] = _rid
+    else:
+        reference_aspects = {}
+    # Posicao do logo escolhida no modal (9 ancoras) — '' = automatica (dossie)
+    logo_position = (data.get('logo_position') or '').strip()
+    _valid_logo_pos = {
+        'top-left', 'top-center', 'top-right',
+        'middle-left', 'middle-center', 'middle-right',
+        'bottom-left', 'bottom-center', 'bottom-right',
+    }
+    if logo_position and logo_position not in _valid_logo_pos:
+        logo_position = ''
 
     # ---- Validacoes (mesmo padrao do gerar_post original) ----
     valid_redes = ['instagram', 'facebook', 'linkedin', 'whatsapp']
@@ -137,6 +161,8 @@ def gerar_post_local(request):
                     'selected_logo_ids': list(selected_logo_ids or []),
                     'selected_reference_ids': list(selected_reference_ids or []),
                     'references_usage_description': references_usage_description,
+                    'reference_aspects': reference_aspects,
+                    'logo_position': logo_position,
                 },
             )
 

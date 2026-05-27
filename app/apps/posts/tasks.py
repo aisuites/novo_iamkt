@@ -301,50 +301,24 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     import os as _os
     text_render_mode = (
         ctx.get('text_render_mode')
-        or _os.environ.get('POST_TEXT_RENDER_MODE', 'inline')
+        or _os.environ.get('POST_TEXT_RENDER_MODE', 'pillow')
     ).lower()
 
     # Coleta logos + uploads como image_parts (refs KB NAO sao mais
-    # incluidas — viram direcionamento textual pelo translator abaixo)
+    # incluidas — viram dossie textual lido de visual_analysis, ver abaixo)
     references = _collect_references(kb=kb, post=post, text_render_mode=text_render_mode)
 
     # ============================================================
-    # KB REFERENCE TRANSLATOR — extrai directives das refs da KB
+    # DOSSIE DAS REFS DA KB — lookup puro (sem reanalise por Vision)
     # ============================================================
-    # Refs selecionadas pelo user na galeria + usage_description -> Claude
-    # multimodal analisa e produz texto estruturado por categoria. Vai
-    # como bloco no prompt do Gemini, NAO como imagem.
-    # Cache em local_pipeline_context.kb_refs_translations (hash dos inputs).
+    # Le o dossie visual ja gravado em ReferenceImage.visual_analysis das
+    # refs selecionadas. Gatilho 3: se alguma ainda nao foi analisada,
+    # analisa inline AGORA e persiste (a info fica garantida para sempre).
+    # O dossie + a intencao do user vao para o ORCHESTRATOR, que decide o
+    # quanto de cada aspecto entra no prompt final do Gemini. kb_translations
+    # so e usado como fallback quando o orchestrator nao roda.
+    kb_dossiers = _collect_kb_dossiers(kb=kb, post=post)
     kb_translations = []
-    kb_refs_for_translation = _collect_kb_refs_for_translation(kb=kb, post=post)
-    if kb_refs_for_translation:
-        try:
-            from apps.posts.services.kb_reference_translator import (
-                translate_kb_references, _hash_inputs as _kb_hash_inputs,
-            )
-            input_hash = _kb_hash_inputs(kb_refs_for_translation)
-            cached = ctx.get('kb_refs_translations') or {}
-            if cached.get('input_hash') == input_hash and cached.get('translations'):
-                kb_translations = cached.get('translations') or []
-                logger.info('[kb_translator] cache HIT (%d translations)', len(kb_translations))
-            else:
-                tr_result = translate_kb_references(kb_refs_for_translation)
-                if tr_result and tr_result.get('translations'):
-                    kb_translations = tr_result['translations']
-                    ctx['kb_refs_translations'] = {
-                        'analyzed_at': dj_tz_now_iso(),
-                        'input_hash': tr_result.get('input_hash'),
-                        'translations': kb_translations,
-                    }
-                    post.local_pipeline_context = ctx
-                    post.save(update_fields=['local_pipeline_context'])
-                    _record_ai_usage(
-                        post, step='kb_reference_translation',
-                        model=tr_result.get('model', 'claude-sonnet-4-5'),
-                        usage_dict=tr_result.get('usage') or {},
-                    )
-        except Exception:
-            logger.exception('[kb_translator] falhou — segue sem directives')
 
     # Adiciona references_usage_description ao marketing_input_summary
     if refs_usage_general:
@@ -368,7 +342,9 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     orchestrator_disabled = _os.environ.get('POST_DISABLE_ORCHESTRATOR', '').lower() in ('1', 'true', 'yes')
     orchestration_output = None
     spatial_instructions = ''
-    if not orchestrator_disabled and references:
+    # Orchestrator roda quando ha imagens (logos/uploads) OU dossies de refs
+    # da KB selecionadas — ele e quem filtra os dossies pela intencao do user.
+    if not orchestrator_disabled and (references or kb_dossiers):
         try:
             from apps.posts.services.post_orchestrator import orchestrate_post
             aspect = (post.post_format.aspect_ratio if post.post_format else '') or ''
@@ -381,6 +357,7 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
                 references_usage_description=ctx.get('references_usage_description', '') or '',
                 formato_px=formato_px,
                 aspect_ratio=aspect,
+                kb_dossiers=kb_dossiers,
             )
             if orch_result:
                 orchestration_output = orch_result['orchestration']
@@ -409,10 +386,22 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
                 )
         except Exception:
             logger.exception('[orchestrator] falhou — segue com prompt cru')
+
+    # Fallback (orchestrator off/falhou): injeta dossies como directives
+    # textuais no prompt do Gemini, SEM IA extra (lookup puro).
+    if kb_dossiers and orchestration_output is None:
+        kb_translations = _dossiers_to_translations(kb_dossiers)
+
+    # Se ha uma ref marcada com aspecto 'layout_composicao', queremos replicar
+    # o layout dela com as FONTES da KB — isso exige modo pillow.
+    layout_dossier = _layout_dossier(kb_dossiers)
+    if layout_dossier:
+        text_render_mode = 'pillow'
     # ============================================================
 
     # Smart Pillow overlay — prepara layout_spec, fonts e logo se mode='pillow'
-    # Quando o orchestrator gerou layout_plan, usa-o (preferencia ao fallback)
+    # Ordem de precedencia (modal vence): brand_spec (base) < orchestrator <
+    # dossie do aspecto 'layout_composicao' selecionado no modal.
     pillow_kwargs = {}
     if text_render_mode == 'pillow':
         pillow_kwargs = _prepare_pillow_overlay(post, kb, formato_px)
@@ -422,6 +411,36 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             pillow_kwargs['pillow_layout_spec'] = _layout_plan_to_spec(
                 layout_plan, fallback=pillow_kwargs.get('pillow_layout_spec', {}),
             )
+        # OVERRIDE final — dossie da ref de layout vence (alinhamento por bloco,
+        # zonas %, peso/caixa). Fontes e cores continuam vindo da KB.
+        if layout_dossier:
+            dossier_spec = _dossier_to_layout_spec(layout_dossier, paleta=paleta)
+            # Adaptacao inteligente de formato (LLM) quando a ref de layout
+            # nasceu num aspect ratio diferente do post (ex: 1:1 -> 9:16).
+            src_ar = layout_dossier.get('_source_ar')
+            tgt_ar = _aspect_ratio_to_float(
+                post.post_format.aspect_ratio if post.post_format else ''
+            )
+            if src_ar and tgt_ar and abs(float(src_ar) - tgt_ar) / max(float(src_ar), tgt_ar) > 0.15:
+                try:
+                    from apps.posts.services.post_orchestrator import adapt_layout_spec
+                    adapted = adapt_layout_spec(dossier_spec, float(src_ar), tgt_ar, formato_px)
+                    if adapted:
+                        dossier_spec = adapted
+                        logger.info('[posts.local] layout adaptado AR %s -> %s', src_ar, tgt_ar)
+                except Exception:
+                    logger.exception('[posts.local] adaptacao de layout falhou — usa spec original')
+            pillow_kwargs['pillow_layout_spec'] = {
+                **(pillow_kwargs.get('pillow_layout_spec') or {}),
+                **dossier_spec,
+            }
+
+        # Posicao do logo escolhida no modal vence (override do dossie/spec)
+        user_logo_pos = (ctx.get('logo_position') or '').strip()
+        if user_logo_pos:
+            _spec = pillow_kwargs.get('pillow_layout_spec') or {}
+            _spec['logo_position'] = user_logo_pos
+            pillow_kwargs['pillow_layout_spec'] = _spec
 
     try:
         result = generate_post_image(
@@ -611,6 +630,184 @@ def _layout_plan_to_spec(layout_plan: dict, fallback: dict = None) -> dict:
     return base
 
 
+# ---- Layout a partir do dossie da ref marcada com aspecto 'layout' ----------
+
+_ALIGN_MAP = {
+    'esquerda': 'left', 'left': 'left',
+    'centro': 'center', 'center': 'center', 'centralizado': 'center',
+    'direita': 'right', 'right': 'right',
+    'justificado': 'left',  # Pillow nao justifica — trata como left
+}
+
+
+def _norm_align(value, default='left') -> str:
+    return _ALIGN_MAP.get(str(value or '').strip().lower(), default)
+
+
+def _anchor_from_pct(x_pct, y_pct):
+    """Mapeia x%/y% da zona para uma das 9 ancoras (logo/cta)."""
+    try:
+        x, y = float(x_pct), float(y_pct)
+    except (TypeError, ValueError):
+        return None
+    h = 'left' if x < 38 else ('center' if x < 60 else 'right')
+    v = 'top' if y < 33 else ('middle' if y < 60 else 'bottom')
+    return f'{v}-{h}'
+
+
+def _find_zone(zonas, *keywords):
+    for z in zonas or []:
+        name = (z.get('nome') or '').lower()
+        cont = (z.get('conteudo') or '').lower()
+        if any(k in name or k in cont for k in keywords):
+            return z
+    return None
+
+
+def _zone_pct(z):
+    if not z:
+        return None
+    return {
+        'x_pct': z.get('x_pct', 0),
+        'y_pct': z.get('y_pct', 0),
+        'width_pct': z.get('largura_pct') or z.get('width_pct') or 90,
+    }
+
+
+def _aspect_ratio_to_float(ar):
+    """'9:16' -> 0.5625 ; '1:1' -> 1.0. None se invalido."""
+    try:
+        s = str(ar or '')
+        if ':' in s:
+            w, h = s.split(':', 1)
+            h = float(h)
+            return round(float(w) / h, 3) if h else None
+    except Exception:
+        return None
+    return None
+
+
+def _layout_dossier(kb_dossiers):
+    """Retorna o dossie da ref marcada com aspecto 'layout_composicao' (ou None)."""
+    for d in kb_dossiers or []:
+        if (d.get('aspect') or '') == 'layout_composicao':
+            return d.get('dossier') or {}
+    return None
+
+
+def _hex_to_rgb_t(h):
+    h = (h or '').lstrip('#')
+    if len(h) != 6:
+        return None
+    try:
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    except ValueError:
+        return None
+
+
+def _nearest_palette_hex(hex_str, paleta):
+    """Cor observada -> cor mais proxima da paleta da KB (consistencia de marca)."""
+    rgb = _hex_to_rgb_t(hex_str)
+    if not rgb or not paleta:
+        return None
+    best, best_d = None, 1e18
+    for c in paleta:
+        prgb = _hex_to_rgb_t(c.get('hex'))
+        if not prgb:
+            continue
+        d = sum((a - b) ** 2 for a, b in zip(rgb, prgb))
+        if d < best_d:
+            best_d, best = d, c.get('hex')
+    return best
+
+
+def _dossier_to_layout_spec(dossier: dict, paleta: list = None) -> dict:
+    """
+    Converte o dossie de uma ref (aspecto layout) em spec parcial do Pillow:
+    zonas % de titulo/subtitulo, alinhamento/peso/caixa POR BLOCO, posicao de
+    logo/cta. Cores do texto = cor observada na ref SNAPADA na paleta da KB.
+    Fontes vem da KB.
+    """
+    spec = {}
+    tx = dossier.get('texto_x_imagem') or {}
+    blocos = tx.get('blocos') or []
+
+    def _bloco(papel):
+        for b in blocos:
+            if (b.get('papel') or '').lower() == papel:
+                return b
+        return {}
+
+    tb, sb, cb = _bloco('titulo'), _bloco('subtitulo'), _bloco('cta')
+    overall = _norm_align(tx.get('alinhamento_paragrafo'), 'left')
+    spec['title_align'] = _norm_align(tb.get('alinhamento_paragrafo'), overall)
+    spec['subtitle_align'] = _norm_align(sb.get('alinhamento_paragrafo'), overall)
+    spec['cta_align'] = _norm_align(cb.get('alinhamento_paragrafo'), overall)
+    spec['alignment'] = spec['title_align']
+    # Cor do titulo = cor primaria da marca (KB), com fallback de contraste.
+    spec['title_color_hint'] = 'brand_primary_safe'
+    # Subtitulo = neutro legivel (auto contraste), distinto do titulo de marca.
+    spec['subtitle_color_hint'] = 'auto_contrast'
+    # Se a ref informou a cor de cada bloco, snap na paleta da KB (a cor que a
+    # marca usou na referencia, garantida dentro da identidade).
+    if paleta:
+        tcor = _nearest_palette_hex(tb.get('cor'), paleta)
+        if tcor:
+            spec['title_color'] = tcor
+        scor = _nearest_palette_hex(sb.get('cor'), paleta)
+        if scor:
+            spec['subtitle_color'] = scor
+    if (tb.get('peso') or '').lower() in ('bold', 'negrito', 'semibold', 'black'):
+        spec['title_weight'] = 'bold'
+    if (tb.get('caixa') or '').lower() in ('alta', 'maiuscula', 'uppercase'):
+        spec['title_case'] = 'alta'
+    if (sb.get('caixa') or '').lower() in ('alta', 'maiuscula', 'uppercase'):
+        spec['subtitle_case'] = 'alta'
+
+    zonas = (dossier.get('grid') or {}).get('zonas') or []
+    tz = _find_zone(zonas, 'titulo', 'texto_principal', 'título', 'bloco_texto')
+    sz = _find_zone(zonas, 'subtitulo', 'texto_secundario', 'subtítulo')
+    # subtitulo so e bloco INDEPENDENTE se for uma zona distinta da do titulo
+    # (quando titulo+subtitulo compartilham uma zona, ficam colados).
+    if sz is not None and tz is not None and (
+        sz is tz or (sz.get('x_pct') == tz.get('x_pct') and sz.get('y_pct') == tz.get('y_pct'))
+    ):
+        sz = None
+    lz = _find_zone(zonas, 'logo')
+    cz = _find_zone(zonas, 'cta', 'call', 'botao', 'botão')
+
+    if tz:
+        spec['title_zone_pct'] = _zone_pct(tz)
+        if tz.get('altura_pct'):
+            # zona de titulo isolada -> fonte maior; zona compartilhada
+            # (titulo+subtitulo) -> fracao menor pra caber os dois. Teto baixo
+            # pra o texto NAO dominar a arte (peso de ocupacao da referencia).
+            frac = 0.32 if sz is not None else 0.18
+            spec['title_size_pct'] = max(5, min(float(tz['altura_pct']) * frac, 10))
+    elif tx.get('posicao_texto'):
+        spec['title_position'] = tx.get('posicao_texto')
+
+    if sz:
+        spec['subtitle_zone_pct'] = _zone_pct(sz)
+        if sz.get('altura_pct'):
+            spec['subtitle_size_pct'] = max(2.5, min(float(sz['altura_pct']) * 0.45, 6))
+
+    if lz:
+        anc = _anchor_from_pct(lz.get('x_pct'), lz.get('y_pct'))
+        if anc:
+            spec['logo_position'] = anc
+        if lz.get('largura_pct'):
+            spec['logo_size_pct'] = max(6, min(float(lz['largura_pct']), 25))
+
+    if cz:
+        anc = _anchor_from_pct(cz.get('x_pct'), cz.get('y_pct'))
+        if anc:
+            spec['cta_position'] = anc
+
+    spec['source'] = 'dossier_layout_aspect'
+    return spec
+
+
 def _prepare_pillow_overlay(post, kb, formato_px: str) -> dict:
     """
     Monta os argumentos opcionais do Smart Pillow Overlay:
@@ -657,7 +854,8 @@ def _prepare_pillow_overlay(post, kb, formato_px: str) -> dict:
 
     try:
         out['pillow_subtitle_font_path'] = (
-            resolve_font_for_kb(kb, usage_filter='corpo', weight='regular')
+            resolve_font_for_kb(kb, usage_filter='subtitulo', weight='regular')
+            or resolve_font_for_kb(kb, usage_filter='corpo', weight='regular')
             or resolve_font_for_kb(kb, usage_filter='texto', weight='regular')
             or system_dejavu_path('regular')
         )
@@ -865,51 +1063,101 @@ def _collect_references(kb, post, text_render_mode: str = 'inline') -> list:
     return out
 
 
-def _collect_kb_refs_for_translation(kb, post) -> list:
+def _collect_kb_dossiers(kb, post) -> list:
     """
-    Coleta refs da KB selecionadas pelo user no modal. Retorna lista
-    de dicts {id, url, usage_description} para passar ao
-    kb_reference_translator.
+    Le os dossies visuais (ReferenceImage.visual_analysis) das refs da KB
+    selecionadas pelo user no modal. LOOKUP PURO — nao reanalisa o que ja
+    tem dossie.
 
-    Fallback: se a ref KB individual nao tem usage_description, usa o
-    references_usage_description geral (textarea do modal) como guia
-    para o translator. Garante que SEMPRE haja um foco indicado.
+    Gatilho 3 (ultimo recurso): se uma ref selecionada ainda nao foi
+    analisada (status != completed), analisa inline AGORA e PERSISTE — a
+    info fica garantida para sempre, e da proxima vez e so leitura.
 
-    NAO inclui logos (logo nunca passa pelo translator — vai literal).
+    Retorna lista de dicts {id, usage_description, dossier}:
+      - usage_description: o que o user escreveu (individual ou o geral do
+        textarea) — a INTENCAO que o orchestrator usa para filtrar o dossie.
+      - dossier: o JSON objetivo gravado em visual_analysis.
+
+    NAO inclui logos (logo nao tem dossie nesta fase).
     """
-    from apps.core.services.s3_service import S3Service
-
     ctx = post.local_pipeline_context or {}
-    selected_ref_ids = set(ctx.get('selected_reference_ids') or [])
+    selected_ref_ids = list(ctx.get('selected_reference_ids') or [])
     if not (kb and selected_ref_ids):
         return []
 
     general_guidance = (ctx.get('references_usage_description') or '').strip()
+    # aspecto por ref: {ref_id(str/int): 'layout_composicao'|'iluminacao'|...}
+    reference_aspects = ctx.get('reference_aspects') or {}
+
+    from apps.knowledge.models import ReferenceImage
+    from apps.knowledge.tasks import run_reference_image_analysis
 
     out = []
-    try:
-        qs_refs = kb.reference_images.filter(id__in=selected_ref_ids)
-        for img in qs_refs:
-            if not img.s3_key:
-                continue
+    refs = ReferenceImage.objects.filter(
+        knowledge_base=kb, id__in=selected_ref_ids
+    )
+    for ref in refs:
+        # Gatilho 3 — fallback inline: analisa e persiste se faltar dossie
+        if ref.analysis_status != 'completed' or not ref.visual_analysis:
             try:
-                url = S3Service.generate_presigned_download_url(
-                    img.s3_key, expires_in=86400
-                )
-                individual_desc = (
-                    getattr(img, 'usage_description', '') or ''
-                ).strip()
-                effective_desc = individual_desc or general_guidance
-                out.append({
-                    'id': img.id,
-                    'url': url,
-                    'usage_description': effective_desc,
-                })
+                logger.info('[posts.local] ref %s sem dossie — analisando inline', ref.id)
+                run_reference_image_analysis(ref)
+                ref.refresh_from_db(fields=['visual_analysis', 'analysis_status'])
             except Exception:
-                pass
-    except Exception:
-        pass
+                logger.exception('[posts.local] fallback analise ref %s falhou', ref.id)
 
+        dossier = ref.visual_analysis if isinstance(ref.visual_analysis, dict) else {}
+        if not dossier:
+            continue
+        individual_desc = (getattr(ref, 'usage_description', '') or '').strip()
+        aspect = (
+            reference_aspects.get(str(ref.id))
+            or reference_aspects.get(ref.id)
+            or ''
+        )
+        out.append({
+            'id': ref.id,
+            'aspect': aspect,
+            'usage_description': individual_desc or general_guidance,
+            'dossier': dossier,
+        })
+    return out
+
+
+def _dossiers_to_translations(kb_dossiers: list) -> list:
+    """
+    Converte dossies em entradas kb_translations (formato consumido pelo
+    gemini builder) SEM IA. Usado apenas como fallback quando o orchestrator
+    nao roda — garante que o direcionamento das refs ainda chegue ao Gemini.
+    """
+    out = []
+    for i, d in enumerate(kb_dossiers, 1):
+        dossier = d.get('dossier') or {}
+        bits = []
+        recreation = (dossier.get('recreation_prompt') or '').strip()
+        if recreation:
+            bits.append(recreation)
+        else:
+            il = dossier.get('iluminacao') or {}
+            comp = dossier.get('composicao') or {}
+            il_txt = ' '.join(
+                str(il.get(k, '')).strip()
+                for k in ('tipo', 'direcao', 'temperatura', 'qualidade')
+            ).strip()
+            if il_txt:
+                bits.append(f'Iluminacao: {il_txt}')
+            if comp.get('enquadramento'):
+                bits.append(f"Enquadramento: {comp.get('enquadramento')}")
+        directives = ' '.join(b for b in bits if b).strip()
+        if not directives:
+            continue
+        out.append({
+            'ref_index': i,
+            'category': (dossier.get('estilo_visual') or 'referencia').replace(' ', '_').lower(),
+            'directives': directives,
+            'kb_reference_id': d.get('id'),
+            'usage_description_user': d.get('usage_description', ''),
+        })
     return out
 
 

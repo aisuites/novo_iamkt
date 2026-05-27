@@ -2280,3 +2280,41 @@ select.form-input-filter:disabled {
   cursor: not-allowed;
   pointer-events: none;
 }
+
+/* ===== Area de aspectos das referencias selecionadas (Etapa 4) ===== */
+.refs-aspects-area {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.refs-aspects-empty {
+  font-size: 12px;
+  opacity: 0.7;
+  padding: 4px 2px;
+}
+.refs-aspect-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.refs-aspect-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+.refs-aspect-name {
+  flex: 1 1 auto;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40%;
+}
+.refs-aspect-select {
+  flex: 0 0 auto;
+  min-width: 180px;
+  height: 38px;
+}

@@ -80,8 +80,9 @@ O QUE EXTRAIR (preencha tudo que for observavel)
     todas na mesma margem esquerda e terminam irregulares -> "esquerda".
   - blocos: lista de cada bloco de texto visivel, cada um com {papel
     (titulo|subtitulo|cta|corpo|outro), texto_aprox (curto, pode resumir),
-    alinhamento_paragrafo, caixa (alta|baixa|mista), peso (bold|regular|...)}.
-    Capture o alinhamento de paragrafo de CADA bloco (titulo, subtitulo etc).
+    alinhamento_paragrafo, caixa (alta|baixa|mista), peso (bold|regular|...),
+    cor (#RRGGBB aproximado da cor do TEXTO desse bloco)}.
+    Capture o alinhamento E a cor de CADA bloco (titulo, subtitulo etc).
   - relacao_com_sujeito: sobreposto | ao_lado | area_limpa
   - contraste_fundo: descreva.
 - logo_na_referencia: {presente (bool), posicao (9 ancoras), tamanho_relativo,
@@ -112,7 +113,7 @@ FORMATO DE SAIDA (JSON puro, sem markdown)
   "iluminacao": {"tipo": "...", "direcao": "...", "temperatura": "...", "intensidade": "...", "sombras": "...", "qualidade": "..."},
   "paleta_observada": [{"hex": "#RRGGBB", "nome": "...", "papel": "dominante"}],
   "tipografia_observada": {"presente": false, "estilo": "", "peso": "", "caixa": "", "descricao": ""},
-  "texto_x_imagem": {"ha_texto": false, "posicao_texto": "", "alinhamento_paragrafo": "", "blocos": [{"papel": "titulo", "texto_aprox": "", "alinhamento_paragrafo": "esquerda", "caixa": "mista", "peso": "bold"}], "relacao_com_sujeito": "", "contraste_fundo": ""},
+  "texto_x_imagem": {"ha_texto": false, "posicao_texto": "", "alinhamento_paragrafo": "", "blocos": [{"papel": "titulo", "texto_aprox": "", "alinhamento_paragrafo": "esquerda", "caixa": "mista", "peso": "bold", "cor": "#RRGGBB"}], "relacao_com_sujeito": "", "contraste_fundo": ""},
   "logo_na_referencia": {"presente": false, "posicao": "", "tamanho_relativo": "", "aplicacao": "", "fundo": ""},
   "assets_grafismos": [{"tipo": "...", "posicao": "...", "cor": "...", "estilo": "...", "funcao": "..."}],
   "grid": {"colunas": 0, "zonas": [{"nome": "...", "x_pct": 0, "y_pct": 0, "largura_pct": 0, "altura_pct": 0, "conteudo": "..."}], "alinhamento_geral": "", "margens_pct": 0},
@@ -189,6 +190,18 @@ def analyze_reference_image(
     if not structured:
         logger.error('[visual_analyzer] parse JSON falhou. Raw: %s', raw[:400])
         return None
+
+    # Registra o aspect ratio REAL da imagem de origem (W/H) — usado depois
+    # para adaptar o layout quando o post tiver um formato diferente da ref.
+    try:
+        from io import BytesIO
+        from PIL import Image
+        _w, _h = Image.open(BytesIO(base64.b64decode(b64))).size
+        if _h:
+            structured['_source_ar'] = round(_w / _h, 3)
+            structured['_source_dimensions'] = f'{_w}x{_h}'
+    except Exception:
+        pass
 
     usage = _extract_usage(resp)
     logger.info(

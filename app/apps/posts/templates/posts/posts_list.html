@@ -4,7 +4,7 @@
 {% block title %}Posts{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/posts.css' %}?v=20260302-0033">
+<link rel="stylesheet" href="{% static 'css/posts.css' %}?v=20260527-1900">
 <link rel="stylesheet" href="{% static 'css/posts-detail.css' %}?v=20260202-1323">
 <link rel="stylesheet" href="{% static 'css/confirm-modal.css' %}?v=20260202-1008">
 <link rel="stylesheet" href="{% static 'css/toaster.css' %}?v=20260202-1008">
@@ -363,6 +363,21 @@
                     <div class="asset-gallery-loading">Carregando logos...</div>
                 </div>
                 <small class="asset-hint">Clique para escolher o logo. Duplo-click para ampliar. Apenas 1 logo por post — sera aplicado fielmente sem alteracao.</small>
+                <div class="field" style="margin-top: 8px;">
+                    <label for="logoPosition" class="small-label">Posicao do logo na arte</label>
+                    <select id="logoPosition" name="logoPosition" class="form-input-filter">
+                        <option value="">Automatica (segue a referencia)</option>
+                        <option value="top-left">Topo / Esquerda</option>
+                        <option value="top-center">Topo / Centro</option>
+                        <option value="top-right">Topo / Direita</option>
+                        <option value="middle-left">Meio / Esquerda</option>
+                        <option value="middle-center">Meio / Centro</option>
+                        <option value="middle-right">Meio / Direita</option>
+                        <option value="bottom-left">Base / Esquerda</option>
+                        <option value="bottom-center">Base / Centro</option>
+                        <option value="bottom-right">Base / Direita</option>
+                    </select>
+                </div>
             </div>
 
             <!-- LINHA 5: Referencias da KB -->
@@ -371,11 +386,8 @@
                 <div id="orgRefsGallery" class="asset-gallery" data-empty-text="Nenhuma imagem de referencia na KB.">
                     <div class="asset-gallery-loading">Carregando referencias...</div>
                 </div>
-                <div class="field" style="margin-top: 8px;">
-                    <label for="refsUsageDescription" class="small-label">Como usar essas referencias?</label>
-                    <textarea id="refsUsageDescription" name="refsUsageDescription"
-                              class="form-input-filter" rows="2" maxlength="500"
-                              placeholder="Ex: usar como inspiracao de fotografia e iluminacao, manter paleta de cores..."></textarea>
+                <div id="refsAspectsArea" class="refs-aspects-area" data-empty-text="Selecione uma ou mais referencias acima e escolha o que aproveitar de cada uma.">
+                    <div class="refs-aspects-empty">Selecione uma ou mais referencias acima e escolha o que aproveitar de cada uma.</div>
                 </div>
             </div>
 
@@ -492,7 +504,7 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260303-0334"></script>
+<script src="{% static 'js/posts.js' %}?v=20260527-2130"></script>
 <!-- Temporariamente desabilitados para debug -->
 <!-- <script src="{% static 'js/posts-modal.js' %}?v=20260203-0129"></script> -->
 <!-- <script src="{% static 'js/posts-gallery.js' %}?v=20260203-0129"></script> -->

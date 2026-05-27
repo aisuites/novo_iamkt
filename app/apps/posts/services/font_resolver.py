@@ -63,18 +63,61 @@ def resolve_font_for_kb(
     if not typographies:
         return None
 
-    # Heuristica: matching por substring (case-insensitive)
-    usage_filter_lower = (usage_filter or '').lower()
-    matched = None
-    for t in typographies:
-        if usage_filter_lower in (t.usage or '').lower():
-            matched = t
-            break
-    if not matched:
-        # Pega a primeira como fallback
+    # Matching por substring SEM ACENTO ('titulo' casa 'Títulos'); entre os
+    # que casam, escolhe a VARIANTE pelo peso pedido (Bold/Light/Regular).
+    uf = _strip_accents((usage_filter or '').lower())
+    matched_list = [t for t in typographies if uf and uf in _strip_accents((t.usage or '').lower())]
+    if matched_list:
+        matched = _pick_by_weight(matched_list, weight)
+    else:
         matched = typographies[0]
 
     return resolve_typography(matched, weight=weight)
+
+
+def _strip_accents(s: str) -> str:
+    import unicodedata
+    return ''.join(
+        c for c in unicodedata.normalize('NFKD', s or '')
+        if not unicodedata.combining(c)
+    )
+
+
+def _pick_by_weight(matched, weight: str):
+    """Entre Typographies que casaram o usage, escolhe a que melhor bate com o
+    peso pedido olhando o nome da fonte (ex: '_Vorwerk-Bold' vs '-Light')."""
+    if len(matched) == 1:
+        return matched[0]
+    w = (weight or '').lower()
+    want_bold = w in ('bold', 'semibold', '600', '700', '800', '900', 'black', 'heavy')
+
+    def _name(t):
+        if getattr(t, 'custom_font', None):
+            return (t.custom_font.name or '').lower()
+        return (t.google_font_name or '').lower()
+
+    def _score(t):
+        n = _name(t)
+        is_bold = any(k in n for k in ('bold', 'black', 'heavy'))
+        is_italic = 'italic' in n
+        is_light = any(k in n for k in ('light', 'thin'))
+        s = 0
+        if want_bold:
+            s += 10 if is_bold else 0
+        else:
+            if 'regular' in n:
+                s += 10
+            elif is_light:
+                s += 7
+            elif 'medium' in n:
+                s += 5
+            if is_bold:
+                s -= 6
+        if is_italic:
+            s -= 3  # evita italico salvo se for a unica opcao
+        return s
+
+    return max(matched, key=_score)
 
 
 def resolve_typography(typography, weight: str = 'bold') -> Optional[str]:

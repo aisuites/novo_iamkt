@@ -49,41 +49,70 @@ PRINCIPIOS:
 3. Hashtags: 5 a 12 hashtags relevantes EM PORTUGUES, retorne array de strings JA
    COM o caractere # no inicio. Ex: ["#produtividade", "#homeoffice", "#dicas"]
 4. image_prompt (em PORTUGUES): descricao da CENA/AMBIENTE em volta dos
-   elementos visuais.
+   elementos visuais, usando ANCORAGEM POR NOME DE ARQUIVO inline.
    - Mencione: ambiente, mood, iluminacao, enquadramento, paleta, elementos
      secundarios (ex: ingredientes, plantas, objetos contextuais)
+   - CORES DOS EFEITOS = CORES DA MARCA. Glow, luz colorida, halo ou acento
+     de cor devem usar as cores da marca (do contexto acima). NUNCA use azul/
+     ciano "de tecnologia" por padrao, salvo se a marca for azul.
    - REGRA ABSOLUTA — NUNCA cite nomes proprios de marca ou produto no
      image_prompt (ex: NAO escreva "Thermomix", "Louis Vuitton", "iPhone",
      "Nike"). Eles ativam priors fortes do gerador de imagem que ignoram a
-     foto anexa. Use SEMPRE descritor generico + "da foto anexa".
-     ❌ ERRADO: "o equipamento Thermomix da foto anexa"
-     ✅ CERTO: "o produto da foto anexa"
-     ❌ ERRADO: "uma bolsa Louis Vuitton classica em couro monograma"
-     ✅ CERTO: "a bolsa da foto anexa"
+     foto anexa. Use SEMPRE descritor generico + ancora por arquivo.
+   - INLINE ANCHORING — cada imagem uploadeada DEVE ser referenciada com
+     o nome de arquivo literal entre parenteses, JUNTO com a regra de
+     fidelidade colada inline. Padrao:
+       "<descritor generico> da foto anexa (arquivo: NOME_DO_ARQUIVO —
+        <REGRA DE FIDELIDADE EM PORTUGUES>)"
+     Use o `original_name` informado em "Imagem N: ... (arquivo: ...)"
+     na lista de uploads abaixo. Copie o filename EXATAMENTE como aparece.
+   - Regras de fidelidade por tipo (SEMPRE encerre com "analise a imagem
+     anexada para manter os detalhes"):
+       produto/equipamento: "manter a mesma IDENTIDADE: modelo, proporcoes,
+         cor, display, materiais, acabamento. Pode ser mostrado de outro
+         angulo/posicao que combine com a cena (variacao moderada, sem
+         rotacao exagerada nem inventar partes nao visiveis). Analise a
+         imagem anexada para manter os detalhes"
+       pessoa: "mesma pessoa: mesmo rosto, cabelo, tom de pele. Pose/angulo
+         podem variar moderadamente. Nao substituir. Analise a imagem
+         anexada para manter os detalhes"
+       cenario/local: "usar como ambiente exato da cena: preservar
+         arquitetura, iluminacao e atmosfera. Analise a imagem anexada
+         para manter os detalhes"
+       acessorio/bolsa/objeto: "manter a mesma IDENTIDADE: formato, cor,
+         padrao, materiais. Pode variar angulo/posicao moderadamente para
+         compor a cena, sem redesenhar. Analise a imagem anexada para
+         manter os detalhes"
    - NUNCA descreva cores/formato/material dos elementos uploadeados em
-     palavras — descreve-los gera conflito com a imagem real anexada.
-   - REFERENCIE cada imagem uploadeada como UMA UNICA referencia generica.
-     Ex: "o produto da foto anexa (seja fiel)", "a pessoa da foto anexa",
-     "a bolsa da foto anexa em destaque".
-   - Quantas imagens houver, mencione cada uma — todas DEVEM aparecer
-     juntas na cena final. Mas evite redundancia: se ha 2 imagens e ambas
-     sao tipo 'produto', use "o produto principal da foto anexa" para a
-     primeira e "o segundo objeto da foto anexa" para a segunda. Confie no
-     descritor visual do user (usage_description) para diferenciar.
-   - NAO mencione textos a serem renderizados na imagem (papel do title)
-   - EXEMPLO MULTI-IMAGEM (1 produto + 1 pessoa + 1 acessorio):
+     palavras (alem da regra de fidelidade) — descreve-los gera conflito
+     com a imagem real anexada.
+   - Quantas imagens houver, mencione cada uma com seu filename — todas
+     DEVEM aparecer juntas na cena final.
+   - NAO mencione textos a serem renderizados na imagem (papel do title).
+   - EXEMPLO MULTI-IMAGEM (1 produto + 1 pessoa + 1 acessorio), assumindo
+     que uploads sao thermomix-foto.png, modelo-mulher.jpg, bolsa-lv.jpg:
      "Ambiente sofisticado de cozinha contemporanea com bancada de marmore
      claro, iluminacao natural suave, atmosfera feminina e aspiracional.
-     A pessoa da foto anexa interagindo naturalmente com o produto da foto
-     anexa (seja fiel ao formato e display original) sobre a bancada, ao
-     lado o acessorio da foto anexa em destaque elegante na mesma
-     superficie. Flores frescas em tons pastel em vaso, ingredientes
-     gourmet coloridos ao redor, paleta nude e branco, mood acolhedor."
-   - EXEMPLO 1 PRODUTO SO:
+     O produto principal da foto anexa (arquivo: thermomix-foto.png —
+     reproduzir com fidelidade absoluta: formato, cor, display, materiais,
+     acabamento. Sem alteracoes. Analise a imagem anexada para manter os
+     detalhes) posicionado em destaque central sobre a bancada. A pessoa
+     da foto anexa (arquivo: modelo-mulher.jpg — mesma pessoa, mesmo rosto,
+     cabelo, tom de pele, expressao. Nao substituir. Analise a imagem
+     anexada para manter os detalhes) interagindo naturalmente com o
+     produto. Ao lado, o acessorio da foto anexa (arquivo: bolsa-lv.jpg —
+     reproduzir com fidelidade absoluta: formato, cor, padrao, materiais.
+     Analise a imagem anexada para manter os detalhes) apoiado
+     elegantemente em primeiro plano. Flores frescas em tons pastel em
+     vaso, ingredientes gourmet coloridos ao redor, paleta nude e branco,
+     mood acolhedor."
+   - EXEMPLO 1 PRODUTO SO (upload: equipamento.png):
      "Cozinha minimalista clean com bancada de marmore, luz natural quente
-     entrando por janela lateral, o produto da foto anexa (seja fiel) em
-     destaque central, ingredientes frescos coloridos ao redor, atmosfera
-     acolhedora e familiar."
+     entrando por janela lateral, o produto da foto anexa (arquivo:
+     equipamento.png — reproduzir com fidelidade absoluta: formato, cor,
+     display, materiais, acabamento. Sem alteracoes. Analise a imagem
+     anexada para manter os detalhes) em destaque central, ingredientes
+     frescos coloridos ao redor, atmosfera acolhedora e familiar."
 5. visual_brief (em PORTUGUES): instrucao curta (1-2 frases) sobre como aplicar
    a marca no visual (logo, cores, key visual). Complementa o image_prompt.
 6. title: max 60 chars, impactante, em portugues
@@ -233,6 +262,7 @@ def _build_user_message(
         for i, ref in enumerate(reference_images, 1):
             usage_type = (ref.get('usage_type') or '').lower()
             usage_desc = ref.get('usage_description') or ''
+            filename = (ref.get('name') or '').strip() or f'upload_{i}'
             # Mapeia tipo para descritor curto que o Claude vai usar no image_prompt
             if 'produto' in usage_type:
                 descriptor = 'produto/equipamento'
@@ -246,12 +276,16 @@ def _build_user_message(
                 descriptor = usage_type
             else:
                 descriptor = 'imagem de referencia'
-            extra = f' (uso indicado: "{usage_desc}")' if usage_desc else ''
-            parts.append(f'  Imagem {i}: {descriptor}{extra}')
+            extra = f' — uso indicado: "{usage_desc}"' if usage_desc else ''
+            parts.append(
+                f'  Imagem {i}: {descriptor} (arquivo: {filename}){extra}'
+            )
         parts.append(
             '  >> IMPORTANTE: no image_prompt, referencie TODAS essas imagens '
-            'usando "da foto anexa" / "seja fiel" para que aparecam juntas na '
-            'cena final.'
+            'usando o padrao INLINE ANCHORING — "<descritor> da foto anexa '
+            '(arquivo: <NOME_EXATO_DO_ARQUIVO> — <regra de fidelidade>)". '
+            'Copie cada filename EXATAMENTE como aparece acima. Todas as '
+            'imagens devem aparecer juntas na cena final.'
         )
 
     if logo_urls:

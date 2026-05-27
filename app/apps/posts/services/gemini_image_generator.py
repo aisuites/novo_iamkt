@@ -369,14 +369,17 @@ def _build_role_label_en(tipo_norm: str, usage_desc: str = '') -> tuple:
         ),
         'produto': (
             'PRODUCT',
-            'reproduce with ABSOLUTE FIDELITY — exact shape, label, color, '
-            'display, finish, materials. No alterations, no stylization, '
-            'no merging with other elements',
+            'keep the SAME PRODUCT IDENTITY — exact model, shape proportions, '
+            'label, color, display, finish, materials. It MAY be shown from a '
+            'DIFFERENT angle/position/framing that fits the scene (MODERATE '
+            'variation only — slight rotation/perspective, do NOT invent unseen '
+            'parts, do NOT redesign or restyle the product)',
         ),
         'pessoa': (
             'MODEL',
-            'use this exact person — same face, hair, skin tone, expression, '
-            'body shape. Do not substitute or generate a different person',
+            'same person — keep face, hair, skin tone, body shape identical. '
+            'Pose and angle MAY vary moderately to fit the scene. Do not '
+            'substitute or generate a different person',
         ),
         'cenario': (
             'SETTING',
@@ -449,6 +452,20 @@ def _build_fidelity_block_en(sorted_refs: List[Dict[str, Any]]) -> str:
         'invented details not present in references.',
     ]
     return '\n'.join(lines)
+
+
+def _scene_has_inline_anchoring(image_prompt: str) -> bool:
+    """
+    Detecta se a SCENE ja contem ancoragem inline por filename
+    no padrao "(arquivo: NOME.ext — ...)".
+
+    Quando True, podemos omitir [REFERENCE ROLES] (redundante) e
+    encurtar o bloco de fidelidade.
+    """
+    if not image_prompt:
+        return False
+    # Aceita "arquivo:", "arquivo :", ou variantes case-insensitive
+    return bool(re.search(r'\(\s*arquivo\s*:', image_prompt, flags=re.IGNORECASE))
 
 
 def _sanitize_brand_terms(text: str, keywords: List[str]) -> str:
@@ -600,9 +617,10 @@ def _build_prompt_text(
             'Trate como diretriz forte de estilo, tratamento e mood.'
         )
 
-    # Bloco [REFERENCE-DERIVED DIRECTIVES] — direcionamento textual extraido
-    # pelo kb_reference_translator (Claude multimodal). Substitui o envio
-    # das imagens da KB ao Gemini.
+    # Bloco [REFERENCE-DERIVED DIRECTIVES] — direcionamento textual derivado
+    # do dossie visual (ReferenceImage.visual_analysis). So e usado como
+    # fallback quando o orchestrator nao roda; no caminho normal o dossie ja
+    # foi fundido no image_prompt_final pelo orchestrator.
     kb_directives_block_en = ''
     kb_directives_block_pt = ''
     if kb_translations:
@@ -632,19 +650,46 @@ def _build_prompt_text(
         kb_directives_block_en = '\n'.join(en_lines)
         kb_directives_block_pt = '\n'.join(pt_lines)
 
+    # Detecta inline anchoring na SCENE — se presente, omite REFERENCE ROLES
+    # (redundante) e adiciona breve nota explicativa antes da cena.
+    image_prompt_text = post.image_prompt or '(propor um cenario adequado ao briefing)'
+    inline_anchored = _scene_has_inline_anchoring(image_prompt_text)
+
     if use_hybrid_en:
-        parts = [
-            '[TASK]',
-            'Create a professional photograph for a social media post.',
-            '',
-            _build_reference_roles_en_block(sorted_refs),
-            user_guidance_block_en,
-            kb_directives_block_en,
-            combination_rules,
-            '',
-            '[SCENE] (in Portuguese, on-brand)',
-            post.image_prompt or '(propor um cenario adequado ao briefing)',
-        ]
+        if inline_anchored:
+            # MODO MINIMALISTA — confia que a SCENE ja contem (a) filename
+            # inline com regras de fidelidade coladas e (b) descricao da
+            # iluminacao incorporada. Sem TASK, USER GUIDANCE, COMBINACAO
+            # ou REFERENCE-DERIVED DIRECTIVES separados.
+            scene_with_kb = image_prompt_text
+            kb_directive_lines = [
+                (t.get('directives') or '').strip()
+                for t in (kb_translations or [])
+                if (t.get('directives') or '').strip()
+            ]
+            if kb_directive_lines:
+                scene_with_kb = (
+                    image_prompt_text.rstrip()
+                    + '\n\n'
+                    + ' '.join(kb_directive_lines)
+                )
+            parts = [scene_with_kb]
+        else:
+            # Modo verboso anterior (compatibilidade com posts sem inline
+            # anchoring na SCENE) — mantem REFERENCE ROLES, USER GUIDANCE,
+            # REFERENCE-DERIVED DIRECTIVES, COMBINACAO e TASK.
+            parts = [
+                '[TASK]',
+                'Create a professional photograph for a social media post.',
+                '',
+                _build_reference_roles_en_block(sorted_refs),
+                user_guidance_block_en,
+                kb_directives_block_en,
+                combination_rules,
+                '',
+                '[SCENE] (in Portuguese, on-brand)',
+                image_prompt_text,
+            ]
     else:
         parts = [
             '# TAREFA',
@@ -693,10 +738,12 @@ def _build_prompt_text(
             '- Not a mockup — this is the final artwork.',
             '- High legibility for mobile.',
         ])
-        # Reforco final de fidelidade (combate fusion failures)
-        fidelity = _build_fidelity_block_en(sorted_refs)
-        if fidelity:
-            parts.extend(['', fidelity])
+        # Reforco final de fidelidade — so no modo verboso. No modo
+        # minimalista (inline_anchored) as regras ja vivem inline na SCENE.
+        if not inline_anchored:
+            fidelity = _build_fidelity_block_en(sorted_refs)
+            if fidelity:
+                parts.extend(['', fidelity])
     else:
         # Modo inline em PT-BR (Gemini vai renderizar texto na imagem em PT)
         parts.extend([
@@ -803,6 +850,58 @@ def _extract_image_from_response(response: Dict[str, Any]) -> Tuple[Optional[byt
 # Fluxo C — Overlay de texto via Pillow (Fluxo 2 / text_render_mode='pillow')
 # ============================================================
 
+_DEJAVU_BOLD = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+_DEJAVU_REG = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+
+# Emojis e simbolos que as fontes de marca (TTF) nao renderizam -> viram tofu.
+_EMOJI_RE = re.compile(
+    '['
+    '\U0001F000-\U0001FAFF'  # pictografos / emojis
+    '\U00002600-\U000027BF'  # misc symbols + dingbats
+    '\U00002190-\U000021FF'  # setas
+    '\U00002B00-\U00002BFF'  # setas/simbolos
+    '\U0001F1E6-\U0001F1FF'  # bandeiras
+    '️‍'            # variation selector + ZWJ
+    ']+',
+    flags=re.UNICODE,
+)
+
+
+def _strip_emoji(text: str) -> str:
+    if not text:
+        return text
+    return _EMOJI_RE.sub('', text).strip()
+
+
+def _fit_text(text, font_path, fallback_path, max_w, start_size, draw, min_size=22):
+    """Shrink-to-fit: reduz o tamanho da fonte ate a linha mais larga caber em
+    max_w (evita estouro/corte com palavras longas ou formatos estreitos).
+    Retorna (font, lines)."""
+    from PIL import ImageFont
+    size = max(int(min_size), int(start_size))
+    font = None
+    lines = []
+    for _ in range(8):
+        try:
+            font = ImageFont.truetype(font_path or fallback_path, size)
+        except Exception:
+            font = ImageFont.truetype(fallback_path, size)
+        lines = _wrap_text(text, font, max_w, draw)
+        widest = 0
+        for ln in lines:
+            try:
+                bb = draw.textbbox((0, 0), ln, font=font)
+                w = bb[2] - bb[0]
+            except Exception:
+                w = len(ln) * size * 0.55
+            widest = max(widest, w)
+        if widest <= max_w or size <= min_size:
+            return font, lines
+        # escala direto pro alvo (com folga), recomputa wrap na proxima volta
+        size = max(min_size, int(size * max(0.55, (max_w / widest) * 0.97)))
+    return font, lines
+
+
 def apply_text_overlay(
     png_bytes: bytes,
     title: str = '',
@@ -850,9 +949,12 @@ def apply_text_overlay(
     draw = ImageDraw.Draw(overlay)
 
     # ---- Tamanhos ---------------------------------------------------------
-    title_size = max(20, int(H * float(spec.get('title_size_pct', 7)) / 100))
-    subtitle_size = max(14, int(H * float(spec.get('subtitle_size_pct', 3)) / 100))
-    cta_size = max(14, int(H * 0.028))
+    # Base no MENOR lado do canvas (nao na altura): mantem o "peso" do texto
+    # consistente entre formatos — no 9:16 a altura e enorme e inflava o texto.
+    basis = min(W, H)
+    title_size = max(20, int(basis * float(spec.get('title_size_pct', 7)) / 100))
+    subtitle_size = max(14, int(basis * float(spec.get('subtitle_size_pct', 3)) / 100))
+    cta_size = max(14, int(basis * 0.030))
 
     # ---- Fontes -----------------------------------------------------------
     tf_path = title_font_path or '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
@@ -885,53 +987,136 @@ def apply_text_overlay(
         except Exception:
             logger.exception('Falha ao desenhar logo no overlay')
 
-    # ---- TEXTO bloco titulo + subtitulo ----------------------------------
-    title_lines = _wrap_text(title, title_font, W - 2 * padding, draw)
-    subtitle_lines = _wrap_text(subtitle, subtitle_font, W - 2 * padding, draw) if spec.get('subtitle_offset', 'below_title') == 'below_title' else []
+    # ---- TEXTO: alinhamento/caixa POR BLOCO + zona % (replica layout ref) -
+    # Compat: se os campos por-bloco nao existem, cai no comportamento antigo
+    # (alignment global + subtitulo colado abaixo do titulo).
+    title_align = spec.get('title_align', alignment)
+    subtitle_align = spec.get('subtitle_align', alignment)
+    color_hint = spec.get('title_color_hint', 'auto_contrast')
+    subtitle_color_hint = spec.get('subtitle_color_hint', 'auto_contrast')
+    title_color_hex = spec.get('title_color')
+    subtitle_color_hex = spec.get('subtitle_color')
+    bg_treatment = spec.get('background_treatment', 'none')
 
+    def _block_color(hex_pref, bx, by, bw, bh, hint):
+        """Prefere a cor explicita (snapada da KB) se tiver contraste; senao
+        usa o hint (brand_primary_safe / auto_contrast)."""
+        if hex_pref:
+            try:
+                rgb = _hex_to_rgb(hex_pref)
+                rl = _region_luminance(img, bx, by, bw, bh)
+                cl = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+                # exige contraste real; senao cai pro auto_contrast (legibilidade
+                # vence — ex: subtitulo branco sobre fundo claro).
+                if abs(cl - rl) >= 70:
+                    return rgb
+            except Exception:
+                pass
+        return _resolve_text_color(img, bx, by, bw, bh, hint=hint, paleta=paleta or [])
     line_h_title = title_size * 1.15
     line_h_sub = subtitle_size * 1.30
     gap_title_sub = int(H * 0.012)
 
-    total_text_h = (
-        int(line_h_title * len(title_lines))
-        + (gap_title_sub if subtitle_lines else 0)
-        + int(line_h_sub * len(subtitle_lines))
-    )
+    def _apply_case(txt, case):
+        if case == 'alta':
+            return txt.upper()
+        if case == 'baixa':
+            return txt.lower()
+        return txt
 
-    # Anchor do bloco baseado em title_position
-    text_x, text_y = _anchor_to_xy(
-        anchor=spec.get('title_position', 'top-left'),
-        canvas_size=(W, H),
-        block_size=(W - 2 * padding, total_text_h),
-        padding=padding,
-    )
+    # Remove emojis/simbolos que a fonte da marca nao renderiza (evita tofu □)
+    title = _apply_case(_strip_emoji(title), spec.get('title_case'))
+    subtitle = _apply_case(_strip_emoji(subtitle), spec.get('subtitle_case'))
+    cta = _strip_emoji(cta)
 
-    # ---- Cores: auto_contrast lê luminância da região onde o texto vai ---
-    color_hint = spec.get('title_color_hint', 'auto_contrast')
-    text_color = _resolve_text_color(
-        img, text_x, text_y, W - 2 * padding, total_text_h,
-        hint=color_hint, paleta=paleta or [],
+    def _block_origin(zone, default_anchor, block_w, block_h):
+        """(x, y, largura) do bloco: usa zona % (x_pct/y_pct/width_pct) se
+        presente, senao a ancora de 9 posicoes."""
+        if isinstance(zone, dict) and zone.get('x_pct') is not None and zone.get('y_pct') is not None:
+            zx = int(W * float(zone['x_pct']) / 100)
+            zy = int(H * float(zone['y_pct']) / 100)
+            zw = int(W * float(zone['width_pct']) / 100) if zone.get('width_pct') else block_w
+            return zx, zy, max(zw, 50)
+        ax, ay = _anchor_to_xy(default_anchor, (W, H), (block_w, block_h), padding)
+        return ax, ay, block_w
+
+    tzone = spec.get('title_zone_pct')
+    szone = spec.get('subtitle_zone_pct')
+    independent_subtitle = isinstance(szone, dict)
+
+    title_block_w = (
+        int(W * float(tzone['width_pct']) / 100)
+        if isinstance(tzone, dict) and tzone.get('width_pct') else (W - 2 * padding)
     )
-    bg_treatment = spec.get('background_treatment', 'none')
+    # Shrink-to-fit: garante que o titulo CABE na largura da zona (sem corte)
+    title_font, title_lines = _fit_text(
+        title, tf_path, _DEJAVU_BOLD, title_block_w, title_size, draw,
+    )
+    line_h_title = title_font.size * 1.15
+
+    if independent_subtitle:
+        sub_block_w = int(W * float(szone.get('width_pct', 80)) / 100)
+    else:
+        # colado abaixo do titulo -> mesma COLUNA de largura do titulo (nao a
+        # largura total), pra respeitar a proporcao da referencia (~50%).
+        sub_block_w = title_block_w
+    show_sub = bool(subtitle) and (
+        independent_subtitle or spec.get('subtitle_offset', 'below_title') == 'below_title'
+    )
+    if show_sub:
+        subtitle_font, subtitle_lines = _fit_text(
+            subtitle, sf_path, _DEJAVU_REG, sub_block_w, subtitle_size, draw,
+        )
+        line_h_sub = subtitle_font.size * 1.30
+    else:
+        subtitle_lines = []
+
+    # ----- Bloco TITULO (com subtitulo colado, se nao for independente) ----
+    title_h = int(line_h_title * len(title_lines))
+    glued_sub_h = 0 if independent_subtitle else (
+        (gap_title_sub + int(line_h_sub * len(subtitle_lines))) if subtitle_lines else 0
+    )
+    tx, ty, tw = _block_origin(tzone, spec.get('title_position', 'top-left'),
+                               title_block_w, title_h + glued_sub_h)
+
+    text_color = _block_color(title_color_hex, tx, ty, tw, title_h + glued_sub_h, color_hint)
     if bg_treatment in ('dark_overlay', 'color_block', 'light_overlay'):
         _draw_text_backdrop(
-            draw, text_x, text_y, W - 2 * padding, total_text_h,
+            draw, tx, ty, tw, title_h + glued_sub_h,
             treatment=bg_treatment, paleta=paleta or [], padding=padding,
         )
 
-    # Desenha titulo
-    y = text_y
+    y = ty
     for line in title_lines:
-        line_x = _x_for_alignment(line, title_font, draw, text_x, W - 2 * padding, alignment)
+        line_x = _x_for_alignment(line, title_font, draw, tx, tw, title_align)
         draw.text((line_x, y), line, fill=text_color + (255,), font=title_font)
         y += int(line_h_title)
 
-    if subtitle_lines:
+    if subtitle_lines and not independent_subtitle:
         y += gap_title_sub
+        # cor PROPRIA do subtitulo (distinta do titulo), amostrada na regiao dele
+        sub_region_h = int(line_h_sub * len(subtitle_lines))
+        sub_color = _block_color(subtitle_color_hex, tx, y, tw, sub_region_h, subtitle_color_hint)
         for line in subtitle_lines:
-            line_x = _x_for_alignment(line, subtitle_font, draw, text_x, W - 2 * padding, alignment)
-            draw.text((line_x, y), line, fill=text_color + (220,), font=subtitle_font)
+            line_x = _x_for_alignment(line, subtitle_font, draw, tx, tw, subtitle_align)
+            draw.text((line_x, y), line, fill=sub_color + (255,), font=subtitle_font)
+            y += int(line_h_sub)
+
+    # ----- Bloco SUBTITULO independente (zona propria) ---------------------
+    if subtitle_lines and independent_subtitle:
+        sub_h = int(line_h_sub * len(subtitle_lines))
+        sx, sy, sw = _block_origin(szone, spec.get('subtitle_position', 'center-left'),
+                                   sub_block_w, sub_h)
+        # Anti-sobreposicao: se o titulo (longo) transbordou sua zona, empurra
+        # o subtitulo para baixo do fim real do titulo.
+        title_bottom = ty + int(line_h_title * len(title_lines))
+        if sy < title_bottom + gap_title_sub:
+            sy = title_bottom + gap_title_sub
+        sub_color = _block_color(subtitle_color_hex, sx, sy, sw, sub_h, subtitle_color_hint)
+        y = sy
+        for line in subtitle_lines:
+            line_x = _x_for_alignment(line, subtitle_font, draw, sx, sw, subtitle_align)
+            draw.text((line_x, y), line, fill=sub_color + (255,), font=subtitle_font)
             y += int(line_h_sub)
 
     # ---- CTA --------------------------------------------------------------
@@ -1025,28 +1210,39 @@ def _resolve_text_color(img, x, y, w, h, hint: str, paleta):
             if hex_str:
                 return _hex_to_rgb(hex_str)
         return (40, 40, 40)
+    if hint == 'brand_primary_safe':
+        # Cor primaria da marca, MAS so se tiver contraste suficiente com a
+        # regiao; senao cai pro auto_contrast (preto/branco) pra nao ficar
+        # ilegivel. Garante "cor da KB" sem sacrificar leitura.
+        cand = _pick_primary_color(paleta)
+        region_lum = _region_luminance(img, x, y, w, h)
+        cand_lum = 0.299 * cand[0] + 0.587 * cand[1] + 0.114 * cand[2]
+        if abs(cand_lum - region_lum) >= 70:
+            return cand
+        return _auto_contrast_color(img, x, y, w, h)
     # auto_contrast: amostra luminancia media da regiao
     return _auto_contrast_color(img, x, y, w, h)
 
 
-def _auto_contrast_color(img, x, y, w, h):
-    """Amostra cor media da regiao e retorna branco ou preto conforme contraste."""
+def _region_luminance(img, x, y, w, h) -> float:
+    """Luminancia media (0-255) da regiao do canvas onde o texto vai."""
     try:
-        x1 = max(0, x)
-        y1 = max(0, y)
+        x1, y1 = max(0, x), max(0, y)
         x2 = min(img.size[0], x + w)
         y2 = min(img.size[1], y + h)
-        crop = img.crop((x1, y1, x2, y2)).convert('RGB')
-        # Amostra reduzida
-        small = crop.resize((8, 8))
-        pixels = list(small.getdata())
+        crop = img.crop((x1, y1, x2, y2)).convert('RGB').resize((8, 8))
+        pixels = list(crop.getdata())
         avg_r = sum(p[0] for p in pixels) / len(pixels)
         avg_g = sum(p[1] for p in pixels) / len(pixels)
         avg_b = sum(p[2] for p in pixels) / len(pixels)
-        lum = 0.299 * avg_r + 0.587 * avg_g + 0.114 * avg_b
-        return (255, 255, 255) if lum < 140 else (20, 20, 20)
+        return 0.299 * avg_r + 0.587 * avg_g + 0.114 * avg_b
     except Exception:
-        return (20, 20, 20)
+        return 200.0
+
+
+def _auto_contrast_color(img, x, y, w, h):
+    """Amostra cor media da regiao e retorna branco ou preto conforme contraste."""
+    return (255, 255, 255) if _region_luminance(img, x, y, w, h) < 140 else (20, 20, 20)
 
 
 def _draw_text_backdrop(draw, x, y, w, h, treatment, paleta, padding):

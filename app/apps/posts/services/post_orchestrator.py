@@ -64,11 +64,21 @@ REGRAS DE SAIDA:
 
       ❌ ERRADO: "uma elegante bolsa de couro com padrao monogramado marrom
                   e fecho dourado"
-      ✅ CERTO: "a bolsa da IMAGEM 3, exatamente como aparece"
+      ✅ CERTO: "a bolsa da IMAGEM 3 (mesma identidade — pode aparecer de
+                 outro angulo/posicao que combine com a cena)"
 
       ❌ ERRADO: "um processador de alimentos moderno com tela touchscreen"
-      ✅ CERTO: "o produto da IMAGEM 4, exatamente como aparece, sem
-                 modificar formato, cor ou display"
+      ✅ CERTO: "o produto da IMAGEM 4 (mesma identidade: modelo, cores,
+                 materiais e display), reposicionado para compor a cena"
+
+   a-bis) IDENTIDADE vs ANGULO. Mantenha a IDENTIDADE do produto/objeto
+      (modelo, proporcoes, cores, materiais, acabamento, display) IDENTICA a
+      foto. Mas o produto PODE ser mostrado de um ANGULO, POSICAO ou
+      ENQUADRAMENTO diferente que combine com a cena — variacao MODERADA
+      (leve giro/perspectiva), SEM rotacao exagerada e SEM inventar partes nao
+      visiveis na foto. Para PESSOAS: preserve o rosto/identidade, mas a pose
+      pode variar moderadamente. Objetivo: variedade de composicao sem perder
+      fidelidade.
 
    b) NUNCA mencione nomes de marca, modelo de produto, ou caracteristicas
       especificas do produto em palavras. Apenas "o produto da IMAGEM N".
@@ -81,6 +91,12 @@ REGRAS DE SAIDA:
    d) Descreva LIVREMENTE em palavras: ambiente, iluminacao, mood,
       composicao geral, elementos secundarios (ingredientes, plantas,
       texturas, paredes). Tudo que NAO seja produto/pessoa principal.
+
+   d-bis) CORES DOS EFEITOS = CORES DA MARCA. Qualquer glow, luz colorida,
+      halo, reflexo ou acento de cor na cena DEVE usar as CORES DA MARCA
+      (paleta informada no briefing). NUNCA use azul/ciano "de tecnologia"
+      por padrao — isso so e permitido se a paleta da marca for azul. Ex:
+      marca verde -> glow/acentos esverdeados; marca roxa -> halos roxos.
 
    e) Mantenha o prompt em 3-6 linhas. Direto, sem floreios.
 4. Decida TEXT_RENDER_MODE:
@@ -337,6 +353,12 @@ def _build_user_text(
         '== Marca (KB compilation) ==',
         kb_summary[:1500] if kb_summary else '(sem resumo da marca)',
         '',
+        '== Cores da marca (paleta KB) — use para glow/acentos da cena ==',
+        ', '.join(
+            f"{(c.get('hex') or '').strip()} ({c.get('tipo') or 'cor'})"
+            for c in (paleta or []) if c.get('hex')
+        ) or '(sem paleta)',
+        '',
         '== Imagens anexadas (na ordem mostrada ACIMA deste texto) ==',
         '\n'.join(image_meta_lines) if image_meta_lines else '(nenhuma)',
     ]
@@ -427,3 +449,94 @@ def _extract_usage(resp) -> Dict[str, Any]:
         'total_tokens': in_tokens + out_tokens,
         'cost_usd': float(cost),
     }
+
+
+# =====================================================================
+# ADAPTADOR DE LAYOUT POR FORMATO (text-only) — usado quando a ref de
+# layout nasceu num aspect ratio diferente do post (ex: 1:1 -> 9:16).
+# =====================================================================
+
+_LAYOUT_ADAPT_SYSTEM = """Voce e um diretor de arte. Recebe um LAYOUT_SPEC de
+texto pensado para um aspect ratio de ORIGEM e deve ADAPTA-LO para um aspect
+ratio de DESTINO diferente, mantendo a INTENCAO mas reposicionando as ZONAS.
+
+REGRAS:
+- Mantenha title_align / subtitle_align / cta_align EXATAMENTE como vieram.
+- Reposicione apenas as zonas em %: title_zone_pct, subtitle_zone_pct e as
+  posicoes de logo/cta. Campos: x_pct, y_pct (canto superior esquerdo),
+  width_pct. Tudo 0-100.
+- Pense na proporcao: indo de 1:1 (quadrado) para 9:16 (vertical alto), um
+  bloco de texto no terco esquerdo pode subir para o TOPO. De 1:1 para 16:9
+  (horizontal), o texto tende a ficar de um LADO (esquerda) e o sujeito do outro.
+- PESO DE OCUPACAO: mantenha o texto com peso visual SEMELHANTE ao da origem.
+  O texto NAO deve dominar a arte — o sujeito (produto/pessoa) continua sendo o
+  foco. NAO alargue a zona de texto alem do necessario (evite width_pct alto so
+  para preencher espaco). Prefira manter o texto compacto num canto/faixa.
+- NAO crie campos novos nem remova existentes. Devolva os MESMOS campos do
+  input, apenas com as zonas/posicoes ajustadas ao destino.
+
+Devolva APENAS o JSON do layout_spec adaptado, sem markdown."""
+
+
+def adapt_layout_spec(
+    layout_spec: Dict[str, Any],
+    source_ar: float,
+    target_ar: float,
+    target_px: str = '',
+) -> Optional[Dict[str, Any]]:
+    """
+    Reposiciona as zonas de um layout_spec da proporcao de origem para a de
+    destino via Claude (text-only, barato). Mantem alinhamentos. Retorna o
+    spec adaptado (merge sobre o original) ou None em falha.
+    """
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key or not layout_spec:
+        return None
+
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+
+    user = (
+        f'LAYOUT_SPEC (origem aspect_ratio={source_ar}):\n'
+        f'{json.dumps(layout_spec, ensure_ascii=False)}\n\n'
+        f'Adapte para o DESTINO: aspect_ratio={target_ar}'
+        + (f', dimensoes={target_px}' if target_px else '')
+        + '.\nDevolva o JSON adaptado.'
+    )
+    try:
+        resp = client.messages.create(
+            model=MODEL,
+            max_tokens=1200,
+            system=_LAYOUT_ADAPT_SYSTEM,
+            messages=[
+                {'role': 'user', 'content': user},
+                {'role': 'assistant', 'content': '{'},
+            ],
+        )
+    except Exception:
+        logger.exception('[layout_adapt] erro Claude')
+        return None
+
+    raw = '{' + ''.join(
+        blk.text for blk in resp.content if getattr(blk, 'type', None) == 'text'
+    )
+    adapted = _parse_json(raw)
+    if not adapted:
+        logger.warning('[layout_adapt] parse JSON falhou')
+        return None
+    merged = dict(layout_spec)
+    merged.update(adapted)
+
+    # Clamp de seguranca: o texto nao deve dominar a arte. Limita a largura das
+    # zonas de texto (mesmo que o LLM tenha alargado demais).
+    for key, cap in (('title_zone_pct', 60), ('subtitle_zone_pct', 72)):
+        zone = merged.get(key)
+        if isinstance(zone, dict) and zone.get('width_pct'):
+            try:
+                if float(zone['width_pct']) > cap:
+                    zone['width_pct'] = cap
+            except (TypeError, ValueError):
+                pass
+
+    merged['source'] = 'dossier_layout_aspect+format_adapted'
+    return merged
