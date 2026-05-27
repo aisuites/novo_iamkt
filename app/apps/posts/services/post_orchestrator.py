@@ -194,6 +194,7 @@ def orchestrate_post(
     references_usage_description: str = '',
     formato_px: str = '',
     aspect_ratio: str = '',
+    kb_dossiers: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Roda o orquestrador Claude Sonnet 4.5 multimodal.
@@ -215,13 +216,15 @@ def orchestrate_post(
         }
     Ou None em caso de falha (caller usa fallback).
     """
+    kb_dossiers = kb_dossiers or []
+
     api_key = os.environ.get('ANTHROPIC_API_KEY')
     if not api_key:
         logger.warning('[orchestrator] ANTHROPIC_API_KEY ausente')
         return None
 
-    if not references:
-        logger.info('[orchestrator] sem refs — skip orchestration')
+    if not references and not kb_dossiers:
+        logger.info('[orchestrator] sem refs nem dossies — skip orchestration')
         return None
 
     import anthropic
@@ -264,6 +267,7 @@ def orchestrate_post(
         image_meta_lines=image_meta_lines,
         formato_px=formato_px,
         aspect_ratio=aspect_ratio,
+        kb_dossiers=kb_dossiers,
     )
     content_blocks.append({'type': 'text', 'text': user_text})
 
@@ -319,6 +323,7 @@ def _build_user_text(
     image_meta_lines: List[str],
     formato_px: str = '',
     aspect_ratio: str = '',
+    kb_dossiers: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     lines = [
         '== Briefing do post ==',
@@ -341,12 +346,31 @@ def _build_user_text(
             '== Observacao geral do user sobre uso das referencias ==',
             references_usage_description,
         ])
+    if kb_dossiers:
+        lines.extend([
+            '',
+            '== Dossies de imagens de referencia da marca (KB) ==',
+            '(Analise visual ja extraida dessas imagens. NAO sao imagens a',
+            'reproduzir — sao referencias de ESTILO. Use APENAS os aspectos que',
+            'o user pediu em "o que aproveitar". Incorpore os aspectos relevantes',
+            '(iluminacao, paleta, composicao, mood, grid, etc) no image_prompt_final.',
+            'NUNCA copie produtos/pessoas especificos desses dossies.)',
+        ])
+        for i, d in enumerate(kb_dossiers, 1):
+            dossier = d.get('dossier') or {}
+            intent = (d.get('usage_description') or '').strip() or '(uso geral / inspiracao)'
+            lines.append('')
+            lines.append(f'-- Referencia KB {i} --')
+            lines.append(f'O que aproveitar (intencao do user): "{intent}"')
+            lines.append('Dossie: ' + json.dumps(dossier, ensure_ascii=False)[:1800])
+
     lines.extend([
         '',
         '== Tarefa ==',
-        'Analise as imagens + o briefing acima e produza o JSON conforme',
-        'instrucoes do system prompt. Foque em INTENCAO, nao apenas em',
-        'usage_type tecnico.',
+        'Analise as imagens + os dossies + o briefing acima e produza o JSON',
+        'conforme instrucoes do system prompt. Foque em INTENCAO, nao apenas em',
+        'usage_type tecnico. Para os dossies da KB, extraia SO o que o user',
+        'pediu em "o que aproveitar" e funda no image_prompt_final.',
     ])
     return '\n'.join(lines)
 

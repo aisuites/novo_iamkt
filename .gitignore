@@ -22,6 +22,10 @@ backups/
 # Docker volumes
 volumes/
 
+# Caches de runtime (assets/fontes baixados em tempo de execução)
+app/assets_cache/
+app/fonts_cache/
+
 # Logs
 *.log
 

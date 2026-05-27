@@ -853,3 +853,188 @@ def wipe_brandguide_data_from_kb(kb, brandguide=None):
         'typography_deleted': typos_deleted,
         'fields_cleared': fields_to_clear,
     }
+
+
+# ============================================================
+# ANALISE VISUAL DE REFERENCIAS (dossie objetivo por imagem)
+# ============================================================
+
+def _run_visual_dossier(instance, analyzer_callable) -> bool:
+    """
+    Generico: analisa UM asset visual (ReferenceImage, BrandgraficModule, ...)
+    e PERSISTE o dossie. Funciona para qualquer model que tenha os campos
+    s3_key/s3_url + visual_analysis/analysis_status/analyzed_at/
+    analysis_cost_usd.
+
+    analyzer_callable(url) -> {structured, usage, model} | None.
+
+    Sincrono. Retorna True se gravou o dossie, False em falha (status='error').
+    """
+    from decimal import Decimal
+
+    instance.analysis_status = 'processing'
+    instance.save(update_fields=['analysis_status'])
+
+    # URL presigned fresca (s3_url salvo pode estar expirado)
+    url = None
+    if instance.s3_key:
+        try:
+            url = S3Service.generate_presigned_download_url(
+                instance.s3_key, expires_in=3600
+            )
+        except Exception:
+            url = instance.s3_url or None
+    else:
+        url = instance.s3_url or None
+
+    if not url:
+        instance.analysis_status = 'error'
+        instance.save(update_fields=['analysis_status'])
+        logger.warning('[visual_analyzer] %s %s sem URL — error',
+                       type(instance).__name__, instance.id)
+        return False
+
+    result = analyzer_callable(url)
+    if not result or not result.get('structured'):
+        instance.analysis_status = 'error'
+        instance.save(update_fields=['analysis_status'])
+        logger.warning('[visual_analyzer] %s %s analise vazia — error',
+                       type(instance).__name__, instance.id)
+        return False
+
+    usage = result.get('usage') or {}
+    instance.visual_analysis = result['structured']
+    instance.analysis_status = 'completed'
+    instance.analyzed_at = timezone.now()
+    instance.analysis_cost_usd = Decimal(str(usage.get('cost_usd', 0) or 0))
+    instance.save(update_fields=[
+        'visual_analysis', 'analysis_status', 'analyzed_at', 'analysis_cost_usd',
+    ])
+    logger.info(
+        '[visual_analyzer] %s %s OK (cost=$%s)',
+        type(instance).__name__, instance.id, usage.get('cost_usd', 0),
+    )
+    return True
+
+
+def run_reference_image_analysis(reference) -> bool:
+    """
+    Analisa UMA ReferenceImage e persiste o dossie (foto/cena).
+    Usado pela task de background, pelo sweep e pelo fallback inline do post.
+    """
+    from apps.knowledge.services.visual_asset_analyzer import analyze_reference_image
+    return _run_visual_dossier(reference, analyze_reference_image)
+
+
+def run_brandgrafic_module_analysis(asset) -> bool:
+    """
+    Analisa UM BrandgraficModule (grafismo/elemento) e persiste o dossie.
+    Passa file_format para o analyzer tratar SVG (rasteriza antes da Vision).
+    """
+    from apps.knowledge.services.visual_asset_analyzer import analyze_brand_asset
+    return _run_visual_dossier(
+        asset, lambda url: analyze_brand_asset(url, asset.file_format)
+    )
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=30)
+def analyze_reference_image_task(self, reference_id: int):
+    """
+    Gatilho 1 (upload, com countdown) e Gatilho 2 (sweep no save).
+
+    Guarda contra corridas:
+      - imagem deletada (upload + delete rapido) -> no-op silencioso
+      - ja em 'processing'/'completed' -> skip (idempotente)
+    """
+    from apps.knowledge.models import ReferenceImage
+
+    ref = ReferenceImage.objects.filter(id=reference_id).first()
+    if not ref:
+        logger.info('[visual_analyzer] ReferenceImage %s inexistente — skip', reference_id)
+        return {'skipped': 'not_found', 'reference_id': reference_id}
+    if ref.analysis_status in ('processing', 'completed'):
+        return {'skipped': ref.analysis_status, 'reference_id': reference_id}
+
+    try:
+        ok = run_reference_image_analysis(ref)
+    except Exception as exc:
+        logger.exception('[visual_analyzer] erro ReferenceImage %s', reference_id)
+        try:
+            ref.analysis_status = 'error'
+            ref.save(update_fields=['analysis_status'])
+        except Exception:
+            pass
+        raise self.retry(exc=exc)
+
+    return {'success': ok, 'reference_id': reference_id}
+
+
+@shared_task
+def analyze_pending_reference_images_task(kb_id: int):
+    """
+    Gatilho 2 (sweep): re-enfileira analise de toda ReferenceImage da KB que
+    esteja 'pending' ou 'error'. Rede de seguranca para imagens que ficaram
+    sem dossie (analise falhou no upload, Celery fora do ar, etc).
+    """
+    from apps.knowledge.models import ReferenceImage
+
+    ids = list(
+        ReferenceImage.objects.filter(
+            knowledge_base_id=kb_id,
+            analysis_status__in=['pending', 'error'],
+        ).values_list('id', flat=True)
+    )
+    for rid in ids:
+        analyze_reference_image_task.delay(rid)
+    logger.info('[visual_analyzer] sweep refs kb=%s enfileirou %d imagens', kb_id, len(ids))
+    return {'kb_id': kb_id, 'enqueued': len(ids)}
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=30)
+def analyze_brandgrafic_module_task(self, asset_id: int):
+    """
+    Gatilho 1 (upload, com countdown) e Gatilho 2 (sweep no save) p/ grafismos.
+    Mesma guarda anti-corrida da task de referencia.
+    """
+    from apps.knowledge.models import BrandgraficModule
+
+    asset = BrandgraficModule.objects.filter(id=asset_id).first()
+    if not asset:
+        logger.info('[visual_analyzer] BrandgraficModule %s inexistente — skip', asset_id)
+        return {'skipped': 'not_found', 'asset_id': asset_id}
+    if asset.analysis_status in ('processing', 'completed'):
+        return {'skipped': asset.analysis_status, 'asset_id': asset_id}
+
+    try:
+        ok = run_brandgrafic_module_analysis(asset)
+    except Exception as exc:
+        logger.exception('[visual_analyzer] erro BrandgraficModule %s', asset_id)
+        try:
+            asset.analysis_status = 'error'
+            asset.save(update_fields=['analysis_status'])
+        except Exception:
+            pass
+        raise self.retry(exc=exc)
+
+    return {'success': ok, 'asset_id': asset_id}
+
+
+@shared_task
+def analyze_pending_brandgrafic_modules_task(kb_id: int):
+    """
+    Gatilho 2 (sweep) p/ grafismos: re-enfileira analise de todo
+    BrandgraficModule da KB 'pending'/'error'. Cobre tanto upload manual
+    quanto grafismos extraidos do brandguide PDF.
+    """
+    from apps.knowledge.models import BrandgraficModule
+
+    ids = list(
+        BrandgraficModule.objects.filter(
+            knowledge_base_id=kb_id,
+            analysis_status__in=['pending', 'error'],
+        ).values_list('id', flat=True)
+    )
+    for aid in ids:
+        analyze_brandgrafic_module_task.delay(aid)
+    logger.info('[visual_analyzer] sweep grafismos kb=%s enfileirou %d', kb_id, len(ids))
+    return {'kb_id': kb_id, 'enqueued': len(ids)}

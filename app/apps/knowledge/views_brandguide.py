@@ -540,6 +540,14 @@ def create_brandgrafic_module(request):
             is_active=True,
         )
 
+        # Gatilho 1 — dossie visual do grafismo em background (countdown
+        # absorve o "subiu errado e deletou"; a task tem guarda anti-corrida).
+        try:
+            from apps.knowledge.tasks import analyze_brandgrafic_module_task
+            analyze_brandgrafic_module_task.apply_async((asset.id,), countdown=15)
+        except Exception:
+            logger.exception('Falha ao enfileirar analise do grafismo %s', asset.id)
+
         preview_url = S3Service.generate_presigned_download_url(s3_key)
         return JsonResponse({
             'success': True,

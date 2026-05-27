@@ -225,7 +225,19 @@ def perfil_apply_suggestions(request):
             logger.warning(f"⚠️ [PERFIL_APPLY] Falha ao enviar para N8N: {n8n_result.get('error')}")
         else:
             logger.info(f"✅ [PERFIL_APPLY] Enviado para N8N - Fluxo: {flow_type}")
-        
+
+        # SWEEP: garantir dossiê visual das imagens de referência (rede de
+        # segurança para imagens adicionadas entre o save da base e a compilação)
+        try:
+            from apps.knowledge.tasks import (
+                analyze_pending_reference_images_task,
+                analyze_pending_brandgrafic_modules_task,
+            )
+            analyze_pending_reference_images_task.delay(kb.id)
+            analyze_pending_brandgrafic_modules_task.delay(kb.id)
+        except Exception:
+            logger.exception('Falha ao enfileirar sweep de análise visual (apply_suggestions)')
+
         # 6. RETORNAR SUCESSO (frontend redireciona)
         # Redirecionar para perfil-visualizacao que detecta compilation_status
         return JsonResponse({
