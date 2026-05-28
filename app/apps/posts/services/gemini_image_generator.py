@@ -95,7 +95,7 @@ def generate_post_image(
     references_usage_general: str = '',
     kb_translations: Optional[List[Dict[str, Any]]] = None,
     layout_document: Optional[Dict[str, Any]] = None,
-    product_urls: Optional[Dict[int, str]] = None,
+    image_prompt_override: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Gera UMA imagem final para o post via Gemini 3 Pro Image.
@@ -156,6 +156,7 @@ def generate_post_image(
         spatial_instructions=spatial_instructions or '',
         references_usage_general=references_usage_general or '',
         kb_translations=kb_translations or [],
+        image_prompt_override=image_prompt_override,
     )
 
     # 3. Monta payload Gemini — IMAGENS PRIMEIRO, depois texto (subject anchor)
@@ -217,7 +218,6 @@ def generate_post_image(
                     'cta': pillow_title_font_path,
                 },
                 logo_url=pillow_logo_url,
-                product_urls=product_urls or {},
             )
             mime_type = 'image/png'
         except Exception:
@@ -531,6 +531,7 @@ def _build_prompt_text(
     spatial_instructions: str = '',
     references_usage_general: str = '',
     kb_translations: List[Dict[str, Any]] = None,
+    image_prompt_override: Optional[str] = None,
 ) -> str:
     """
     Prompt SIMPLES — confia na dereferenciacao por imagem ("o produto da
@@ -685,7 +686,10 @@ def _build_prompt_text(
 
     # Detecta inline anchoring na SCENE — se presente, omite REFERENCE ROLES
     # (redundante) e adiciona breve nota explicativa antes da cena.
-    image_prompt_text = post.image_prompt or '(propor um cenario adequado ao briefing)'
+    # image_prompt_text: usa o override do orquestrador quando disponivel
+    # (image_prompt_final). Senao, cai pra post.image_prompt (Fase 1).
+    image_prompt_text = (image_prompt_override or post.image_prompt
+                         or '(propor um cenario adequado ao briefing)')
     # Sanitiza marca/modelo da CENA em QUALQUER modo: citar a marca no prompt
     # ativa priors do Gemini (ele renderiza branding e ignora a foto anexa).
     # O titulo/subtitulo (desenhados via Pillow) podem manter a marca; a CENA nao.
@@ -755,6 +759,33 @@ def _build_prompt_text(
             'NAO crie painel, faixa lisa, area chapada nem "espaco reservado" '
             'para texto/logo, e NAO desenhe texto ou logo.',
         ])
+
+    # === EXPERIMENT: bloco LAYOUT REFERENCE (start) ===
+    # Lista as refs com tipo='referencia_layout' (anexadas pela tasks.py) com
+    # instrucoes deterministicas. Facil reverter: delete entre os marcadores.
+    _layout_ref_lines = []
+    for _i, _ref in enumerate(sorted_refs, 1):
+        if str(_ref.get('tipo', '')).lower() == 'referencia_layout':
+            _u = (_ref.get('usage_description') or '').strip()
+            if _u:
+                _layout_ref_lines.append(f'IMAGE {_i} (LAYOUT REFERENCE): {_u}')
+    if _layout_ref_lines:
+        parts.extend([
+            '',
+            '[LAYOUT REFERENCE — replicate the STRUCTURE only]',
+            'A IMAGEM(NS) abaixo e a referencia de LAYOUT/TEMPLATE da marca. ',
+            'Use APENAS o que esta listado no brief abaixo (posicoes em %, '
+            'cores, formas). NAO copie o sujeito/comida/produto especifico da '
+            'referencia, NAO reproduza textos visiveis dentro de faixas/selos.',
+            '',
+            'REGRA DE ANGULO/PERSPECTIVA: o angulo/perspectiva da cena e dos '
+            'objetos da nossa cena deve seguir o angulo/perspectiva mostrado na '
+            'LAYOUT REFERENCE. Se a referencia e flat-lay cenital, a nossa cena '
+            'tambem e flat-lay cenital. Se a referencia mostra o produto num '
+            'angulo X, o produto da nossa cena aparece no MESMO angulo X.',
+            *_layout_ref_lines,
+        ])
+    # === EXPERIMENT: bloco LAYOUT REFERENCE (end) ===
 
     if use_hybrid_en:
         # Briefing + diretrizes em ingles (modos pillow/sanitized)
@@ -910,6 +941,43 @@ def _strip_emoji(text: str) -> str:
     if not text:
         return text
     return _EMOJI_RE.sub('', text).strip()
+
+
+def _fit_text_to_box(text, font_path, fallback_path, max_w, max_h, start_size, draw, min_size=22):
+    """Shrink-to-fit considerando LARGURA E ALTURA da caixa declarada.
+    Retorna (font, lines, fit_ok). fit_ok=False quando chegou ao min_size sem
+    caber (e renderiza no minimo, mas loga aviso)."""
+    from PIL import ImageFont
+    size = max(int(min_size), int(start_size))
+    font = None
+    lines = []
+    for _ in range(14):
+        try:
+            font = ImageFont.truetype(font_path or fallback_path, size)
+        except Exception:
+            font = ImageFont.truetype(fallback_path, size)
+        lines = _wrap_text(text, font, max_w, draw)
+        widest = 0
+        for ln in lines:
+            try:
+                bb = draw.textbbox((0, 0), ln, font=font)
+                w = bb[2] - bb[0]
+            except Exception:
+                w = len(ln) * size * 0.55
+            widest = max(widest, w)
+        line_h = size * 1.18
+        total_h = int(line_h * len(lines))
+        width_ok = widest <= max_w
+        height_ok = total_h <= max_h
+        if width_ok and height_ok:
+            return font, lines, True
+        if size <= min_size:
+            return font, lines, False
+        scale_w = (max_w / widest) if not width_ok and widest > 0 else 1.0
+        scale_h = (max_h / total_h) if not height_ok and total_h > 0 else 1.0
+        scale = min(scale_w, scale_h) * 0.95
+        size = max(min_size, int(size * max(0.55, scale)))
+    return font, lines, False
 
 
 def _fit_text(text, font_path, fallback_path, max_w, start_size, draw, min_size=22):
@@ -1208,15 +1276,12 @@ _DOC_ALIGN = {
 
 
 def _doc_color(img, hex_str, x, y, w, h, paleta):
-    """Cor do elemento: usa a cor do documento (paleta KB) se contrastar com a
-    regiao; senao auto_contrast (legivel). Sem painel."""
+    """Cor do elemento: HONRA a cor escolhida pelo orquestrador (designer).
+    Auto-contraste APENAS quando o orquestrador deixou null/em branco —
+    delegacao explicita ao Pillow."""
     if hex_str:
         try:
-            rgb = _hex_to_rgb(hex_str)
-            rl = _region_luminance(img, x, y, w, h)
-            cl = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
-            if abs(cl - rl) >= 60:
-                return rgb
+            return _hex_to_rgb(hex_str)
         except Exception:
             pass
     return _auto_contrast_color(img, x, y, w, h)
@@ -1240,46 +1305,8 @@ def _draw_logo_at(overlay, logo_url, x, y, target_w):
     return (x, y, target_w, target_h)
 
 
-def _cutout_white_bg(img, tolerance=18, feather=2):
-    """Remove fundo branco/quase-branco de uma imagem (foto de produto em
-    studio). Heuristica: se 3+ cantos sao quase-brancos, faz cutout; senao
-    retorna a imagem original (RGBA). feather suaviza serrilha das bordas.
-    Usa numpy para vetorizar (rapido em PNG de catalogo)."""
-    from PIL import Image, ImageFilter
-    img = img.convert('RGBA')
-    W, H = img.size
-    corners = [img.getpixel((1, 1)), img.getpixel((W - 2, 1)),
-               img.getpixel((1, H - 2)), img.getpixel((W - 2, H - 2))]
-    white_corners = sum(
-        1 for px in corners
-        if px[0] > 230 and px[1] > 230 and px[2] > 230
-    )
-    if white_corners < 3:
-        return img
-    try:
-        import numpy as np
-        arr = np.asarray(img).copy()
-        th = 255 - tolerance
-        mask = (arr[..., 0] >= th) & (arr[..., 1] >= th) & (arr[..., 2] >= th)
-        arr[..., 3][mask] = 0
-        img = Image.fromarray(arr, mode='RGBA')
-    except ImportError:
-        # fallback puro PIL (lento)
-        th = 255 - tolerance
-        px = img.load()
-        for y in range(H):
-            for x in range(W):
-                r, g, b, _ = px[x, y]
-                if r >= th and g >= th and b >= th:
-                    px[x, y] = (r, g, b, 0)
-    if feather > 0:
-        alpha = img.split()[3].filter(ImageFilter.GaussianBlur(radius=feather))
-        img.putalpha(alpha)
-    return img
-
-
 def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
-                           logo_url=None, product_urls=None):
+                           logo_url=None):
     """
     Renderiza o layout_document (lista de 'divs' do orquestrador) sobre a
     imagem do Gemini. Cada elemento ja traz posicao/tamanho RELATIVOS (%),
@@ -1312,44 +1339,6 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
             except Exception:
                 logger.exception('[layout_doc] falha grafismo')
 
-    # Composito final do overlay (grafismos) na imagem ANTES dos produtos —
-    # produtos sao colados na IMAGEM (img), nao no overlay, p/ pisar nos grafismos.
-    if any((el.get('role') or '').lower() == 'grafismo' for el in elements):
-        img = Image.alpha_composite(img, overlay)
-        overlay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay)
-
-    # Produtos (cutout do fundo branco -> cola por cima da cena+grafismos).
-    # Cada elemento role='produto' tem image_url (URL presigned). Order: grafismo
-    # -> produto -> texto -> logo. Assim o produto fica ACIMA das faixas mas
-    # ABAIXO do texto e logo (consistente com o template de marca).
-    product_urls = product_urls or {}
-    for el in elements:
-        if (el.get('role') or '').lower() != 'produto':
-            continue
-        try:
-            src = el.get('image_url') or product_urls.get(el.get('image_n'))
-            if not src:
-                continue
-            req = urllib.request.Request(
-                src, headers={'User-Agent': 'Mozilla/5.0 IAMKT'}
-            )
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                raw = resp.read()
-            prod_img = Image.open(BytesIO(raw))
-            prod_img = _cutout_white_bg(prod_img)
-            target_w = max(60, _px(el.get('width_pct', 25), W))
-            ratio = target_w / prod_img.width
-            target_h = max(60, int(prod_img.height * ratio))
-            prod_img = prod_img.resize(
-                (target_w, target_h), Image.LANCZOS
-            )
-            x = _px(el.get('x_pct', 70), W)
-            y = _px(el.get('y_pct', 65), H)
-            img.alpha_composite(prod_img, (x, y))
-        except Exception:
-            logger.exception('[layout_doc] falha cutout/composite produto')
-
     # Logo primeiro (texto pode evitar sobreposicao se preciso)
     logo_box = None
     for el in elements:
@@ -1363,8 +1352,9 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
             except Exception:
                 logger.exception('[layout_doc] falha logo')
 
-    # 1a passada: prepara cada bloco de texto (fonte, linhas, altura real)
-    blocks = []
+    # 1a passada: coleta DADOS CRUS de cada bloco de texto (sem fitar ainda;
+    # precisamos saber o gap para o proximo bloco para calcular max_h real).
+    raw_blocks = []
     for el in elements:
         role = (el.get('role') or '').lower()
         if role in ('logo', 'grafismo', 'shape', 'forma', 'produto'):
@@ -1374,28 +1364,70 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
             continue
         if (el.get('case') or '').lower() in ('upper', 'alta', 'uppercase'):
             content = content.upper()
-        x = _px(el.get('x_pct', 5), W)
-        y = _px(el.get('y_pct', 5), H)
-        bw = max(60, _px(el.get('width_pct', 60), W))
-        pad = _px(el.get('padding_pct', 0), W)
-        size = max(14, int(basis * float(el.get('font_size_pct', 6) or 6) / 100))
         weight = (el.get('weight') or 'regular').lower()
         is_bold = weight in ('bold', 'black', 'heavy', 'semibold')
-        fpath = fonts.get(role) or fonts.get('titulo') or (_DEJAVU_BOLD if is_bold else _DEJAVU_REG)
-        fb = _DEJAVU_BOLD if is_bold else _DEJAVU_REG
-        font, lines = _fit_text(content, fpath, fb, max(40, bw - 2 * pad), size, draw)
-        line_h = font.size * 1.18
-        blocks.append({
-            'x': x, 'y': y, 'bw': bw, 'pad': pad, 'font': font, 'lines': lines,
-            'line_h': line_h, 'total_h': int(line_h * len(lines)),
-            'align': _DOC_ALIGN.get((el.get('align') or 'left').lower(), 'left'),
+        raw_blocks.append({
+            'role': role,
+            'content': content,
+            'x_pct': float(el.get('x_pct', 5) or 5),
+            'y_pct': float(el.get('y_pct', 5) or 5),
+            'width_pct': float(el.get('width_pct', 60) or 60),
+            'height_pct': float(el.get('height_pct') or 0),  # 0 = sem declaracao
+            'padding_pct': float(el.get('padding_pct', 0) or 0),
+            'font_size_pct': float(el.get('font_size_pct', 6) or 6),
+            'is_bold': is_bold,
+            'fpath': fonts.get(role) or fonts.get('titulo') or (_DEJAVU_BOLD if is_bold else _DEJAVU_REG),
+            'fb': _DEJAVU_BOLD if is_bold else _DEJAVU_REG,
+            'align_raw': el.get('align') or 'left',
             'color_hex': el.get('color'),
         })
 
-    # 2a passada: FLOW anti-sobreposicao. O orquestrador estima y mas nao sabe
-    # a altura real do texto quebrado; empilhamos respeitando o y declarado
-    # como PISO, empurrando pra baixo so quando colidiria com o bloco anterior.
-    blocks.sort(key=lambda b: b['y'])
+    # Ordena por y_pct p/ conseguir derivar max_h = gap ate o proximo bloco.
+    raw_blocks.sort(key=lambda b: b['y_pct'])
+
+    # 2a passada: para cada bloco, calcula max_h e roda auto-fit (largura+altura).
+    blocks = []
+    for i, rb in enumerate(raw_blocks):
+        x = _px(rb['x_pct'], W)
+        y = _px(rb['y_pct'], H)
+        bw = max(60, _px(rb['width_pct'], W))
+        pad = _px(rb['padding_pct'], W)
+        # max_h: prefere height_pct declarado; senao gap pro proximo bloco
+        # (com pequena folga p/ respiro) ou ate o fim do canvas.
+        if rb['height_pct'] > 0:
+            max_h_pct = rb['height_pct']
+        else:
+            next_y_pct = raw_blocks[i + 1]['y_pct'] if i + 1 < len(raw_blocks) else 100.0
+            max_h_pct = max(4.0, next_y_pct - rb['y_pct'] - 1.0)  # 1% de folga
+        max_h = _px(max_h_pct, H)
+        start_size = max(14, int(basis * rb['font_size_pct'] / 100))
+        min_size = max(12, int(basis * 0.03))  # piso: 3% da menor dim
+        font, lines, fit_ok = _fit_text_to_box(
+            rb['content'], rb['fpath'], rb['fb'],
+            max(40, bw - 2 * pad), max_h, start_size, draw, min_size=min_size,
+        )
+        if not fit_ok:
+            logger.warning(
+                '[layout_doc] texto nao coube na caixa (role=%s len=%d max_h_px=%d) '
+                'renderizado no min_size %d',
+                rb['role'], len(rb['content']), max_h, min_size,
+            )
+        line_h = font.size * 1.18
+        blocks.append({
+            'role': rb['role'],
+            'x': x, 'y': y, 'bw': bw, 'pad': pad, 'font': font, 'lines': lines,
+            'line_h': line_h, 'total_h': int(line_h * len(lines)),
+            'align': _DOC_ALIGN.get(str(rb['align_raw']).lower(), 'left'),
+            'color_hex': rb['color_hex'],
+            '_raw': rb,
+            '_min_size': min_size,
+            '_max_h': max_h,
+        })
+
+    # Hierarquia: confia no designer. Auto-fit ja garante que cada bloco cabe
+    # na sua caixa declarada. Se o designer escolheu inverter visualmente,
+    # respeitamos — nao impomos ratio.
+
     gap = int(H * 0.012)
     flow_y = 0
     for b in blocks:

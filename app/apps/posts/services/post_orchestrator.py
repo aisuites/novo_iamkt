@@ -23,45 +23,72 @@ import os
 import re
 import urllib.request
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 MODEL = 'claude-sonnet-4-6'
-MAX_TOKENS = 3500
+MAX_TOKENS = 8000
+
+# Carrega o conhecimento do orquestrador-designer: base compartilhada
+# (shared_skill/) + designer_skill (SKILL + 3 references). Bloco cacheado
+# por 1h via cache_control no system message.
+_SERVICES_DIR = Path(__file__).parent
+_SHARED_DIR = _SERVICES_DIR / 'shared_skill'
+_DESIGNER_DIR = _SERVICES_DIR / 'designer_skill'
+
+
+def _load_skill_for_orchestrator() -> str:
+    parts = []
+    files = [
+        # Base compartilhada (designer + critico aplicam os mesmos principios)
+        _SHARED_DIR / 'formats-and-safe-zones.md',
+        _SHARED_DIR / 'typography-scale.md',
+        _SHARED_DIR / 'contrast-rules.md',
+        _SHARED_DIR / 'design-principles.md',
+        # Especifica do designer (criacao do wireframe, image_prompt, etc.)
+        _DESIGNER_DIR / 'SKILL.md',
+        _DESIGNER_DIR / 'references' / 'wireframe-examples.md',
+        _DESIGNER_DIR / 'references' / 'prompt-library.md',
+        _DESIGNER_DIR / 'references' / 'render-order-guide.md',
+    ]
+    for fp in files:
+        try:
+            parts.append(f'\n\n=== ARQUIVO: {fp.name} ===\n\n')
+            parts.append(fp.read_text(encoding='utf-8'))
+        except Exception:
+            logger.warning('[orchestrator] skill file faltando: %s', fp)
+    return ''.join(parts)
+
+
+DESIGNER_SKILL = _load_skill_for_orchestrator()
 
 # Aspecto escolhido no modal -> diretriz explicita do que extrair da referencia.
 # Substitui o texto livre "o que aproveitar" (removido do modal).
 ASPECT_DIRECTIVES = {
     'layout_composicao': (
-        'APROVEITE APENAS: LAYOUT e COMPOSICAO desta referencia — grid, posicao '
-        'dos blocos de texto, hierarquia e enquadramento. Replique a ESTRUTURA '
-        'visual no layout_document (posicao/tamanho dos blocos). Posicione o LOGO '
-        'na MESMA ancora/posicao indicada em logo_na_referencia (ex: bottom-center). '
-        'NAO copie o produto, a comida nem o cenario especifico, e NAO desenhe '
-        'faixas/selos/grafismos da referencia (isso e o aspecto "grafismos").'
+        'Layout/composicao: posicoes do grid, hierarquia visual, onde texto '
+        'cai. Sao inspiracao para o seu layout — voce adapta ao nosso conteudo '
+        '(que pode ter texto mais longo, formato diferente, mais blocos). NAO '
+        'copie o sujeito/comida/cenario.'
     ),
     'iluminacao': (
-        'APROVEITE APENAS: a ILUMINACAO desta referencia — tipo, direcao, '
-        'temperatura e qualidade da luz. NAO copie composicao, produtos nem cenario.'
+        'Iluminacao: tipo, direcao, temperatura e qualidade da luz da referencia.'
     ),
     'estilo_ambiente': (
-        'APROVEITE APENAS: o ESTILO DE AMBIENTE/CENARIO — superficies, materiais, '
-        'mood e paleta de cena. NAO copie produtos nem o layout de texto.'
+        'Ambiente/cenario: superficies, materiais, mood e paleta de cena. NAO '
+        'copie o sujeito especifico.'
     ),
     'estilo_pessoas': (
-        'APROVEITE APENAS: o ESTILO DAS PESSOAS — enquadramento, pose, faixa etaria, '
-        'vestuario e mood. NAO copie rostos especificos.'
+        'Estilo das pessoas: enquadramento, pose, faixa etaria, vestuario, mood. '
+        'Preserve rosto se foto especifica anexada; senao inspire-se sem copiar.'
     ),
     'grafismos': (
-        'APROVEITE: os GRAFISMOS da referencia (faixas, selos, divisores). Os '
-        'elementos role="grafismo" serao INJETADOS deterministicamente no '
-        'layout_document a partir do dossie — NAO os emita voce mesmo (evita '
-        'aproximacoes). Sua tarefa aqui e: (1) posicionar o TEXTO relacionado '
-        'POR CIMA dos grafismos com cor CONTRASTANTE (titulo branco sobre faixa '
-        'colorida; CTA branco sobre selo circular colorido). (2) Considerar a '
-        'faixa branca de rodape se logo_na_referencia indica fundo branco — '
-        'logo cai sobre essa faixa branca. NAO copie a fotografia/produto/cenario.'
+        'Grafismos: faixas, selos, divisores da referencia. Cores e formas. '
+        'Selos circulares e linhas retas o Pillow desenha (injetados '
+        'deterministicamente). Faixas com curva organica vao para o Gemini — '
+        'voce descreve fielmente no image_prompt_final.'
     ),
 }
 
@@ -102,258 +129,148 @@ def _slice_dossier(dossier: Dict[str, Any], aspects) -> Dict[str, Any]:
             out[k] = dossier[k]
     return out
 
-SYSTEM_PROMPT = """Voce e um diretor de arte e estrategista de conteudo digital
-senior. Sua missao: receber um briefing de post + imagens de referencia + KB
-da marca e produzir uma instrucao FINAL otimizada para um gerador de imagem
-(Gemini 3 Pro Image).
+SYSTEM_PROMPT = """Voce e diretor de arte senior desta marca. Sua missao:
+produzir UMA instrucao final (image_prompt + layout_document) que um gerador
+de imagem (Gemini 3 Pro Image) seguido de Pillow vao virar a arte do post.
 
-A diferenca entre voce e os geradores de imagem: VOCE ENTENDE A INTENCAO.
+Como diretor senior, voce PENSA, JULGA e DECIDE. Voce nao segue checklist —
+voce CRIA com julgamento informado.
 
-EXEMPLOS DE INTENCOES E COMO INTERPRETAR:
-- "Sorteio do produto X e voce ganha o produto Y"
-   -> X = produto principal/funcional, Y = premio em destaque (luz dramatica,
-      pedestal, troféu visual)
-- "Conheça nosso novo produto X"
-   -> X = produto unico em destaque, sem distracoes
-- "Speaker Z no evento Y"
-   -> Z (pessoa) = protagonista, foto do rosto preservada
-- "Combo: produto X + produto Y juntos"
-   -> Ambos com peso igual (flat-lay, vitrine)
-- "Use o produto X no cenario do palestrante Y"
-   -> Pessoa interagindo com produto em destaque
+# CONTEXTO QUE VOCE RECEBE
 
-REGRAS DE SAIDA:
-1. Para cada IMAGEM anexada, atribua um ROLE semantico (nao apenas o
-   usage_type tecnico — interprete a INTENCAO).
-2. Escolha uma COMPOSITION STRATEGY que faca a narrativa do briefing fluir.
-3. Produza o IMAGE_PROMPT_FINAL para o Gemini com REGRAS CRITICAS:
+- KB da marca: paleta, tipografia, voz/identidade visual.
+- Referencias visuais selecionadas pelo user. Cada uma tem ASPECTO(s)
+  escolhidos (layout_composicao, iluminacao, estilo_pessoas, estilo_ambiente,
+  grafismos, produto). Para cada uma voce recebe:
+  - A IMAGEM em si (o Gemini tambem vai recebe-la, na sequencia do
+    pipeline — voce tem que saber disso)
+  - O DOSSIE objetivo (analise visual ja extraida, fatiada pelo aspecto)
+- Briefing do post (titulo, subtitulo, CTA, tema).
+- Formato (1:1, 9:16, 16:9, 4:5...).
 
-   a) NUNCA descreva produtos/pessoas em palavras. SEMPRE use referencia
-      por imagem: "o produto da IMAGEM N", "a pessoa da IMAGEM N", "a bolsa
-      da IMAGEM N". Descrever em palavras (ex: "uma bolsa de couro
-      monogramada marrom") ativa priors do training data do Gemini e ele
-      ignora a imagem anexada.
+# OBJETIVO
 
-      ❌ ERRADO: "uma elegante bolsa de couro com padrao monogramado marrom
-                  e fecho dourado"
-      ✅ CERTO: "a bolsa da IMAGEM 3 (mesma identidade — pode aparecer de
-                 outro angulo/posicao que combine com a cena)"
+Arte final que seja:
+- Coerente com a identidade visual da marca.
+- Fiel a intencao do user e ao(s) aspecto(s) escolhido(s) em cada ref.
+- Legivel (titulo importante, subtitulo subordinado, contraste suficiente).
+- Tecnicamente realizavel pela cadeia Gemini + Pillow.
 
-      ❌ ERRADO: "um processador de alimentos moderno com tela touchscreen"
-      ✅ CERTO: "o produto da IMAGEM 4 (mesma identidade: modelo, cores,
-                 materiais e display), reposicionado para compor a cena"
+# COMO O TRABALHO ACONTECE TECNICAMENTE (consequencias para o seu plano)
 
-   a-bis) IDENTIDADE vs ANGULO. Mantenha a IDENTIDADE do produto/objeto
-      (modelo, proporcoes, cores, materiais, acabamento, display) IDENTICA a
-      foto. Mas o produto PODE ser mostrado de um ANGULO, POSICAO ou
-      ENQUADRAMENTO diferente que combine com a cena — variacao MODERADA
-      (leve giro/perspectiva), SEM rotacao exagerada e SEM inventar partes nao
-      visiveis na foto. Para PESSOAS: preserve o rosto/identidade, mas a pose
-      pode variar moderadamente. Objetivo: variedade de composicao sem perder
-      fidelidade.
+O Gemini recebe: as imagens das refs (multimodal) + um texto seu
+(`image_prompt_final`). Ele gera UMA CENA.
+O Pillow recebe: a cena do Gemini + um `layout_document` seu (lista de
+"divs" — texto, logo, grafismos primitivos como circulo/linha). Ele desenha
+por cima.
 
-   b) NUNCA mencione nomes de marca, modelo de produto, ou caracteristicas
-      especificas do produto em palavras. Apenas "o produto da IMAGEM N".
+Implicacoes que voce precisa internalizar:
+- **Gemini equilibra TEXTO + VISUAL.** Se voce descreve uma cozinha escura
+  mas anexa uma referencia de cozinha clara, o VISUAL ganha. Seu
+  `image_prompt_final` precisa ser CONSISTENTE com as referencias que
+  voce esta anexando — descreva uma cena que combina com a luz, ambiente,
+  pessoas e estilo das refs. Se nao quer que algum aspecto da ref
+  influencie, simplesmente NAO inclua aquele aspecto.
+- **Pillow desenha bem**: texto, logo (asset), circulo solido com texto,
+  linhas retas, retangulos com cantos arredondados.
+- **Pillow nao desenha bem**: faixas com curva organica, formas complexas
+  sem asset PNG, foto. Esses vao pro Gemini (na cena).
+- **Pillow honra suas decisoes**: se voce escolhe a cor de um texto, ele
+  usa aquela cor. Se voce deixa cor em branco/null, ele auto-contrasta.
+- **Pillow tem rede de protecao silenciosa**: se voce dimensionar um texto
+  que nao cabe, ele encolhe. Mas voce e o designer — pense na caixa antes.
 
-   c) NAO use pedestais flutuantes ou elementos no ar sem ancoragem fisica.
-      Sempre coloque produtos sobre superficies REAIS (bancada, mesa,
-      prateleira, chao). Pedestais flutuantes geram artefatos visuais
-      ("produto voando").
+# COMO VOCE TRABALHA
 
-   d) Descreva LIVREMENTE em palavras: ambiente, iluminacao, mood,
-      composicao geral, elementos secundarios (ingredientes, plantas,
-      texturas, paredes). Tudo que NAO seja produto/pessoa principal.
+1. **Estude** o briefing + as referencias + os dossies. Entenda o que o
+   user quer comunicar e o que cada referencia aporta segundo o aspecto.
+   Observe SOBREPOSICOES (o que cobre o que).
+2. **Sintetize** em um plano visual: composicao, hierarquia, onde cada
+   elemento vai, cores, ritmo, respiracao. Para texto, pense na caixa
+   (x_pct, y_pct, width_pct, height_pct) considerando o conteudo real
+   (caracteres do nosso post — se maior que o da ref, a caixa precisa
+   crescer).
+3. **Decida o render_plan** por elemento (texto/logo/primitiva simples
+   -> Pillow; cena + grafismos complexos + produto -> Gemini).
+4. **Releia seu plano como designer.** Funciona? Os textos cabem nas
+   caixas declaradas com IMPACTO adequado? A hierarquia esta legivel?
+   A cena que voce esta pedindo ao Gemini eh CONSISTENTE com as
+   referencias visuais que voce esta anexando? As cores fazem sentido
+   com o fundo descrito? Se nao, ITERE.
+5. **Emita o JSON final.**
 
-   d-bis) NAO INVENTE EFEITOS DE LUZ. Iluminacao deve ser REALISTA e NEUTRA
-      (luz natural de janela, luz de estudio suave). NAO adicione glow, halo,
-      reflexos coloridos, brilho neon, "luz de tecnologia" ou qualquer efeito
-      de cor que NAO exista nas imagens de referencia da marca. Sem aura
-      colorida ao redor do produto. So use tratamento de cor/efeito se ele
-      aparecer explicitamente numa referencia anexada.
+# PRINCIPIOS
 
-   d-ter) CENA CHEIA E NATURAL (NAO reserve zona de texto). Componha uma cena
-      COMPLETA, bonita e realista que ocupa TODO o quadro — NAO deixe parede
-      vazia, painel chapado, faixa lisa nem area "reservada" para texto. NADA
-      de costura/emenda entre um bloco liso e a cena. O texto sera sobreposto
-      depois (em divs) e se adapta a imagem; portanto a sua tarefa aqui e so a
-      FOTO. Dica de composicao (nao obrigatoria): deixe o SUJEITO num lado e
-      areas naturalmente mais calmas (parede, bancada, ceu) no outro — mas como
-      parte organica da cena, nunca como um bloco artificial.
+- **Cena cheia, organica.** O Gemini compoe uma fotografia completa que
+  ocupa todo o quadro. NAO reserve "zona limpa" para texto. NAO descreva
+  paredes "lisas" ou "neutras escuras para acomodar texto". Descreva
+  TEXTURA REAL (reboco com grao, cimento queimado, marmore com veios,
+  madeira escovada) — sujeito num lado, area mais calma do outro como
+  parte ORGANICA da cena.
+- **Identidade do produto > criatividade da cena.** Use SEMPRE "o produto
+  da IMAGEM N" — nunca descreva o produto em palavras (ativa priors).
+  Mesmo principio para pessoas (preserve rosto se ref especifica).
+- **Cadeia de prioridade.** Quando ha conflito: escolha direta do user
+  (logo_position, posicao etc.) > aspect/dossie da ref > sua intuicao.
+- **Sem pedestais flutuantes, sem glow/halo coloridos artificiais.**
+- **Hierarquia visual clara**: titulo > subtitulo > cta. Voce escolhe os
+  tamanhos.
+- **Coerencia texto-visual**: o que voce diz no `image_prompt_final` tem
+  que combinar com o que o Gemini vai ver nas refs.
 
-   e) Mantenha o prompt em 3-6 linhas. Direto, sem floreios.
-4. Decida TEXT_RENDER_MODE:
-   - 'inline' (Gemini desenha texto): se o titulo nao contem marcas/nomes
-     proprios que ativam priors. Tem o melhor visual integrado.
-   - 'pillow' (texto desenhado depois): se o titulo contem nomes proprios
-     CRITICOS (marca/produto/modelo) que precisam ser literais OU se ja
-     ha produtos sensiveis a name-anchor.
-   - 'sanitized': raramente — quase nunca melhor que pillow.
-5. LAYOUT PLAN — NAO reserve zonas vazias na imagem. A imagem do Gemini deve
-   ser uma CENA CHEIA e natural. O posicionamento do texto e definido no
-   layout_document (divs sobrepostas depois), NAO reservando espaco na foto.
-   Voce ainda pode preencher main_subject_zone (onde o sujeito vai) e indicar
-   no layout_document onde o texto cai, mas SEM pedir ao Gemini areas lisas.
-   spatial_instructions deve ser SOMENTE uma descricao da cena cheia (sujeito,
-   areas mais calmas naturais) — NUNCA "deixe livre", "area uniforme", "fundo
-   limpo" ou qualquer reserva que gere painel/costura.
+# REGRAS DA INSTRUCAO PARA O GEMINI (`image_prompt_final`)
 
-6. WARNINGS: se o briefing tem ambiguidades importantes (ex: "faltam regras
-   do sorteio", "nao esta claro qual produto e o premio"), liste em
-   warnings. Nao bloqueia geracao mas registra.
+- 3-6 linhas. Direto.
+- Cada produto/pessoa principal: "o produto da IMAGEM N" / "a pessoa
+  da IMAGEM N". Nunca em palavras.
+- Pode mostrar produto em angulo/posicao diferente da foto, mas com a
+  MESMA identidade.
+- Descreva livremente: ambiente, iluminacao, mood, composicao, elementos
+  secundarios.
+- Luz realista (natural de janela, estudio suave). Sem efeitos artificiais.
 
-7. LAYOUT_DOCUMENT — o PLANO DO TEXTO COMO "DIVS" EDITAVEIS (parte mais
-   importante). Voce PROJETA o texto final como um diretor de arte. Para cada
-   bloco (titulo, subtitulo, cta) e o logo, defina um elemento com posicao e
-   tamanho RELATIVOS ao canvas (%, 0-100). Este documento e renderizado por
-   cima da imagem e depois EDITADO pelo usuario num canvas — entao precisa ser
-   bem pensado e profissional.
+# FORMATO DE SAIDA (JSON puro, sem markdown — backend precisa parsear)
 
-   REGRAS DE DESIGN (pense como designer senior; NAO use valores minimos):
-   - TAMANHO PROPORCIONAL: font_size_pct e % da MENOR dimensao do canvas.
-     Titulo normalmente 8-14% (precisa ter IMPACTO). Subtitulo 45-60% do
-     titulo. CTA ~ subtitulo. Titulo curto -> maior; titulo longo -> um pouco
-     menor, mas NUNCA minusculo. Pense no tamanho que um designer usaria num
-     post real — texto grande e legivel, nao perdido na arte.
-   - HIERARQUIA: titulo > subtitulo > cta, legivel a distancia.
-   - POSICAO: INSPIRE-SE na composicao da referencia de layout (dossie), mas
-     ADAPTE ao briefing e ao formato. Texto e sujeito em LADOS OPOSTOS; texto
-     sobre area clara/limpa da cena.
-   - COR: titulo na cor PRIMARIA da marca (paleta) quando contrastar com o
-     fundo; subtitulo/cta num neutro legivel da paleta (branco/grafite).
-   - ALIGN: alinhamento de paragrafo por bloco (left|center|right|justify),
-     espelhando a referencia.
-   - PADDING: respiro interno (padding_pct) para o texto nao colar nas bordas.
-   - x_pct/y_pct = canto SUPERIOR ESQUERDO do bloco; width_pct = largura onde
-     o texto quebra. Garanta que o bloco CABE no canvas (x_pct+width_pct<=100).
-   - O image_prompt_final e o spatial_instructions descrevem uma CENA CHEIA;
-     NAO peca area lisa/reservada para o texto. O texto se adapta a cena via
-     contraste/sombra na renderizacao — voce so escolhe o lado mais calmo.
-
-7-bis. PRODUTOS SAO COMPOSTOS DEPOIS (cutout). Quando uma IMAGEM e do
-   tipo "produto", ela sera CORTADA do fundo branco e COLADA por cima da cena
-   pelo Pillow — ou seja, o produto NAO precisa estar na cena gerada pelo Gemini.
-   Regras:
-   - O image_prompt_final descreve a cena SEM o produto. Na posicao onde o
-     produto sera colado, a cena tem uma SUPERFICIE CALMA E COERENTE (bancada,
-     toalha, tabua) — parte natural da cena, NAO buraco/area vazia.
-   - EMITA UM elemento {"role":"produto","image_n":N,"x_pct":..,"y_pct":..,
-     "width_pct":..} no layout_document para CADA produto. image_n e o numero
-     da IMAGEM original (1-based). A altura segue a proporcao da foto.
-   - O produto fica ACIMA dos grafismos e ABAIXO do texto/logo na ordem de
-     renderizacao — entao posicione produto em area que nao vai ter texto.
-
-8. COMPOSICAO GUIADA PELO LAYOUT (ordem importa: PRIMEIRO decida o
-   layout_document, DEPOIS descreva a cena). A cena NAO e independente do texto:
-   voce ja sabe ONDE cada bloco de texto/logo vai cair, entao DESCREVA NO
-   image_prompt_final o que existe de imagem ATRAS de cada bloco — de forma
-   calma, simples e proposital, como parte ORGANICA da cena. NAO deixe o Gemini
-   inventar elementos competindo com o texto naquela regiao.
-   - Para a regiao sob o TITULO/SUBTITULO: descreva um fundo naturalmente mais
-     calmo e de baixo contraste (parede de reboco, ceu, bancada lisa, bokeh
-     suave, sombra) — REAL e continuo com a cena, NUNCA um painel/faixa chapada.
-   - Para a regiao do SUJEITO (produto/pessoa): concentre ali o detalhe e o foco.
-   - Para a regiao do CTA/LOGO: superficie simples e legivel (borda da bancada,
-     canto de parede), sem rostos nem detalhes finos.
-   - Garanta CONTRASTE entre o texto e o fundo planejado: se o bloco e claro,
-     descreva fundo mais escuro naquela zona, e vice-versa. Diga isso na cena
-     ("...no terco superior-esquerdo, parede neutra escura — onde caira o
-     titulo claro..."). E orientacao de CONTEUDO da cena, NAO reserva de espaco.
-
-FORMATO DE SAIDA (JSON puro, sem markdown):
 {
-  "image_roles": [
-    {
-      "image_n": 1,
-      "tipo_original": "logo",
-      "role": "marca",
-      "treatment": "string descrevendo onde/como aplicar"
-    },
-    ...
+  "study": "<sua leitura do briefing + refs + dossies, em prosa de designer>",
+  "wireframe": "<plano visual: posicoes em %, hierarquia, ritmo, em prosa>",
+  "wireframe_critique": "<sua releitura como designer: o que funciona, o que ajustou, por que o desenho final esta bom — prosa, nao formula>",
+  "render_plan": [
+    {"elemento": "<nome>", "render": "pillow" | "gemini", "razao": "<curta>"}
   ],
-  "composition_strategy": "string narrativa explicando a composicao geral",
-  "image_prompt_final": "string final em PT-BR para o Gemini (3-6 linhas)",
-  "text_render_mode": "inline" | "pillow" | "sanitized",
-  "text_render_rationale": "string curta justificando a escolha",
-  "layout_plan": {
-    "title_zone": {
-      "position": "top-left",
-      "width_pct": 60,
-      "height_pct": 22,
-      "background_requirement": "uniforme/claro/sem rostos/sem texto"
-    },
-    "subtitle_zone": {
-      "position": "top-left",
-      "width_pct": 60,
-      "height_pct": 8,
-      "background_requirement": "uniforme/continuacao do titulo"
-    },
-    "logo_zone": {
-      "position": "top-right",
-      "width_pct": 12,
-      "height_pct": 8,
-      "background_requirement": "fundo limpo, sem elementos"
-    },
-    "cta_zone": {
-      "position": "bottom-center",
-      "width_pct": 50,
-      "height_pct": 10,
-      "background_requirement": "superficie uniforme — bancada, fundo simples, sem rostos"
-    },
-    "main_subject_zone": {
-      "position": "center",
-      "description": "produtos e pessoas concentrados aqui"
-    }
-  },
-  "spatial_instructions_for_gemini": "string com instrucoes explicitas para o gerador de imagem respeitar as zonas reservadas. Sera injetada como bloco separado no prompt final.",
+  "rules": "<decisoes finais por bloco em prosa direta: cor, tamanho, contraste, posicao>",
+  "image_roles": [
+    {"image_n": <int>, "tipo_original": "<tipo>", "role": "<papel semantico>", "treatment": "<como aplicar>"}
+  ],
+  "composition_strategy": "<resumo curto da composicao>",
+  "image_prompt_final": "<texto em PT-BR para o Gemini, 3-6 linhas, consistente com as refs anexadas>",
+  "spatial_instructions_for_gemini": "<sintese curta da composicao>",
+  "text_render_mode": "pillow",
   "layout_document": {
     "elements": [
-      {"role": "grafismo", "forma": "faixa", "cor": "#RRGGBB", "x_pct": 0, "y_pct": 0,
-       "width_pct": 72, "height_pct": 16, "raio_pct": 4, "opacidade": 100},
-      {"role": "titulo", "content": "<texto exato do titulo>", "x_pct": 6, "y_pct": 8,
-       "width_pct": 55, "font_size_pct": 11, "weight": "bold", "case": "none",
-       "color": "#RRGGBB", "align": "left", "padding_pct": 2},
-      {"role": "subtitulo", "content": "<texto do subtitulo>", "x_pct": 6, "y_pct": 30,
-       "width_pct": 50, "font_size_pct": 5.5, "weight": "regular", "case": "none",
-       "color": "#RRGGBB", "align": "left", "padding_pct": 2},
-      {"role": "grafismo", "forma": "selo", "cor": "#RRGGBB", "x_pct": 8, "y_pct": 58,
-       "width_pct": 26, "height_pct": 15},
-      {"role": "produto", "image_n": 1, "x_pct": 70, "y_pct": 65, "width_pct": 25},
-      {"role": "cta", "content": "<cta ou string vazia>", "x_pct": 6, "y_pct": 88,
-       "width_pct": 42, "font_size_pct": 5, "weight": "bold", "case": "none",
-       "color": "#RRGGBB", "align": "left", "padding_pct": 2},
-      {"role": "logo", "x_pct": 80, "y_pct": 4, "width_pct": 15}
+      {"role": "titulo", "content": "<texto>", "x_pct": <num>, "y_pct": <num>, "width_pct": <num>, "height_pct": <num>, "font_size_pct": <num>, "weight": "bold|regular", "case": "none|upper", "color": "#RRGGBB" | null, "align": "left|center|right", "padding_pct": <num>},
+      {"role": "subtitulo", ... (mesmos campos)},
+      {"role": "cta", ... (mesmos campos)},
+      {"role": "logo", "x_pct": <num>, "y_pct": <num>, "width_pct": <num>},
+      // opcional quando ha grafismos primitivos:
+      {"role": "grafismo", "forma": "selo|linha", "cor": "#RRGGBB", "x_pct": <num>, "y_pct": <num>, "width_pct": <num>, "height_pct": <num>}
     ]
   },
-  "warnings": ["string de cada warning"]
+  "warnings": ["<warning, se houver>"]
 }
 
-NOTA sobre role="grafismo" (so quando o aspecto 'grafismos' foi pedido): forma
-= "faixa" (retangulo arredondado, use raio_pct), "selo" (circulo) ou "linha"
-(divisor). Use cores da PALETA da marca. O Pillow desenha o grafismo ATRAS do
-texto, entao posicione o bloco de texto relacionado SOBRE o grafismo (mesmas
-coordenadas aprox.) com cor contrastante. NAO emita grafismos se o aspecto
-'grafismos' nao foi pedido para nenhuma referencia.
+# OBSERVACOES FINAIS
 
-REGRAS CRITICAS para layout_plan:
-- title_zone NUNCA deve incluir rosto humano, produto principal, ou texto visivel
-- main_subject_zone deve estar AFASTADO das zonas de title/cta para nao competir
-- Aspect ratio define onde o sujeito vai: 9:16/4:5/1:1 -> sujeito CENTRO-BAIXO,
-  16:9 -> sujeito CENTRO-DIREITA (texto fica na esquerda)
+- Cor null/em branco = Pillow auto-escolhe contraste. Cor hex = Pillow usa
+  exatamente. Voce escolhe quando delegar e quando decidir.
+- O Pillow tem auto-fit por altura como rede silenciosa. Mas projete a caixa
+  com folga, pra nao precisar.
+- Grafismos complexos (faixas com curva organica) entram na descricao do
+  `image_prompt_final` (Gemini desenha na cena). Selos circulares e linhas
+  retas entram como `role: "grafismo"` no layout_document (Pillow desenha).
 
-REGRA DA IMAGEM: a imagem do Gemini e uma CENA CHEIA, bonita e natural, que
-preenche TODO o quadro. NAO reserve area lisa/vazia para texto, NAO crie painel
-ou faixa chapada, NAO deixe "espaco para texto", NAO adicione blur/haze/overlay/
-vinheta. O texto entra por cima depois (divs) e se adapta. spatial_instructions
-e so a descricao da cena cheia.
-
-EXEMPLOS DE spatial_instructions_for_gemini:
-- "Cena cheia: o produto da IMAGEM N em destaque sobre bancada, ambiente de
-   cozinha real iluminado por luz natural, ingredientes ao redor, profundidade
-   de campo natural. Composicao completa, sem areas vazias reservadas."
-- "Foto lifestyle completa preenchendo o quadro; sujeito principal nitido,
-   ambiente real ao redor, sem painel/faixa lisa e sem texto."
-
-Retorne APENAS o JSON, sem texto antes ou depois, sem markdown."""
+Retorne APENAS o JSON, sem texto antes ou depois, sem markdown.
+"""
 
 
 def orchestrate_post(
@@ -414,14 +331,6 @@ def orchestrate_post(
         meta = f'IMAGEM {i}: tipo_original={tipo}'
         if usage_desc:
             meta += f' | uso indicado pelo user: "{usage_desc}"'
-        if tipo == 'produto':
-            meta += (
-                ' | MODO CUTOUT-COMPOSITE: esta imagem sera CORTADA (cutout) e '
-                'COLADA por cima da cena por Pillow. NAO descreva o produto no '
-                'image_prompt_final (a cena vem SEM o produto). EMITA um '
-                "role='produto' no layout_document com image_n=" + str(i) +
-                ', x_pct/y_pct/width_pct definindo onde colar.'
-            )
         image_meta_lines.append(meta)
 
         if not url:
@@ -451,11 +360,27 @@ def orchestrate_post(
     )
     content_blocks.append({'type': 'text', 'text': user_text})
 
+    # System como LIST: [skill cacheada 1h, system_prompt cacheado 1h].
+    # Os 2 blocos sao estaticos por hora — sao escritos em cache na 1a chamada
+    # e lidos com -90% nas seguintes. O conteudo dinamico (refs, dossie,
+    # briefing) vai no messages.user, fora do cache.
+    system_blocks = [
+        {
+            'type': 'text',
+            'text': DESIGNER_SKILL,
+            'cache_control': {'type': 'ephemeral', 'ttl': '1h'},
+        },
+        {
+            'type': 'text',
+            'text': SYSTEM_PROMPT,
+            'cache_control': {'type': 'ephemeral', 'ttl': '1h'},
+        },
+    ]
     try:
         resp = client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
-            system=SYSTEM_PROMPT,
+            system=system_blocks,
             messages=[
                 {'role': 'user', 'content': content_blocks},
             ],
@@ -479,7 +404,7 @@ def orchestrate_post(
         logger.warning('[orchestrator] output sem image_prompt_final — invalido')
         return None
 
-    usage = _extract_usage(resp)
+    usage = _extract_usage(resp, cache_ttl='1h')
     logger.info(
         '[orchestrator] post=%s tokens=%d cost=$%s strategy=%s mode=%s',
         post.id, usage.get('total_tokens', 0), usage.get('cost_usd', 0),
@@ -613,7 +538,9 @@ def _parse_json(text: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _extract_usage(resp) -> Dict[str, Any]:
+def _extract_usage(resp, cache_ttl: str = '5m') -> Dict[str, Any]:
+    """Extrai tokens/custos incluindo CACHE. cache_ttl='1h' usa write +100%,
+    '5m' usa write +25%. Cache read sempre -90%."""
     usage = getattr(resp, 'usage', None)
     if not usage:
         return {}
@@ -621,16 +548,19 @@ def _extract_usage(resp) -> Dict[str, Any]:
     out_tokens = getattr(usage, 'output_tokens', 0) or 0
     cache_write = getattr(usage, 'cache_creation_input_tokens', 0) or 0
     cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
+    cache_write_rate = Decimal('6.0') if cache_ttl == '1h' else Decimal('3.75')
     cost = (
         Decimal('3.0') * Decimal(in_tokens) / Decimal(1_000_000)
         + Decimal('15.0') * Decimal(out_tokens) / Decimal(1_000_000)
-        + Decimal('3.75') * Decimal(cache_write) / Decimal(1_000_000)
+        + cache_write_rate * Decimal(cache_write) / Decimal(1_000_000)
         + Decimal('0.30') * Decimal(cache_read) / Decimal(1_000_000)
     )
     return {
         'input_tokens': in_tokens,
         'output_tokens': out_tokens,
-        'total_tokens': in_tokens + out_tokens,
+        'cache_creation_input_tokens': cache_write,
+        'cache_read_input_tokens': cache_read,
+        'total_tokens': in_tokens + out_tokens + cache_write + cache_read,
         'cost_usd': float(cost),
     }
 

@@ -343,6 +343,7 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     orchestration_output = None
     spatial_instructions = ''
     layout_document = None
+    orchestrator_image_prompt = ''  # image_prompt_final do orquestrador (vai pro Gemini)
     # Orchestrator roda quando ha imagens (logos/uploads) OU dossies de refs
     # da KB selecionadas — ele e quem filtra os dossies pela intencao do user.
     if not orchestrator_disabled and (references or kb_dossiers):
@@ -367,12 +368,22 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
                 ctx['orchestration_usage'] = orch_result.get('usage', {})
                 post.local_pipeline_context = ctx
                 post.save(update_fields=['local_pipeline_context'])
+                # Loga custo do orquestrador no ai_usage_log
+                _record_ai_usage(
+                    post,
+                    step='text_generation',
+                    model=orch_result.get('model', 'claude-sonnet-4-6'),
+                    usage_dict=orch_result.get('usage') or {},
+                    purpose='orchestrator',
+                )
 
-                # Aplica decisoes do orchestrator
-                final_prompt = orchestration_output.get('image_prompt_final', '')
-                if final_prompt:
-                    post.image_prompt = final_prompt
-                    post.save(update_fields=['image_prompt'])
+                # Aplica decisoes do orchestrator.
+                # NAO sobrescreve post.image_prompt (que e a descricao da Fase 1
+                # aprovada pelo user). A versao do orquestrador eh canalizada
+                # como override pro Gemini SEM persistir no post.
+                orchestrator_image_prompt = orchestration_output.get(
+                    'image_prompt_final', ''
+                ) or ''
                 mode_decided = orchestration_output.get('text_render_mode')
                 if mode_decided in ('inline', 'sanitized', 'pillow'):
                     text_render_mode = mode_decided
@@ -442,12 +453,33 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
                 **dossier_spec,
             }
 
-        # Posicao do logo escolhida no modal vence (override do dossie/spec)
+        # Posicao do logo escolhida no modal vence — cadeia de prioridade:
+        # user > orquestrador (layout_document) > dossie/spec legado.
         user_logo_pos = (ctx.get('logo_position') or '').strip()
         if user_logo_pos:
+            # spec legado (caminho sem layout_document)
             _spec = pillow_kwargs.get('pillow_layout_spec') or {}
             _spec['logo_position'] = user_logo_pos
             pillow_kwargs['pillow_layout_spec'] = _spec
+            # layout_document do orquestrador: sobrepoe o elemento 'logo'
+            if layout_document:
+                _coords = _logo_pos_to_coords(user_logo_pos)
+                if _coords:
+                    elements = layout_document.get('elements') or []
+                    for el in elements:
+                        if (el.get('role') or '').lower() == 'logo':
+                            el['x_pct'] = _coords['x_pct']
+                            el['y_pct'] = _coords['y_pct']
+                            break
+                    else:
+                        elements.append({
+                            'role': 'logo', **_coords, 'width_pct': 15,
+                        })
+                    layout_document['elements'] = elements
+                    logger.info(
+                        '[posts.local] logo_position do user (%s) sobreposto no layout_document',
+                        user_logo_pos,
+                    )
 
     # Grafismos DETERMINISTICOS (fideis ao dossie): para cada KB ref com
     # aspecto 'grafismos', constroi elementos role='grafismo' usando posicoes
@@ -472,42 +504,50 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
                 len(deterministic_grafismos),
             )
 
-    # Roteamento de PRODUTOS (cutout-composite): refs de produto sao composta-
-    # das via Pillow, NAO enviadas a Gemini (a cena vem sem o produto). Mapeia
-    # image_n (1-based no orchestrator) -> url do produto, e remove esses refs
-    # da lista que vai ao Gemini.
-    product_urls = {}
-    for i, ref in enumerate(references, 1):
-        if str(ref.get('tipo', '')).lower() == 'produto' and ref.get('url'):
-            product_urls[i] = ref['url']
-    gemini_references = [
-        r for r in references
-        if str(r.get('tipo', '')).lower() != 'produto'
-    ]
-    # Anexa URL aos elementos 'produto' do layout_document (image_n -> url)
-    if layout_document and product_urls:
-        elements = layout_document.get('elements') or []
-        for el in elements:
-            if (el.get('role') or '').lower() == 'produto':
-                n = el.get('image_n')
-                if n in product_urls:
-                    el['image_url'] = product_urls[n]
-        # Se o orquestrador esqueceu de emitir elementos produto, injeta um
-        # default por produto (bottom-right) p/ nao perder o produto.
-        existing_n = {e.get('image_n') for e in elements
-                      if (e.get('role') or '').lower() == 'produto'}
-        for n, url in product_urls.items():
-            if n not in existing_n:
-                elements.append({
-                    'role': 'produto', 'image_n': n, 'image_url': url,
-                    'x_pct': 70, 'y_pct': 70, 'width_pct': 25,
+    # === EXPERIMENT: enviar ref KB de layout/grafismos ao Gemini (start) ===
+    # Anexa a imagem da ref KB com aspecto layout_composicao/grafismos como
+    # input visual do Gemini. O "o que utilizar" e o proprio DOSSIE que ja
+    # extraimos (fatiado pelo aspecto), convertido em brief estruturado.
+    # Facil de reverter: deletar este bloco (start..end) restaura comportamento.
+    if kb_dossiers:
+        try:
+            from apps.core.services.s3_service import S3Service
+            from apps.knowledge.models import ReferenceImage
+            for _d in kb_dossiers:
+                _aspects = _d.get('aspects') or []
+                if not any(a in _aspects for a in ('layout_composicao', 'grafismos')):
+                    continue
+                _kb_ref = ReferenceImage.objects.filter(id=_d.get('id')).first()
+                if not _kb_ref or not _kb_ref.s3_key:
+                    continue
+                try:
+                    _url = S3Service.generate_presigned_download_url(
+                        _kb_ref.s3_key, expires_in=86400
+                    )
+                except Exception:
+                    continue
+                _brief = _dossier_to_gemini_brief(
+                    _d.get('dossier') or {}, _aspects,
+                )
+                if not _brief:
+                    continue
+                references.append({
+                    'tipo': 'referencia_layout',
+                    'url': _url,
+                    'usage_description': _brief,
                 })
-        layout_document['elements'] = elements
+                logger.info(
+                    '[posts.local][EXP] ref KB %s anexada ao Gemini como '
+                    'referencia_layout', _kb_ref.id,
+                )
+        except Exception:
+            logger.exception('[posts.local][EXP] falha ao anexar ref KB ao Gemini')
+    # === EXPERIMENT: enviar ref KB de layout/grafismos ao Gemini (end) ===
 
     try:
         result = generate_post_image(
             post=post,
-            references=gemini_references,
+            references=references,
             paleta=paleta,
             tipografia=tipografia,
             publico_alvo=publico_alvo,
@@ -520,7 +560,7 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             references_usage_general=refs_usage_general,
             kb_translations=kb_translations,
             layout_document=layout_document,
-            product_urls=product_urls,
+            image_prompt_override=orchestrator_image_prompt or None,
             **pillow_kwargs,
         )
     except Exception as exc:
@@ -528,6 +568,88 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
         post.status = 'failed'
         post.save(update_fields=['status'])
         raise self.retry(exc=exc)
+
+    # ============================================================
+    # DESIGNER-CRITIC — olhos novos sobre a arte renderizada.
+    # Itera ate 3x. Em cada iteracao: critic ve o PNG atual + layout,
+    # propoe edits cirurgicos, aplicamos, re-renderizamos (Pillow sobre
+    # raw, sem chamar Gemini de novo). Custo: 0-3 calls de critic ($0.03-0.05/cada).
+    # ============================================================
+    critique_iterations = []
+    if (orchestration_output and layout_document
+            and result.get('raw_png_bytes') and result.get('png_bytes')):
+        try:
+            from apps.posts.services.post_critic import critique
+            from apps.posts.services.gemini_image_generator import render_layout_document
+            _max_iter = 3
+            current_png = result['png_bytes']
+            raw_png = result['raw_png_bytes']
+            for _it in range(1, _max_iter + 1):
+                cresp = critique(
+                    post=post,
+                    orchestration=orchestration_output,
+                    layout_document=layout_document,
+                    png_preview_bytes=current_png,
+                    paleta=paleta,
+                    iteration=_it,
+                    max_iterations=_max_iter,
+                )
+                if not cresp:
+                    break
+                critique_iterations.append({
+                    'iteration': _it,
+                    'approved': bool(cresp.get('approved')),
+                    'rationale': cresp.get('rationale', ''),
+                    'edits': cresp.get('edits', []),
+                    'usage': cresp.get('usage', {}),
+                })
+                # Loga custo da iteracao do critico no ai_usage_log
+                try:
+                    _record_ai_usage(
+                        post,
+                        step='text_generation',
+                        model=cresp.get('model', 'claude-sonnet-4-6'),
+                        usage_dict=cresp.get('usage') or {},
+                        purpose=f'critic_iter_{_it}',
+                    )
+                except Exception:
+                    logger.exception('[posts.local] falha logar uso critico iter %d', _it)
+                if cresp.get('approved'):
+                    break
+                applied = _apply_layout_edits(
+                    layout_document, cresp.get('edits') or []
+                )
+                if applied == 0:
+                    break  # nada a aplicar, sai
+                # Re-render Pillow sobre o raw (sem novo Gemini)
+                try:
+                    current_png = render_layout_document(
+                        raw_png,
+                        elements=layout_document.get('elements') or [],
+                        paleta=paleta,
+                        fonts={
+                            'titulo': pillow_kwargs.get('pillow_title_font_path'),
+                            'subtitulo': pillow_kwargs.get('pillow_subtitle_font_path'),
+                            'cta': pillow_kwargs.get('pillow_title_font_path'),
+                        },
+                        logo_url=pillow_kwargs.get('pillow_logo_url'),
+                    )
+                except Exception:
+                    logger.exception('[posts.local] re-render apos critic falhou')
+                    break
+            # Atualiza o png final com o ultimo render
+            result['png_bytes'] = current_png
+            # Persiste trail no ctx
+            ctx['critique_iterations'] = critique_iterations
+            ctx['orchestration'] = orchestration_output
+            post.local_pipeline_context = ctx
+            post.save(update_fields=['local_pipeline_context'])
+            logger.info(
+                '[posts.local] designer-critic: %d iteracoes',
+                len(critique_iterations),
+            )
+        except Exception:
+            logger.exception('[posts.local] designer-critic falhou — segue sem')
 
     # Upload PNG no S3
     s3_key, s3_url = _upload_image_to_s3(
@@ -774,13 +896,73 @@ def _layout_dossier(kb_dossiers):
     return None
 
 
+def _dossier_to_gemini_brief(dossier: dict, aspects: list) -> str:
+    """Converte a fatia do dossie (filtrada por aspectos) em brief estruturado
+    pra enviar ao Gemini junto com a imagem da referencia. Inclui POSICOES,
+    CORES e FORMAS — mas NAO o conteudo de texto (titulos/CTAs sao do nosso
+    post). Inclui regras explicitas do que IGNORAR na referencia."""
+    if not isinstance(dossier, dict) or not aspects:
+        return ''
+    lines = []
+    if 'layout_composicao' in aspects:
+        lines.append('GRID/ZONAS (replicar com as MESMAS porcentagens):')
+        grid = dossier.get('grid') or {}
+        for z in (grid.get('zonas') or []):
+            nome = z.get('nome', '?')
+            x = z.get('x_pct', 0); y = z.get('y_pct', 0)
+            w = z.get('largura_pct', 0); h = z.get('altura_pct', 0)
+            conteudo = z.get('conteudo', '')
+            lines.append(f'  - {nome}: x={x}%, y={y}%, w={w}%, h={h}% ({conteudo})')
+        comp = dossier.get('composicao') or {}
+        if comp.get('enquadramento'):
+            lines.append(f"COMPOSICAO: enquadramento={comp.get('enquadramento')}")
+        if comp.get('foco_principal'):
+            lines.append(f"  foco={comp.get('foco_principal')}")
+        lnr = dossier.get('logo_na_referencia') or {}
+        if lnr.get('presente'):
+            lines.append(
+                f"LOGO: posicao={lnr.get('posicao')}, fundo={lnr.get('fundo')}"
+            )
+        tx = dossier.get('texto_x_imagem') or {}
+        if tx.get('blocos'):
+            lines.append(
+                'POSICIONAMENTO DOS TEXTOS (cor + alinhamento — o CONTEUDO sera '
+                'sobreposto depois por nos, NAO replique o texto da referencia):'
+            )
+            for b in tx['blocos']:
+                lines.append(
+                    f"  - {b.get('papel')}: cor={b.get('cor')}, "
+                    f"peso={b.get('peso')}, "
+                    f"alinhamento={b.get('alinhamento_paragrafo')}"
+                )
+    if 'grafismos' in aspects:
+        lines.append('GRAFISMOS (replicar FIELMENTE forma e cor):')
+        for g in (dossier.get('assets_grafismos') or []):
+            lines.append(
+                f"  - {g.get('tipo')} cor={g.get('cor')} | "
+                f"estilo={g.get('estilo')} | funcao={g.get('funcao')} | "
+                f"posicao={g.get('posicao')}"
+            )
+    lines.append('')
+    lines.append('IGNORE COMPLETAMENTE na imagem de referencia:')
+    lines.append('  - O TEXTO VISIVEL dentro das faixas e selos (e exemplo).')
+    lines.append('  - O sujeito especifico (a comida, o produto especifico).')
+    lines.append('  - Detalhes de cenario que nao fazem parte do template.')
+    lines.append(
+        'TRATE faixas/selos/rodape como CAIXAS VAZIAS — texto e logo serao '
+        'sobrepostos depois.'
+    )
+    return '\n'.join(lines)
+
+
 def _grafismos_from_dossier(dossier: dict) -> list:
-    """Constroi elementos role='grafismo' deterministicos do dossie:
-      - assets_grafismos[].tipo -> forma (faixa/selo/linha).
-      - grid.zonas mapeia funcao -> coords (faixa_titulo, selo_cta, rodape_logo).
-      - estilo "inferior direito arredondado" -> cantos orgânico (so br).
-      - logo_na_referencia.fundo branco -> faixa branca de rodape (full-width).
-    Cor EXATA do dossie (sem snap a paleta da marca).
+    """Constroi elementos role='grafismo' deterministicos APENAS para
+    primitivas que o Pillow desenha bem matematicamente:
+      - SELO circular (com texto centralizado por cima)
+      - LINHA / DIVISOR reto
+    Faixas/bandas (especialmente com canto organico) NAO entram aqui — o
+    orquestrador as descreve no image_prompt_final para o Gemini desenhar
+    fielmente dentro da cena. Cor EXATA do dossie.
     """
     if not isinstance(dossier, dict):
         return []
@@ -798,33 +980,13 @@ def _grafismos_from_dossier(dossier: dict) -> list:
         tipo = (g.get('tipo') or '').lower()
         cor = g.get('cor') or ''
         funcao = (g.get('funcao') or '').lower()
-        estilo = (g.get('estilo') or '').lower()
-        # mapeia funcao -> zona do grid p/ posicao real
         zona = None
-        if 'titulo' in funcao:
-            zona = zonas.get('faixa_titulo')
-        elif 'call' in funcao or 'cta' in funcao:
+        if 'call' in funcao or 'cta' in funcao:
             zona = zonas.get('selo_cta')
         elif 'rodape' in funcao or 'footer' in funcao:
             zona = zonas.get('rodape_logo') or zonas.get('rodape')
-        if any(t in tipo for t in ('faixa', 'banda', 'background', 'retangulo')):
-            cantos = None
-            if 'inferior direito arredondado' in estilo or 'br arredondado' in estilo:
-                cantos = {'tl': False, 'tr': False, 'br': True, 'bl': False}
-            elif 'inferior esquerdo arredondado' in estilo:
-                cantos = {'tl': False, 'tr': False, 'br': False, 'bl': True}
-            el = {
-                'role': 'grafismo', 'forma': 'faixa', 'cor': cor,
-                'x_pct': _coord(zona, 'x_pct', 0),
-                'y_pct': _coord(zona, 'y_pct', 0),
-                'width_pct': _coord(zona, 'largura_pct', 70),
-                'height_pct': _coord(zona, 'altura_pct', 16),
-                'raio_pct': 6,
-            }
-            if cantos:
-                el['cantos'] = cantos
-            out.append(el)
-        elif any(t in tipo for t in ('selo', 'circulo', 'badge')):
+        # SELO circular: primitiva — Pillow
+        if any(t in tipo for t in ('selo', 'circulo', 'badge')):
             out.append({
                 'role': 'grafismo', 'forma': 'selo', 'cor': cor,
                 'x_pct': _coord(zona, 'x_pct', 8),
@@ -832,6 +994,7 @@ def _grafismos_from_dossier(dossier: dict) -> list:
                 'width_pct': _coord(zona, 'largura_pct', 22),
                 'height_pct': _coord(zona, 'altura_pct', 22),
             })
+        # LINHA reta: primitiva — Pillow
         elif any(t in tipo for t in ('linha', 'divisor', 'rule')):
             out.append({
                 'role': 'grafismo', 'forma': 'linha', 'cor': cor,
@@ -840,19 +1003,7 @@ def _grafismos_from_dossier(dossier: dict) -> list:
                 'width_pct': _coord(zona, 'largura_pct', 40),
                 'height_pct': _coord(zona, 'altura_pct', 0.3),
             })
-
-    # Faixa branca de rodape (extraida de logo_na_referencia)
-    lnr = dossier.get('logo_na_referencia') or {}
-    if lnr.get('presente') and 'branco' in (lnr.get('fundo') or '').lower():
-        rod = zonas.get('rodape_logo') or {}
-        out.append({
-            'role': 'grafismo', 'forma': 'faixa', 'cor': '#FFFFFF',
-            'x_pct': 0,
-            'y_pct': _coord(rod, 'y_pct', 88),
-            'width_pct': 100,
-            'height_pct': _coord(rod, 'altura_pct', 12),
-            'raio_pct': 1,
-        })
+        # Faixa/banda/background: organico OU simples — vai pro Gemini (descricao)
     return out
 
 
@@ -1259,6 +1410,63 @@ def _collect_references(kb, post, text_render_mode: str = 'inline') -> list:
     return out
 
 
+_LOGO_POS_COORDS = {
+    'top-left':      {'x_pct': 4,  'y_pct': 4},
+    'top-center':    {'x_pct': 42, 'y_pct': 4},
+    'top-right':     {'x_pct': 78, 'y_pct': 4},
+    'middle-left':   {'x_pct': 4,  'y_pct': 46},
+    'middle-center': {'x_pct': 42, 'y_pct': 46},
+    'middle-right':  {'x_pct': 78, 'y_pct': 46},
+    'bottom-left':   {'x_pct': 4,  'y_pct': 90},
+    'bottom-center': {'x_pct': 42, 'y_pct': 90},
+    'bottom-right':  {'x_pct': 78, 'y_pct': 90},
+}
+
+
+def _logo_pos_to_coords(pos: str) -> dict:
+    """Mapeia keyword de posicao (top-left, etc) para x_pct/y_pct."""
+    return _LOGO_POS_COORDS.get((pos or '').strip().lower())
+
+
+def _apply_layout_edits(layout_document: dict, edits: list) -> int:
+    """Aplica edits cirurgicos do designer-critic no layout_document.
+    Cada edit muda um campo de um elemento, identificado por target_role
+    (primeiro elemento com aquele role) ou target_index (posicao na lista).
+    Retorna numero de edits aplicados com sucesso."""
+    if not (layout_document and edits):
+        return 0
+    elements = layout_document.get('elements') or []
+    applied = 0
+    for edit in edits:
+        if not isinstance(edit, dict):
+            continue
+        if 'new_value' not in edit:
+            continue
+        field = (edit.get('field') or '').strip()
+        if not field:
+            continue
+        target_el = None
+        idx = edit.get('target_index')
+        role = edit.get('target_role')
+        if isinstance(idx, int) and 0 <= idx < len(elements):
+            target_el = elements[idx]
+        elif role:
+            role_lower = str(role).strip().lower()
+            for el in elements:
+                if (el.get('role') or '').lower() == role_lower:
+                    target_el = el
+                    break
+        if target_el is None:
+            logger.warning(
+                '[critic] edit nao aplicado (target nao encontrado): %s', edit
+            )
+            continue
+        target_el[field] = edit['new_value']
+        applied += 1
+    layout_document['elements'] = elements
+    return applied
+
+
 def _normalize_aspects(val) -> list:
     """Normaliza reference_aspects[ref] em lista de strings (aceita str legado)."""
     if isinstance(val, list):
@@ -1425,22 +1633,40 @@ def _log_usage_gemini(post, model: str, cost_usd: float, usage_metadata: dict = 
 
 
 def _log_usage(post, model: str, usage: dict, purpose: str):
-    """Wrapper retrocompativel — apenas redireciona para _record_ai_usage."""
+    """Wrapper retrocompativel — redireciona para _record_ai_usage com purpose."""
     _record_ai_usage(
         post,
         step='text_generation',
         model=model,
         usage_dict=usage,
+        purpose=purpose,
         images_generated=0,
     )
 
 
+def _derive_cache_status(cache_creation: int, cache_read: int) -> str:
+    """Classifica a chamada pelo uso de cache.
+    - 'cold': escrita de cache (1a da janela, paga premium)
+    - 'warm': leitura de cache (chamadas subsequentes na janela, -90%)
+    - 'partial': escrita E leitura (raro, parcialmente cacheado)
+    - 'no_cache': nenhum cache_control aplicado
+    """
+    if cache_creation > 0 and cache_read > 0:
+        return 'partial'
+    if cache_creation > 0:
+        return 'cold'
+    if cache_read > 0:
+        return 'warm'
+    return 'no_cache'
+
+
 def _record_ai_usage(post, *, step: str, model: str, usage_dict: dict,
-                     images_generated: int = 0):
+                     purpose: str = '', images_generated: int = 0):
     """
     Acumula custo de IA no Post + adiciona entry granular no ai_usage_log.
 
-    step: 'text_generation' | 'image_generation'
+    step: 'text_generation' | 'image_generation' (categoria de billing agregado)
+    purpose: 'phase1_text' | 'orchestrator' | 'critic_iter_N' | 'gemini' (granular)
     usage_dict: dict com input_tokens, output_tokens, cost_usd (e demais)
     images_generated: para Gemini, quantas imagens foram geradas (cobranca flat)
     """
@@ -1450,15 +1676,20 @@ def _record_ai_usage(post, *, step: str, model: str, usage_dict: dict,
     rate = float(getattr(dj_settings, 'USD_TO_BRL_RATE', 5.80))
     cost_usd_dec = Decimal(str(usage_dict.get('cost_usd', 0) or 0))
     cost_brl_dec = cost_usd_dec * Decimal(str(rate))
+    cache_read = int(usage_dict.get('cache_read_input_tokens', 0) or 0)
+    cache_creation = int(usage_dict.get('cache_creation_input_tokens', 0) or 0)
+    cache_status = _derive_cache_status(cache_creation, cache_read)
 
     entry = {
         'timestamp': dj_tz.now().isoformat(),
         'step': step,
+        'purpose': purpose,
         'model': model,
         'input_tokens': int(usage_dict.get('input_tokens', 0) or 0),
         'output_tokens': int(usage_dict.get('output_tokens', 0) or 0),
-        'cache_read_tokens': int(usage_dict.get('cache_read_input_tokens', 0) or 0),
-        'cache_creation_tokens': int(usage_dict.get('cache_creation_input_tokens', 0) or 0),
+        'cache_read_tokens': cache_read,
+        'cache_creation_tokens': cache_creation,
+        'cache_status': cache_status,
         'total_tokens': int(usage_dict.get('total_tokens', 0) or 0),
         'images_generated': int(images_generated or 0),
         'cost_usd': float(cost_usd_dec),
