@@ -342,6 +342,7 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     orchestrator_disabled = _os.environ.get('POST_DISABLE_ORCHESTRATOR', '').lower() in ('1', 'true', 'yes')
     orchestration_output = None
     spatial_instructions = ''
+    layout_document = None
     # Orchestrator roda quando ha imagens (logos/uploads) OU dossies de refs
     # da KB selecionadas — ele e quem filtra os dossies pela intencao do user.
     if not orchestrator_disabled and (references or kb_dossiers):
@@ -378,10 +379,16 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
                 spatial_instructions = orchestration_output.get(
                     'spatial_instructions_for_gemini', ''
                 ) or ''
+                # layout_document = "divs" do texto decididas pelo diretor de arte
+                # (base do canvas editavel). Se presente, o texto vai via Pillow.
+                ld = orchestration_output.get('layout_document') or None
+                if ld and ld.get('elements'):
+                    layout_document = ld
+                    text_render_mode = 'pillow'
                 logger.info(
-                    '[posts.local] orchestrator -> mode=%s, layout_plan=%s, spatial_len=%d',
+                    '[posts.local] orchestrator -> mode=%s, layout_doc_els=%s, spatial_len=%d',
                     text_render_mode,
-                    bool(orchestration_output.get('layout_plan')),
+                    len((layout_document or {}).get('elements', [])),
                     len(spatial_instructions),
                 )
         except Exception:
@@ -442,10 +449,65 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             _spec['logo_position'] = user_logo_pos
             pillow_kwargs['pillow_layout_spec'] = _spec
 
+    # Grafismos DETERMINISTICOS (fideis ao dossie): para cada KB ref com
+    # aspecto 'grafismos', constroi elementos role='grafismo' usando posicoes
+    # exatas de grid.zonas + cores reais de assets_grafismos + faixa branca de
+    # logo_na_referencia. Remove quaisquer grafismos emitidos pelo orquestrador.
+    if layout_document and kb_dossiers:
+        deterministic_grafismos = []
+        for d in kb_dossiers:
+            if 'grafismos' in (d.get('aspects') or []):
+                deterministic_grafismos.extend(
+                    _grafismos_from_dossier(d.get('dossier') or {})
+                )
+        if deterministic_grafismos:
+            elements = layout_document.get('elements') or []
+            elements = [
+                e for e in elements
+                if (e.get('role') or '').lower() != 'grafismo'
+            ]
+            layout_document['elements'] = deterministic_grafismos + elements
+            logger.info(
+                '[posts.local] %d grafismos deterministicos injetados',
+                len(deterministic_grafismos),
+            )
+
+    # Roteamento de PRODUTOS (cutout-composite): refs de produto sao composta-
+    # das via Pillow, NAO enviadas a Gemini (a cena vem sem o produto). Mapeia
+    # image_n (1-based no orchestrator) -> url do produto, e remove esses refs
+    # da lista que vai ao Gemini.
+    product_urls = {}
+    for i, ref in enumerate(references, 1):
+        if str(ref.get('tipo', '')).lower() == 'produto' and ref.get('url'):
+            product_urls[i] = ref['url']
+    gemini_references = [
+        r for r in references
+        if str(r.get('tipo', '')).lower() != 'produto'
+    ]
+    # Anexa URL aos elementos 'produto' do layout_document (image_n -> url)
+    if layout_document and product_urls:
+        elements = layout_document.get('elements') or []
+        for el in elements:
+            if (el.get('role') or '').lower() == 'produto':
+                n = el.get('image_n')
+                if n in product_urls:
+                    el['image_url'] = product_urls[n]
+        # Se o orquestrador esqueceu de emitir elementos produto, injeta um
+        # default por produto (bottom-right) p/ nao perder o produto.
+        existing_n = {e.get('image_n') for e in elements
+                      if (e.get('role') or '').lower() == 'produto'}
+        for n, url in product_urls.items():
+            if n not in existing_n:
+                elements.append({
+                    'role': 'produto', 'image_n': n, 'image_url': url,
+                    'x_pct': 70, 'y_pct': 70, 'width_pct': 25,
+                })
+        layout_document['elements'] = elements
+
     try:
         result = generate_post_image(
             post=post,
-            references=references,
+            references=gemini_references,
             paleta=paleta,
             tipografia=tipografia,
             publico_alvo=publico_alvo,
@@ -457,6 +519,8 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             spatial_instructions=spatial_instructions,
             references_usage_general=refs_usage_general,
             kb_translations=kb_translations,
+            layout_document=layout_document,
+            product_urls=product_urls,
             **pillow_kwargs,
         )
     except Exception as exc:
@@ -472,6 +536,21 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
         png_bytes=result['png_bytes'],
         mime_type=result.get('mime_type', 'image/png'),
     )
+
+    # Upload do PNG CRU (cena do Gemini SEM texto) — base do canvas editavel
+    raw_bytes = result.get('raw_png_bytes')
+    if raw_bytes:
+        try:
+            raw_key, raw_url = _upload_image_to_s3(
+                org_id=post.organization.id,
+                post_id=post.id,
+                png_bytes=raw_bytes,
+                mime_type='image/png',
+            )
+            post.raw_image_s3_key = raw_key
+            post.raw_image_s3_url = raw_url
+        except Exception:
+            logger.exception('[posts.local] falha upload raw png')
 
     # Cria PostImage (model FK que o frontend le via post.images.all())
     # Equivalente ao que o callback N8N faz em views_webhook.py
@@ -690,9 +769,91 @@ def _aspect_ratio_to_float(ar):
 def _layout_dossier(kb_dossiers):
     """Retorna o dossie da ref marcada com aspecto 'layout_composicao' (ou None)."""
     for d in kb_dossiers or []:
-        if (d.get('aspect') or '') == 'layout_composicao':
+        if 'layout_composicao' in (d.get('aspects') or []):
             return d.get('dossier') or {}
     return None
+
+
+def _grafismos_from_dossier(dossier: dict) -> list:
+    """Constroi elementos role='grafismo' deterministicos do dossie:
+      - assets_grafismos[].tipo -> forma (faixa/selo/linha).
+      - grid.zonas mapeia funcao -> coords (faixa_titulo, selo_cta, rodape_logo).
+      - estilo "inferior direito arredondado" -> cantos orgânico (so br).
+      - logo_na_referencia.fundo branco -> faixa branca de rodape (full-width).
+    Cor EXATA do dossie (sem snap a paleta da marca).
+    """
+    if not isinstance(dossier, dict):
+        return []
+    out: list = []
+    grid = dossier.get('grid') or {}
+    zonas = {(z.get('nome') or '').lower(): z for z in (grid.get('zonas') or [])}
+
+    def _coord(z, key, default):
+        if not z:
+            return default
+        v = z.get(key)
+        return v if v is not None else default
+
+    for g in (dossier.get('assets_grafismos') or []):
+        tipo = (g.get('tipo') or '').lower()
+        cor = g.get('cor') or ''
+        funcao = (g.get('funcao') or '').lower()
+        estilo = (g.get('estilo') or '').lower()
+        # mapeia funcao -> zona do grid p/ posicao real
+        zona = None
+        if 'titulo' in funcao:
+            zona = zonas.get('faixa_titulo')
+        elif 'call' in funcao or 'cta' in funcao:
+            zona = zonas.get('selo_cta')
+        elif 'rodape' in funcao or 'footer' in funcao:
+            zona = zonas.get('rodape_logo') or zonas.get('rodape')
+        if any(t in tipo for t in ('faixa', 'banda', 'background', 'retangulo')):
+            cantos = None
+            if 'inferior direito arredondado' in estilo or 'br arredondado' in estilo:
+                cantos = {'tl': False, 'tr': False, 'br': True, 'bl': False}
+            elif 'inferior esquerdo arredondado' in estilo:
+                cantos = {'tl': False, 'tr': False, 'br': False, 'bl': True}
+            el = {
+                'role': 'grafismo', 'forma': 'faixa', 'cor': cor,
+                'x_pct': _coord(zona, 'x_pct', 0),
+                'y_pct': _coord(zona, 'y_pct', 0),
+                'width_pct': _coord(zona, 'largura_pct', 70),
+                'height_pct': _coord(zona, 'altura_pct', 16),
+                'raio_pct': 6,
+            }
+            if cantos:
+                el['cantos'] = cantos
+            out.append(el)
+        elif any(t in tipo for t in ('selo', 'circulo', 'badge')):
+            out.append({
+                'role': 'grafismo', 'forma': 'selo', 'cor': cor,
+                'x_pct': _coord(zona, 'x_pct', 8),
+                'y_pct': _coord(zona, 'y_pct', 58),
+                'width_pct': _coord(zona, 'largura_pct', 22),
+                'height_pct': _coord(zona, 'altura_pct', 22),
+            })
+        elif any(t in tipo for t in ('linha', 'divisor', 'rule')):
+            out.append({
+                'role': 'grafismo', 'forma': 'linha', 'cor': cor,
+                'x_pct': _coord(zona, 'x_pct', 30),
+                'y_pct': _coord(zona, 'y_pct', 94),
+                'width_pct': _coord(zona, 'largura_pct', 40),
+                'height_pct': _coord(zona, 'altura_pct', 0.3),
+            })
+
+    # Faixa branca de rodape (extraida de logo_na_referencia)
+    lnr = dossier.get('logo_na_referencia') or {}
+    if lnr.get('presente') and 'branco' in (lnr.get('fundo') or '').lower():
+        rod = zonas.get('rodape_logo') or {}
+        out.append({
+            'role': 'grafismo', 'forma': 'faixa', 'cor': '#FFFFFF',
+            'x_pct': 0,
+            'y_pct': _coord(rod, 'y_pct', 88),
+            'width_pct': 100,
+            'height_pct': _coord(rod, 'altura_pct', 12),
+            'raio_pct': 1,
+        })
+    return out
 
 
 def _hex_to_rgb_t(h):
@@ -746,6 +907,8 @@ def _dossier_to_layout_spec(dossier: dict, paleta: list = None) -> dict:
     spec['alignment'] = spec['title_align']
     # Cor do titulo = cor primaria da marca (KB), com fallback de contraste.
     spec['title_color_hint'] = 'brand_primary_safe'
+    # Sem painel/overlay do Pillow atras do texto (o fundo limpo vem da cena).
+    spec['background_treatment'] = 'none'
     # Subtitulo = neutro legivel (auto contraste), distinto do titulo de marca.
     spec['subtitle_color_hint'] = 'auto_contrast'
     # Se a ref informou a cor de cada bloco, snap na paleta da KB (a cor que a
@@ -895,29 +1058,36 @@ def _resolve_logo_url_for_overlay(post, kb):
 
 def _brand_keywords_from_kb(kb) -> list:
     """
-    Extrai termos da marca/produto que devem ser sanitizados no texto enviado
-    ao Gemini (modo 'sanitized'). Pega nome da empresa + palavras-chave do
-    descricao_produto (heuristica: palavras com inicial maiuscula ou
-    contendo digito — indicam modelos).
+    Termos de MARCA/MODELO a sanitizar na CENA enviada ao Gemini (citar marca
+    ativa priors). CONSERVADOR de proposito: nome da empresa + tokens com
+    digito (modelos, ex: TM7) + acronimos all-caps curtos. NAO inclui palavras
+    genericas (ex: "Cozinha", "Robot") pra nao quebrar a descricao do ambiente.
     Funciona para qualquer empresa (le da KB dinamicamente).
     """
     import re as _re
     if not kb:
         return []
+    # Palavras genericas que NUNCA devem ser tratadas como marca
+    stop = {
+        'de', 'da', 'do', 'e', 'a', 'o', 'os', 'as', 'um', 'uma', 'que',
+        'para', 'com', 'em', 'robot', 'robo', 'cozinha', 'kitchen', 'maquina',
+        'aparelho', 'produto', 'equipamento', 'multifuncional', 'inteligente',
+    }
     keywords = set()
-    # Nome da empresa (ex: "Thermomix")
-    if kb.nome_empresa:
-        for w in str(kb.nome_empresa).split():
-            w = w.strip()
-            if len(w) >= 2 and (w[0].isupper() or any(c.isdigit() for c in w)):
-                keywords.add(w)
-    # Descricao do produto — palavras com maiuscula seguida de letra/digito
-    # (ex: "TM7", "iPhone", "Vorwerk") OU sequencias tipo "Modelo XYZ"
+    # Nome da empresa = marca por definicao (tokens com >=3 chars, nao-stop)
+    for w in str(kb.nome_empresa or '').split():
+        w = w.strip()
+        if len(w) >= 3 and w.lower() not in stop:
+            keywords.add(w)
+    # Descricao do produto: SO modelos (token com digito) ou acronimos all-caps
     desc = (kb.descricao_produto or '')[:500]
-    for match in _re.findall(r'\b[A-Z][A-Za-z0-9]{1,}\b', desc):
-        # Exclui palavras genericas curtas demais ou comuns
-        if match.lower() not in {'a', 'o', 'de', 'da', 'do', 'um', 'uma', 'que', 'para', 'com', 'em'}:
-            keywords.add(match)
+    for tok in _re.findall(r'\b[A-Za-z0-9]{2,}\b', desc):
+        if tok.lower() in stop:
+            continue
+        if any(c.isdigit() for c in tok):          # ex: TM7, TM6
+            keywords.add(tok)
+        elif tok.isupper() and 2 <= len(tok) <= 6:  # ex: acronimos de marca
+            keywords.add(tok)
     return sorted(keywords)
 
 
@@ -1060,7 +1230,49 @@ def _collect_references(kb, post, text_render_mode: str = 'inline') -> list:
     except Exception:
         pass
 
+    # Refs da KB marcadas com aspecto 'produto' — enviadas como IMAGEM ao Gemini
+    # (fidelidade), NAO viram dossie de texto (ver _collect_kb_dossiers).
+    try:
+        reference_aspects = ctx.get('reference_aspects') or {}
+        product_ref_ids = [
+            rid for rid, asps in reference_aspects.items()
+            if 'produto' in _normalize_aspects(asps)
+        ]
+        if kb and product_ref_ids:
+            from apps.knowledge.models import ReferenceImage
+            prod_refs = ReferenceImage.objects.filter(
+                knowledge_base=kb, id__in=product_ref_ids
+            )
+            for ref in prod_refs:
+                if not ref.s3_key:
+                    continue
+                try:
+                    url = S3Service.generate_presigned_download_url(
+                        ref.s3_key, expires_in=86400
+                    )
+                    out.append({'tipo': 'produto', 'url': url, 'usage_description': ''})
+                except Exception:
+                    pass
+    except Exception:
+        logger.exception('[posts.local] falha ao coletar refs KB de produto')
+
     return out
+
+
+def _normalize_aspects(val) -> list:
+    """Normaliza reference_aspects[ref] em lista de strings (aceita str legado)."""
+    if isinstance(val, list):
+        return [str(a).strip() for a in val if str(a).strip()]
+    if isinstance(val, str) and val.strip():
+        return [val.strip()]
+    return []
+
+
+def _aspects_for_ref(reference_aspects: dict, ref_id) -> list:
+    """Aspectos de uma ref (tenta chave str e int)."""
+    return _normalize_aspects(
+        reference_aspects.get(str(ref_id)) or reference_aspects.get(ref_id)
+    )
 
 
 def _collect_kb_dossiers(kb, post) -> list:
@@ -1073,12 +1285,13 @@ def _collect_kb_dossiers(kb, post) -> list:
     analisada (status != completed), analisa inline AGORA e PERSISTE — a
     info fica garantida para sempre, e da proxima vez e so leitura.
 
-    Retorna lista de dicts {id, usage_description, dossier}:
-      - usage_description: o que o user escreveu (individual ou o geral do
-        textarea) — a INTENCAO que o orchestrator usa para filtrar o dossie.
+    Retorna lista de dicts {id, aspects, usage_description, dossier}:
+      - aspects: lista de aspectos escolhidos no modal (multi-selecao) — a
+        INTENCAO que o orchestrator usa para filtrar o dossie.
       - dossier: o JSON objetivo gravado em visual_analysis.
 
-    NAO inclui logos (logo nao tem dossie nesta fase).
+    NAO inclui logos (logo nao tem dossie nesta fase) nem refs marcadas como
+    'produto' (essas vao como IMAGEM ao Gemini via _collect_references).
     """
     ctx = post.local_pipeline_context or {}
     selected_ref_ids = list(ctx.get('selected_reference_ids') or [])
@@ -1086,7 +1299,7 @@ def _collect_kb_dossiers(kb, post) -> list:
         return []
 
     general_guidance = (ctx.get('references_usage_description') or '').strip()
-    # aspecto por ref: {ref_id(str/int): 'layout_composicao'|'iluminacao'|...}
+    # aspectos por ref: {ref_id(str/int): ['layout_composicao', 'grafismos', ...]}
     reference_aspects = ctx.get('reference_aspects') or {}
 
     from apps.knowledge.models import ReferenceImage
@@ -1097,6 +1310,12 @@ def _collect_kb_dossiers(kb, post) -> list:
         knowledge_base=kb, id__in=selected_ref_ids
     )
     for ref in refs:
+        aspects = _aspects_for_ref(reference_aspects, ref.id)
+        # Aspecto 'produto': a ref e enviada como IMAGEM ao Gemini
+        # (_collect_references), NAO vira dossie de texto — preserva fidelidade.
+        # So pula o dossie se 'produto' for o UNICO aspecto.
+        if aspects == ['produto']:
+            continue
         # Gatilho 3 — fallback inline: analisa e persiste se faltar dossie
         if ref.analysis_status != 'completed' or not ref.visual_analysis:
             try:
@@ -1110,14 +1329,11 @@ def _collect_kb_dossiers(kb, post) -> list:
         if not dossier:
             continue
         individual_desc = (getattr(ref, 'usage_description', '') or '').strip()
-        aspect = (
-            reference_aspects.get(str(ref.id))
-            or reference_aspects.get(ref.id)
-            or ''
-        )
+        # 'produto' nao e aspecto de dossie (a ref tambem vai como imagem)
+        dossier_aspects = [a for a in aspects if a != 'produto']
         out.append({
             'id': ref.id,
-            'aspect': aspect,
+            'aspects': dossier_aspects,
             'usage_description': individual_desc or general_guidance,
             'dossier': dossier,
         })

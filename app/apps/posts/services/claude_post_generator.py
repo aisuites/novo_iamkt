@@ -52,9 +52,15 @@ PRINCIPIOS:
    elementos visuais, usando ANCORAGEM POR NOME DE ARQUIVO inline.
    - Mencione: ambiente, mood, iluminacao, enquadramento, paleta, elementos
      secundarios (ex: ingredientes, plantas, objetos contextuais)
-   - CORES DOS EFEITOS = CORES DA MARCA. Glow, luz colorida, halo ou acento
-     de cor devem usar as cores da marca (do contexto acima). NUNCA use azul/
-     ciano "de tecnologia" por padrao, salvo se a marca for azul.
+   - NAO INVENTE EFEITOS DE LUZ. Iluminacao realista e neutra (luz natural /
+     estudio suave). NAO adicione glow, halo, reflexos coloridos, brilho neon
+     ou "luz de tecnologia" que nao exista nas referencias. Sem aura colorida
+     ao redor do produto.
+   - COMPOSICAO: o texto e o sujeito principal ficam em LADOS OPOSTOS (texto
+     a esquerda -> sujeito a direita). A area do texto cai sobre uma parte
+     CLARA e LIMPA da cena real (parede/superficie iluminada), EM FOCO, sem
+     produto/pessoa por baixo. NAO adicione blur/haze/overlay/vinheta por cima
+     nem bloco de cor chapado — fundo claro ajuda o texto colorido a contrastar.
    - REGRA ABSOLUTA — NUNCA cite nomes proprios de marca ou produto no
      image_prompt (ex: NAO escreva "Thermomix", "Louis Vuitton", "iPhone",
      "Nike"). Eles ativam priors fortes do gerador de imagem que ignoram a

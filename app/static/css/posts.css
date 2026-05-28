@@ -2295,7 +2295,7 @@ select.form-input-filter:disabled {
 }
 .refs-aspect-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
 }
 .refs-aspect-thumb {
@@ -2306,15 +2306,44 @@ select.form-input-filter:disabled {
   flex: 0 0 auto;
 }
 .refs-aspect-name {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 40%;
+  max-width: 28%;
+  padding-top: 4px;
 }
 .refs-aspect-select {
   flex: 0 0 auto;
   min-width: 180px;
   height: 38px;
+}
+.refs-aspect-chips {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.refs-aspect-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color, #d0d0d0);
+  border-radius: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.refs-aspect-chip input {
+  margin: 0;
+  cursor: pointer;
+}
+.refs-aspect-chip.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.refs-aspect-chip.is-disabled input {
+  cursor: not-allowed;
 }

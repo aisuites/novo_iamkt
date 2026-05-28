@@ -2347,19 +2347,23 @@
     references: [],
     selectedLogoIds: new Set(),
     selectedRefIds: new Set(),
-    refAspects: {},   // { refId: 'layout_composicao' | 'iluminacao' | ... }
+    refAspects: {},   // { refId: ['layout_composicao', 'grafismos', ...] } (multi)
     loaded: false,
   };
 
   // Aspecto a aproveitar de cada referencia (1 por imagem, exclusivo entre elas)
   const REFERENCE_ASPECTS = [
     { value: '', label: 'O que aproveitar...' },
+    { value: 'produto', label: 'Produto (enviar fiel ao Gemini)' },
     { value: 'layout_composicao', label: 'Layout / composicao' },
     { value: 'iluminacao', label: 'Iluminacao' },
     { value: 'estilo_pessoas', label: 'Estilo de pessoas' },
     { value: 'estilo_ambiente', label: 'Estilo de ambiente' },
     { value: 'grafismos', label: 'Grafismos' },
   ];
+  // Aspectos exclusivos entre refs (1 ref por aspecto). 'produto' NAO entra:
+  // varias refs podem ser produtos enviados como imagem ao Gemini.
+  const NON_EXCLUSIVE_ASPECTS = new Set(['produto']);
 
   // Cada uploaded image: {file, dataUrl, name, usageType, usageDescription}
   const uploadedImagesState = [];
@@ -2472,7 +2476,11 @@
       return;
     }
 
-    const used = new Set(Object.values(orgAssetsState.refAspects).filter(Boolean));
+    // aspecto -> refId que ja o utiliza (exclusividade cruzada entre imagens)
+    const owner = {};
+    Object.entries(orgAssetsState.refAspects).forEach(([rid, arr]) => {
+      (Array.isArray(arr) ? arr : []).forEach((a) => { if (a) owner[a] = rid; });
+    });
 
     selectedIds.forEach((rid) => {
       const ref = orgAssetsState.references.find((r) => String(r.id) === String(rid));
@@ -2492,25 +2500,41 @@
       name.textContent = ref.title || ref.description || `Referencia ${rid}`;
       row.appendChild(name);
 
-      const sel = document.createElement('select');
-      sel.className = 'refs-aspect-select form-input-filter';
-      const mine = orgAssetsState.refAspects[rid] || '';
+      // Multi-selecao: 1 checkbox por aspecto. Um aspecto exclusivo so pode
+      // pertencer a UMA imagem; 'produto' pode repetir em varias.
+      const chips = document.createElement('div');
+      chips.className = 'refs-aspect-chips';
+      const mine = Array.isArray(orgAssetsState.refAspects[rid])
+        ? orgAssetsState.refAspects[rid] : [];
       REFERENCE_ASPECTS.forEach((o) => {
-        const opt = document.createElement('option');
-        opt.value = o.value;
-        opt.textContent = o.label;
-        // exclusividade: desabilita aspectos ja usados por OUTRA ref
-        opt.disabled = !!o.value && o.value !== mine && used.has(o.value);
-        if (o.value === mine) opt.selected = true;
-        sel.appendChild(opt);
+        if (!o.value) return; // ignora placeholder
+        const label = document.createElement('label');
+        label.className = 'refs-aspect-chip';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = o.value;
+        const checkedHere = mine.includes(o.value);
+        cb.checked = checkedHere;
+        const ownedByOther = owner[o.value] && String(owner[o.value]) !== String(rid);
+        cb.disabled = !checkedHere && !NON_EXCLUSIVE_ASPECTS.has(o.value) && !!ownedByOther;
+        if (cb.disabled) label.classList.add('is-disabled');
+        cb.addEventListener('change', (e) => {
+          let arr = Array.isArray(orgAssetsState.refAspects[rid])
+            ? [...orgAssetsState.refAspects[rid]] : [];
+          if (e.target.checked) {
+            if (!arr.includes(o.value)) arr.push(o.value);
+          } else {
+            arr = arr.filter((x) => x !== o.value);
+          }
+          if (arr.length) orgAssetsState.refAspects[rid] = arr;
+          else delete orgAssetsState.refAspects[rid];
+          renderAspectsArea();
+        });
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(' ' + o.label));
+        chips.appendChild(label);
       });
-      sel.addEventListener('change', (e) => {
-        const v = e.target.value;
-        if (v) orgAssetsState.refAspects[rid] = v;
-        else delete orgAssetsState.refAspects[rid];
-        renderAspectsArea();
-      });
-      row.appendChild(sel);
+      row.appendChild(chips);
       area.appendChild(row);
     });
   }
@@ -2750,13 +2774,14 @@
     uploadedImagesState,
     getRefsUsageDescription: () =>
       document.getElementById('refsUsageDescription')?.value.trim() || '',
-    // { refId: aspecto } apenas das refs efetivamente selecionadas
+    // { refId: [aspectos] } apenas das refs efetivamente selecionadas
     getReferenceAspects: () => {
       const out = {};
       const sel = orgAssetsState.selectedRefIds;
-      Object.entries(orgAssetsState.refAspects).forEach(([rid, asp]) => {
-        if (asp && Array.from(sel).some((s) => String(s) === String(rid))) {
-          out[rid] = asp;
+      Object.entries(orgAssetsState.refAspects).forEach(([rid, arr]) => {
+        const list = (Array.isArray(arr) ? arr : []).filter(Boolean);
+        if (list.length && Array.from(sel).some((s) => String(s) === String(rid))) {
+          out[rid] = list;
         }
       });
       return out;

@@ -94,6 +94,8 @@ def generate_post_image(
     spatial_instructions: Optional[str] = None,
     references_usage_general: str = '',
     kb_translations: Optional[List[Dict[str, Any]]] = None,
+    layout_document: Optional[Dict[str, Any]] = None,
+    product_urls: Optional[Dict[int, str]] = None,
 ) -> Dict[str, Any]:
     """
     Gera UMA imagem final para o post via Gemini 3 Pro Image.
@@ -197,8 +199,31 @@ def generate_post_image(
             f'Gemini nao retornou imagem. Response: {json.dumps(response_json)[:500]}'
         )
 
-    # 6. Se modo='pillow', aplica SMART overlay de texto sobre a imagem
-    if text_render_mode == 'pillow':
+    # PNG CRU do Gemini (sem texto) — base do canvas editavel + debug.
+    raw_png_bytes = png_bytes
+
+    # 6. Render do texto sobre a imagem.
+    #    Preferencial: layout_document (divs do orquestrador) — base do canvas.
+    #    Fallback: apply_text_overlay (spec antigo) quando nao ha documento.
+    if layout_document and (layout_document.get('elements')):
+        try:
+            png_bytes = render_layout_document(
+                png_bytes,
+                elements=layout_document.get('elements') or [],
+                paleta=paleta,
+                fonts={
+                    'titulo': pillow_title_font_path,
+                    'subtitulo': pillow_subtitle_font_path,
+                    'cta': pillow_title_font_path,
+                },
+                logo_url=pillow_logo_url,
+                product_urls=product_urls or {},
+            )
+            mime_type = 'image/png'
+        except Exception:
+            logger.exception('Falha ao renderizar layout_document — tenta overlay legado')
+            layout_document = None  # cai no overlay abaixo
+    if (not layout_document) and text_render_mode == 'pillow':
         try:
             png_bytes = apply_text_overlay(
                 png_bytes,
@@ -229,6 +254,7 @@ def generate_post_image(
 
     return {
         'png_bytes': png_bytes,
+        'raw_png_bytes': raw_png_bytes,  # cena do Gemini SEM texto (base canvas)
         'mime_type': mime_type,
         'cost_usd': real_cost,
         'model': model_used,
@@ -515,6 +541,13 @@ def _build_prompt_text(
     product_analyses fica como argumento mas e ignorado nesta versao
     (mantido para compatibilidade — pode ser util em futuras iteracoes).
     """
+    # Sanitiza marca/modelo de TODO texto que vai ao Gemini (cena, instrucoes
+    # espaciais do orchestrator, guidance do user). Citar a marca ativa priors
+    # e o produto sai infiel. So o titulo/subtitulo (Pillow) mantem a marca.
+    if brand_keywords:
+        spatial_instructions = _sanitize_brand_terms(spatial_instructions or '', brand_keywords)
+        references_usage_general = _sanitize_brand_terms(references_usage_general or '', brand_keywords)
+
     # Conta quantos de cada tipo (para nomear "produto principal" / "produto 2" etc)
     type_counts: Dict[str, int] = {}
     for ref in sorted_refs:
@@ -653,6 +686,11 @@ def _build_prompt_text(
     # Detecta inline anchoring na SCENE — se presente, omite REFERENCE ROLES
     # (redundante) e adiciona breve nota explicativa antes da cena.
     image_prompt_text = post.image_prompt or '(propor um cenario adequado ao briefing)'
+    # Sanitiza marca/modelo da CENA em QUALQUER modo: citar a marca no prompt
+    # ativa priors do Gemini (ele renderiza branding e ignora a foto anexa).
+    # O titulo/subtitulo (desenhados via Pillow) podem manter a marca; a CENA nao.
+    if brand_keywords:
+        image_prompt_text = _sanitize_brand_terms(image_prompt_text, brand_keywords)
     inline_anchored = _scene_has_inline_anchoring(image_prompt_text)
 
     if use_hybrid_en:
@@ -705,16 +743,17 @@ def _build_prompt_text(
             post.image_prompt or '(propor um cenario adequado ao briefing)',
         ]
 
-    # Bloco LAYOUT ESPACIAL — instrucoes do orchestrator para o Gemini
-    # respeitar zonas reservadas para texto/logo (evita rosto/produto sob titulo)
+    # Bloco COMPOSICAO DA CENA — descricao da cena cheia vinda do orchestrator.
+    # NAO pedimos zonas reservadas: a cena preenche o quadro e o texto e
+    # sobreposto depois (layout_document) adaptando-se por contraste.
     if spatial_instructions:
         parts.extend([
             '',
-            '# LAYOUT ESPACIAL OBRIGATORIO',
+            '# COMPOSICAO DA CENA',
             spatial_instructions,
-            'IMPORTANTE: respeite essas zonas reservadas. NAO posicione rostos, '
-            'produtos principais ou elementos visuais detalhados sobre as areas '
-            'que devem ficar livres para texto/logo.',
+            'IMPORTANTE: a cena deve preencher TODO o quadro de forma natural. '
+            'NAO crie painel, faixa lisa, area chapada nem "espaco reservado" '
+            'para texto/logo, e NAO desenhe texto ou logo.',
         ])
 
     if use_hybrid_en:
@@ -976,9 +1015,10 @@ def apply_text_overlay(
     alignment = spec.get('alignment', 'left')
 
     # ---- LOGO -------------------------------------------------------------
+    logo_box = None
     if logo_url and spec.get('logo_position', 'none') != 'none':
         try:
-            _draw_logo_on_overlay(
+            logo_box = _draw_logo_on_overlay(
                 overlay, logo_url,
                 position=spec['logo_position'],
                 size_pct=float(spec.get('logo_size_pct', 12)),
@@ -986,6 +1026,17 @@ def apply_text_overlay(
             )
         except Exception:
             logger.exception('Falha ao desenhar logo no overlay')
+
+    def _hits_logo(bx, by, bw, bh):
+        """True so quando o retangulo do texto realmente INTERSECTA a caixa do
+        logo (horizontal E vertical). Evita texto por cima do logo sem cortar
+        texto de uma coluna lateral quando o logo esta em outra posicao."""
+        if not logo_box:
+            return False
+        lx, ly, lw, lh = logo_box
+        m = int(H * 0.01)
+        return not (bx + bw < lx - m or bx > lx + lw + m or
+                    by + bh < ly - m or by > ly + lh + m)
 
     # ---- TEXTO: alinhamento/caixa POR BLOCO + zona % (replica layout ref) -
     # Compat: se os campos por-bloco nao existem, cai no comportamento antigo
@@ -999,15 +1050,14 @@ def apply_text_overlay(
     bg_treatment = spec.get('background_treatment', 'none')
 
     def _block_color(hex_pref, bx, by, bw, bh, hint):
-        """Prefere a cor explicita (snapada da KB) se tiver contraste; senao
-        usa o hint (brand_primary_safe / auto_contrast)."""
+        """Cor do texto: usa a cor de marca (hex_pref) quando ela contrasta com
+        o fundo (desfocado) da zona; senao cai pro hint/auto_contrast (legivel).
+        Sem painel solido — a legibilidade vem do blur discreto da cena."""
         if hex_pref:
             try:
                 rgb = _hex_to_rgb(hex_pref)
                 rl = _region_luminance(img, bx, by, bw, bh)
                 cl = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
-                # exige contraste real; senao cai pro auto_contrast (legibilidade
-                # vence — ex: subtitulo branco sobre fundo claro).
                 if abs(cl - rl) >= 70:
                     return rgb
             except Exception:
@@ -1053,6 +1103,9 @@ def apply_text_overlay(
         title, tf_path, _DEJAVU_BOLD, title_block_w, title_size, draw,
     )
     line_h_title = title_font.size * 1.15
+    # Hierarquia: o subtitulo deve ser BEM menor que o titulo FINAL (apos o
+    # shrink, o titulo pode ter encolhido — o subtitulo nunca passa de ~55%).
+    subtitle_size = min(subtitle_size, max(13, int(title_font.size * 0.55)))
 
     if independent_subtitle:
         sub_block_w = int(W * float(szone.get('width_pct', 80)) / 100)
@@ -1088,6 +1141,8 @@ def apply_text_overlay(
 
     y = ty
     for line in title_lines:
+        if _hits_logo(tx, y, tw, int(line_h_title)):
+            break
         line_x = _x_for_alignment(line, title_font, draw, tx, tw, title_align)
         draw.text((line_x, y), line, fill=text_color + (255,), font=title_font)
         y += int(line_h_title)
@@ -1098,6 +1153,8 @@ def apply_text_overlay(
         sub_region_h = int(line_h_sub * len(subtitle_lines))
         sub_color = _block_color(subtitle_color_hex, tx, y, tw, sub_region_h, subtitle_color_hint)
         for line in subtitle_lines:
+            if _hits_logo(tx, y, tw, int(line_h_sub)):
+                break  # nao desenha por cima do logo
             line_x = _x_for_alignment(line, subtitle_font, draw, tx, tw, subtitle_align)
             draw.text((line_x, y), line, fill=sub_color + (255,), font=subtitle_font)
             y += int(line_h_sub)
@@ -1115,6 +1172,8 @@ def apply_text_overlay(
         sub_color = _block_color(subtitle_color_hex, sx, sy, sw, sub_h, subtitle_color_hint)
         y = sy
         for line in subtitle_lines:
+            if _hits_logo(sx, y, sw, int(line_h_sub)):
+                break  # nao desenha por cima do logo
             line_x = _x_for_alignment(line, subtitle_font, draw, sx, sw, subtitle_align)
             draw.text((line_x, y), line, fill=sub_color + (255,), font=subtitle_font)
             y += int(line_h_sub)
@@ -1134,6 +1193,301 @@ def apply_text_overlay(
     buf = BytesIO()
     out.save(buf, format='PNG', optimize=True)
     return buf.getvalue()
+
+
+# =====================================================================
+# RENDER DO LAYOUT_DOCUMENT (divs do orquestrador) — base do canvas editavel
+# =====================================================================
+
+_DOC_ALIGN = {
+    'esquerda': 'left', 'left': 'left',
+    'centro': 'center', 'center': 'center',
+    'direita': 'right', 'right': 'right',
+    'justify': 'left', 'justificado': 'left',
+}
+
+
+def _doc_color(img, hex_str, x, y, w, h, paleta):
+    """Cor do elemento: usa a cor do documento (paleta KB) se contrastar com a
+    regiao; senao auto_contrast (legivel). Sem painel."""
+    if hex_str:
+        try:
+            rgb = _hex_to_rgb(hex_str)
+            rl = _region_luminance(img, x, y, w, h)
+            cl = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+            if abs(cl - rl) >= 60:
+                return rgb
+        except Exception:
+            pass
+    return _auto_contrast_color(img, x, y, w, h)
+
+
+def _draw_logo_at(overlay, logo_url, x, y, target_w):
+    """Cola o logo numa posicao (x,y) explicita com largura target_w."""
+    from io import BytesIO
+    from PIL import Image
+    try:
+        req = urllib.request.Request(logo_url, headers={'User-Agent': 'Mozilla/5.0 IAMKT'})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = resp.read()
+        logo = Image.open(BytesIO(data)).convert('RGBA')
+    except Exception:
+        return None
+    ratio = target_w / logo.size[0]
+    target_h = max(16, int(logo.size[1] * ratio))
+    logo = logo.resize((max(16, target_w), target_h), Image.LANCZOS)
+    overlay.alpha_composite(logo, (x, y))
+    return (x, y, target_w, target_h)
+
+
+def _cutout_white_bg(img, tolerance=18, feather=2):
+    """Remove fundo branco/quase-branco de uma imagem (foto de produto em
+    studio). Heuristica: se 3+ cantos sao quase-brancos, faz cutout; senao
+    retorna a imagem original (RGBA). feather suaviza serrilha das bordas.
+    Usa numpy para vetorizar (rapido em PNG de catalogo)."""
+    from PIL import Image, ImageFilter
+    img = img.convert('RGBA')
+    W, H = img.size
+    corners = [img.getpixel((1, 1)), img.getpixel((W - 2, 1)),
+               img.getpixel((1, H - 2)), img.getpixel((W - 2, H - 2))]
+    white_corners = sum(
+        1 for px in corners
+        if px[0] > 230 and px[1] > 230 and px[2] > 230
+    )
+    if white_corners < 3:
+        return img
+    try:
+        import numpy as np
+        arr = np.asarray(img).copy()
+        th = 255 - tolerance
+        mask = (arr[..., 0] >= th) & (arr[..., 1] >= th) & (arr[..., 2] >= th)
+        arr[..., 3][mask] = 0
+        img = Image.fromarray(arr, mode='RGBA')
+    except ImportError:
+        # fallback puro PIL (lento)
+        th = 255 - tolerance
+        px = img.load()
+        for y in range(H):
+            for x in range(W):
+                r, g, b, _ = px[x, y]
+                if r >= th and g >= th and b >= th:
+                    px[x, y] = (r, g, b, 0)
+    if feather > 0:
+        alpha = img.split()[3].filter(ImageFilter.GaussianBlur(radius=feather))
+        img.putalpha(alpha)
+    return img
+
+
+def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
+                           logo_url=None, product_urls=None):
+    """
+    Renderiza o layout_document (lista de 'divs' do orquestrador) sobre a
+    imagem do Gemini. Cada elemento ja traz posicao/tamanho RELATIVOS (%),
+    cor, alinhamento, peso e padding decididos pelo diretor de arte — o Pillow
+    so DESENHA (sem heuristica de tamanho; shrink-to-fit so como seguranca).
+    fonts: {role: caminho_ttf} resolvido da KB.
+    Mesmo modelo que o canvas editavel vai consumir.
+    """
+    from io import BytesIO
+    from PIL import Image, ImageDraw
+    img = Image.open(BytesIO(png_bytes)).convert('RGBA')
+    W, H = img.size
+    overlay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    basis = min(W, H)
+    fonts = fonts or {}
+    elements = elements or []
+
+    def _px(v, total):
+        try:
+            return int(float(v) / 100.0 * total)
+        except (TypeError, ValueError):
+            return 0
+
+    # Grafismos primeiro (faixas/selos/linhas) — texto, produto e logo ficam POR CIMA.
+    for el in elements:
+        if (el.get('role') or '').lower() in ('grafismo', 'shape', 'forma'):
+            try:
+                _draw_grafismo(draw, el, W, H, paleta)
+            except Exception:
+                logger.exception('[layout_doc] falha grafismo')
+
+    # Composito final do overlay (grafismos) na imagem ANTES dos produtos —
+    # produtos sao colados na IMAGEM (img), nao no overlay, p/ pisar nos grafismos.
+    if any((el.get('role') or '').lower() == 'grafismo' for el in elements):
+        img = Image.alpha_composite(img, overlay)
+        overlay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+
+    # Produtos (cutout do fundo branco -> cola por cima da cena+grafismos).
+    # Cada elemento role='produto' tem image_url (URL presigned). Order: grafismo
+    # -> produto -> texto -> logo. Assim o produto fica ACIMA das faixas mas
+    # ABAIXO do texto e logo (consistente com o template de marca).
+    product_urls = product_urls or {}
+    for el in elements:
+        if (el.get('role') or '').lower() != 'produto':
+            continue
+        try:
+            src = el.get('image_url') or product_urls.get(el.get('image_n'))
+            if not src:
+                continue
+            req = urllib.request.Request(
+                src, headers={'User-Agent': 'Mozilla/5.0 IAMKT'}
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                raw = resp.read()
+            prod_img = Image.open(BytesIO(raw))
+            prod_img = _cutout_white_bg(prod_img)
+            target_w = max(60, _px(el.get('width_pct', 25), W))
+            ratio = target_w / prod_img.width
+            target_h = max(60, int(prod_img.height * ratio))
+            prod_img = prod_img.resize(
+                (target_w, target_h), Image.LANCZOS
+            )
+            x = _px(el.get('x_pct', 70), W)
+            y = _px(el.get('y_pct', 65), H)
+            img.alpha_composite(prod_img, (x, y))
+        except Exception:
+            logger.exception('[layout_doc] falha cutout/composite produto')
+
+    # Logo primeiro (texto pode evitar sobreposicao se preciso)
+    logo_box = None
+    for el in elements:
+        if (el.get('role') or '').lower() == 'logo' and logo_url:
+            try:
+                logo_box = _draw_logo_at(
+                    overlay, logo_url,
+                    _px(el.get('x_pct', 80), W), _px(el.get('y_pct', 4), H),
+                    max(48, _px(el.get('width_pct', 14), W)),
+                )
+            except Exception:
+                logger.exception('[layout_doc] falha logo')
+
+    # 1a passada: prepara cada bloco de texto (fonte, linhas, altura real)
+    blocks = []
+    for el in elements:
+        role = (el.get('role') or '').lower()
+        if role in ('logo', 'grafismo', 'shape', 'forma', 'produto'):
+            continue
+        content = _strip_emoji((el.get('content') or '').strip())
+        if not content:
+            continue
+        if (el.get('case') or '').lower() in ('upper', 'alta', 'uppercase'):
+            content = content.upper()
+        x = _px(el.get('x_pct', 5), W)
+        y = _px(el.get('y_pct', 5), H)
+        bw = max(60, _px(el.get('width_pct', 60), W))
+        pad = _px(el.get('padding_pct', 0), W)
+        size = max(14, int(basis * float(el.get('font_size_pct', 6) or 6) / 100))
+        weight = (el.get('weight') or 'regular').lower()
+        is_bold = weight in ('bold', 'black', 'heavy', 'semibold')
+        fpath = fonts.get(role) or fonts.get('titulo') or (_DEJAVU_BOLD if is_bold else _DEJAVU_REG)
+        fb = _DEJAVU_BOLD if is_bold else _DEJAVU_REG
+        font, lines = _fit_text(content, fpath, fb, max(40, bw - 2 * pad), size, draw)
+        line_h = font.size * 1.18
+        blocks.append({
+            'x': x, 'y': y, 'bw': bw, 'pad': pad, 'font': font, 'lines': lines,
+            'line_h': line_h, 'total_h': int(line_h * len(lines)),
+            'align': _DOC_ALIGN.get((el.get('align') or 'left').lower(), 'left'),
+            'color_hex': el.get('color'),
+        })
+
+    # 2a passada: FLOW anti-sobreposicao. O orquestrador estima y mas nao sabe
+    # a altura real do texto quebrado; empilhamos respeitando o y declarado
+    # como PISO, empurrando pra baixo so quando colidiria com o bloco anterior.
+    blocks.sort(key=lambda b: b['y'])
+    gap = int(H * 0.012)
+    flow_y = 0
+    for b in blocks:
+        y = max(b['y'], flow_y)
+        color = _doc_color(
+            img, b['color_hex'], b['x'] + b['pad'], y, b['bw'] - 2 * b['pad'],
+            b['total_h'], paleta,
+        )
+        yy = y
+        for line in b['lines']:
+            lx = _x_for_alignment(line, b['font'], draw, b['x'] + b['pad'],
+                                  b['bw'] - 2 * b['pad'], b['align'])
+            draw.text((lx, yy), line, fill=color + (255,), font=b['font'])
+            yy += int(b['line_h'])
+        flow_y = y + b['total_h'] + gap
+
+    out = Image.alpha_composite(img, overlay).convert('RGB')
+    buf = BytesIO()
+    out.save(buf, format='PNG', optimize=True)
+    return buf.getvalue()
+
+
+def _draw_grafismo(draw, el, W, H, paleta=None):
+    """Desenha um elemento grafico (faixa arredondada / selo circular / linha)
+    do layout_document. Cor vem do proprio elemento (cor da paleta da marca);
+    fallback = primeira cor primaria da paleta. Desenhado ANTES do texto.
+    """
+    forma = (el.get('forma') or el.get('shape') or 'faixa').lower()
+    cor = el.get('cor') or el.get('color') or ''
+    rgb = None
+    if cor:
+        try:
+            rgb = _hex_to_rgb(cor)
+        except Exception:
+            rgb = None
+    if not rgb and paleta:
+        for c in paleta:
+            if c.get('hex'):
+                try:
+                    rgb = _hex_to_rgb(c['hex'])
+                    break
+                except Exception:
+                    continue
+    if not rgb:
+        rgb = (0, 172, 70)
+
+    def px(v, total, default=0):
+        try:
+            return int(float(v) / 100.0 * total)
+        except (TypeError, ValueError):
+            return default
+
+    x = px(el.get('x_pct', 0), W)
+    y = px(el.get('y_pct', 0), H)
+    w = px(el.get('width_pct', 30), W)
+    h = px(el.get('height_pct', 10), H)
+    try:
+        op = float(el.get('opacidade', el.get('opacity', 100)))
+    except (TypeError, ValueError):
+        op = 100.0
+    alpha = max(0, min(255, int(op / 100.0 * 255)))
+    fill = rgb + (alpha,)
+
+    if forma in ('selo', 'circulo', 'circle', 'badge'):
+        d = min(w, h) if (w and h) else max(w, h)
+        draw.ellipse([x, y, x + d, y + d], fill=fill)
+    elif forma in ('linha', 'divisor', 'line', 'rule'):
+        th = max(2, h or px(0.4, H))
+        draw.rectangle([x, y, x + w, y + th], fill=fill)
+    else:  # faixa / banda / retangulo arredondado
+        raio = px(el.get('raio_pct', 4), W)
+        # cantos: dict {tl,tr,br,bl: bool} ou lista p/ canto organico (so
+        # alguns arredondados, ex: so o canto inferior-direito).
+        c = el.get('cantos')
+        corners = None
+        if isinstance(c, dict):
+            corners = (bool(c.get('tl', True)), bool(c.get('tr', True)),
+                       bool(c.get('br', True)), bool(c.get('bl', True)))
+        elif isinstance(c, (list, tuple)) and c:
+            keys = {str(k).lower() for k in c}
+            corners = ('tl' in keys, 'tr' in keys, 'br' in keys, 'bl' in keys)
+        try:
+            if corners is not None:
+                draw.rounded_rectangle(
+                    [x, y, x + w, y + h], radius=raio, fill=fill, corners=corners
+                )
+            else:
+                draw.rounded_rectangle(
+                    [x, y, x + w, y + h], radius=raio, fill=fill
+                )
+        except Exception:
+            draw.rectangle([x, y, x + w, y + h], fill=fill)
 
 
 # Default layout spec (usado quando nada e passado)
@@ -1329,12 +1683,12 @@ def _draw_logo_on_overlay(overlay, logo_url: str, position: str,
             data = resp.read()
     except Exception as exc:
         logger.warning('Falha download logo overlay: %s', exc)
-        return
+        return None
 
     try:
         logo = Image.open(BytesIO(data)).convert('RGBA')
     except Exception:
-        return
+        return None
 
     W, H = canvas_size
     target_w = max(40, int(W * size_pct / 100))
@@ -1347,6 +1701,7 @@ def _draw_logo_on_overlay(overlay, logo_url: str, position: str,
         block_size=(target_w, target_h), padding=padding,
     )
     overlay.alpha_composite(logo, (x, y))
+    return (x, y, target_w, target_h)  # caixa do logo (p/ evitar texto por cima)
 
 
 def _wrap_text(text: str, font, max_width: int, draw) -> List[str]:

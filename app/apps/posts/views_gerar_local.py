@@ -69,19 +69,35 @@ def gerar_post_local(request):
         selected_logo_ids = selected_logo_ids[:1]
     selected_reference_ids = data.get('selected_reference_ids') or []
     references_usage_description = (data.get('references_usage_description') or '').strip()
-    # Aspecto por ref selecionada: {ref_id: 'layout_composicao'|'iluminacao'|...}.
-    # Exclusivo/unico por imagem (validacao defensiva: 1 ref por aspecto).
+    # Aspecto(s) por ref selecionada: {ref_id: ['layout_composicao', 'grafismos', ...]}.
+    # Multi-selecao por imagem; aspectos exclusivos so podem pertencer a UMA ref
+    # ('produto' e nao-exclusivo). Aceita str (legado) ou lista.
+    _NON_EXCLUSIVE = {'produto'}
     reference_aspects = data.get('reference_aspects') or {}
     if isinstance(reference_aspects, dict):
-        _seen_aspects = {}
-        for _rid, _asp in list(reference_aspects.items()):
-            _asp = (_asp or '').strip()
-            if _asp and _asp in _seen_aspects:
-                # conflito: mesmo aspecto em 2+ imagens — mantem a 1a, ignora demais
-                logger.warning('[posts.local] aspecto duplicado "%s" — ignorando ref %s', _asp, _rid)
-                reference_aspects[_rid] = ''
-            elif _asp:
-                _seen_aspects[_asp] = _rid
+        _seen_aspects = {}  # aspecto exclusivo -> rid que o reservou
+        _clean = {}
+        for _rid, _asps in reference_aspects.items():
+            if isinstance(_asps, str):
+                _asps = [_asps] if _asps.strip() else []
+            elif not isinstance(_asps, list):
+                _asps = []
+            _kept = []
+            for _a in _asps:
+                _a = (_a or '').strip()
+                if not _a:
+                    continue
+                if _a in _NON_EXCLUSIVE:
+                    _kept.append(_a)
+                    continue
+                if _a in _seen_aspects:
+                    logger.warning('[posts.local] aspecto duplicado "%s" — ignorando em ref %s', _a, _rid)
+                    continue
+                _seen_aspects[_a] = str(_rid)
+                _kept.append(_a)
+            if _kept:
+                _clean[str(_rid)] = _kept
+        reference_aspects = _clean
     else:
         reference_aspects = {}
     # Posicao do logo escolhida no modal (9 ancoras) — '' = automatica (dossie)

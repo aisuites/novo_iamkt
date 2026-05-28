@@ -27,8 +27,80 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-MODEL = 'claude-sonnet-4-5'
-MAX_TOKENS = 2500
+MODEL = 'claude-sonnet-4-6'
+MAX_TOKENS = 3500
+
+# Aspecto escolhido no modal -> diretriz explicita do que extrair da referencia.
+# Substitui o texto livre "o que aproveitar" (removido do modal).
+ASPECT_DIRECTIVES = {
+    'layout_composicao': (
+        'APROVEITE APENAS: LAYOUT e COMPOSICAO desta referencia — grid, posicao '
+        'dos blocos de texto, hierarquia e enquadramento. Replique a ESTRUTURA '
+        'visual no layout_document (posicao/tamanho dos blocos). Posicione o LOGO '
+        'na MESMA ancora/posicao indicada em logo_na_referencia (ex: bottom-center). '
+        'NAO copie o produto, a comida nem o cenario especifico, e NAO desenhe '
+        'faixas/selos/grafismos da referencia (isso e o aspecto "grafismos").'
+    ),
+    'iluminacao': (
+        'APROVEITE APENAS: a ILUMINACAO desta referencia — tipo, direcao, '
+        'temperatura e qualidade da luz. NAO copie composicao, produtos nem cenario.'
+    ),
+    'estilo_ambiente': (
+        'APROVEITE APENAS: o ESTILO DE AMBIENTE/CENARIO — superficies, materiais, '
+        'mood e paleta de cena. NAO copie produtos nem o layout de texto.'
+    ),
+    'estilo_pessoas': (
+        'APROVEITE APENAS: o ESTILO DAS PESSOAS — enquadramento, pose, faixa etaria, '
+        'vestuario e mood. NAO copie rostos especificos.'
+    ),
+    'grafismos': (
+        'APROVEITE: os GRAFISMOS da referencia (faixas, selos, divisores). Os '
+        'elementos role="grafismo" serao INJETADOS deterministicamente no '
+        'layout_document a partir do dossie — NAO os emita voce mesmo (evita '
+        'aproximacoes). Sua tarefa aqui e: (1) posicionar o TEXTO relacionado '
+        'POR CIMA dos grafismos com cor CONTRASTANTE (titulo branco sobre faixa '
+        'colorida; CTA branco sobre selo circular colorido). (2) Considerar a '
+        'faixa branca de rodape se logo_na_referencia indica fundo branco — '
+        'logo cai sobre essa faixa branca. NAO copie a fotografia/produto/cenario.'
+    ),
+}
+
+# Aspecto -> chaves do dossie que importam (envia so a fatia relevante,
+# evita truncamento e ruido). 'descricao_geral' entra sempre como contexto.
+ASPECT_DOSSIER_KEYS = {
+    # layout = ESTRUTURA (sem grafismos: faixas/selos sao o aspecto 'grafismos')
+    'layout_composicao': ['grid', 'composicao', 'texto_x_imagem',
+                          'recreation_prompt', 'logo_na_referencia'],
+    'iluminacao': ['iluminacao'],
+    'estilo_ambiente': ['ambiente', 'mood', 'estilo_visual', 'paleta_observada'],
+    'estilo_pessoas': ['pessoas', 'is_humanizada'],
+    'grafismos': ['assets_grafismos', 'paleta_observada'],
+}
+
+
+def _slice_dossier(dossier: Dict[str, Any], aspects) -> Dict[str, Any]:
+    """Retorna so a fatia do dossie relevante aos aspectos escolhidos (uniao das
+    chaves de cada aspecto). Sempre inclui 'descricao_geral' como contexto curto.
+    Sem aspecto conhecido -> dossie inteiro."""
+    if not isinstance(dossier, dict):
+        return {}
+    if isinstance(aspects, str):
+        aspects = [aspects]
+    aspects = [a for a in (aspects or []) if a]
+    wanted = []
+    for a in aspects:
+        for k in ASPECT_DOSSIER_KEYS.get(a, []):
+            if k not in wanted:
+                wanted.append(k)
+    if not wanted:
+        return dossier
+    out = {}
+    if dossier.get('descricao_geral'):
+        out['descricao_geral'] = dossier['descricao_geral']
+    for k in wanted:
+        if k in dossier:
+            out[k] = dossier[k]
+    return out
 
 SYSTEM_PROMPT = """Voce e um diretor de arte e estrategista de conteudo digital
 senior. Sua missao: receber um briefing de post + imagens de referencia + KB
@@ -92,11 +164,21 @@ REGRAS DE SAIDA:
       composicao geral, elementos secundarios (ingredientes, plantas,
       texturas, paredes). Tudo que NAO seja produto/pessoa principal.
 
-   d-bis) CORES DOS EFEITOS = CORES DA MARCA. Qualquer glow, luz colorida,
-      halo, reflexo ou acento de cor na cena DEVE usar as CORES DA MARCA
-      (paleta informada no briefing). NUNCA use azul/ciano "de tecnologia"
-      por padrao — isso so e permitido se a paleta da marca for azul. Ex:
-      marca verde -> glow/acentos esverdeados; marca roxa -> halos roxos.
+   d-bis) NAO INVENTE EFEITOS DE LUZ. Iluminacao deve ser REALISTA e NEUTRA
+      (luz natural de janela, luz de estudio suave). NAO adicione glow, halo,
+      reflexos coloridos, brilho neon, "luz de tecnologia" ou qualquer efeito
+      de cor que NAO exista nas imagens de referencia da marca. Sem aura
+      colorida ao redor do produto. So use tratamento de cor/efeito se ele
+      aparecer explicitamente numa referencia anexada.
+
+   d-ter) CENA CHEIA E NATURAL (NAO reserve zona de texto). Componha uma cena
+      COMPLETA, bonita e realista que ocupa TODO o quadro — NAO deixe parede
+      vazia, painel chapado, faixa lisa nem area "reservada" para texto. NADA
+      de costura/emenda entre um bloco liso e a cena. O texto sera sobreposto
+      depois (em divs) e se adapta a imagem; portanto a sua tarefa aqui e so a
+      FOTO. Dica de composicao (nao obrigatoria): deixe o SUJEITO num lado e
+      areas naturalmente mais calmas (parede, bancada, ceu) no outro — mas como
+      parte organica da cena, nunca como um bloco artificial.
 
    e) Mantenha o prompt em 3-6 linhas. Direto, sem floreios.
 4. Decida TEXT_RENDER_MODE:
@@ -106,34 +188,76 @@ REGRAS DE SAIDA:
      CRITICOS (marca/produto/modelo) que precisam ser literais OU se ja
      ha produtos sensiveis a name-anchor.
    - 'sanitized': raramente — quase nunca melhor que pillow.
-5. LAYOUT PLAN — defina zonas reservadas no canvas para que o gerador de
-   imagem NAO posicione elementos visuais (rostos, produtos, detalhes) sobre
-   areas que vao receber texto/logo em pos-processamento.
-
-   Por padrao, o canvas tem 4 zonas:
-   - title_zone: onde o titulo aparece (topo esquerdo ou superior)
-   - subtitle_zone: opcional, abaixo do titulo
-   - logo_zone: pequena area para logo da marca (canto)
-   - cta_zone: opcional, area do call-to-action (rodape)
-   - main_subject_zone: centro/foco principal (onde produtos+pessoas devem
-     ser concentrados)
-
-   Para cada zona, defina:
-   - position: "top-left"|"top-center"|"top-right"|"center-left"|"center"|
-     "center-right"|"bottom-left"|"bottom-center"|"bottom-right"
-   - width_pct e height_pct: tamanho relativo ao canvas (0-100)
-   - background_requirement: "uniforme/claro/desfocado/sem rostos/sem texto"
-     — instrucao para o Gemini deixar essa area visualmente "limpa"
-
-   Considere o aspect ratio do canvas (sera informado no briefing):
-   - 1:1 (feed quadrado): title topo, cta rodape, sujeito centro
-   - 9:16 (stories/reels): titulo topo, cta base, sujeito centro
-   - 4:5 (feed retrato): title topo, cta base, sujeito centro-baixo
-   - 16:9 (banner/linkedin): title left, sujeito right (lado a lado)
+5. LAYOUT PLAN — NAO reserve zonas vazias na imagem. A imagem do Gemini deve
+   ser uma CENA CHEIA e natural. O posicionamento do texto e definido no
+   layout_document (divs sobrepostas depois), NAO reservando espaco na foto.
+   Voce ainda pode preencher main_subject_zone (onde o sujeito vai) e indicar
+   no layout_document onde o texto cai, mas SEM pedir ao Gemini areas lisas.
+   spatial_instructions deve ser SOMENTE uma descricao da cena cheia (sujeito,
+   areas mais calmas naturais) — NUNCA "deixe livre", "area uniforme", "fundo
+   limpo" ou qualquer reserva que gere painel/costura.
 
 6. WARNINGS: se o briefing tem ambiguidades importantes (ex: "faltam regras
    do sorteio", "nao esta claro qual produto e o premio"), liste em
    warnings. Nao bloqueia geracao mas registra.
+
+7. LAYOUT_DOCUMENT — o PLANO DO TEXTO COMO "DIVS" EDITAVEIS (parte mais
+   importante). Voce PROJETA o texto final como um diretor de arte. Para cada
+   bloco (titulo, subtitulo, cta) e o logo, defina um elemento com posicao e
+   tamanho RELATIVOS ao canvas (%, 0-100). Este documento e renderizado por
+   cima da imagem e depois EDITADO pelo usuario num canvas — entao precisa ser
+   bem pensado e profissional.
+
+   REGRAS DE DESIGN (pense como designer senior; NAO use valores minimos):
+   - TAMANHO PROPORCIONAL: font_size_pct e % da MENOR dimensao do canvas.
+     Titulo normalmente 8-14% (precisa ter IMPACTO). Subtitulo 45-60% do
+     titulo. CTA ~ subtitulo. Titulo curto -> maior; titulo longo -> um pouco
+     menor, mas NUNCA minusculo. Pense no tamanho que um designer usaria num
+     post real — texto grande e legivel, nao perdido na arte.
+   - HIERARQUIA: titulo > subtitulo > cta, legivel a distancia.
+   - POSICAO: INSPIRE-SE na composicao da referencia de layout (dossie), mas
+     ADAPTE ao briefing e ao formato. Texto e sujeito em LADOS OPOSTOS; texto
+     sobre area clara/limpa da cena.
+   - COR: titulo na cor PRIMARIA da marca (paleta) quando contrastar com o
+     fundo; subtitulo/cta num neutro legivel da paleta (branco/grafite).
+   - ALIGN: alinhamento de paragrafo por bloco (left|center|right|justify),
+     espelhando a referencia.
+   - PADDING: respiro interno (padding_pct) para o texto nao colar nas bordas.
+   - x_pct/y_pct = canto SUPERIOR ESQUERDO do bloco; width_pct = largura onde
+     o texto quebra. Garanta que o bloco CABE no canvas (x_pct+width_pct<=100).
+   - O image_prompt_final e o spatial_instructions descrevem uma CENA CHEIA;
+     NAO peca area lisa/reservada para o texto. O texto se adapta a cena via
+     contraste/sombra na renderizacao — voce so escolhe o lado mais calmo.
+
+7-bis. PRODUTOS SAO COMPOSTOS DEPOIS (cutout). Quando uma IMAGEM e do
+   tipo "produto", ela sera CORTADA do fundo branco e COLADA por cima da cena
+   pelo Pillow — ou seja, o produto NAO precisa estar na cena gerada pelo Gemini.
+   Regras:
+   - O image_prompt_final descreve a cena SEM o produto. Na posicao onde o
+     produto sera colado, a cena tem uma SUPERFICIE CALMA E COERENTE (bancada,
+     toalha, tabua) — parte natural da cena, NAO buraco/area vazia.
+   - EMITA UM elemento {"role":"produto","image_n":N,"x_pct":..,"y_pct":..,
+     "width_pct":..} no layout_document para CADA produto. image_n e o numero
+     da IMAGEM original (1-based). A altura segue a proporcao da foto.
+   - O produto fica ACIMA dos grafismos e ABAIXO do texto/logo na ordem de
+     renderizacao — entao posicione produto em area que nao vai ter texto.
+
+8. COMPOSICAO GUIADA PELO LAYOUT (ordem importa: PRIMEIRO decida o
+   layout_document, DEPOIS descreva a cena). A cena NAO e independente do texto:
+   voce ja sabe ONDE cada bloco de texto/logo vai cair, entao DESCREVA NO
+   image_prompt_final o que existe de imagem ATRAS de cada bloco — de forma
+   calma, simples e proposital, como parte ORGANICA da cena. NAO deixe o Gemini
+   inventar elementos competindo com o texto naquela regiao.
+   - Para a regiao sob o TITULO/SUBTITULO: descreva um fundo naturalmente mais
+     calmo e de baixo contraste (parede de reboco, ceu, bancada lisa, bokeh
+     suave, sombra) — REAL e continuo com a cena, NUNCA um painel/faixa chapada.
+   - Para a regiao do SUJEITO (produto/pessoa): concentre ali o detalhe e o foco.
+   - Para a regiao do CTA/LOGO: superficie simples e legivel (borda da bancada,
+     canto de parede), sem rostos nem detalhes finos.
+   - Garanta CONTRASTE entre o texto e o fundo planejado: se o bloco e claro,
+     descreva fundo mais escuro naquela zona, e vice-versa. Diga isso na cena
+     ("...no terco superior-esquerdo, parede neutra escura — onde caira o
+     titulo claro..."). E orientacao de CONTEUDO da cena, NAO reserva de espaco.
 
 FORMATO DE SAIDA (JSON puro, sem markdown):
 {
@@ -181,8 +305,34 @@ FORMATO DE SAIDA (JSON puro, sem markdown):
     }
   },
   "spatial_instructions_for_gemini": "string com instrucoes explicitas para o gerador de imagem respeitar as zonas reservadas. Sera injetada como bloco separado no prompt final.",
+  "layout_document": {
+    "elements": [
+      {"role": "grafismo", "forma": "faixa", "cor": "#RRGGBB", "x_pct": 0, "y_pct": 0,
+       "width_pct": 72, "height_pct": 16, "raio_pct": 4, "opacidade": 100},
+      {"role": "titulo", "content": "<texto exato do titulo>", "x_pct": 6, "y_pct": 8,
+       "width_pct": 55, "font_size_pct": 11, "weight": "bold", "case": "none",
+       "color": "#RRGGBB", "align": "left", "padding_pct": 2},
+      {"role": "subtitulo", "content": "<texto do subtitulo>", "x_pct": 6, "y_pct": 30,
+       "width_pct": 50, "font_size_pct": 5.5, "weight": "regular", "case": "none",
+       "color": "#RRGGBB", "align": "left", "padding_pct": 2},
+      {"role": "grafismo", "forma": "selo", "cor": "#RRGGBB", "x_pct": 8, "y_pct": 58,
+       "width_pct": 26, "height_pct": 15},
+      {"role": "produto", "image_n": 1, "x_pct": 70, "y_pct": 65, "width_pct": 25},
+      {"role": "cta", "content": "<cta ou string vazia>", "x_pct": 6, "y_pct": 88,
+       "width_pct": 42, "font_size_pct": 5, "weight": "bold", "case": "none",
+       "color": "#RRGGBB", "align": "left", "padding_pct": 2},
+      {"role": "logo", "x_pct": 80, "y_pct": 4, "width_pct": 15}
+    ]
+  },
   "warnings": ["string de cada warning"]
 }
+
+NOTA sobre role="grafismo" (so quando o aspecto 'grafismos' foi pedido): forma
+= "faixa" (retangulo arredondado, use raio_pct), "selo" (circulo) ou "linha"
+(divisor). Use cores da PALETA da marca. O Pillow desenha o grafismo ATRAS do
+texto, entao posicione o bloco de texto relacionado SOBRE o grafismo (mesmas
+coordenadas aprox.) com cor contrastante. NAO emita grafismos se o aspecto
+'grafismos' nao foi pedido para nenhuma referencia.
 
 REGRAS CRITICAS para layout_plan:
 - title_zone NUNCA deve incluir rosto humano, produto principal, ou texto visivel
@@ -190,12 +340,18 @@ REGRAS CRITICAS para layout_plan:
 - Aspect ratio define onde o sujeito vai: 9:16/4:5/1:1 -> sujeito CENTRO-BAIXO,
   16:9 -> sujeito CENTRO-DIREITA (texto fica na esquerda)
 
+REGRA DA IMAGEM: a imagem do Gemini e uma CENA CHEIA, bonita e natural, que
+preenche TODO o quadro. NAO reserve area lisa/vazia para texto, NAO crie painel
+ou faixa chapada, NAO deixe "espaco para texto", NAO adicione blur/haze/overlay/
+vinheta. O texto entra por cima depois (divs) e se adapta. spatial_instructions
+e so a descricao da cena cheia.
+
 EXEMPLOS DE spatial_instructions_for_gemini:
-- "DEIXE LIVRE a area do topo (0-25% da altura): nenhum rosto, nenhum produto,
-   nenhum texto. Pode haver parede uniforme, ceu, fundo desfocado, mesa lisa.
-   Esta area sera coberta por titulo em pos-processamento."
-- "Posicione o sujeito principal e os produtos no terço CENTRAL e INFERIOR
-   da composicao, deixando o terço superior visualmente limpo."
+- "Cena cheia: o produto da IMAGEM N em destaque sobre bancada, ambiente de
+   cozinha real iluminado por luz natural, ingredientes ao redor, profundidade
+   de campo natural. Composicao completa, sem areas vazias reservadas."
+- "Foto lifestyle completa preenchendo o quadro; sujeito principal nitido,
+   ambiente real ao redor, sem painel/faixa lisa e sem texto."
 
 Retorne APENAS o JSON, sem texto antes ou depois, sem markdown."""
 
@@ -258,6 +414,14 @@ def orchestrate_post(
         meta = f'IMAGEM {i}: tipo_original={tipo}'
         if usage_desc:
             meta += f' | uso indicado pelo user: "{usage_desc}"'
+        if tipo == 'produto':
+            meta += (
+                ' | MODO CUTOUT-COMPOSITE: esta imagem sera CORTADA (cutout) e '
+                'COLADA por cima da cena por Pillow. NAO descreva o produto no '
+                'image_prompt_final (a cena vem SEM o produto). EMITA um '
+                "role='produto' no layout_document com image_n=" + str(i) +
+                ', x_pct/y_pct/width_pct definindo onde colar.'
+            )
         image_meta_lines.append(meta)
 
         if not url:
@@ -294,14 +458,15 @@ def orchestrate_post(
             system=SYSTEM_PROMPT,
             messages=[
                 {'role': 'user', 'content': content_blocks},
-                {'role': 'assistant', 'content': '{'},  # prefill JSON
             ],
         )
     except Exception:
         logger.exception('[orchestrator] erro Claude')
         return None
 
-    raw = '{' + ''.join(
+    # Sonnet 4.6 nao aceita prefill de assistant; _parse_json extrai o JSON
+    # mesmo com cercas markdown / texto ao redor.
+    raw = ''.join(
         blk.text for blk in resp.content if getattr(blk, 'type', None) == 'text'
     )
     orchestration = _parse_json(raw)
@@ -373,26 +538,45 @@ def _build_user_text(
             '',
             '== Dossies de imagens de referencia da marca (KB) ==',
             '(Analise visual ja extraida dessas imagens. NAO sao imagens a',
-            'reproduzir — sao referencias de ESTILO. Use APENAS os aspectos que',
-            'o user pediu em "o que aproveitar". Incorpore os aspectos relevantes',
-            '(iluminacao, paleta, composicao, mood, grid, etc) no image_prompt_final.',
-            'NUNCA copie produtos/pessoas especificos desses dossies.)',
+            'reproduzir — sao referencias de ESTILO. Cada uma tem um ASPECTO que o',
+            'user escolheu aproveitar (na linha "Instrucao"). Extraia SOMENTE aquele',
+            'aspecto e funda no image_prompt_final / layout_document. O dossie abaixo',
+            'ja vem FILTRADO para o aspecto escolhido. NUNCA copie produtos/pessoas',
+            'especificos desses dossies.)',
         ])
         for i, d in enumerate(kb_dossiers, 1):
             dossier = d.get('dossier') or {}
-            intent = (d.get('usage_description') or '').strip() or '(uso geral / inspiracao)'
+            aspects = d.get('aspects')
+            if aspects is None:  # compat: formato antigo com 'aspect' string
+                _a = (d.get('aspect') or '').strip()
+                aspects = [_a] if _a else []
+            aspects = [a for a in aspects if a]
+            free_text = (d.get('usage_description') or '').strip()
+            directives = [ASPECT_DIRECTIVES[a] for a in aspects if a in ASPECT_DIRECTIVES]
+            if directives:
+                intent = '\n  '.join(directives)
+            elif free_text:
+                intent = free_text
+            else:
+                intent = '(uso geral / inspiracao — extraia o que melhor servir ao briefing)'
+            sliced = _slice_dossier(dossier, aspects)
+            header = f'-- Referencia KB {i}'
+            header += f' [aspectos: {", ".join(aspects)}] --' if aspects else ' --'
             lines.append('')
-            lines.append(f'-- Referencia KB {i} --')
-            lines.append(f'O que aproveitar (intencao do user): "{intent}"')
-            lines.append('Dossie: ' + json.dumps(dossier, ensure_ascii=False)[:1800])
+            lines.append(header)
+            lines.append(f'Instrucao: {intent}')
+            lines.append(
+                'Dossie (filtrado para os aspectos): '
+                + json.dumps(sliced, ensure_ascii=False)[:5000]
+            )
 
     lines.extend([
         '',
         '== Tarefa ==',
         'Analise as imagens + os dossies + o briefing acima e produza o JSON',
         'conforme instrucoes do system prompt. Foque em INTENCAO, nao apenas em',
-        'usage_type tecnico. Para os dossies da KB, extraia SO o que o user',
-        'pediu em "o que aproveitar" e funda no image_prompt_final.',
+        'usage_type tecnico. Para cada dossie da KB, extraia SOMENTE o aspecto da',
+        'linha "Instrucao" e funda no image_prompt_final / layout_document.',
     ])
     return '\n'.join(lines)
 
@@ -510,14 +694,13 @@ def adapt_layout_spec(
             system=_LAYOUT_ADAPT_SYSTEM,
             messages=[
                 {'role': 'user', 'content': user},
-                {'role': 'assistant', 'content': '{'},
             ],
         )
     except Exception:
         logger.exception('[layout_adapt] erro Claude')
         return None
 
-    raw = '{' + ''.join(
+    raw = ''.join(
         blk.text for blk in resp.content if getattr(blk, 'type', None) == 'text'
     )
     adapted = _parse_json(raw)
