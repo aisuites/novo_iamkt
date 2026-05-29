@@ -1157,7 +1157,13 @@
     if (dom.postCTA) dom.postCTA.textContent = post.cta || '—';
     
     if (dom.postDescricaoImagem) {
-      dom.postDescricaoImagem.textContent = post.image_prompt || post.description || '—';
+      // Preferir descricao em PT-BR (visual_brief / strategist.image_style)
+      // para o usuario. image_prompt e o prompt EN do Gemini — fallback so se
+      // nao houver PT-BR.
+      dom.postDescricaoImagem.textContent = post.image_description_ptbr
+        || post.image_prompt
+        || post.description
+        || '—';
       
       if (post.carousel && post.carousel_quantity > 1) {
         if (!dom.postDescricaoImagem.classList.contains('post-image-prompt')) {

@@ -39,4 +39,5 @@ urlpatterns = [
     path('<int:post_id>/overlay-data/', views_overlay.overlay_data, name='overlay_data'),
     path('<int:post_id>/export-png/', views_overlay.export_png, name='export_png'),
     path('<int:post_id>/save-elements/', views_overlay.save_elements, name='save_elements'),
+    path('<int:post_id>/fonts/<str:role>/', views_overlay.font_file, name='font_file'),
 ]

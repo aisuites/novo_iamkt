@@ -72,7 +72,17 @@ def posts_list(request):
             
             # Obter limite de alterações da organização
             max_image_revisions = post.organization.max_image_revisions if post.organization else 1
-            
+
+            # Descricao da imagem em PT-BR para o front (image_prompt e o prompt EN
+            # enviado ao Gemini — nao deve ir pro user).
+            # Prioridade: visual_brief (curto, PT-BR) -> strategist.visual_direction.image_style
+            image_description_ptbr = (post.visual_brief or '').strip()
+            if not image_description_ptbr:
+                sp = (post.copy_payload or {}).get('_strategic_payload') or {}
+                image_description_ptbr = (
+                    (sp.get('visual_direction') or {}).get('image_style') or ''
+                ).strip()
+
             posts_json.append({
                 'id': post.id,
                 'title': post.title or '',
@@ -81,6 +91,7 @@ def posts_list(request):
                 'hashtags': list(post.hashtags) if post.hashtags else [],
                 'cta': post.cta or '',
                 'image_prompt': post.image_prompt or '',
+                'image_description_ptbr': image_description_ptbr,
                 'status': post.status,
                 'social_network': post.social_network,
                 'rede': post.social_network,

@@ -342,6 +342,47 @@ def _build_user_text(*, post, copy_payload, kb_summary, paleta, tipografia,
     return '\n'.join(lines)
 
 
+_CLAUDE_IMAGE_MAX_BYTES = 5 * 1024 * 1024  # 5 MB hard limit da API Anthropic
+_CLAUDE_IMAGE_SAFE_BYTES = int(4.5 * 1024 * 1024)  # margem de seguranca
+
+
+def _shrink_image_for_claude(data: bytes, ct: str) -> tuple:
+    """Garante que a imagem cabe no limite de 5MB do Claude.
+    Estrategia: JPEG quality 85, se nao bastar redimensiona para 2048x2048.
+    Retorna (bytes, content_type)."""
+    if len(data) <= _CLAUDE_IMAGE_SAFE_BYTES:
+        return data, ct
+    try:
+        from PIL import Image
+        import io
+        img = Image.open(io.BytesIO(data))
+        if img.mode in ('RGBA', 'LA', 'P'):
+            bg = Image.new('RGB', img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+            img = bg
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+
+        for max_side in (None, 2048, 1536, 1024):
+            if max_side and (img.width > max_side or img.height > max_side):
+                img.thumbnail((max_side, max_side), Image.LANCZOS)
+            for quality in (85, 75, 65):
+                buf = io.BytesIO()
+                img.save(buf, format='JPEG', quality=quality, optimize=True)
+                out = buf.getvalue()
+                if len(out) <= _CLAUDE_IMAGE_SAFE_BYTES:
+                    logger.info(
+                        '[designer] imagem comprimida %d->%d bytes (%sx%s q%d)',
+                        len(data), len(out), img.width, img.height, quality,
+                    )
+                    return out, 'image/jpeg'
+        logger.warning('[designer] nao conseguiu reduzir imagem abaixo de 4.5MB (%d bytes)', len(out))
+        return out, 'image/jpeg'
+    except Exception:
+        logger.exception('[designer] falha redimensionar imagem')
+        return data, ct
+
+
 def _download_image_b64(url: str):
     try:
         req = urllib.request.Request(
@@ -354,6 +395,9 @@ def _download_image_b64(url: str):
         return None, 'image/png'
     if ct not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
         ct = 'image/png'
+    # Limite de 5MB do Claude — recomprime se necessario.
+    if len(data) > _CLAUDE_IMAGE_SAFE_BYTES:
+        data, ct = _shrink_image_for_claude(data, ct)
     return base64.b64encode(data).decode('ascii'), ct
 
 

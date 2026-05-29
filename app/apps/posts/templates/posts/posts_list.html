@@ -199,12 +199,14 @@
                     <p id="postCTA">{{ post.cta|default:"—" }}</p>
                 </div>
 
-                <!-- Descrição da Imagem -->
+                <!-- Descrição da Imagem (PT-BR para o usuario; prompt EN vai para o Gemini separadamente) -->
                 <div class="post-section">
                     <h4>Descrição da imagem a ser gerada</h4>
+                    {% with image_desc_pt=post.visual_brief|default:"" %}
                     <p id="postDescricaoImagem" {% if post.is_carousel and post.image_count > 1 %}class="post-image-prompt"{% endif %}>
-                        {{ post.image_prompt|default:"—" }}
+                        {% if image_desc_pt %}{{ image_desc_pt }}{% else %}{{ post.image_prompt|default:"—" }}{% endif %}
                     </p>
+                    {% endwith %}
                 </div>
 
                 <!-- Caixa de Solicitação de Alteração de Texto -->
@@ -732,6 +734,8 @@ function toggleCarrossel() {
     let selectedIdx = null;
     let canvasW = 1080, canvasH = 1080, scale = 1;
     let titleFont = 'serif', logoUrl = null;
+    // Famílias CSS efetivas por role (sao trocadas no openArteFinal)
+    let fontFamilyByRole = { titulo: 'serif', subtitulo: 'serif', cta: 'serif' };
 
     const ROLE_LABELS = { titulo:'Título', subtitulo:'Subtítulo', cta:'CTA', grafismo:'Pill/Fundo', logo:'Logo' };
 
@@ -752,7 +756,17 @@ function toggleCarrossel() {
             titleFont = (data.font_names && data.font_names.titulo) || 'serif';
             elements = JSON.parse(JSON.stringify(data.elements));
             bgEl.src = data.raw_image_url;
-            _loadGoogleFont(titleFont);
+            // Injeta @font-face local por role (TTF da KB cacheado em /app/fonts_cache/).
+            // Funciona para qualquer fonte (Google ou KB upload) — nao depende mais
+            // do Google Fonts CSS, garantindo que o modal mostre EXATAMENTE o que o PNG vai usar.
+            fontFamilyByRole = _registerPostFonts(postId, data.font_urls || {}, data.font_names || {});
+            // Aguarda fontes carregarem (document.fonts.ready) — evita flash com serif
+            try {
+                await Promise.race([
+                    document.fonts.ready,
+                    new Promise(r => setTimeout(r, 1500)),  // hard cap
+                ]);
+            } catch(_) {}
             await new Promise(r => requestAnimationFrame(r));
             await new Promise(r => requestAnimationFrame(r));
             _fitContainer();
@@ -805,10 +819,11 @@ function toggleCarrossel() {
             if (!el.content) return;
             dom = document.createElement('div');
             const fsPx = ((el.font_size_pct||5)/100*canvasH*scale).toFixed(1);
+            const fam = fontFamilyByRole[role] || fontFamilyByRole.titulo || 'serif';
             Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
                 width:el.width_pct+'%', color:el.color||'#000', fontSize:fsPx+'px',
                 fontWeight:el.weight==='bold'?'bold':'normal', textAlign:el.align||'left',
-                fontFamily:`'${titleFont}',serif`, lineHeight:'1.2', cursor:'pointer', userSelect:'none', boxSizing:'border-box' });
+                fontFamily:fam, lineHeight:'1.2', cursor:'pointer', userSelect:'none', boxSizing:'border-box' });
             if (role==='cta') { dom.style.display='flex'; dom.style.alignItems='center'; dom.style.justifyContent='center'; }
             dom.textContent = el.content;
         } else return;
@@ -909,14 +924,36 @@ function toggleCarrossel() {
     });
 
     // ── Helpers ────────────────────────────────────────────────────────────
-    function _loadGoogleFont(family) {
-        if (!family || family==='serif') return;
-        const id = 'gf-'+family.replace(/\s/g,'-');
-        if (document.getElementById(id)) return;
-        const link = document.createElement('link');
-        link.id=id; link.rel='stylesheet';
-        link.href=`https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@300;400;700&display=swap`;
-        document.head.appendChild(link);
+    /**
+     * Registra @font-face por role apontando ao endpoint /posts/<id>/fonts/<role>/.
+     * O endpoint serve o TTF/OTF da KB (Vorwerk, etc) ou Google Fonts cacheado.
+     * Retorna { titulo: "fontFamilyCSS", subtitulo: ..., cta: ... } para usar
+     * diretamente em element.style.fontFamily.
+     */
+    function _registerPostFonts(postId, fontUrls, fontNames) {
+        const roles = ['titulo','subtitulo','cta'];
+        const families = {};
+        const styleId = `postfonts-${postId}`;
+        let styleEl = document.getElementById(styleId);
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+        const css = [];
+        roles.forEach(role => {
+            const url = fontUrls && fontUrls[role];
+            if (url) {
+                const family = `IAMKT_${postId}_${role}`;
+                css.push(`@font-face{font-family:'${family}';src:url('${url}') format('truetype');font-display:swap;}`);
+                families[role] = `'${family}', '${(fontNames && fontNames[role]) || 'serif'}', serif`;
+            } else {
+                // Fallback: nome bruto (so funciona se browser conhecer ou se for Google Fonts default)
+                families[role] = `'${(fontNames && fontNames[role]) || 'serif'}', serif`;
+            }
+        });
+        styleEl.textContent = css.join('\n');
+        return families;
     }
     function _toHex6(c) {
         if (/^#[0-9a-f]{6}$/i.test(c)) return c;

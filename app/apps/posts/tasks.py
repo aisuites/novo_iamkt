@@ -752,6 +752,17 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             ctx['orchestration'] = orchestration_output
             post.local_pipeline_context = ctx
             post.save(update_fields=['local_pipeline_context'])
+            # Re-persiste _layout_elements (critic pode ter mutado posicoes/cores
+            # via _apply_layout_edits). Garantia idempotente para o modal Arte Final.
+            try:
+                _final_els = (layout_document or {}).get('elements') or []
+                if _final_els:
+                    _dp = post.designer_payload or {}
+                    _dp['_layout_elements'] = _final_els
+                    post.designer_payload = _dp
+                    post.save(update_fields=['designer_payload'])
+            except Exception:
+                logger.exception('[posts.local] falha re-persistir _layout_elements pos-critic')
             logger.info(
                 '[posts.local] designer-critic: %d iteracoes',
                 len(critique_iterations),
@@ -810,6 +821,21 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     existing.append(img_entry)
     post.generated_images = existing
     post.status = 'image_ready'
+    # Salvaguarda final: se layout_document tem elements e o designer_payload
+    # em memoria perdeu (suspeita de race com refresh_from_db do _record_ai_usage),
+    # re-injeta antes do save geral. Idempotente.
+    try:
+        _final_els = (layout_document or {}).get('elements') or []
+        if _final_els and not (post.designer_payload or {}).get('_layout_elements'):
+            _dp = post.designer_payload or {}
+            _dp['_layout_elements'] = _final_els
+            post.designer_payload = _dp
+            logger.info(
+                '[posts.local] _layout_elements re-injetado antes do save final (%d els)',
+                len(_final_els),
+            )
+    except Exception:
+        logger.exception('[posts.local] falha re-injetar _layout_elements pre-save')
     post.save()
 
     # Loga custo

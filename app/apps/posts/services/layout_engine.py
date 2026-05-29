@@ -77,8 +77,12 @@ def build_elements(
     safe_l = int(safe_z.get('left',   60))
     safe_r = int(safe_z.get('right',  60))
 
-    # Zona de texto: extrai largura, lado e posição X da composição do strategist
-    zone_pct, zone_side, zone_x_pct = _extract_text_zone(vd.get('composition') or '')
+    # Zona de texto: extrai largura, lado e posição X da composição do strategist.
+    # Fallback agora adapta por aspect ratio (stories vertical precisa mais largura).
+    zone_pct, zone_side, zone_x_pct = _extract_text_zone(
+        vd.get('composition') or '',
+        canvas_w=canvas_w, canvas_h=canvas_h,
+    )
     zone_w_px = int(canvas_w * zone_pct / 100)
     # X: usa coordenada explícita do strategist se disponível; senão usa safe margin
     if zone_x_pct > 0:
@@ -262,12 +266,19 @@ def build_elements(
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
-def _extract_text_zone(composition: str) -> Tuple[int, str, int]:
+def _extract_text_zone(
+    composition: str, canvas_w: int = 1080, canvas_h: int = 1080,
+) -> Tuple[int, str, int]:
     """Extrai (width_pct, side, x_pct) da zona de texto do card.
 
     Suporta dois formatos emitidos pelo strategist:
       A) Estruturado: "bloco de texto ... (x=5% y=30% w=40% h=40%)"
       B) Livre:       "esquerda (35%)"  ou  "left 35%"
+
+    Fallback adapta por aspect ratio:
+      stories vertical (h > w): 60% (mais largura pro texto caber)
+      quadrado (h == w):        38%
+      horizontal (w > h):       45%
 
     Retorna (width_pct, side, x_pct).
     """
@@ -301,8 +312,14 @@ def _extract_text_zone(composition: str) -> Tuple[int, str, int]:
     if m:
         return int(m.group(1)), 'right', 0
 
-    # fallback: esquerda 38%
-    return 38, 'left', 0
+    # Fallback adaptativo por aspect ratio do canvas
+    if canvas_h > canvas_w * 1.1:        # vertical (stories 9:16, etc)
+        default_pct = 60
+    elif canvas_w > canvas_h * 1.1:      # horizontal (landscape, twitter)
+        default_pct = 45
+    else:                                # quadrado (~1:1)
+        default_pct = 38
+    return default_pct, 'left', 0
 
 
 def _fit_font(

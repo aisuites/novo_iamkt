@@ -6,11 +6,13 @@ import asyncio
 import base64
 import json
 import logging
+import mimetypes
 import os
 import urllib.request
+from pathlib import Path
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET, require_POST
 
@@ -49,9 +51,18 @@ def overlay_data(request, post_id):
     logo_url = _get_logo_url(post)
     canvas_w, canvas_h = _get_canvas(post)
     font_names = _get_font_names(post)
+    font_paths = _get_font_paths(post) or {}
 
     if not elements or not raw_image_url:
         return JsonResponse({'error': 'overlay_not_ready'}, status=404)
+
+    # Para cada role, indica se ha TTF/OTF servivel via endpoint /fonts/<role>/.
+    # JS injeta @font-face apontando ao endpoint quando tem arquivo (sempre que
+    # _get_font_paths achou path); fallback so se nao houver arquivo nenhum.
+    font_urls = {}
+    for role in _VALID_FONT_ROLES:
+        if font_paths.get(role):
+            font_urls[role] = f'/posts/{post.id}/fonts/{role}/'
 
     return JsonResponse({
         'elements': elements,
@@ -60,6 +71,7 @@ def overlay_data(request, post_id):
         'canvas_w': canvas_w,
         'canvas_h': canvas_h,
         'font_names': font_names,
+        'font_urls': font_urls,
     })
 
 
@@ -118,6 +130,43 @@ def export_png(request, post_id):
     response = HttpResponse(png_bytes, content_type='image/png')
     response['Content-Disposition'] = f'attachment; filename="post-{post_id}-arte.png"'
     return response
+
+
+_VALID_FONT_ROLES = {'titulo', 'subtitulo', 'cta'}
+_FONTS_CACHE_DIR = Path('/app/fonts_cache')
+
+
+@login_required
+@require_GET
+def font_file(request, post_id, role):
+    """Serve o arquivo TTF/OTF da fonte usada por um role do post.
+    Permite que o modal Arte Final injete @font-face apontando para a fonte
+    real da KB (ou Google Fonts cacheado) — independente do Google Fonts CSS.
+    """
+    if role not in _VALID_FONT_ROLES:
+        return JsonResponse({'error': 'role_invalido'}, status=400)
+    post = get_object_or_404(Post, id=post_id, organization=request.organization)
+    paths = _get_font_paths(post)
+    fp = (paths or {}).get(role) or ''
+    if not fp:
+        return JsonResponse({'error': 'font_missing'}, status=404)
+    try:
+        # Sandbox: so serve dentro de /app/fonts_cache
+        resolved = Path(fp).resolve()
+        if _FONTS_CACHE_DIR not in resolved.parents and resolved != _FONTS_CACHE_DIR:
+            return JsonResponse({'error': 'path_forbidden'}, status=403)
+        if not resolved.is_file():
+            return JsonResponse({'error': 'file_missing'}, status=404)
+    except Exception:
+        return JsonResponse({'error': 'invalid_path'}, status=400)
+
+    mime, _ = mimetypes.guess_type(resolved.name)
+    if not mime:
+        mime = 'font/otf' if resolved.suffix.lower() == '.otf' else 'font/ttf'
+    resp = FileResponse(open(resolved, 'rb'), content_type=mime)
+    resp['Cache-Control'] = 'private, max-age=3600'
+    resp['Access-Control-Allow-Origin'] = '*'  # CORS-safe para @font-face
+    return resp
 
 
 @login_required
@@ -212,17 +261,44 @@ def _get_canvas(post: Post):
     return 1080, 1080
 
 
+def _norm_uso(s: str) -> str:
+    """Normaliza rotulo de uso da tipografia (lower + sem acento + sem plural simples)."""
+    import unicodedata
+    s = unicodedata.normalize('NFKD', s or '').encode('ascii', 'ignore').decode().lower()
+    return s.rstrip('s')  # 'titulos' -> 'titulo', 'subtitulos' -> 'subtitulo'
+
+
 def _get_font_names(post: Post) -> dict:
+    """Resolve a fonte da KB para exibicao no modal (browser).
+    Tenta varios rotulos comuns ('titulo', 'headline', 'principal', 'primary')
+    com normalizacao de acento/plural. Fallback: primeira fonte da KB, depois serif.
+    """
     try:
         from apps.posts.tasks import _get_kb, _kb_typography
         kb = _get_kb(post)
-        tipografia = _kb_typography(kb)
-        titulo_font = next(
-            (t['nome'] for t in tipografia if t.get('uso', '').lower() == 'titulo'),
-            'serif'
+        tipografia = _kb_typography(kb) or []
+        if not tipografia:
+            return {'titulo': 'serif', 'subtitulo': 'serif', 'cta': 'serif'}
+
+        def _pick(usage_keys):
+            for t in tipografia:
+                u = _norm_uso(t.get('uso') or '')
+                if any(k in u for k in usage_keys) and t.get('nome'):
+                    return t['nome']
+            return None
+
+        titulo_font = (
+            _pick(['titulo', 'headline', 'principal', 'primary', 'destaque'])
+            or (tipografia[0].get('nome') if tipografia else None)
+            or 'serif'
         )
-        return {'titulo': titulo_font, 'subtitulo': titulo_font, 'cta': titulo_font}
+        sub_font = (
+            _pick(['subtitulo', 'secundaria', 'secondary', 'body', 'corpo', 'texto'])
+            or titulo_font
+        )
+        return {'titulo': titulo_font, 'subtitulo': sub_font, 'cta': titulo_font}
     except Exception:
+        logger.exception('[overlay] falha resolver font_names')
         return {'titulo': 'serif', 'subtitulo': 'serif', 'cta': 'serif'}
 
 
