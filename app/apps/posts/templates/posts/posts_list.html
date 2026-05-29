@@ -245,8 +245,9 @@
                 <div class="post-gallery" id="postGallery" {% if post.images.count <= 1 %}hidden{% endif %}>
                     {% if post.images.count > 1 %}
                         {% for img in post.images.all %}
-                        <button type="button" class="gallery-thumb {% if forloop.first %}active{% endif %}" data-image-index="{{ forloop.counter0 }}" data-s3-key="{{ img.s3_key }}">
+                        <button type="button" class="gallery-thumb {% if forloop.first %}active{% endif %}" data-image-index="{{ forloop.counter0 }}" data-image-id="{{ img.id }}" data-s3-key="{{ img.s3_key }}">
                             <img src="#" alt="Miniatura {{ forloop.counter }}" data-lazy-load="{{ img.s3_key }}" data-s3-url="{{ img.s3_url }}">
+                            <span class="btn-remove-image" data-action="remove-post-image" data-post-id="{{ post.id }}" data-image-id="{{ img.id }}" title="Remover imagem" role="button" tabindex="0">&times;</span>
                         </button>
                         {% endfor %}
                     {% endif %}
@@ -472,13 +473,83 @@
     <button type="button" class="lb-close" aria-label="Fechar">&times;</button>
     <img id="imageLightboxImg" src="" alt="Visualizacao ampliada">
 </div>
+
+<!-- Modal Arte Final — editor visual -->
+<div id="modalArteFinal" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="max-width:1280px;width:97vw;padding:0;max-height:97vh;display:flex;flex-direction:column;">
+        <div class="modal-header" style="flex-shrink:0;">
+            <h3>Arte Final</h3>
+            <button type="button" class="modal-close" id="btnCloseArteFinal">&times;</button>
+        </div>
+        <div style="display:flex;flex:1;overflow:hidden;">
+            <!-- Imagem -->
+            <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:16px;background:#f0f0f0;overflow:hidden;">
+                <div id="arteFinalContainer" style="position:relative;overflow:hidden;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,.25);">
+                    <img id="arteFinalBg" src="" alt="Fundo" style="display:block;width:100%;height:100%;object-fit:cover;">
+                    <div id="arteFinalOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;"></div>
+                </div>
+            </div>
+            <!-- Painel de propriedades -->
+            <div id="arteFinalPanel" style="width:260px;flex-shrink:0;border-left:1px solid #e0e0e0;display:flex;flex-direction:column;overflow-y:auto;background:#fff;">
+                <div id="panelEmpty" style="padding:24px 16px;color:#888;font-size:13px;text-align:center;">
+                    <div style="font-size:28px;margin-bottom:8px;">↖</div>
+                    Clique em um elemento para editar
+                </div>
+                <div id="panelControls" style="display:none;padding:16px;flex:1;">
+                    <div id="panelRoleLabel" style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Elemento</div>
+                    <div id="ctrlTextWrap" style="margin-bottom:14px;">
+                        <label style="font-size:12px;color:#555;display:block;margin-bottom:4px;">Texto</label>
+                        <textarea id="ctrlText" rows="3" style="width:100%;font-size:13px;border:1px solid #ddd;border-radius:4px;padding:6px;resize:vertical;box-sizing:border-box;"></textarea>
+                    </div>
+                    <div style="margin-bottom:14px;">
+                        <label style="font-size:12px;color:#555;display:flex;justify-content:space-between;">Tamanho <span id="ctrlSizeVal">55</span>px</label>
+                        <input type="range" id="ctrlSize" min="8" max="200" step="1" style="width:100%;accent-color:#471811;">
+                    </div>
+                    <div id="ctrlColorWrap" style="margin-bottom:14px;">
+                        <label style="font-size:12px;color:#555;display:block;margin-bottom:4px;">Cor do texto</label>
+                        <input type="color" id="ctrlColor" style="width:100%;height:32px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                    </div>
+                    <div id="ctrlBgColorWrap" style="display:none;margin-bottom:14px;">
+                        <label style="font-size:12px;color:#555;display:block;margin-bottom:4px;">Cor do fundo</label>
+                        <input type="color" id="ctrlBgColor" style="width:100%;height:32px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                    </div>
+                    <div id="ctrlStyleWrap" style="margin-bottom:14px;display:flex;gap:8px;">
+                        <div style="flex:1;">
+                            <label style="font-size:12px;color:#555;display:block;margin-bottom:4px;">Peso</label>
+                            <button id="ctrlBold" type="button" style="width:100%;padding:5px;border:1px solid #ddd;border-radius:4px;background:#fff;font-weight:bold;cursor:pointer;">B</button>
+                        </div>
+                        <div style="flex:2;">
+                            <label style="font-size:12px;color:#555;display:block;margin-bottom:4px;">Alinhamento</label>
+                            <div style="display:flex;gap:4px;">
+                                <button data-align="left"   class="align-btn" type="button" style="flex:1;padding:5px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:11px;">Esq</button>
+                                <button data-align="center" class="align-btn" type="button" style="flex:1;padding:5px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:11px;">Cen</button>
+                                <button data-align="right"  class="align-btn" type="button" style="flex:1;padding:5px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:11px;">Dir</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:14px;">
+                        <label style="font-size:12px;color:#555;display:block;margin-bottom:4px;">Posição</label>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                            <div><label style="font-size:11px;color:#999;">X %</label><input type="number" id="ctrlX" min="0" max="100" step="0.5" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:13px;box-sizing:border-box;"></div>
+                            <div><label style="font-size:11px;color:#999;">Y %</label><input type="number" id="ctrlY" min="0" max="100" step="0.5" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:13px;box-sizing:border-box;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div style="flex-shrink:0;padding:12px 20px;border-top:1px solid #e0e0e0;display:flex;align-items:center;gap:12px;background:#fff;">
+            <button type="button" id="btnExportPng" class="btn" style="min-width:140px;">Baixar PNG</button>
+            <button type="button" class="btn ghost" id="btnCloseArteFinal2">Fechar</button>
+            <p id="arteFinalStatus" style="margin:0;font-size:13px;color:#666;flex:1;text-align:right;"></p>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'js/confirm-modal.js' %}?v=20260202-1008"></script>
 <script src="{% static 'js/toaster.js' %}?v=20260202-1008"></script>
 <script src="{% static 'js/logger.js' %}?v=20260202-1008"></script>
-<script src="{% static 'js/image-preview-loader.js' %}?v=20260202-1008"></script>
 
 <script>
 // ============================================================================
@@ -626,5 +697,234 @@ function toggleCarrossel() {
     
     console.log('✅ Carrossel atualizado - display:', carrosselQtyField.style.display);
 }
+</script>
+
+<script>
+// ============================================================================
+// MODAL ARTE FINAL — editor visual com controles por elemento
+// ============================================================================
+(function () {
+    'use strict';
+
+    const modal      = document.getElementById('modalArteFinal');
+    const bgEl       = document.getElementById('arteFinalBg');
+    const overlay    = document.getElementById('arteFinalOverlay');
+    const btnExport  = document.getElementById('btnExportPng');
+    const statusEl   = document.getElementById('arteFinalStatus');
+    const panelEmpty    = document.getElementById('panelEmpty');
+    const panelControls = document.getElementById('panelControls');
+    const panelRoleLabel= document.getElementById('panelRoleLabel');
+    const ctrlText      = document.getElementById('ctrlText');
+    const ctrlTextWrap  = document.getElementById('ctrlTextWrap');
+    const ctrlSize      = document.getElementById('ctrlSize');
+    const ctrlSizeVal   = document.getElementById('ctrlSizeVal');
+    const ctrlColor     = document.getElementById('ctrlColor');
+    const ctrlColorWrap = document.getElementById('ctrlColorWrap');
+    const ctrlBgColor   = document.getElementById('ctrlBgColor');
+    const ctrlBgColorWrap = document.getElementById('ctrlBgColorWrap');
+    const ctrlBold      = document.getElementById('ctrlBold');
+    const ctrlStyleWrap = document.getElementById('ctrlStyleWrap');
+    const ctrlX         = document.getElementById('ctrlX');
+    const ctrlY         = document.getElementById('ctrlY');
+
+    let currentPostId = null;
+    let elements  = [];
+    let selectedIdx = null;
+    let canvasW = 1080, canvasH = 1080, scale = 1;
+    let titleFont = 'serif', logoUrl = null;
+
+    const ROLE_LABELS = { titulo:'Título', subtitulo:'Subtítulo', cta:'CTA', grafismo:'Pill/Fundo', logo:'Logo' };
+
+    // ── Abrir ──────────────────────────────────────────────────────────────
+    window.openArteFinal = async function (postId) {
+        currentPostId = postId; selectedIdx = null; elements = [];
+        statusEl.textContent = 'Carregando…';
+        overlay.innerHTML = ''; bgEl.src = '';
+        _showPanel(false);
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        try {
+            const resp = await fetch(`/posts/${postId}/overlay-data/`, { headers:{'X-CSRFToken':window.CSRF_TOKEN} });
+            if (!resp.ok) throw new Error('not_ready');
+            const data = await resp.json();
+            canvasW = data.canvas_w; canvasH = data.canvas_h;
+            logoUrl = data.logo_url;
+            titleFont = (data.font_names && data.font_names.titulo) || 'serif';
+            elements = JSON.parse(JSON.stringify(data.elements));
+            bgEl.src = data.raw_image_url;
+            _loadGoogleFont(titleFont);
+            await new Promise(r => requestAnimationFrame(r));
+            await new Promise(r => requestAnimationFrame(r));
+            _fitContainer();
+            _renderAll();
+            statusEl.textContent = '';
+        } catch(e) {
+            statusEl.textContent = 'Arte final não disponível para este post.';
+            console.error('[arteFinal]', e);
+        }
+    };
+
+    function _fitContainer() {
+        const container = document.getElementById('arteFinalContainer');
+        const panel     = document.getElementById('arteFinalPanel');
+        const availW = modal.querySelector('.modal-content').offsetWidth - panel.offsetWidth - 48;
+        const availH = window.innerHeight - 130;
+        const ratio  = canvasW / canvasH;
+        let w = Math.min(availW, availH * ratio);
+        let h = w / ratio;
+        if (h > availH) { h = availH; w = h * ratio; }
+        container.style.width  = Math.round(w) + 'px';
+        container.style.height = Math.round(h) + 'px';
+        scale = w / canvasW;
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────────
+    function _renderAll() { overlay.innerHTML = ''; elements.forEach((el,i) => _renderOne(el,i)); }
+
+    function _renderOne(el, idx) {
+        const role = (el.role||'').toLowerCase();
+        let dom;
+
+        if (role === 'grafismo') {
+            const forma = (el.forma||'').toLowerCase();
+            if (!['faixa','pill','retangulo'].includes(forma)) return;
+            dom = document.createElement('div');
+            const raio = ((el.raio_pct||0)/100*canvasW*scale).toFixed(1);
+            Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
+                width:el.width_pct+'%', height:el.height_pct+'%',
+                background:el.cor||'#000', borderRadius:raio+'px', boxSizing:'border-box', cursor:'pointer' });
+
+        } else if (role === 'logo' && logoUrl) {
+            dom = document.createElement('img');
+            dom.src = logoUrl; dom.alt = 'Logo';
+            Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
+                width:el.width_pct+'%', height:el.height_pct+'%',
+                objectFit:'contain', objectPosition:'left center', cursor:'pointer' });
+
+        } else if (['titulo','subtitulo','cta'].includes(role)) {
+            if (!el.content) return;
+            dom = document.createElement('div');
+            const fsPx = ((el.font_size_pct||5)/100*canvasH*scale).toFixed(1);
+            Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
+                width:el.width_pct+'%', color:el.color||'#000', fontSize:fsPx+'px',
+                fontWeight:el.weight==='bold'?'bold':'normal', textAlign:el.align||'left',
+                fontFamily:`'${titleFont}',serif`, lineHeight:'1.2', cursor:'pointer', userSelect:'none', boxSizing:'border-box' });
+            if (role==='cta') { dom.style.display='flex'; dom.style.alignItems='center'; dom.style.justifyContent='center'; }
+            dom.textContent = el.content;
+        } else return;
+
+        if (idx === selectedIdx) { dom.style.outline='2px dashed #0078d4'; dom.style.outlineOffset='2px'; }
+        dom.addEventListener('click', e => { e.stopPropagation(); _selectElement(idx); });
+        overlay.appendChild(dom);
+    }
+
+    function _selectElement(idx) { selectedIdx = idx; _renderAll(); _updatePanel(); }
+
+    overlay.addEventListener('click', () => { selectedIdx = null; _renderAll(); _showPanel(false); });
+
+    // ── Painel ─────────────────────────────────────────────────────────────
+    function _showPanel(show) {
+        panelEmpty.style.display    = show ? 'none'  : 'block';
+        panelControls.style.display = show ? 'block' : 'none';
+    }
+
+    function _updatePanel() {
+        if (selectedIdx === null) { _showPanel(false); return; }
+        const el   = elements[selectedIdx];
+        const role = (el.role||'').toLowerCase();
+        _showPanel(true);
+        panelRoleLabel.textContent = ROLE_LABELS[role] || role;
+        const isText = ['titulo','subtitulo','cta'].includes(role);
+        const isGraf = role === 'grafismo';
+        ctrlTextWrap.style.display    = isText ? 'block' : 'none';
+        ctrlColorWrap.style.display   = isText ? 'block' : 'none';
+        ctrlStyleWrap.style.display   = isText ? 'flex'  : 'none';
+        ctrlBgColorWrap.style.display = isGraf  ? 'block' : 'none';
+        if (isText) {
+            ctrlText.value  = el.content || '';
+            ctrlColor.value = _toHex6(el.color||'#000000');
+            ctrlBold.style.background = el.weight==='bold' ? '#471811' : '#fff';
+            ctrlBold.style.color      = el.weight==='bold' ? '#fff'    : '#333';
+            document.querySelectorAll('.align-btn').forEach(b => {
+                b.style.background = b.dataset.align===(el.align||'left') ? '#e8e8e8' : '#fff';
+            });
+        }
+        if (isGraf) ctrlBgColor.value = _toHex6(el.cor||'#000000');
+        const curPx = Math.round((el.font_size_pct||5)/100*canvasH);
+        ctrlSize.value = curPx; ctrlSizeVal.textContent = curPx;
+        ctrlX.value = +(el.x_pct||0).toFixed(1);
+        ctrlY.value = +(el.y_pct||0).toFixed(1);
+    }
+
+    // ── Listeners controles ────────────────────────────────────────────────
+    ctrlText.addEventListener('input', () => { if(selectedIdx===null)return; elements[selectedIdx].content=ctrlText.value; _renderAll(); });
+    ctrlSize.addEventListener('input', () => { if(selectedIdx===null)return; const px=+ctrlSize.value; ctrlSizeVal.textContent=px; elements[selectedIdx].font_size_pct=(px/canvasH*100); _renderAll(); });
+    ctrlColor.addEventListener('input', () => { if(selectedIdx===null)return; elements[selectedIdx].color=ctrlColor.value; _renderAll(); });
+    ctrlBgColor.addEventListener('input', () => { if(selectedIdx===null)return; elements[selectedIdx].cor=ctrlBgColor.value; _renderAll(); });
+    ctrlBold.addEventListener('click', () => { if(selectedIdx===null)return; const el=elements[selectedIdx]; el.weight=el.weight==='bold'?'regular':'bold'; _updatePanel(); _renderAll(); });
+    document.querySelectorAll('.align-btn').forEach(btn => {
+        btn.addEventListener('click', () => { if(selectedIdx===null)return; elements[selectedIdx].align=btn.dataset.align; _updatePanel(); _renderAll(); });
+    });
+    ctrlX.addEventListener('input', () => { if(selectedIdx===null)return; elements[selectedIdx].x_pct=+ctrlX.value; _renderAll(); });
+    ctrlY.addEventListener('input', () => { if(selectedIdx===null)return; elements[selectedIdx].y_pct=+ctrlY.value; _renderAll(); });
+
+    // ── Fechar ─────────────────────────────────────────────────────────────
+    function _saveElements(postId, els) {
+        if (!postId || !els || !els.length) return;
+        fetch(`/posts/${postId}/save-elements/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ elements: els }),
+        }).catch(() => {});
+    }
+    function closeModal() {
+        const pid = currentPostId;
+        const els = elements.slice();   // cópia antes de resetar
+        modal.style.display='none'; document.body.style.overflow=''; currentPostId=null; selectedIdx=null;
+        _saveElements(pid, els);        // fire-and-forget após fechar
+    }
+    document.getElementById('btnCloseArteFinal').addEventListener('click', closeModal);
+    document.getElementById('btnCloseArteFinal2').addEventListener('click', closeModal);
+    document.addEventListener('keydown', e => { if(e.key==='Escape' && modal.style.display!=='none') closeModal(); });
+
+    // ── Exportar PNG ───────────────────────────────────────────────────────
+    btnExport.addEventListener('click', async () => {
+        if (!currentPostId) return;
+        statusEl.textContent = 'Gerando PNG…';
+        btnExport.disabled = true;
+        try {
+            const resp = await fetch(`/posts/${currentPostId}/export-png/`, {
+                method:'POST', headers:{'X-CSRFToken':window.CSRF_TOKEN,'Content-Type':'application/json'},
+                body: JSON.stringify({ elements }),
+            });
+            if (!resp.ok) throw new Error('failed');
+            const blob = await resp.blob();
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href=url; a.download=`post-${currentPostId}-arte.png`; a.click();
+            URL.revokeObjectURL(url);
+            statusEl.textContent = 'PNG baixado!';
+        } catch(e) { statusEl.textContent = 'Erro ao gerar PNG.'; }
+        finally { btnExport.disabled=false; }
+    });
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    function _loadGoogleFont(family) {
+        if (!family || family==='serif') return;
+        const id = 'gf-'+family.replace(/\s/g,'-');
+        if (document.getElementById(id)) return;
+        const link = document.createElement('link');
+        link.id=id; link.rel='stylesheet';
+        link.href=`https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@300;400;700&display=swap`;
+        document.head.appendChild(link);
+    }
+    function _toHex6(c) {
+        if (/^#[0-9a-f]{6}$/i.test(c)) return c;
+        const d=document.createElement('div'); d.style.color=c; document.body.appendChild(d);
+        const v=getComputedStyle(d).color; document.body.removeChild(d);
+        const m=v.match(/\d+/g); if(!m) return '#000000';
+        return '#'+m.slice(0,3).map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
+    }
+})();
 </script>
 {% endblock %}

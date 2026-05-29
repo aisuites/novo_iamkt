@@ -558,6 +558,7 @@ select.form-input-filter:disabled {
 }
 
 .post-gallery button {
+  position: relative;
   border: 1px solid var(--posts-border);
   background: var(--posts-bg);
   border-radius: 10px;
@@ -580,6 +581,39 @@ select.form-input-filter:disabled {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* Botao X para remover miniatura (mesmo padrao do .btn-remove-reference do knowledge) */
+.btn-remove-image {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  background: rgba(193, 18, 58, 0.95);
+  color: #fff;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.post-gallery button:hover .btn-remove-image,
+.post-gallery button:focus-within .btn-remove-image {
+  opacity: 1;
+}
+
+.btn-remove-image:hover {
+  background: #c1123a;
+  transform: scale(1.08);
 }
 
 /* ========================================

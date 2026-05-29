@@ -67,12 +67,17 @@ def resolve_font_for_kb(
     # que casam, escolhe a VARIANTE pelo peso pedido (Bold/Light/Regular).
     uf = _strip_accents((usage_filter or '').lower())
     matched_list = [t for t in typographies if uf and uf in _strip_accents((t.usage or '').lower())]
-    if matched_list:
-        matched = _pick_by_weight(matched_list, weight)
-    else:
-        matched = typographies[0]
+    candidates = matched_list or typographies
 
-    return resolve_typography(matched, weight=weight)
+    # Ordena candidatos pelo peso pedido; tenta cada um até achar arquivo válido
+    preferred = _pick_by_weight(candidates, weight)
+    ordered = [preferred] + [t for t in candidates if t != preferred]
+    for t in ordered:
+        result = resolve_typography(t, weight=weight)
+        if result:
+            return result
+
+    return None
 
 
 def _strip_accents(s: str) -> str:
@@ -165,44 +170,65 @@ def _load_custom_font(custom_font) -> Optional[str]:
 
 
 def _load_google_font(family: str, weight: str) -> Optional[str]:
-    """Baixa TTF do Google Fonts via CSS API com UA Android 2.3.5."""
+    """Baixa TTF do Google Fonts via CSS API com UA Android 2.3.5.
+
+    Se o peso exato nao existir na familia, tenta pesos proximos (mesma fonte)
+    antes de desistir — preserva a familia cadastrada na KB.
+    Ordem de fallback: peso solicitado → vizinhos mais proximos → 400.
+    """
     family_clean = (family or '').strip()
     if not family_clean:
         return None
 
     weight_norm = _normalize_weight(weight)
-    weight_num = WEIGHT_TO_NUMERIC.get(weight_norm, '400')
-    safe = family_clean.lower().replace(' ', '_')
-    cache_path = FONTS_CACHE_DIR / f'gf_{safe}_{weight_num}.ttf'
-    if cache_path.exists() and cache_path.stat().st_size > 0:
-        return str(cache_path)
+    requested_num = int(WEIGHT_TO_NUMERIC.get(weight_norm, '400'))
+
+    # Gera sequencia de pesos para tentar: solicitado primeiro, depois vizinhos
+    all_nums = [100, 200, 300, 400, 500, 600, 700, 800, 900]
+    candidates = sorted(all_nums, key=lambda w: (abs(w - requested_num), w))
 
     family_url = family_clean.replace(' ', '+')
-    css_url = (
-        f'https://fonts.googleapis.com/css2?family={family_url}'
-        f':wght@{weight_num}&display=swap'
-    )
-    try:
-        req = urllib.request.Request(
-            css_url,
-            headers={
-                # UA Android 2.3.5: forca Google Fonts a servir TTF (nao WOFF2)
-                'User-Agent': 'Mozilla/5.0 (Linux; U; Android 2.3.5)',
-            },
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            css = resp.read().decode('utf-8', errors='ignore')
-    except Exception as exc:
-        logger.warning('Falha CSS Google Fonts %s: %s', css_url, exc)
-        return None
+    safe = family_clean.lower().replace(' ', '_')
 
-    m = re.search(r'url\((https://fonts\.gstatic\.com/[^)]+?\.ttf)\)', css)
-    if not m:
-        logger.warning('TTF URL nao achada no CSS de %s (peso %s)', family_clean, weight)
-        return None
-    if not _download(m.group(1), cache_path):
-        return None
-    return str(cache_path)
+    for num in candidates:
+        cache_path = FONTS_CACHE_DIR / f'gf_{safe}_{num}.ttf'
+        if cache_path.exists() and cache_path.stat().st_size > 0:
+            if num != requested_num:
+                logger.info('Google Font %s: peso %d nao existe, usando %d do cache', family_clean, requested_num, num)
+            return str(cache_path)
+
+        css_url = (
+            f'https://fonts.googleapis.com/css2?family={family_url}'
+            f':wght@{num}&display=swap'
+        )
+        try:
+            req = urllib.request.Request(
+                css_url,
+                headers={
+                    # UA Android 2.3.5: forca Google Fonts a servir TTF (nao WOFF2)
+                    'User-Agent': 'Mozilla/5.0 (Linux; U; Android 2.3.5)',
+                },
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                css = resp.read().decode('utf-8', errors='ignore')
+        except Exception as exc:
+            logger.debug('Google Font %s peso %d indisponivel: %s', family_clean, num, exc)
+            continue
+
+        m = re.search(r'url\((https://fonts\.gstatic\.com/[^)]+?\.ttf)\)', css)
+        if not m:
+            logger.debug('TTF URL nao achada no CSS de %s peso %d', family_clean, num)
+            continue
+
+        if not _download(m.group(1), cache_path):
+            continue
+
+        if num != requested_num:
+            logger.info('Google Font %s: peso %d indisponivel, usando %d', family_clean, requested_num, num)
+        return str(cache_path)
+
+    logger.warning('Google Font %s: nenhum peso disponivel', family_clean)
+    return None
 
 
 def _normalize_weight(weight: str) -> str:

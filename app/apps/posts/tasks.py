@@ -57,6 +57,23 @@ def generate_post_text_task(self, post_id: int):
     post.status = 'generating'
     post.save(update_fields=['status'])
 
+    # ============================================================
+    # PIPELINE 2-AGENTES (copywriter + designer-orquestrador)
+    # Coexiste com o pipeline antigo via env POST_USE_NEW_PIPELINE.
+    # ============================================================
+    import os as _os_env
+    use_new_pipeline = _os_env.environ.get(
+        'POST_USE_NEW_PIPELINE', '').lower() in ('1', 'true', 'yes')
+    if use_new_pipeline:
+        try:
+            return _run_new_pipeline_phase1(post)
+        except Exception:
+            logger.exception(
+                '[posts.local] pipeline novo falhou no post %s — '
+                'caindo no pipeline antigo (fallback)', post_id,
+            )
+            # cai pro pipeline antigo abaixo
+
     # Resumo da KB (igual ao fallback do N8N)
     kb_summary = _build_kb_summary(post.organization)
 
@@ -336,17 +353,108 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     brand_keywords = _brand_keywords_from_kb(kb)
 
     # ============================================================
+    # PIPELINE NOVO (2 agentes): se POST_USE_NEW_PIPELINE=true E post tem
+    # designer_payload preenchido pela Fase 1 nova, usa diretamente o plano
+    # do designer. Pula o orquestrador velho.
+    # ============================================================
+    use_new_pipeline = _os.environ.get(
+        'POST_USE_NEW_PIPELINE', '').lower() in ('1', 'true', 'yes')
+    spatial_instructions = ''
+    layout_document = None
+    orchestrator_image_prompt = ''
+    orchestration_output = None
+
+    # ── Pipeline novo — caminho preferencial quando Fase 1 rodou ──────────────
+    # Usa prompt_designer (prompt Gemini) + layout_engine (elementos Pillow).
+    # Ativado quando copy_payload tem _strategic_payload (Fase 1 nova).
+    if use_new_pipeline and (post.copy_payload or {}).get('_strategic_payload'):
+        try:
+            from apps.posts.services.prompt_designer import build_prompt as _build_img_prompt
+            from apps.posts.services.layout_engine import build_elements as _build_elements
+
+            _sp = post.copy_payload['_strategic_payload']
+            _cp = post.copy_payload
+            _canvas_w, _canvas_h = _parse_formato_px(formato_px)
+
+            # 1. Prompt Gemini via prompt_designer
+            _prompt_result = _build_img_prompt(
+                strategic_payload=_sp,
+                copy_payload=_cp,
+                canvas_w=_canvas_w,
+                canvas_h=_canvas_h,
+                kb_dossiers=kb_dossiers,
+            )
+            if _prompt_result:
+                orchestrator_image_prompt = _prompt_result.get('prompt', '')
+
+            # 2. Elementos de layout via layout_engine
+            _pillow_kw = _prepare_pillow_overlay(post, kb, formato_px)
+            _font_map = {
+                'titulo':    _pillow_kw.get('pillow_title_font_path'),
+                'subtitulo': _pillow_kw.get('pillow_subtitle_font_path'),
+                'cta':       _pillow_kw.get('pillow_title_font_path'),
+            }
+            _bg_color = _dominant_bg_from_dossiers(kb_dossiers)
+            _modal_for_engine = {'logo_position': ctx.get('logo_position') or 'bottom-right'}
+            _elements = _build_elements(
+                strategic_payload=_sp,
+                copy_payload=_cp,
+                canvas_w=_canvas_w,
+                canvas_h=_canvas_h,
+                paleta=paleta,
+                fonts=_font_map,
+                modal_choices=_modal_for_engine,
+                bg_color=_bg_color,
+            )
+            layout_document = {'elements': _elements}
+            pillow_kwargs = {**_pillow_kw}
+            # Persiste elementos para o overlay HTML do frontend
+            _dp = post.designer_payload or {}
+            _dp['_layout_elements'] = _elements
+            post.designer_payload = _dp
+            post.save(update_fields=['designer_payload'])
+            text_render_mode = 'pillow'
+            orchestration_output = {
+                'image_prompt_final': orchestrator_image_prompt,
+                'layout_document': layout_document,
+                'text_render_mode': 'pillow',
+                '_from': 'layout_engine',
+            }
+            logger.info(
+                '[posts.local][new] layout_engine: %d elementos bg=%s prompt=%d chars',
+                len(_elements), _bg_color or 'auto', len(orchestrator_image_prompt),
+            )
+        except Exception:
+            logger.exception('[posts.local][new] layout_engine falhou — fallback designer_payload')
+            layout_document = None
+            orchestration_output = None
+
+    # Fallback: designer_payload com wireframe_plan (caminho antigo)
+    if use_new_pipeline and layout_document is None and (post.designer_payload or {}).get('wireframe_plan'):
+        layout_document, orchestrator_image_prompt = _consume_designer_payload(
+            post, references, ctx,
+        )
+        orchestration_output = {
+            'image_prompt_final': orchestrator_image_prompt,
+            'layout_document': layout_document,
+            'text_render_mode': 'pillow',
+            '_from': 'designer_agent',
+        }
+        text_render_mode = 'pillow'
+        logger.info(
+            '[posts.local][new] usando designer_payload (%d elementos)',
+            len(layout_document.get('elements', [])),
+        )
+
+    # ============================================================
     # ORCHESTRATOR — analisa briefing + imagens e produz prompt otimizado
     # + layout_plan + spatial_instructions
     # ============================================================
     orchestrator_disabled = _os.environ.get('POST_DISABLE_ORCHESTRATOR', '').lower() in ('1', 'true', 'yes')
-    orchestration_output = None
-    spatial_instructions = ''
-    layout_document = None
-    orchestrator_image_prompt = ''  # image_prompt_final do orquestrador (vai pro Gemini)
+    # Pula orquestrador velho se o pipeline novo ja produziu plano
     # Orchestrator roda quando ha imagens (logos/uploads) OU dossies de refs
     # da KB selecionadas — ele e quem filtra os dossies pela intencao do user.
-    if not orchestrator_disabled and (references or kb_dossiers):
+    if not orchestrator_disabled and (references or kb_dossiers) and not layout_document:
         try:
             from apps.posts.services.post_orchestrator import orchestrate_post
             aspect = (post.post_format.aspect_ratio if post.post_format else '') or ''
@@ -1519,10 +1627,19 @@ def _collect_kb_dossiers(kb, post) -> list:
     )
     for ref in refs:
         aspects = _aspects_for_ref(reference_aspects, ref.id)
-        # Aspecto 'produto': a ref e enviada como IMAGEM ao Gemini
-        # (_collect_references), NAO vira dossie de texto — preserva fidelidade.
-        # So pula o dossie se 'produto' for o UNICO aspecto.
+        # Aspecto 'produto': a ref vai como IMAGEM ao Gemini mas sua analise
+        # visual ja foi feita — passa o resumo ao strategist como descricao
+        # do produto (nao como dossie de composicao).
         if aspects == ['produto']:
+            if ref.analysis_status == 'completed' and ref.visual_analysis:
+                dossier = ref.visual_analysis if isinstance(ref.visual_analysis, dict) else {}
+                if dossier:
+                    out.append({
+                        'id': ref.id,
+                        'aspects': ['produto'],
+                        'usage_description': (getattr(ref, 'usage_description', '') or '').strip(),
+                        'dossier': dossier,
+                    })
             continue
         # Gatilho 3 — fallback inline: analisa e persiste se faltar dossie
         if ref.analysis_status != 'completed' or not ref.visual_analysis:
@@ -1730,3 +1847,257 @@ def _record_ai_usage(post, *, step: str, model: str, usage_dict: dict,
         entry['input_tokens'], entry['output_tokens'], entry['images_generated'],
         entry['cost_usd'], entry['cost_brl'],
     )
+
+
+# ============================================================
+# PIPELINE NOVO — 2 agentes (copywriter + designer-orquestrador)
+# Roda quando POST_USE_NEW_PIPELINE=true.
+# ============================================================
+
+def _run_new_pipeline_phase1(post):
+    """Phase 1 do pipeline novo (3 agentes): strategist → copywriter → designer.
+    Salva strategic_payload + copy_payload + designer_payload + wireframe_png.
+    Mantém os campos legados (title/subtitle/cta/caption/image_prompt) preenchidos
+    pra UI funcionar.
+    """
+    from apps.posts.services.strategist_agent import generate_strategy
+    from apps.posts.services.copywriter_agent import generate_copy
+    from apps.posts.services.designer_agent import generate_design
+    from apps.posts.services.designer_payload_adapter import (
+        render_wireframe_png, AssetResolver,
+    )
+
+    logger.info('[posts.local][new] phase1 iniciada post=%s', post.id)
+
+    kb_summary = _build_kb_summary(post.organization)
+    paleta = _kb_colors(_get_kb(post))
+    tipografia = _kb_typography(_get_kb(post))
+
+    references = _collect_references(
+        kb=_get_kb(post), post=post, text_render_mode='pillow',
+    )
+    kb_dossiers = _collect_kb_dossiers(kb=_get_kb(post), post=post)
+    ctx = post.local_pipeline_context or {}
+    modal_choices = {
+        'logo_position': ctx.get('logo_position') or '',
+        'reference_aspects': ctx.get('reference_aspects') or {},
+        'selected_logo_ids': ctx.get('selected_logo_ids') or [],
+        'selected_reference_ids': ctx.get('selected_reference_ids') or [],
+    }
+
+    # ---- 1º STRATEGIST ----
+    strategy_result = generate_strategy(
+        post=post, kb_summary=kb_summary, references=references,
+        modal_choices=modal_choices,
+        paleta=paleta, tipografia=tipografia,
+        kb_dossiers=kb_dossiers,
+    )
+    if not strategy_result:
+        logger.error('[posts.local][new] strategist falhou')
+        raise RuntimeError('strategist agent retornou None')
+
+    strategic_payload = strategy_result['payload']
+    if not isinstance(post.copy_payload, dict):
+        post.copy_payload = {}
+    post.copy_payload = {
+        **(post.copy_payload or {}),
+        '_strategic_payload': strategic_payload,
+    }
+    _record_ai_usage(
+        post, step='text_generation', model=strategy_result['model'],
+        usage_dict=strategy_result['usage'], purpose='strategist_phase1a',
+    )
+
+    blockers = [
+        f for f in (strategic_payload.get('flags') or [])
+        if f.get('type') == 'blocker'
+    ]
+    if blockers:
+        logger.warning(
+            '[posts.local][new] strategist emitiu %d blockers: %s',
+            len(blockers), [b.get('message', '?')[:60] for b in blockers],
+        )
+
+    copy_direction = strategic_payload.get('copy_direction') or {}
+
+    # ---- 2º COPYWRITER (recebe copy_direction do strategist) ----
+    copy_result = generate_copy(
+        post=post, kb_summary=kb_summary, references=references,
+        copy_direction=copy_direction,
+    )
+    if not copy_result:
+        logger.error('[posts.local][new] copywriter falhou')
+        raise RuntimeError('copywriter agent retornou None')
+
+    copy_payload = copy_result['payload']
+    post.copy_payload = {
+        **copy_payload,
+        '_strategic_payload': strategic_payload,
+    }
+    _record_ai_usage(
+        post, step='text_generation', model=copy_result['model'],
+        usage_dict=copy_result['usage'], purpose='copywriter_phase1b',
+    )
+
+    variant = _pick_copy_variant(copy_payload)
+    if variant:
+        copy = variant.get('copy') or {}
+        post.title = copy.get('headline', '') or ''
+        post.subtitle = _first_sentence(copy.get('body', '')) or ''
+        post.cta = copy.get('cta', '') or ''
+        post.caption = copy.get('body', '') or ''
+        hashtags = copy.get('hashtags') or []
+        post.hashtags = [
+            h if str(h).startswith('#') else f'#{str(h).lstrip("#").strip()}'
+            for h in hashtags if h
+        ]
+
+    # ---- 3º DESIGNER (recebe strategic_payload + copy_payload) ----
+    designer_result = generate_design(
+        post=post, copy_payload=copy_payload, kb_summary=kb_summary,
+        paleta=paleta, tipografia=tipografia, references=references,
+        kb_dossiers=kb_dossiers, modal_choices=modal_choices,
+        strategic_payload=strategic_payload,
+    )
+    if not designer_result:
+        logger.error('[posts.local][new] designer falhou — segue só com copy')
+        post.status = 'pending'
+        post.ia_provider = 'anthropic'
+        post.ia_model_text = copy_result['model']
+        post.save()
+        return {'success': True, 'post_id': post.id, 'phase': 'copy_only'}
+
+    designer_payload = designer_result['payload']
+    post.designer_payload = designer_payload
+    _record_ai_usage(
+        post, step='text_generation', model=designer_result['model'],
+        usage_dict=designer_result['usage'], purpose='designer_phase1c',
+    )
+
+    image_prompts = designer_payload.get('image_prompts') or []
+    if image_prompts:
+        post.image_prompt = image_prompts[0].get('prompt', '')
+
+    try:
+        meta = designer_payload.get('designer_meta') or {}
+        dims = meta.get('dimensions_px') or {}
+        canvas_w = int(dims.get('width') or
+                       (post.post_format.width if post.post_format else 1080))
+        canvas_h = int(dims.get('height') or
+                       (post.post_format.height if post.post_format else 1080))
+        png_bytes = render_wireframe_png(designer_payload, canvas_w, canvas_h)
+        wf_key, wf_url = _upload_image_to_s3(
+            org_id=post.organization.id, post_id=post.id,
+            png_bytes=png_bytes, mime_type='image/png',
+        )
+        post.wireframe_s3_key = wf_key
+        post.wireframe_s3_url = wf_url
+        logger.info(
+            '[posts.local][new] wireframe_png salvo: %s (%d bytes)',
+            wf_key, len(png_bytes),
+        )
+    except Exception:
+        logger.exception('[posts.local][new] falha gerar wireframe_png')
+
+    post.ia_provider = 'anthropic'
+    post.ia_model_text = copy_result['model']
+    post.status = 'pending'
+    post.save()
+
+    strat_cost = strategy_result['usage'].get('cost_usd', 0)
+    copy_cost = copy_result['usage'].get('cost_usd', 0)
+    design_cost = designer_result['usage'].get('cost_usd', 0)
+    logger.info(
+        '[posts.local][new] phase1 OK post=%s strat=$%.4f copy=$%.4f '
+        'design=$%.4f total=$%.4f intent=%s img_style=%s',
+        post.id, strat_cost, copy_cost, design_cost,
+        strat_cost + copy_cost + design_cost,
+        (strategic_payload.get('intention') or {}).get('primary', '?'),
+        (strategic_payload.get('visual_direction') or {}).get('image_style', '?'),
+    )
+    return {
+        'success': True, 'post_id': post.id, 'phase': 'phase1_complete',
+        'designer_iterations': designer_result.get('iterations', 1),
+        'intent': (strategic_payload.get('intention') or {}).get('primary'),
+        'image_style': (strategic_payload.get('visual_direction') or {}).get('image_style'),
+    }
+
+
+def _get_kb(post):
+    from apps.knowledge.models import KnowledgeBase
+    return KnowledgeBase.objects.filter(organization=post.organization).first()
+
+
+def _pick_copy_variant(copy_payload: dict) -> dict:
+    """Retorna a variant recomendada (ou v1 fallback)."""
+    if not isinstance(copy_payload, dict):
+        return {}
+    variants = copy_payload.get('variants') or []
+    if not variants:
+        return {}
+    rec_id = copy_payload.get('recommended_variant') or 'v1'
+    for v in variants:
+        if v.get('id') == rec_id:
+            return v
+    return variants[0]
+
+
+def _first_sentence(text: str) -> str:
+    """Primeiro fragmento curto pra preencher post.subtitle."""
+    if not text:
+        return ''
+    s = text.strip().split('\n')[0]
+    if len(s) > 120:
+        s = s[:117].rsplit(' ', 1)[0] + '...'
+    return s
+
+
+def _consume_designer_payload(post, references, ctx):
+    """Adapta o designer_payload (px-based, asset_path lógico) ao formato que
+    o renderer iamkt entende. Retorna (layout_document, image_prompt)."""
+    from apps.posts.services.designer_payload_adapter import (
+        wireframe_plan_to_layout_document, AssetResolver,
+    )
+
+    designer_payload = post.designer_payload or {}
+    meta = designer_payload.get('designer_meta') or {}
+    dims = meta.get('dimensions_px') or {}
+    canvas_w = int(dims.get('width') or
+                   (post.post_format.width if post.post_format else 1080))
+    canvas_h = int(dims.get('height') or
+                   (post.post_format.height if post.post_format else 1080))
+
+    asset_resolver = AssetResolver(post=post, ctx=ctx, references=references)
+    layout_document = wireframe_plan_to_layout_document(
+        designer_payload, canvas_w, canvas_h, asset_resolver=asset_resolver,
+    )
+
+    # image_prompt principal pro Gemini (primeiro do array)
+    image_prompts = designer_payload.get('image_prompts') or []
+    image_prompt = ''
+    if image_prompts:
+        image_prompt = image_prompts[0].get('prompt', '')
+
+    return layout_document, image_prompt
+
+
+def _parse_formato_px(formato_px: str):
+    """'1080x1080' → (1080, 1080)."""
+    try:
+        w, h = formato_px.split('x')
+        return int(w), int(h)
+    except Exception:
+        return 1080, 1080
+
+
+def _dominant_bg_from_dossiers(kb_dossiers: list) -> str:
+    """Extrai a cor dominante (papel='dominante') da paleta_observada do primeiro
+    dossie de referencia. Usado para contraste do subtitulo no layout_engine."""
+    for d in (kb_dossiers or []):
+        if 'produto' in (d.get('aspects') or []):
+            continue
+        dossier = d.get('dossier') or {}
+        for c in (dossier.get('paleta_observada') or []):
+            if c.get('papel') == 'dominante':
+                return c.get('hex') or ''
+    return ''

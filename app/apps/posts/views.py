@@ -49,14 +49,17 @@ def posts_list(request):
     posts_json = []
     for post in posts.prefetch_related('images', 'change_requests').order_by('-created_at'):
         try:
-            # Buscar imagens do post (enviar s3_keys para usar com lazyload)
+            # Buscar imagens do post (id + s3_key para lazyload + delete)
             post_images = post.images.all().order_by('order')
-            imagens_keys = [img.s3_key for img in post_images if img.s3_key]
-            
+            imagens_data = [
+                {'id': img.id, 's3_key': img.s3_key}
+                for img in post_images if img.s3_key
+            ]
+
             # Calcular imageStatus baseado no status do post e se tem imagens
             if post.status == 'image_generating':
                 image_status = 'generating'
-            elif post.status == 'image_ready' or (imagens_keys and post.status in ['approved', 'pending']):
+            elif post.status == 'image_ready' or (imagens_data and post.status in ['approved', 'pending']):
                 image_status = 'ready'
             else:
                 image_status = 'none'
@@ -86,7 +89,7 @@ def posts_list(request):
                 'qtdImagens': int(post.image_count) if post.is_carousel else 1,
                 'created_at': post.created_at.isoformat() if post.created_at else '',
                 'has_image': bool(post.has_image),
-                'imagens': imagens_keys,
+                'imagens': imagens_data,
                 'imageStatus': image_status,
                 'imageChanges': image_changes,
                 'maxImageRevisions': max_image_revisions,

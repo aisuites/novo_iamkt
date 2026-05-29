@@ -1233,12 +1233,16 @@
     if (post.imageStatus === 'ready' && post.imagens && post.imagens.length) {
       const index = Math.max(0, Math.min(post.imagens.length - 1, post.activeImageIndex || 0));
       post.activeImageIndex = index;
-      
+
+      // post.imagens vem como [{id, s3_key}] do backend (suporta legacy: array de strings)
+      const _keyOf = (item) => (item && typeof item === 'object') ? item.s3_key : item;
+      const _idOf  = (item) => (item && typeof item === 'object') ? item.id : null;
+
       // Mostrar imagem principal com lazyload
       dom.postImageFrame.style.position = 'relative';
       const img = document.createElement('img');
       img.src = '#';
-      img.setAttribute('data-lazy-load', post.imagens[index]);
+      img.setAttribute('data-lazy-load', _keyOf(post.imagens[index]));
       img.alt = `Pré-visualização da imagem ${index + 1}`;
       dom.postImageFrame.appendChild(img);
 
@@ -1250,7 +1254,7 @@
       dlBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
       dlBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const s3Key = post.imagens[post.activeImageIndex || 0];
+        const s3Key = _keyOf(post.imagens[post.activeImageIndex || 0]);
         try {
           dlBtn.style.opacity = '0.5';
           dlBtn.style.pointerEvents = 'none';
@@ -1284,28 +1288,52 @@
       // Galeria de miniaturas (se houver múltiplas imagens)
       if (post.imagens.length > 1 && dom.postGallery) {
         dom.postGallery.hidden = false;
-        post.imagens.forEach((s3Key, idx) => {
+        dom.postGallery.innerHTML = '';
+        const postServerId = post.serverId || post.id;
+        post.imagens.forEach((item, idx) => {
+          const s3Key   = _keyOf(item);
+          const imageId = _idOf(item);
+
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'gallery-thumb';
           if (idx === index) btn.classList.add('active');
-          
+          btn.dataset.imageIndex = idx;
+          if (imageId != null) btn.dataset.imageId = imageId;
+          if (s3Key) btn.dataset.s3Key = s3Key;
+
           const thumb = document.createElement('img');
           thumb.src = '#';
           thumb.setAttribute('data-lazy-load', s3Key);
           thumb.alt = `Miniatura ${idx + 1}`;
           btn.appendChild(thumb);
-          
+
+          // Botao X para deletar (so se tiver imageId — sem id nao da pra apagar)
+          if (imageId != null) {
+            const x = document.createElement('span');
+            x.className = 'btn-remove-image';
+            x.dataset.action = 'remove-post-image';
+            x.dataset.postId = postServerId;
+            x.dataset.imageId = imageId;
+            x.title = 'Remover imagem';
+            x.setAttribute('role', 'button');
+            x.tabIndex = 0;
+            x.innerHTML = '&times;';
+            btn.appendChild(x);
+          }
+
           // Ativar lazyload para miniatura
           if (window.postsImageLoader) {
             window.postsImageLoader.observe(thumb);
           }
-          
-          btn.addEventListener('click', () => {
+
+          btn.addEventListener('click', (e) => {
+            // Click no X nao deve trocar a imagem ativa
+            if (e.target.closest('.btn-remove-image')) return;
             post.activeImageIndex = idx;
             updatePostVisual(post);
           });
-          
+
           dom.postGallery.appendChild(btn);
         });
       }
@@ -1337,10 +1365,20 @@
           });
           dom.postImageActions.appendChild(btn);
         }
+
+        // Botão "Ver arte final" — abre modal HTML overlay (novo pipeline)
+        const btnArteFinal = document.createElement('button');
+        btnArteFinal.type = 'button';
+        btnArteFinal.className = 'btn ghost';
+        btnArteFinal.textContent = 'Ver arte final';
+        btnArteFinal.addEventListener('click', () => {
+          if (typeof openArteFinal === 'function') openArteFinal(post.serverId || post.id);
+        });
+        dom.postImageActions.appendChild(btnArteFinal);
       }
       return;
     }
-    
+
     // Imagem gerando
     if (post.imageStatus === 'generating') {
       const span = document.createElement('span');
@@ -2787,6 +2825,68 @@
       return out;
     },
   };
+
+  /**
+   * Delete de miniatura — handler global delegated.
+   * Reusa showConfirm (confirm-modal.js) e o endpoint
+   * DELETE /posts/<post_id>/images/<image_id>/delete/ (views_actions.delete_post_image).
+   */
+  document.addEventListener('click', async (e) => {
+    const target = e.target.closest('[data-action="remove-post-image"]');
+    if (!target) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const postId  = target.dataset.postId;
+    const imageId = target.dataset.imageId;
+    if (!postId || !imageId) return;
+
+    const confirmed = typeof window.showConfirm === 'function'
+      ? await window.showConfirm(
+          'Esta acao nao pode ser desfeita. A imagem sera removida permanentemente.',
+          'Remover imagem?'
+        )
+      : window.confirm('Remover esta imagem? Acao irreversivel.');
+    if (!confirmed) return;
+
+    try {
+      const resp = await fetch(`/posts/${postId}/images/${imageId}/delete/`, {
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': CSRF_TOKEN },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) {
+        // Atualiza state em memoria e re-renderiza esse post
+        const post = (postsState && Array.isArray(postsState.items) ? postsState.items : [])
+          .find((p) => String(p.serverId || p.id) === String(postId));
+        if (post && Array.isArray(post.imagens)) {
+          post.imagens = post.imagens.filter((it) => {
+            const id = (it && typeof it === 'object') ? it.id : null;
+            return String(id) !== String(imageId);
+          });
+          // Mantem activeImageIndex valido
+          if (post.activeImageIndex >= post.imagens.length) {
+            post.activeImageIndex = Math.max(0, post.imagens.length - 1);
+          }
+          if (!post.imagens.length) {
+            post.imageStatus = 'none';
+            post.has_image = false;
+          }
+          updatePostVisual(post);
+        } else {
+          // fallback: reload pagina se o state nao bate
+          window.location.reload();
+        }
+        if (window.toaster) toaster.success('Imagem removida.');
+      } else {
+        const msg = (data && data.error) || 'Erro ao remover imagem.';
+        if (window.toaster) toaster.error(msg); else alert(msg);
+      }
+    } catch (err) {
+      logger.error('[posts] delete image falhou', err);
+      if (window.toaster) toaster.error('Erro ao remover imagem.');
+    }
+  });
 
   // Bootstrap: carrega galerias e ativa lightbox
   attachLightboxHandlers();

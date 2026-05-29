@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, views_upload, views_gerar, views_gerar_local, views_actions, views_webhook, views_api
+from . import views, views_upload, views_gerar, views_gerar_local, views_actions, views_webhook, views_api, views_overlay
 
 app_name = 'posts'
 
@@ -33,4 +33,10 @@ urlpatterns = [
     path('<int:post_id>/request-text-change/', views_actions.request_text_change, name='request_text_change'),
     path('<int:post_id>/request-image-change/', views_actions.request_image_change, name='request_image_change'),
     path('<int:post_id>/edit/', views_actions.edit_post, name='edit'),
+    path('<int:post_id>/images/<int:image_id>/delete/', views_actions.delete_post_image, name='delete_image'),
+
+    # HTML Overlay — preview com textos + export PNG
+    path('<int:post_id>/overlay-data/', views_overlay.overlay_data, name='overlay_data'),
+    path('<int:post_id>/export-png/', views_overlay.export_png, name='export_png'),
+    path('<int:post_id>/save-elements/', views_overlay.save_elements, name='save_elements'),
 ]

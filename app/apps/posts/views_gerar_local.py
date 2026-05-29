@@ -173,6 +173,8 @@ def gerar_post_local(request):
                 ia_provider='anthropic',
                 ia_model_text='claude-sonnet-4-5',
                 pipeline_used='local',
+                copy_payload={},
+                designer_payload={},
                 local_pipeline_context={
                     'selected_logo_ids': list(selected_logo_ids or []),
                     'selected_reference_ids': list(selected_reference_ids or []),

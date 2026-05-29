@@ -349,6 +349,30 @@ class Post(models.Model):
         verbose_name='Chave S3 da imagem raw'
     )
 
+    # ============================================================
+    # PIPELINE 2-AGENTES (copywriter + designer) — coexiste com pipeline antigo
+    # via env POST_USE_NEW_PIPELINE. Default off.
+    # ============================================================
+    copy_payload = models.JSONField(
+        default=dict, blank=True,
+        verbose_name='Payload do copywriter agent',
+        help_text='Output do copywriter: variants, recommended_variant, design_hints, metrics'
+    )
+    designer_payload = models.JSONField(
+        default=dict, blank=True,
+        verbose_name='Payload do designer agent',
+        help_text='Output do designer: wireframe_plan, image_prompts, approval, flags'
+    )
+    wireframe_s3_url = models.URLField(
+        max_length=1000, blank=True,
+        verbose_name='URL S3 do wireframe PNG',
+        help_text='Preview visual do plano antes do Gemini — base do canvas editavel'
+    )
+    wireframe_s3_key = models.CharField(
+        max_length=500, blank=True,
+        verbose_name='Chave S3 do wireframe PNG'
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')

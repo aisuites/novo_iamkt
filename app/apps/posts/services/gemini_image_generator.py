@@ -309,6 +309,8 @@ def _normalize_tipo(tipo: str) -> str:
         return 'fundo'
     if 'icone' in t or 'ícone' in t:
         return 'icone'
+    if 'referencia_layout' in t or 'layout' in t:
+        return 'referencia_layout'
     if 'refer' in t:
         return 'referencia'
     return t or 'desconhecido'
@@ -387,7 +389,8 @@ def _build_role_label_en(tipo_norm: str, usage_desc: str = '') -> tuple:
     Retorna (LABEL_INGLES, FIDELITY_RULE_INGLES) baseado no tipo normalizado.
     Usado em modos pillow/sanitized para prompt hibrido (EN + PT).
     """
-    desc_extra = f' (user note: "{usage_desc}")' if usage_desc else ''
+    # referencia_layout: brief vai em bloco separado, não inline — ver _build_reference_roles_en_block
+    desc_extra = f' (user note: "{usage_desc}")' if (usage_desc and tipo_norm != 'referencia_layout') else ''
     mapping = {
         'logo': (
             'BRAND LOGO',
@@ -426,6 +429,13 @@ def _build_role_label_en(tipo_norm: str, usage_desc: str = '') -> tuple:
             'use as inspiration for photography style, lighting and mood ONLY '
             '— do not copy any specific element or text',
         ),
+        'referencia_layout': (
+            'GRAPHIC & LAYOUT REFERENCE',
+            'replicate the GRAPHIC ELEMENTS (shapes, colors, positions) from '
+            'this image exactly as described in the brief below — the geometric '
+            'decorative elements must appear in the final image. '
+            'Do not copy people, products, or any visible text from this image',
+        ),
     }
     label, rule = mapping.get(tipo_norm, ('REFERENCE', 'use as visual reference'))
     return label, rule + desc_extra
@@ -455,6 +465,11 @@ def _build_reference_roles_en_block(sorted_refs: List[Dict[str, Any]]) -> str:
         if type_counts[tipo_norm] > 1:
             suffix = f' #{running[tipo_norm]}/{type_counts[tipo_norm]}'
         lines.append(f'Image {i} ({label}{suffix}): {rule}.')
+        # referencia_layout: brief dos grafismos em bloco dedicado, não como parêntese
+        if tipo_norm == 'referencia_layout' and usage_desc:
+            lines.append(f'  MANDATORY BRIEF FOR Image {i} — read and apply with full fidelity:')
+            for brief_line in usage_desc.splitlines():
+                lines.append(f'  {brief_line}')
     return '\n'.join(lines)
 
 
@@ -471,7 +486,8 @@ def _build_fidelity_block_en(sorted_refs: List[Dict[str, Any]]) -> str:
         f'All {n} referenced items must appear clearly and SIMULTANEOUSLY in '
         'the final frame. Do not merge, stylize, replace, or omit any '
         'referenced element. Product labels and brand details must remain '
-        'legible. Any human face must match the reference exactly.',
+        'legible. Graphic elements (shapes, patterns, decorative assets) '
+        'must match the GRAPHIC & LAYOUT REFERENCE exactly.',
         '',
         'AVOID / EVITE: altered product, different bag/accessory, generated face, '
         'similar-but-not-identical model, merged elements, stylized objects, '
@@ -720,11 +736,33 @@ def _build_prompt_text(
             # Modo verboso anterior (compatibilidade com posts sem inline
             # anchoring na SCENE) — mantem REFERENCE ROLES, USER GUIDANCE,
             # REFERENCE-DERIVED DIRECTIVES, COMBINACAO e TASK.
+
+            # Bloco de reforço para refs de grafismo: instrui o Gemini a examinar
+            # a imagem física antes de gerar, garantindo replicação fiel.
+            _grafismo_reinforcement = ''
+            _layout_refs = [(i, r) for i, r in enumerate(sorted_refs, 1)
+                            if _normalize_tipo(str(r.get('tipo','')).lower()) == 'referencia_layout']
+            if _layout_refs:
+                lines_rf = ['[PRE-GENERATION — MANDATORY STEP]',
+                            'Before generating anything: carefully examine the following attached image(s):']
+                for idx, ref in _layout_refs:
+                    lines_rf.append(
+                        f'  → Image {idx} (GRAPHIC & LAYOUT REFERENCE): '
+                        f'study every graphic element visible — exact shape, color, position and style.'
+                    )
+                lines_rf.extend([
+                    'These graphic elements MUST appear in your output exactly as you observe them '
+                    'in the attached image(s). Do not invent, approximate or relocate them.',
+                    'Replicate what you SEE in the image, reinforced by the brief in [REFERENCE ROLES].',
+                ])
+                _grafismo_reinforcement = '\n'.join(lines_rf)
+
             parts = [
                 '[TASK]',
                 'Create a professional photograph for a social media post.',
                 '',
                 _build_reference_roles_en_block(sorted_refs),
+                _grafismo_reinforcement,
                 user_guidance_block_en,
                 kb_directives_block_en,
                 combination_rules,
@@ -760,32 +798,9 @@ def _build_prompt_text(
             'para texto/logo, e NAO desenhe texto ou logo.',
         ])
 
-    # === EXPERIMENT: bloco LAYOUT REFERENCE (start) ===
-    # Lista as refs com tipo='referencia_layout' (anexadas pela tasks.py) com
-    # instrucoes deterministicas. Facil reverter: delete entre os marcadores.
-    _layout_ref_lines = []
-    for _i, _ref in enumerate(sorted_refs, 1):
-        if str(_ref.get('tipo', '')).lower() == 'referencia_layout':
-            _u = (_ref.get('usage_description') or '').strip()
-            if _u:
-                _layout_ref_lines.append(f'IMAGE {_i} (LAYOUT REFERENCE): {_u}')
-    if _layout_ref_lines:
-        parts.extend([
-            '',
-            '[LAYOUT REFERENCE — replicate the STRUCTURE only]',
-            'A IMAGEM(NS) abaixo e a referencia de LAYOUT/TEMPLATE da marca. ',
-            'Use APENAS o que esta listado no brief abaixo (posicoes em %, '
-            'cores, formas). NAO copie o sujeito/comida/produto especifico da '
-            'referencia, NAO reproduza textos visiveis dentro de faixas/selos.',
-            '',
-            'REGRA DE ANGULO/PERSPECTIVA: o angulo/perspectiva da cena e dos '
-            'objetos da nossa cena deve seguir o angulo/perspectiva mostrado na '
-            'LAYOUT REFERENCE. Se a referencia e flat-lay cenital, a nossa cena '
-            'tambem e flat-lay cenital. Se a referencia mostra o produto num '
-            'angulo X, o produto da nossa cena aparece no MESMO angulo X.',
-            *_layout_ref_lines,
-        ])
-    # === EXPERIMENT: bloco LAYOUT REFERENCE (end) ===
+    # LAYOUT REFERENCE block removido — o brief dos grafismos já está em
+    # [REFERENCE ROLES] como bloco dedicado via _build_reference_roles_en_block.
+    # Manter dois blocos criava contradição ("STRUCTURE only" vs "full fidelity").
 
     if use_hybrid_en:
         # Briefing + diretrizes em ingles (modos pillow/sanitized)
@@ -1401,7 +1416,9 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
             max_h_pct = max(4.0, next_y_pct - rb['y_pct'] - 1.0)  # 1% de folga
         max_h = _px(max_h_pct, H)
         start_size = max(14, int(basis * rb['font_size_pct'] / 100))
-        min_size = max(12, int(basis * 0.03))  # piso: 3% da menor dim
+        # min_size: honra o tamanho calculado pelo layout_engine (start_size é o alvo).
+        # Piso absoluto = 60% do start_size ou 12px, o que for maior.
+        min_size = max(12, int(start_size * 0.6))
         font, lines, fit_ok = _fit_text_to_box(
             rb['content'], rb['fpath'], rb['fb'],
             max(40, bw - 2 * pad), max_h, start_size, draw, min_size=min_size,

@@ -53,3 +53,8 @@ db.sqlite3-journal
 .idea/
 *.sublime-project
 *.sublime-workspace
+
+# Scratch/wireframes na raiz do repo (assets de debug, nao versionar)
+/final94*.png
+/wf94*.png
+/wireframe*.png
