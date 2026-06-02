@@ -282,6 +282,7 @@ class Post(models.Model):
             ('approved', 'Aprovado'),
             ('agent', 'Agente Alterando — Aguarde'),
             ('rejected', 'Rejeitado'),
+            ('failed', 'Falhou'),
         ],
         default='pending',
         verbose_name='Status'
