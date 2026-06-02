@@ -106,24 +106,29 @@ body {{
 
 
 def _build_font_css(font_paths: Dict[str, str]) -> str:
-    """Embute fontes TTF como base64 @font-face."""
+    """Embute fontes TTF como base64 @font-face — uma declaracao por role.
+    Mesmo quando varios roles compartilham o mesmo arquivo, cada role
+    recebe sua propria @font-face. Cacheia o base64 por path para evitar
+    re-encoding redundante."""
     css_lines = []
-    seen = set()
+    cache = {}  # path -> (b64, fmt)
     for role, path in font_paths.items():
-        if not path or path in seen:
+        if not path:
             continue
-        seen.add(path)
-        try:
-            data = Path(path).read_bytes()
-            b64 = base64.b64encode(data).decode()
-            family = Path(path).stem.replace('_', ' ').replace('-', ' ')
-            fmt = 'opentype' if path.endswith('.otf') else 'truetype'
-            css_lines.append(f"""@font-face {{
-    font-family: 'CustomFont_{role}';
-    src: url('data:font/{fmt};base64,{b64}') format('{fmt}');
-}}""")
-        except Exception:
-            logger.warning('[html_renderer] falha ao ler fonte %s', path)
+        if path not in cache:
+            try:
+                data = Path(path).read_bytes()
+                b64 = base64.b64encode(data).decode()
+                fmt = 'opentype' if path.endswith('.otf') else 'truetype'
+                cache[path] = (b64, fmt)
+            except Exception:
+                logger.warning('[html_renderer] falha ao ler fonte %s', path)
+                continue
+        b64, fmt = cache[path]
+        css_lines.append(
+            f"@font-face {{font-family:'CustomFont_{role}';"
+            f"src:url('data:font/{fmt};base64,{b64}') format('{fmt}');}}"
+        )
     return '\n'.join(css_lines)
 
 
@@ -144,6 +149,10 @@ def _build_elements_html(
     parts = []
 
     for el in elements:
+        # Visibilidade — quando False, elemento e ocultado tanto no modal
+        # quanto no PNG exportado (consistente com o olhinho do painel).
+        if el.get('visible', True) is False:
+            continue
         role = (el.get('role') or '').lower()
         x = el.get('x_pct', 0)
         y = el.get('y_pct', 0)
@@ -170,10 +179,23 @@ def _build_elements_html(
                     f'style="left:{x:.3f}%;top:{y:.3f}%;width:{w:.3f}%;height:{h:.3f}%;">'
                 )
 
+        elif role == 'image':
+            # Sticker — `url` deve ser data URI (Playwright nao busca URLs externas).
+            # views_overlay._prepare_stickers_for_export injeta data URI antes do build.
+            img_url = (el.get('url') or '').strip()
+            if img_url:
+                parts.append(
+                    f'<img class="el el-image" src="{img_url}" '
+                    f'style="left:{x:.3f}%;top:{y:.3f}%;width:{w:.3f}%;height:{h:.3f}%;'
+                    f'object-fit:contain;">'
+                )
+
         elif role in ('titulo', 'subtitulo', 'cta'):
             content = (el.get('content') or '').strip()
-            if not content:
-                continue
+            if not content and not el.get('visible_force', False):
+                # CTA unificado pode nao ter content quando user esvaziou — pula
+                if role != 'cta' or not el.get('background_color'):
+                    continue
             color = el.get('color') or '#000000'
             weight = 'bold' if (el.get('weight') or '').lower() == 'bold' else 'normal'
             align = el.get('align') or 'left'
@@ -188,16 +210,48 @@ def _build_elements_html(
                 font_family = 'serif'
 
             css_class = f'el el-{role}'
-            extra = ''
+            extra_styles = []
+            inner_pad = ''
+
+            # CTA unificado: pode ter background_color + radius_pct + padding
+            bg = (el.get('background_color') or '').strip() if role == 'cta' else ''
+            if bg:
+                extra_styles.append(f'background:{bg}')
+                radius_pct = float(el.get('radius_pct') or 0)
+                if radius_pct > 0:
+                    radius_px = int(radius_pct / 100 * canvas_w)
+                    extra_styles.append(f'border-radius:{radius_px}px')
+                ph_pct = float(el.get('padding_h_pct') or 0)
+                pv_pct = float(el.get('padding_v_pct') or 0)
+                if ph_pct or pv_pct:
+                    ph_px = int(ph_pct / 100 * canvas_w)
+                    pv_px = int(pv_pct / 100 * canvas_h)
+                    inner_pad = f'padding:{pv_px}px {ph_px}px;'
+
+            # Altura quando especificada (CTA precisa pra alinhar texto vertical)
+            h_pct = el.get('height_pct')
+            if h_pct:
+                extra_styles.append(f'height:{float(h_pct):.3f}%')
+
+            # CTA centraliza vertical+horizontal o texto dentro do box
             if role == 'cta':
-                extra = 'display:flex;align-items:center;justify-content:center;'
+                extra_styles.append('display:flex')
+                extra_styles.append('align-items:center')
+                extra_styles.append('justify-content:center')
+
+            # Suporta quebra de linha (\n no content)
+            extra_styles.append('white-space:pre-line')
+
+            extras = ';'.join(extra_styles)
+            if extras:
+                extras += ';'
 
             parts.append(
                 f'<div class="{css_class}" style="'
                 f'left:{x:.3f}%;top:{y:.3f}%;width:{w:.3f}%;'
                 f'color:{color};font-size:{font_size_px:.1f}px;'
                 f'font-weight:{weight};text-align:{align};'
-                f'font-family:{font_family};{extra}'
+                f'font-family:{font_family};{extras}{inner_pad}'
                 f'">{_escape(content)}</div>'
             )
 

@@ -860,6 +860,235 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     }
 
 
+@shared_task(
+    bind=True,
+    max_retries=1,
+    default_retry_delay=30,
+)
+def regenerate_background_task(self, post_id: int, message: str):
+    """
+    Regera APENAS a imagem de fundo (sem texto) usando o Gemini com a imagem
+    atual + a mensagem do usuario como ajuste. Nao altera _layout_elements,
+    nao re-roda strategist/copywriter/designer/critic. O usuario continua
+    com seus textos, posicoes e edicoes intactas.
+
+    Estrategia:
+      1. Baixa a raw_image atual do S3 (PNG cru do Gemini, sem texto).
+      2. Monta prompt: a imagem como image_part + texto curto em EN
+         pedindo a alteracao do usuario, reforcando "no text in image".
+      3. Chama Gemini Image API direto (sem passar por generate_post_image).
+      4. Sobe novo PNG no S3.
+      5. Empilha o raw_image_s3_key antigo em local_pipeline_context.background_history.
+      6. Atualiza post.raw_image_s3_key/url.
+    """
+    import os as _os
+    import urllib.request as _ur
+    import urllib.error as _ue
+    import base64 as _b64
+    import json as _json
+    from apps.posts.models import Post as _Post
+    from apps.posts.services.gemini_image_generator import (
+        _resolved_endpoint, _extract_image_from_response, _download_to_base64,
+    )
+    from apps.core.services.s3_service import S3Service
+
+    logger.info('[regen_bg] iniciada post_id=%s msg=%s', post_id, (message or '')[:80])
+
+    try:
+        post = _Post.objects.select_related('organization', 'post_format').get(id=post_id)
+    except _Post.DoesNotExist:
+        logger.error('[regen_bg] post nao existe id=%s', post_id)
+        return {'success': False, 'error': 'post_not_found'}
+
+    if not post.raw_image_s3_key:
+        logger.error('[regen_bg] post sem raw_image_s3_key id=%s', post_id)
+        return {'success': False, 'error': 'no_raw_image'}
+
+    # 1. Baixa raw_image atual (presigned 5min)
+    try:
+        cur_url = S3Service.generate_presigned_download_url(post.raw_image_s3_key, expires_in=300)
+    except Exception:
+        logger.exception('[regen_bg] presigned current raw falhou')
+        return {'success': False, 'error': 'presign_failed'}
+
+    cur_b64, cur_mime = _download_to_base64(cur_url)
+    if not cur_b64:
+        logger.error('[regen_bg] falha baixar imagem atual post=%s', post_id)
+        return {'success': False, 'error': 'download_failed'}
+
+    # 2. Monta prompt: simples e direto
+    user_msg = (message or '').strip()
+    prompt_text = (
+        'Modify the attached image according to the user request below. '
+        'Keep the same subject, composition style and brand feel — apply ONLY the requested change.\n\n'
+        f'USER REQUEST (Portuguese): "{user_msg}"\n\n'
+        'STRICT RULES:\n'
+        '- Output an image only. No text, no typography, no letters, no logos anywhere.\n'
+        '- Keep the aspect ratio of the original image.\n'
+        '- Preserve identity of any product or person visible in the attached image.\n'
+    )
+
+    api_key = _os.environ.get('GEMINI_API_KEY')
+    if not api_key:
+        logger.error('[regen_bg] GEMINI_API_KEY ausente')
+        return {'success': False, 'error': 'no_api_key'}
+
+    payload = {
+        'contents': [{
+            'parts': [
+                {'inline_data': {'mime_type': cur_mime or 'image/png', 'data': cur_b64}},
+                {'text': prompt_text},
+            ],
+        }],
+        'generationConfig': {
+            'responseModalities': ['IMAGE', 'TEXT'],
+            'candidateCount': 1,
+            'temperature': 0.5,
+        },
+    }
+
+    model_used, endpoint = _resolved_endpoint()
+    body = _json.dumps(payload).encode('utf-8')
+    req = _ur.Request(
+        endpoint, data=body, method='POST',
+        headers={'Content-Type': 'application/json', 'X-Goog-Api-Key': api_key},
+    )
+    try:
+        with _ur.urlopen(req, timeout=180) as resp:
+            response_data = resp.read()
+    except _ue.HTTPError as exc:
+        err_body = exc.read().decode('utf-8', errors='ignore')[:500]
+        logger.error('[regen_bg] Gemini HTTP %s: %s', exc.code, err_body)
+        return {'success': False, 'error': f'gemini_http_{exc.code}', 'detail': err_body}
+    except Exception:
+        logger.exception('[regen_bg] falha chamada Gemini post=%s', post_id)
+        return {'success': False, 'error': 'gemini_call_failed'}
+
+    response_json = _json.loads(response_data.decode('utf-8'))
+    png_bytes, mime_type = _extract_image_from_response(response_json)
+    if not png_bytes:
+        logger.error('[regen_bg] sem imagem na resposta Gemini post=%s', post_id)
+        return {'success': False, 'error': 'no_image_returned'}
+
+    # 3. Upload novo PNG no S3
+    new_key, new_url = _upload_image_to_s3(
+        org_id=post.organization.id,
+        post_id=post.id,
+        png_bytes=png_bytes,
+        mime_type=mime_type or 'image/png',
+    )
+
+    # 4. Empilha antigo no history, atualiza raw_image_s3_key
+    old_key = post.raw_image_s3_key
+    old_url = post.raw_image_s3_url or ''
+    ctx = post.local_pipeline_context or {}
+    history = ctx.get('background_history') or []
+    history.append({
+        's3_key': old_key,
+        's3_url': old_url,
+        'replaced_at': dj_tz_now_isoformat(),
+        'user_request': user_msg[:300],
+    })
+    # Limita a 10 versoes anteriores
+    ctx['background_history'] = history[-10:]
+    post.local_pipeline_context = ctx
+    post.raw_image_s3_key = new_key
+    post.raw_image_s3_url = new_url
+    post.save(update_fields=['raw_image_s3_key', 'raw_image_s3_url', 'local_pipeline_context'])
+
+    # 5. Loga custo
+    try:
+        usage = (response_json.get('usageMetadata') or {})
+        cost_in = int(usage.get('promptTokenCount', 0) or 0) * 0.10 / 1_000_000
+        cost_out = 0.04  # flat por imagem
+        cost = round(cost_in + cost_out, 6)
+        _log_usage_gemini(post, model_used, cost, usage_metadata=usage)
+    except Exception:
+        logger.exception('[regen_bg] falha logar custo')
+
+    # 6. Re-renderiza a PostImage "editavel" com o novo raw + elements atuais.
+    # Isso garante que a miniatura/imagem grande no card do post reflitam a
+    # nova foto (compondo com os textos/logo que o user editou no modal).
+    try:
+        _refresh_editable_post_image(post)
+    except Exception:
+        logger.exception('[regen_bg] falha refresh PostImage editavel post=%s', post_id)
+
+    logger.info('[regen_bg] OK post=%s old=%s new=%s', post_id, old_key, new_key)
+    return {
+        'success': True,
+        'post_id': post_id,
+        'old_s3_key': old_key,
+        'new_s3_key': new_key,
+        'new_s3_url': new_url,
+    }
+
+
+def _refresh_editable_post_image(post):
+    """Rerenderiza a versao composta (raw + textos + logo) via Playwright e
+    atualiza a PostImage "editavel" (s3_key == post.image_s3_key) + o proprio
+    post.image_s3_key. Usado apos regenerate_background_task para que as
+    miniaturas no card do post reflitam a nova foto."""
+    import asyncio as _asyncio
+    from apps.posts.models import PostImage as _PostImage
+    from apps.posts.views_overlay import (
+        _get_elements, _get_raw_image_url, _get_logo_url, _get_canvas,
+        _get_font_paths, _download_as_data_uri, _playwright_screenshot,
+        _prepare_stickers_for_export,
+    )
+    from apps.posts.services.html_renderer import build_html
+
+    els = _get_elements(post)
+    if not els:
+        logger.info('[regen_bg] post sem _layout_elements, pula refresh')
+        return
+
+    raw_url = _get_raw_image_url(post)
+    logo_url = _get_logo_url(post)
+    cw, ch = _get_canvas(post)
+    font_paths = _get_font_paths(post)
+    raw_data = _download_as_data_uri(raw_url)
+    logo_data = _download_as_data_uri(logo_url)
+    if not raw_data:
+        logger.warning('[regen_bg] raw_data vazio no refresh')
+        return
+
+    els_prepared = _prepare_stickers_for_export(els)
+    html = build_html(els_prepared, raw_data, logo_data, cw, ch, font_paths)
+    png_bytes = _asyncio.run(_playwright_screenshot(html, cw, ch))
+
+    new_key, new_url = _upload_image_to_s3(
+        org_id=post.organization.id,
+        post_id=post.id,
+        png_bytes=png_bytes,
+        mime_type='image/png',
+    )
+
+    # Atualiza a PostImage "editavel" (atual). Se nao houver, cria uma.
+    old_main_key = post.image_s3_key or ''
+    editable = post.images.filter(s3_key=old_main_key).first() if old_main_key else None
+    if editable:
+        editable.s3_key = new_key
+        editable.s3_url = new_url
+        editable.save(update_fields=['s3_key', 's3_url'])
+    else:
+        # Sem PostImage casando — cria nova como a "atual"
+        from django.db.models import Max
+        next_order = ((post.images.aggregate(Max('order'))['order__max'] or -1) + 1)
+        _PostImage.objects.create(post=post, s3_key=new_key, s3_url=new_url, order=next_order)
+
+    post.image_s3_key = new_key
+    post.image_s3_url = new_url
+    post.has_image = True
+    post.save(update_fields=['image_s3_key', 'image_s3_url', 'has_image'])
+    logger.info('[regen_bg] PostImage editavel atualizada post=%s key=%s', post.id, new_key)
+
+
+def dj_tz_now_isoformat() -> str:
+    from django.utils import timezone as _tz
+    return _tz.now().isoformat()
+
+
 def _analyze_products_in_references(references, brand_context: str = '') -> list:
     """
     Para cada referencia com tipo contendo 'produto', baixa a imagem e
@@ -1515,18 +1744,27 @@ def _collect_references(kb, post, text_render_mode: str = 'inline') -> list:
     except Exception:
         pass
 
-    # Refs da KB marcadas com aspecto 'produto' — enviadas como IMAGEM ao Gemini
-    # (fidelidade), NAO viram dossie de texto (ver _collect_kb_dossiers).
+    # Refs da KB marcadas como image-first ('produto' ou 'pessoa_modelo') —
+    # enviadas como IMAGEM ao Gemini para fidelidade total (produto: mesma
+    # caixa/forma/cor; pessoa_modelo: mesmo rosto/cabelo/tom de pele).
+    # NAO viram dossie textual no prompt_designer (ver _collect_kb_dossiers).
     try:
         reference_aspects = ctx.get('reference_aspects') or {}
-        product_ref_ids = [
-            rid for rid, asps in reference_aspects.items()
-            if 'produto' in _normalize_aspects(asps)
-        ]
-        if kb and product_ref_ids:
+        IMAGE_FIRST_ASPECTS = {'produto', 'pessoa_modelo'}
+        # Mapeia ref_id -> tipo (produto/pessoa). pessoa_modelo vira tipo='pessoa'
+        # no Gemini (cai no bucket MODEL — mesma identidade) via _normalize_tipo.
+        image_first_refs = {}
+        for rid, asps in reference_aspects.items():
+            asps_norm = _normalize_aspects(asps)
+            for aspect in asps_norm:
+                if aspect in IMAGE_FIRST_ASPECTS:
+                    tipo = 'pessoa' if aspect == 'pessoa_modelo' else 'produto'
+                    image_first_refs[str(rid)] = tipo
+                    break
+        if kb and image_first_refs:
             from apps.knowledge.models import ReferenceImage
             prod_refs = ReferenceImage.objects.filter(
-                knowledge_base=kb, id__in=product_ref_ids
+                knowledge_base=kb, id__in=list(image_first_refs.keys())
             )
             for ref in prod_refs:
                 if not ref.s3_key:
@@ -1535,11 +1773,15 @@ def _collect_references(kb, post, text_render_mode: str = 'inline') -> list:
                     url = S3Service.generate_presigned_download_url(
                         ref.s3_key, expires_in=86400
                     )
-                    out.append({'tipo': 'produto', 'url': url, 'usage_description': ''})
+                    out.append({
+                        'tipo': image_first_refs[str(ref.id)],
+                        'url': url,
+                        'usage_description': '',
+                    })
                 except Exception:
                     pass
     except Exception:
-        logger.exception('[posts.local] falha ao coletar refs KB de produto')
+        logger.exception('[posts.local] falha ao coletar refs KB image-first')
 
     return out
 
@@ -1651,18 +1893,25 @@ def _collect_kb_dossiers(kb, post) -> list:
     refs = ReferenceImage.objects.filter(
         knowledge_base=kb, id__in=selected_ref_ids
     )
+    # Aspectos "image-first" — a ref vai como IMAGEM ao Gemini para fidelidade
+    # (NAO entram como dossie textual no prompt_designer). 'produto' eh fidelidade
+    # do objeto, 'pessoa_modelo' eh fidelidade da pessoa (mesmo rosto, cabelo,
+    # tom de pele, etc — a identidade do tema do user e ignorada).
+    IMAGE_FIRST_ASPECTS = {'produto', 'pessoa_modelo'}
+
     for ref in refs:
         aspects = _aspects_for_ref(reference_aspects, ref.id)
-        # Aspecto 'produto': a ref vai como IMAGEM ao Gemini mas sua analise
-        # visual ja foi feita — passa o resumo ao strategist como descricao
-        # do produto (nao como dossie de composicao).
-        if aspects == ['produto']:
+        # Se o unico aspecto eh image-first, a ref vai como image_part e nao
+        # entra como dossie. Mantemos o dossier no payload apenas para que o
+        # strategist conheca o produto/pessoa, mas o prompt_designer
+        # ignora dossiers com aspects ⊆ IMAGE_FIRST_ASPECTS.
+        if aspects and all(a in IMAGE_FIRST_ASPECTS for a in aspects):
             if ref.analysis_status == 'completed' and ref.visual_analysis:
                 dossier = ref.visual_analysis if isinstance(ref.visual_analysis, dict) else {}
                 if dossier:
                     out.append({
                         'id': ref.id,
-                        'aspects': ['produto'],
+                        'aspects': aspects,
                         'usage_description': (getattr(ref, 'usage_description', '') or '').strip(),
                         'dossier': dossier,
                     })

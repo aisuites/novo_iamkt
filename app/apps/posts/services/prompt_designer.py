@@ -123,30 +123,81 @@ def _build_user_text(strategic_payload, copy_payload, canvas_w, canvas_h,
     h = dims.get('height') or canvas_h
     aspect_ratio = _aspect_ratio_str(w, h)
 
-    # Separa dossiers de referência e de produto
-    dossiers_ref = [d for d in kb_dossiers if d.get('aspects') != ['produto']]
+    # Separa dossiers de referência dos "image-first" (produto / pessoa_modelo).
+    # Esses ja vao como IMAGEM ao Gemini via _collect_references — nao puxa o
+    # dossier textual deles aqui para evitar duplicar/contradizer.
+    _IMAGE_FIRST = {'produto', 'pessoa_modelo'}
+    dossiers_ref = [
+        d for d in kb_dossiers
+        if not (d.get('aspects') and all(a in _IMAGE_FIRST for a in d.get('aspects')))
+    ]
 
-    # Extrai dados ricos do dossier de referência
-    recreation_prompt = None
+    # Extrai dados do dossier de referência RESPEITANDO os aspects que o user
+    # escolheu no modal. Sem filtro, descricoes como "mulher negra de olhos
+    # fechados" da referencia acabavam parando no prompt mesmo quando o user
+    # so pediu "iluminacao" + "layout_composicao".
+    #
+    # Mapping aspect → campos do dossier liberados:
+    #   layout_composicao  → composicao, grid, texto_x_imagem (so posicoes)
+    #   iluminacao         → iluminacao
+    #   estilo_pessoas     → pessoas (estilo apenas, sem detalhes etnicos)
+    #   estilo_ambiente    → ambiente
+    #   grafismos          → assets_grafismos
+    #
+    # paleta_observada eh global por dossier (entra se houver algum aspect
+    # de estilo selecionado: nunca passa sozinha). recreation_prompt e
+    # texto_e_imagem NUNCA entram crus (puxam a cena INTEIRA da referencia).
+    ASPECT_FIELDS = {
+        'layout_composicao': ('composicao', 'grid', 'texto_x_imagem'),
+        'iluminacao':        ('iluminacao',),
+        'estilo_pessoas':    ('pessoas',),
+        'estilo_ambiente':   ('ambiente',),
+        'grafismos':         ('assets_grafismos',),
+    }
+
     paleta_observada = []
     assets_grafismos = []
     composicao_ref = {}
     pessoas_ref = []
     iluminacao_ref = {}
     ambiente_ref = {}
+    grid_ref = {}
+    texto_x_imagem_ref = {}
     ref_image_url = None
+    aspects_combined = set()
 
     for d in dossiers_ref:
         dossier = d.get('dossier') or {}
-        if dossier.get('recreation_prompt') and not recreation_prompt:
-            recreation_prompt = dossier['recreation_prompt']
-            paleta_observada = dossier.get('paleta_observada') or []
-            assets_grafismos = dossier.get('assets_grafismos') or []
-            composicao_ref = dossier.get('composicao') or {}
-            pessoas_ref = dossier.get('pessoas') or []
+        aspects_list = [a for a in (d.get('aspects') or []) if a in ASPECT_FIELDS]
+        aspects_combined.update(aspects_list)
+
+        # Libera campos por aspect. Se NENHUM aspect listado (ou
+        # so aspects nao reconhecidos), nao puxa nada deste dossier para
+        # evitar contaminacao da cena.
+        if 'layout_composicao' in aspects_list:
+            if not composicao_ref:
+                composicao_ref = dossier.get('composicao') or {}
+            if not grid_ref:
+                grid_ref = dossier.get('grid') or {}
+            if not texto_x_imagem_ref:
+                texto_x_imagem_ref = dossier.get('texto_x_imagem') or {}
+        if 'iluminacao' in aspects_list and not iluminacao_ref:
             iluminacao_ref = dossier.get('iluminacao') or {}
+        if 'estilo_pessoas' in aspects_list and not pessoas_ref:
+            pessoas_ref = dossier.get('pessoas') or []
+        if 'estilo_ambiente' in aspects_list and not ambiente_ref:
             ambiente_ref = dossier.get('ambiente') or {}
+        if 'grafismos' in aspects_list and not assets_grafismos:
+            assets_grafismos = dossier.get('assets_grafismos') or []
+        # Paleta entra junto com qualquer aspect de estilo (cor anda com tom)
+        if aspects_list and not paleta_observada:
+            paleta_observada = dossier.get('paleta_observada') or []
+        if not ref_image_url:
             ref_image_url = d.get('s3_url') or d.get('ref_url')
+
+    # recreation_prompt NAO entra mais cru. Foi substituido por blocos
+    # filtrados (composicao, iluminacao, ambiente, paleta).
+    recreation_prompt = None
 
     # Cor de fundo: paleta_observada (referência) > brand palette
     bg_color = 'white, pure studio white'
@@ -177,15 +228,74 @@ def _build_user_text(strategic_payload, copy_payload, canvas_w, canvas_h,
         '',
     ]
 
-    # ---- BLOCO 1: recreation_prompt como base ----
-    if recreation_prompt:
+    # ---- BLOCO 1: aspectos liberados pelo user (somente os marcados) ----
+    if aspects_combined:
         lines.extend([
-            '== VISUAL STYLE DESCRIPTION (from the GRAPHIC & LAYOUT REFERENCE image) ==',
-            '(Extracted from the actual reference image. Translate faithfully.',
-            ' All visual characteristics here are REAL, not imagined.)',
-            recreation_prompt,
+            '== STYLE ASPECTS BORROWED FROM REFERENCE (use ONLY for the aspects listed) ==',
+            ('IMPORTANT: the SUBJECT (people, products) of the final image comes '
+             'from the SCENE description below — NOT from the reference. Use the '
+             'reference image only for the specific aspects listed here.'),
             '',
         ])
+    if iluminacao_ref:
+        lines.extend([
+            'LIGHTING (from reference):',
+            *[f'  - {k}: {v}' for k, v in iluminacao_ref.items() if v],
+            '',
+        ])
+    if composicao_ref or grid_ref:
+        lines.append('LAYOUT & COMPOSITION (from reference — STRUCTURE ONLY, NEVER copy the subject):')
+        # Inclui apenas campos cujo schema do dossier eh estritamente
+        # estrutural (numerico ou enquadramento abstrato). Campos de texto
+        # livre como "simetria", "foco_principal", "regra_dos_tercos",
+        # "profundidade_de_campo" descrevem o SUJEITO da ref (modelo, rosto,
+        # prato...) e contaminam — sao pulados aqui.
+        STRUCTURAL_COMP_FIELDS = ('enquadramento', 'espaco_negativo')
+        for k in STRUCTURAL_COMP_FIELDS:
+            v = composicao_ref.get(k)
+            if v:
+                lines.append(f'  - {k}: {v}')
+        zonas = (grid_ref.get('zonas') or []) if isinstance(grid_ref, dict) else []
+        if zonas:
+            lines.append('  Grid zones (replicate the % positions; CONTENT comes from our scene):')
+            for z in zonas:
+                # Omite o "conteudo" da zona — descreve TEXTOS literais da
+                # referencia (ex: "titulo 'Beleza Autentica'"). So % importa.
+                lines.append(
+                    f'    - {z.get("nome", "?")}: x={z.get("x_pct", 0)}% y={z.get("y_pct", 0)}% '
+                    f'w={z.get("largura_pct", 0)}% h={z.get("altura_pct", 0)}%'
+                )
+        # Posicoes de texto (so como zonas reservadas — conteudo eh nosso)
+        blocos = (texto_x_imagem_ref.get('blocos') or []) if isinstance(texto_x_imagem_ref, dict) else []
+        if blocos:
+            lines.append('  Text overlay zones (positions only — actual text content is added by us via overlay):')
+            for b in blocos:
+                lines.append(
+                    f'    - {b.get("papel", "?")}: color={b.get("cor", "?")}, '
+                    f'weight={b.get("peso", "?")}, align={b.get("alinhamento_paragrafo", "?")}'
+                )
+        lines.append('')
+    if ambiente_ref:
+        lines.extend([
+            'AMBIENT STYLE (from reference):',
+            *[f'  - {k}: {v}' for k, v in ambiente_ref.items() if v],
+            '',
+        ])
+    if pessoas_ref:
+        # PEOPLE STYLE so libera campos ESTRUTURAIS do dossier (pose, expressao,
+        # enquadramento). Campos identitarios (tom_pele, cabelo, etnicidade,
+        # idade, genero) sao do schema mas ficam de fora — a identidade do
+        # sujeito vem do tema do user na SCENE description, nao da referencia.
+        STRUCTURAL_PEOPLE_FIELDS = ('pose', 'expressao', 'enquadramento')
+        lines.extend([
+            'PEOPLE STYLE (structural only — pose, expression, framing — identity comes from SCENE):',
+        ])
+        for p in pessoas_ref:
+            keep = {k: p[k] for k in STRUCTURAL_PEOPLE_FIELDS if p.get(k)}
+            if keep:
+                lines.append('  - ' + ', '.join(f'{k}: {v}' for k, v in keep.items()))
+        lines.append('  Subject identity (ethnicity, hair, skin tone, age, gender) comes from the SCENE description, NOT from this reference.')
+        lines.append('')
 
     # ---- BLOCO 2: paleta observada (prioridade sobre brand palette) ----
     if paleta_observada:
@@ -200,13 +310,23 @@ def _build_user_text(strategic_payload, copy_payload, canvas_w, canvas_h,
         ])
 
     # ---- BLOCO 3: grafismos com posição exata do dossier ----
-    if assets_grafismos:
+    # Filtra grafismos que sao TEXTO / LOGOTIPO da referencia — nao queremos
+    # replicar marca de outra empresa no nosso post.
+    TEXT_GRAPHIC_TYPES = {
+        'destaque_tipografico', 'tipografia', 'texto', 'palavra',
+        'logo', 'logotipo', 'marca', 'wordmark', 'lettering',
+    }
+    grafismos_nao_textuais = [
+        g for g in assets_grafismos
+        if (g.get('tipo') or '').lower() not in TEXT_GRAPHIC_TYPES
+    ]
+    if grafismos_nao_textuais:
         lines.extend([
-            '== GRAPHIC ELEMENTS — mandatory, replicate from the GRAPHIC & LAYOUT REFERENCE image ==',
-            'These elements MUST appear in the final image exactly as shown in the GRAPHIC & LAYOUT REFERENCE image.',
-            'Full fidelity is required: exact shape, color, position and style. No relocation, no invention.',
+            '== GRAPHIC ELEMENTS — replicate from the GRAPHIC & LAYOUT REFERENCE image ==',
+            'These NON-TEXTUAL graphic elements should appear: shape, color, position and style.',
+            'Do NOT reproduce any letters, words or wordmarks from the reference image.',
         ])
-        for g in assets_grafismos:
+        for g in grafismos_nao_textuais:
             lines.append(
                 f'  - type: {g.get("tipo")} | color: {g.get("cor")} '
                 f'| style: {g.get("estilo")} | POSITION: {g.get("posicao")} '
@@ -228,13 +348,17 @@ def _build_user_text(strategic_payload, copy_payload, canvas_w, canvas_h,
     # ---- BLOCO 5: instrução de fidelidade à referência ----
     lines.extend([
         '== FIDELITY INSTRUCTION ==',
-        'Follow the visual style of the reference image described above.',
-        'When the reference description conflicts with any other instruction, the reference wins.',
-        'Do not invent graphic elements not mentioned in the reference description.',
+        'Follow the visual STYLE of the reference image for the aspects listed above (lighting, layout, ambient, palette).',
+        'NEVER copy the subject (person, product, food, scene) from the reference image — the subject comes from the SCENE description.',
+        'Do not invent graphic elements that are not mentioned above.',
         '',
-        '== MANDATORY ==',
-        'No text, no words, no typography, no letters, no numbers anywhere in the image.',
-        'No logos, no brand marks, no watermarks.',
+        '== MANDATORY — NO TEXT, NO TYPOGRAPHY, NO LOGOS ==',
+        'The generated image MUST have NO text of any kind. Specifically:',
+        '  - NO title, NO subtitle, NO caption, NO CTA text, NO button text.',
+        '  - NO letters, NO words, NO numbers, NO typography, NO lettering anywhere.',
+        '  - NO logos, NO brand marks, NO watermarks, NO product labels with text.',
+        'Titles/subtitles/CTA are added afterwards by an external overlay system — leave the corresponding zones VISUALLY CLEAN (flat, low complexity).',
+        'If you would normally render text, render nothing in its place.',
         f'Aspect ratio: {aspect_ratio}',
     ])
 

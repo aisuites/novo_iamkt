@@ -1320,6 +1320,42 @@ def _draw_logo_at(overlay, logo_url, x, y, target_w):
     return (x, y, target_w, target_h)
 
 
+def _draw_image_at(overlay, img_url, x, y, target_w, target_h):
+    """Cola uma imagem (sticker) num retangulo (x,y,target_w,target_h) com
+    object-fit:contain — preserva aspect ratio, centraliza dentro da box.
+    Aceita data URI (data:image/...;base64,...) ou URL externa."""
+    from io import BytesIO
+    from PIL import Image
+    import base64
+
+    try:
+        if img_url.startswith('data:'):
+            # data:image/png;base64,XXXX
+            head, _, payload = img_url.partition(',')
+            data = base64.b64decode(payload)
+        else:
+            req = urllib.request.Request(img_url, headers={'User-Agent': 'Mozilla/5.0 IAMKT'})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = resp.read()
+        sticker = Image.open(BytesIO(data)).convert('RGBA')
+    except Exception:
+        logger.exception('[layout_doc] sticker load fail')
+        return None
+
+    # object-fit:contain — escala mantendo aspect ratio, centraliza na box
+    iw, ih = sticker.size
+    if iw <= 0 or ih <= 0:
+        return None
+    scale_factor = min(target_w / iw, target_h / ih)
+    new_w = max(8, int(iw * scale_factor))
+    new_h = max(8, int(ih * scale_factor))
+    sticker = sticker.resize((new_w, new_h), Image.LANCZOS)
+    cx = x + (target_w - new_w) // 2
+    cy = y + (target_h - new_h) // 2
+    overlay.alpha_composite(sticker, (cx, cy))
+    return (cx, cy, new_w, new_h)
+
+
 def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
                            logo_url=None):
     """
@@ -1338,7 +1374,8 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
     draw = ImageDraw.Draw(overlay)
     basis = min(W, H)
     fonts = fonts or {}
-    elements = elements or []
+    # Filtra elementos invisiveis (campo visible=False vindo do modal/olhinho)
+    elements = [el for el in (elements or []) if el.get('visible', True) is not False]
 
     def _px(v, total):
         try:
@@ -1354,6 +1391,15 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
             except Exception:
                 logger.exception('[layout_doc] falha grafismo')
 
+    # CTA unificado: fundo arredondado + texto desenhados juntos.
+    # Desenha o fundo antes do logo (logo fica POR CIMA do CTA se conflitar).
+    for el in elements:
+        if (el.get('role') or '').lower() == 'cta' and (el.get('background_color') or '').strip():
+            try:
+                _draw_cta_background(draw, el, W, H)
+            except Exception:
+                logger.exception('[layout_doc] falha cta background')
+
     # Logo primeiro (texto pode evitar sobreposicao se preciso)
     logo_box = None
     for el in elements:
@@ -1366,6 +1412,20 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
                 )
             except Exception:
                 logger.exception('[layout_doc] falha logo')
+
+    # Stickers (role='image') — colado sobre o fundo, abaixo dos textos.
+    # Aceita url (presigned S3) ou data URI (vindo de _prepare_stickers_for_export).
+    for el in elements:
+        if (el.get('role') or '').lower() == 'image':
+            try:
+                _draw_image_at(
+                    overlay, el.get('url') or '',
+                    _px(el.get('x_pct', 30), W), _px(el.get('y_pct', 30), H),
+                    max(24, _px(el.get('width_pct', 30), W)),
+                    max(24, _px(el.get('height_pct', 30), H)),
+                )
+            except Exception:
+                logger.exception('[layout_doc] falha sticker')
 
     # 1a passada: coleta DADOS CRUS de cada bloco de texto (sem fitar ainda;
     # precisamos saber o gap para o proximo bloco para calcular max_h real).
@@ -1395,6 +1455,8 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
             'fb': _DEJAVU_BOLD if is_bold else _DEJAVU_REG,
             'align_raw': el.get('align') or 'left',
             'color_hex': el.get('color'),
+            # CTA unificado: tem fundo colorido — texto centraliza vertical no box.
+            'has_bg': bool((el.get('background_color') or '').strip()),
         })
 
     # Ordena por y_pct p/ conseguir derivar max_h = gap ate o proximo bloco.
@@ -1439,6 +1501,7 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
             '_raw': rb,
             '_min_size': min_size,
             '_max_h': max_h,
+            'has_bg': rb.get('has_bg', False),
         })
 
     # Hierarquia: confia no designer. Auto-fit ja garante que cada bloco cabe
@@ -1453,7 +1516,12 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
             img, b['color_hex'], b['x'] + b['pad'], y, b['bw'] - 2 * b['pad'],
             b['total_h'], paleta,
         )
-        yy = y
+        # CTA unificado: centraliza verticalmente o texto dentro do box (max_h).
+        # Sem isso o texto ficaria colado no topo do pill colorido.
+        if b.get('has_bg') and b.get('_max_h'):
+            yy = y + max(0, (b['_max_h'] - b['total_h']) // 2)
+        else:
+            yy = y
         for line in b['lines']:
             lx = _x_for_alignment(line, b['font'], draw, b['x'] + b['pad'],
                                   b['bw'] - 2 * b['pad'], b['align'])
@@ -1537,6 +1605,36 @@ def _draw_grafismo(draw, el, W, H, paleta=None):
                 )
         except Exception:
             draw.rectangle([x, y, x + w, y + h], fill=fill)
+
+
+def _draw_cta_background(draw, el, W, H):
+    """Desenha o fundo arredondado do CTA unificado (background_color +
+    radius_pct + paddings). O texto e desenhado depois pelo loop de texto,
+    centralizado no box."""
+    bg = (el.get('background_color') or '').strip()
+    if not bg:
+        return
+    try:
+        rgb = _hex_to_rgb(bg)
+    except Exception:
+        return
+
+    def px(v, total):
+        try:
+            return int(float(v) / 100.0 * total)
+        except (TypeError, ValueError):
+            return 0
+
+    x = px(el.get('x_pct', 0), W)
+    y = px(el.get('y_pct', 0), H)
+    w = px(el.get('width_pct', 30), W)
+    h = px(el.get('height_pct', 8), H)
+    raio = px(el.get('radius_pct', el.get('raio_pct', 4)), W)
+    fill = rgb + (255,)
+    try:
+        draw.rounded_rectangle([x, y, x + w, y + h], radius=raio, fill=fill)
+    except Exception:
+        draw.rectangle([x, y, x + w, y + h], fill=fill)
 
 
 # Default layout spec (usado quando nada e passado)

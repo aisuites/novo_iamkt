@@ -64,6 +64,8 @@ def overlay_data(request, post_id):
         if font_paths.get(role):
             font_urls[role] = f'/posts/{post.id}/fonts/{role}/'
 
+    history = ((post.local_pipeline_context or {}).get('background_history') or [])
+
     return JsonResponse({
         'elements': elements,
         'raw_image_url': raw_image_url,
@@ -72,6 +74,13 @@ def overlay_data(request, post_id):
         'canvas_h': canvas_h,
         'font_names': font_names,
         'font_urls': font_urls,
+        # Status + chave da imagem raw — usados pelo polling do "Solicitar nova
+        # imagem de fundo" para saber quando a nova arte ficou pronta.
+        'status': post.status,
+        'raw_image_s3_key': post.raw_image_s3_key or '',
+        # Tamanho do histórico de imagens de fundo — frontend usa pra
+        # mostrar/esconder botão "Voltar imagem anterior".
+        'background_history_size': len(history),
     })
 
 
@@ -111,6 +120,10 @@ def export_png(request, post_id):
         logger.error('[overlay] imagem não pôde ser baixada para export post=%s', post_id)
         return JsonResponse({'error': 'image_download_failed'}, status=500)
 
+    # Stickers (role='image'): baixa cada um e injeta data URI no elemento.
+    # Playwright headless nao busca URLs externas, entao precisa data URI inline.
+    elements = _prepare_stickers_for_export(elements)
+
     from apps.posts.services.html_renderer import build_html
     html = build_html(
         elements=elements,
@@ -134,6 +147,12 @@ def export_png(request, post_id):
 
 _VALID_FONT_ROLES = {'titulo', 'subtitulo', 'cta'}
 _FONTS_CACHE_DIR = Path('/app/fonts_cache')
+
+# Sticker upload — limites e MIME aceitos
+_STICKER_MAX_BYTES = 8 * 1024 * 1024  # 8 MB hard cap
+_STICKER_ACCEPTED_MIME = {
+    'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif',
+}
 
 
 @login_required
@@ -171,6 +190,135 @@ def font_file(request, post_id, role):
 
 @login_required
 @require_POST
+def regenerate_background(request, post_id):
+    """Dispara task que regera SOMENTE a imagem de fundo a partir da imagem
+    atual + mensagem do usuario. Nao toca em _layout_elements, copy, etc.
+
+    Body JSON: {"message": "texto do usuario"}
+    """
+    post = get_object_or_404(Post, id=post_id, organization=request.organization)
+    try:
+        body = json.loads(request.body or '{}')
+    except Exception:
+        body = {}
+    message = (body.get('message') or '').strip()
+    if not message:
+        return JsonResponse({'error': 'message_required'}, status=400)
+    if not post.raw_image_s3_key:
+        return JsonResponse({'error': 'no_raw_image'}, status=400)
+
+    from apps.posts.tasks import regenerate_background_task
+    regenerate_background_task.delay(post.id, message)
+    return JsonResponse({
+        'success': True,
+        'status': 'queued',
+        'current_raw_s3_key': post.raw_image_s3_key,
+    })
+
+
+@login_required
+@require_POST
+def restore_background(request, post_id):
+    """Volta para a imagem de fundo anterior (pop do background_history).
+    Empurra a atual de volta para o final do history (permite ping-pong)."""
+    post = get_object_or_404(Post, id=post_id, organization=request.organization)
+    ctx = dict(post.local_pipeline_context or {})
+    history = list(ctx.get('background_history') or [])
+    if not history:
+        return JsonResponse({'error': 'history_empty'}, status=400)
+
+    # Pop ultimo entry
+    last = history.pop()
+    prev_key = last.get('s3_key') or ''
+    prev_url = last.get('s3_url') or ''
+    if not prev_key:
+        return JsonResponse({'error': 'history_invalid'}, status=500)
+
+    # Salva o ATUAL no inicio do history (pode voltar a frente depois)
+    current_key = post.raw_image_s3_key
+    current_url = post.raw_image_s3_url or ''
+    if current_key:
+        # Insere no comeco para nao misturar com fluxo natural — pop sempre
+        # retorna a mais recente. Aqui colocamos a "ultima trocada" no topo
+        # invertido. Simpler: substitui post.raw e nao re-empurra. Decision:
+        # empurra so para permitir refazer (UX redo).
+        history.append({
+            's3_key': current_key,
+            's3_url': current_url,
+            'replaced_at': last.get('replaced_at'),
+            'user_request': '__restored__',
+        })
+
+    ctx['background_history'] = history
+    post.local_pipeline_context = ctx
+    post.raw_image_s3_key = prev_key
+    post.raw_image_s3_url = prev_url
+    post.save(update_fields=['raw_image_s3_key', 'raw_image_s3_url', 'local_pipeline_context'])
+
+    # Regenera presigned para uso imediato no modal
+    try:
+        from apps.core.services.s3_service import S3Service
+        fresh_url = S3Service.generate_presigned_download_url(prev_key, expires_in=3600)
+    except Exception:
+        fresh_url = prev_url
+
+    return JsonResponse({
+        'success': True,
+        'raw_image_s3_key': prev_key,
+        'raw_image_url': fresh_url,
+        'history_remaining': len(history),
+    })
+
+
+@login_required
+@require_POST
+def upload_sticker(request, post_id):
+    """Recebe upload de imagem (multipart) e armazena no S3 como sticker do post.
+    Retorna {s3_key, url} para o frontend criar um elemento role='image' no canvas.
+    """
+    from apps.core.services.s3_service import S3Service
+
+    post = get_object_or_404(Post, id=post_id, organization=request.organization)
+    f = request.FILES.get('file')
+    if not f:
+        return JsonResponse({'error': 'arquivo_ausente'}, status=400)
+    if f.size > _STICKER_MAX_BYTES:
+        return JsonResponse({'error': 'arquivo_muito_grande', 'max_mb': 8}, status=413)
+    ct = (f.content_type or '').lower().strip()
+    if ct not in _STICKER_ACCEPTED_MIME:
+        return JsonResponse({'error': 'tipo_nao_suportado', 'aceitos': sorted(_STICKER_ACCEPTED_MIME)}, status=415)
+
+    import time
+    safe_name = ''.join(c if c.isalnum() or c in ('.', '-', '_') else '_' for c in f.name)[:120]
+    ts = int(time.time() * 1000)
+    s3_key = f'org-{post.organization.id}/posts/stickers/{ts}-post{post.id}-{safe_name}'
+
+    try:
+        import boto3
+        from django.conf import settings as dj_settings
+        client = boto3.client(
+            's3',
+            region_name=getattr(dj_settings, 'AWS_S3_REGION_NAME', None) or 'us-east-1',
+        )
+        bucket = getattr(dj_settings, 'AWS_BUCKET_NAME', None) or os.environ.get('AWS_BUCKET_NAME', '')
+        client.put_object(
+            Bucket=bucket, Key=s3_key, Body=f.read(), ContentType=ct,
+            ServerSideEncryption='AES256',
+        )
+    except Exception:
+        logger.exception('[stickers] falha upload S3 post=%s', post_id)
+        return JsonResponse({'error': 'upload_falhou'}, status=500)
+
+    try:
+        url = S3Service.generate_presigned_download_url(s3_key, expires_in=3600)
+    except Exception:
+        url = ''
+
+    return JsonResponse({'s3_key': s3_key, 'url': url})
+
+
+@login_required
+@require_POST
 def save_elements(request, post_id):
     """Persiste os elementos editados — chamado ao fechar o modal."""
     post = get_object_or_404(Post, id=post_id, organization=request.organization)
@@ -203,6 +351,34 @@ async def _playwright_screenshot(html: str, width: int, height: int) -> bytes:
 
 
 # ── helpers ────────────────────────────────────────────────────────────────
+
+def _prepare_stickers_for_export(elements: list) -> list:
+    """Para cada elemento role='image' (sticker), regenera presigned URL pelo
+    s3_key (se houver) e baixa o arquivo como data URI no campo `url` — assim
+    o html_renderer consegue inline na <img src> e o Playwright renderiza.
+    Mantem todos os outros elementos intactos."""
+    from apps.core.services.s3_service import S3Service
+    out = []
+    for el in elements or []:
+        if (el.get('role') or '').lower() != 'image':
+            out.append(el)
+            continue
+        new_el = dict(el)
+        url = el.get('url') or ''
+        s3_key = el.get('s3_key') or ''
+        # Sempre regenera URL pelo s3_key (presigned pode ter expirado)
+        if s3_key:
+            try:
+                url = S3Service.generate_presigned_download_url(s3_key, expires_in=600)
+            except Exception:
+                pass
+        if url:
+            data_uri = _download_as_data_uri(url)
+            if data_uri:
+                new_el['url'] = data_uri
+        out.append(new_el)
+    return out
+
 
 def _save_elements(post_pk: int, elements: list) -> None:
     """Grava elementos no banco usando update() direto — evita conflitos de instância."""

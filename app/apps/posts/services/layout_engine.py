@@ -159,7 +159,14 @@ def build_elements(
     })
     hl_bottom = zone_top + hl_h_px + int(base_px * 0.5)
 
-    # ── 2. CTA PILL (ancora base, CTA scale) ───────────────────────────────
+    # ── 2. CTA PILL UNIFICADO ────────────────────────────────────────────
+    # Um unico elemento role='cta' com:
+    #   color: cor do texto
+    #   background_color: cor do pill (antes era um grafismo separado)
+    #   radius_pct: raio do pill em % da largura do canvas (50% da altura = pill total)
+    #   padding_h_pct / padding_v_pct: espacamento interno em % do canvas
+    # Renderizadores (html_renderer, Pillow, modal JS) leem essas props e
+    # desenham fundo+texto juntos.
     cta_font_size, _, cta_line_h = _fit_font(
         cta_text, f_cta, zone_w_px - CTA_PILL_PAD_H * 2, max_lines=1,
         size_start=cta_px,
@@ -168,36 +175,26 @@ def build_elements(
     pill_h   = cta_line_h + CTA_PILL_PAD_V * 2
     pill_w   = _measure_text_width(cta_text, f_cta, cta_font_size) + CTA_PILL_PAD_H * 2
     pill_w   = min(pill_w, zone_w_px)
-    radius   = pill_h // 2  # pill = totalmente arredondado
+    radius   = pill_h // 2  # pill totalmente arredondado
 
     pill_x   = zone_x_px
     pill_y   = zone_bot - pill_h - int(canvas_h * 0.02)
 
-    # Shape do pill (grafismo rounded)
     elements.append({
-        'role':       'grafismo',
-        'forma':      'faixa',
-        'x_pct':      _pct(pill_x, canvas_w),
-        'y_pct':      _pct(pill_y, canvas_h),
-        'width_pct':  _pct(pill_w, canvas_w),
-        'height_pct': _pct(pill_h, canvas_h),
-        'cor':        cor_cta_bg,
-        'raio_pct':   _pct(radius, canvas_w),
-        'opacidade':  100,
-    })
-    # Texto do CTA centralizado dentro do pill
-    elements.append({
-        'role':          'cta',
-        'content':       cta_text,
-        'x_pct':         _pct(pill_x + CTA_PILL_PAD_H, canvas_w),
-        'y_pct':         _pct(pill_y + CTA_PILL_PAD_V, canvas_h),
-        'width_pct':     _pct(pill_w - CTA_PILL_PAD_H * 2, canvas_w),
-        'height_pct':    _pct(cta_line_h, canvas_h),
-        'font_size_pct': _pct(cta_font_size, min(canvas_w, canvas_h)),
-        'color':         '#FFFFFF',
-        'weight':        'bold',
-        'align':         'center',
-        'padding_pct':   0,
+        'role':             'cta',
+        'content':          cta_text,
+        'x_pct':            _pct(pill_x, canvas_w),
+        'y_pct':            _pct(pill_y, canvas_h),
+        'width_pct':        _pct(pill_w, canvas_w),
+        'height_pct':       _pct(pill_h, canvas_h),
+        'font_size_pct':    _pct(cta_font_size, canvas_h),
+        'color':            '#FFFFFF',
+        'background_color': cor_cta_bg,
+        'radius_pct':       _pct(radius, canvas_w),
+        'padding_h_pct':    _pct(CTA_PILL_PAD_H, canvas_w),
+        'padding_v_pct':    _pct(CTA_PILL_PAD_V, canvas_h),
+        'weight':           'bold',
+        'align':            'center',
     })
     cta_top = pill_y
 

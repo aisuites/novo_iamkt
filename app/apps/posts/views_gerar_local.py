@@ -72,7 +72,7 @@ def gerar_post_local(request):
     # Aspecto(s) por ref selecionada: {ref_id: ['layout_composicao', 'grafismos', ...]}.
     # Multi-selecao por imagem; aspectos exclusivos so podem pertencer a UMA ref
     # ('produto' e nao-exclusivo). Aceita str (legado) ou lista.
-    _NON_EXCLUSIVE = {'produto'}
+    _NON_EXCLUSIVE = {'produto', 'pessoa_modelo'}
     reference_aspects = data.get('reference_aspects') or {}
     if isinstance(reference_aspects, dict):
         _seen_aspects = {}  # aspecto exclusivo -> rid que o reservou

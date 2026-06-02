@@ -49,10 +49,18 @@ def posts_list(request):
     posts_json = []
     for post in posts.prefetch_related('images', 'change_requests').order_by('-created_at'):
         try:
-            # Buscar imagens do post (id + s3_key para lazyload + delete)
+            # Buscar imagens do post (id + s3_key para lazyload + delete + edit-flag).
+            # is_editable=True para a PostImage que e a "versao atual" composta
+            # (s3_key == post.image_s3_key). So nessa o botao "Edicao Avancada"
+            # aparece no front — abre o modal que sempre carrega a versao atual.
+            current_main_key = (post.image_s3_key or '').strip()
             post_images = post.images.all().order_by('order')
             imagens_data = [
-                {'id': img.id, 's3_key': img.s3_key}
+                {
+                    'id': img.id,
+                    's3_key': img.s3_key,
+                    'is_editable': bool(current_main_key) and img.s3_key == current_main_key,
+                }
                 for img in post_images if img.s3_key
             ]
 

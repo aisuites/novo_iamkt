@@ -980,10 +980,18 @@
             : 'Post enviado ao agente! Aguarde o processamento.';
           window.toaster.success(msg);
         }
-        
+
+        // Marca o post recem-criado como selecionado para o reload puxar ele.
+        // Sem isso, o restore do localStorage abriria o post selecionado ANTES
+        // de criar o novo, sem mostrar o que esta gerando.
+        try {
+          const newId = result && (result.id || result.post_id || result.serverId);
+          if (newId) localStorage.setItem('selectedPostId', String(newId));
+        } catch (_) { /* noop */ }
+
         closeModal('modalGerarPost');
         resetGerarPostForm();
-        
+
         // Recarregar página após 2 segundos
         setTimeout(() => {
           window.location.reload();
@@ -1372,15 +1380,23 @@
           dom.postImageActions.appendChild(btn);
         }
 
-        // Botão "Ver arte final" — abre modal HTML overlay (novo pipeline)
-        const btnArteFinal = document.createElement('button');
-        btnArteFinal.type = 'button';
-        btnArteFinal.className = 'btn ghost';
-        btnArteFinal.textContent = 'Ver arte final';
-        btnArteFinal.addEventListener('click', () => {
-          if (typeof openArteFinal === 'function') openArteFinal(post.serverId || post.id);
-        });
-        dom.postImageActions.appendChild(btnArteFinal);
+        // Botão "Edição Avançada" — abre modal HTML overlay (novo pipeline).
+        // Visível apenas quando a imagem ATIVA no carrossel é a "editável"
+        // (PostImage cujo s3_key == post.image_s3_key — versão composta atual).
+        const activeImg = post.imagens[post.activeImageIndex || 0];
+        const isEditable = (activeImg && typeof activeImg === 'object')
+            ? !!activeImg.is_editable
+            : false;
+        if (isEditable) {
+            const btnArteFinal = document.createElement('button');
+            btnArteFinal.type = 'button';
+            btnArteFinal.className = 'btn';
+            btnArteFinal.textContent = 'Edição Avançada';
+            btnArteFinal.addEventListener('click', () => {
+                if (typeof openArteFinal === 'function') openArteFinal(post.serverId || post.id);
+            });
+            dom.postImageActions.appendChild(btnArteFinal);
+        }
       }
       return;
     }
@@ -2399,15 +2415,17 @@
   const REFERENCE_ASPECTS = [
     { value: '', label: 'O que aproveitar...' },
     { value: 'produto', label: 'Produto (enviar fiel ao Gemini)' },
+    { value: 'pessoa_modelo', label: 'Pessoa como modelo (fidelidade)' },
     { value: 'layout_composicao', label: 'Layout / composicao' },
     { value: 'iluminacao', label: 'Iluminacao' },
-    { value: 'estilo_pessoas', label: 'Estilo de pessoas' },
+    { value: 'estilo_pessoas', label: 'Estilo de pessoas (inspirar)' },
     { value: 'estilo_ambiente', label: 'Estilo de ambiente' },
     { value: 'grafismos', label: 'Grafismos' },
   ];
-  // Aspectos exclusivos entre refs (1 ref por aspecto). 'produto' NAO entra:
-  // varias refs podem ser produtos enviados como imagem ao Gemini.
-  const NON_EXCLUSIVE_ASPECTS = new Set(['produto']);
+  // Aspectos exclusivos entre refs (1 ref por aspecto). produto/pessoa_modelo NAO
+  // entram aqui — varias refs podem ser enviadas como imagem ao Gemini (mesmo
+  // tratamento de fidelidade).
+  const NON_EXCLUSIVE_ASPECTS = new Set(['produto', 'pessoa_modelo']);
 
   // Cada uploaded image: {file, dataUrl, name, usageType, usageDescription}
   const uploadedImagesState = [];
