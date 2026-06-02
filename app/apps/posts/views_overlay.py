@@ -85,6 +85,44 @@ def overlay_data(request, post_id):
 
 
 @login_required
+@require_GET
+def simple_debug(request, post_id):
+    """Área de validação (TEMPORÁRIA) do pipeline simples v2.
+
+    Retorna o fundo SEM texto, a imagem final e os prompts/JSON usados, para
+    comparação visual durante os testes. Restrito a pipeline_used='simple'.
+    """
+    post = get_object_or_404(Post, id=post_id, organization=request.organization)
+    if post.pipeline_used != 'simple':
+        return JsonResponse({'error': 'not_simple_pipeline'}, status=404)
+
+    dbg = (post.local_pipeline_context or {}).get('simple_image') or {}
+
+    def _presign(key, fallback=''):
+        if not key:
+            return fallback
+        try:
+            from apps.core.services.s3_service import S3Service
+            return S3Service.generate_presigned_download_url(key, expires_in=3600)
+        except Exception:
+            return fallback
+
+    return JsonResponse({
+        'pipeline': 'simple',
+        'status': post.status,
+        'bg_url': _presign(post.raw_image_s3_key, post.raw_image_s3_url or ''),
+        'final_url': _presign(post.image_s3_key, post.image_s3_url or ''),
+        'bg_prompt': dbg.get('bg_prompt', ''),
+        'final_prompt': dbg.get('final_prompt', ''),
+        'rules': dbg.get('rules', {}),
+        'model_bg': dbg.get('model_bg', ''),
+        'model_final': dbg.get('model_final', ''),
+        'created_at': dbg.get('created_at', ''),
+        'texts': {'title': post.title or '', 'subtitle': post.subtitle or '', 'cta': post.cta or ''},
+    })
+
+
+@login_required
 @require_POST
 def export_png(request, post_id):
     """Renderiza o overlay HTML via Playwright e retorna PNG para download."""

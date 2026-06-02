@@ -168,6 +168,23 @@ def generate_image(request, post_id):
         except Exception as exc:
             logger.warning(f'Erro ao enviar email de solicitação: {exc}')
         
+        # Pipeline SIMPLES v2 (Celery + Gemini Nano Banana) — pipeline_used='simple'
+        if post.pipeline_used == 'simple':
+            from apps.posts.tasks import generate_post_simple_image_task
+            generate_post_simple_image_task.delay(post.id, message or '')
+            logger.info('[posts.simple] generate_post_simple_image_task disparado post_id=%s', post.id)
+            return JsonResponse({
+                'success': True,
+                'id': post.id,
+                'serverId': post.id,
+                'status': post.status,
+                'statusLabel': post.get_status_display(),
+                'imageStatus': 'generating',
+                'imageChanges': image_change_count,
+                'imageRequestedAt': change_request.created_at.isoformat(),
+                'pipeline': 'simple',
+            })
+
         # Pipeline INTERNA (Celery + Gemini) — disparada se o post foi criado
         # via "Enviar Fluxo interno" (pipeline_used='local')
         if post.pipeline_used == 'local':

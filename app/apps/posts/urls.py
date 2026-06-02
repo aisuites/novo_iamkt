@@ -46,4 +46,7 @@ urlpatterns = [
     path('<int:post_id>/stickers/', views_overlay.upload_sticker, name='upload_sticker'),
     path('<int:post_id>/regenerate-background/', views_overlay.regenerate_background, name='regenerate_background'),
     path('<int:post_id>/restore-background/', views_overlay.restore_background, name='restore_background'),
+
+    # DEBUG temporário — validação do pipeline simples v2 (fundo×final + prompts)
+    path('<int:post_id>/simple-debug/', views_overlay.simple_debug, name='simple_debug'),
 ]

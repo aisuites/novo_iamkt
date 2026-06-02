@@ -609,6 +609,63 @@
         </div>
     </div>
 </div>
+
+{% if enable_local_pipeline %}
+<!-- ===================================================================== -->
+<!-- ÁREA DE DEBUG TEMPORÁRIA — pipeline simples v2 (fundo × final + prompts) -->
+<!-- REMOVER após validação dos testes. -->
+<!-- ===================================================================== -->
+<section id="simpleDebugArea" style="margin:32px auto;max-width:1100px;padding:16px;border:2px dashed #c00;border-radius:8px;background:#fff7f7;">
+    <h3 style="margin:0 0 8px;color:#c00;">🧪 Debug pipeline simples v2 <small style="font-weight:normal;color:#999;">(temporário)</small></h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+        <label style="font-size:13px;">Post ID:</label>
+        <input id="simpleDebugId" type="number" style="width:120px;padding:6px;" placeholder="ex: 42">
+        <button id="simpleDebugLoad" type="button" class="btn btn-primary">Carregar</button>
+        <span id="simpleDebugMsg" style="font-size:13px;color:#666;"></span>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:300px;">
+            <strong style="font-size:13px;">Fundo (sem texto)</strong>
+            <img id="simpleDebugBg" style="width:100%;border:1px solid #ddd;border-radius:6px;margin-top:4px;" alt="fundo">
+        </div>
+        <div style="flex:1;min-width:300px;">
+            <strong style="font-size:13px;">Imagem final (com texto)</strong>
+            <img id="simpleDebugFinal" style="width:100%;border:1px solid #ddd;border-radius:6px;margin-top:4px;" alt="final">
+        </div>
+    </div>
+    <div style="margin-top:12px;">
+        <strong style="font-size:13px;">Prompt do fundo</strong>
+        <pre id="simpleDebugBgPrompt" style="white-space:pre-wrap;background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;max-height:200px;overflow:auto;font-size:12px;"></pre>
+        <strong style="font-size:13px;">Prompt final (aplicação de texto)</strong>
+        <pre id="simpleDebugFinalPrompt" style="white-space:pre-wrap;background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;max-height:200px;overflow:auto;font-size:12px;"></pre>
+        <strong style="font-size:13px;">JSON do agente de regras</strong>
+        <pre id="simpleDebugRules" style="white-space:pre-wrap;background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;max-height:240px;overflow:auto;font-size:12px;"></pre>
+    </div>
+</section>
+<script>
+(function () {
+    var btn = document.getElementById('simpleDebugLoad');
+    if (!btn) return;
+    btn.addEventListener('click', async function () {
+        var id = (document.getElementById('simpleDebugId').value || '').trim();
+        var msg = document.getElementById('simpleDebugMsg');
+        if (!id) { msg.textContent = 'informe um Post ID'; return; }
+        msg.textContent = 'carregando...';
+        try {
+            var r = await fetch('/posts/' + id + '/simple-debug/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!r.ok) { msg.textContent = 'erro ' + r.status + ' (post é pipeline simple?)'; return; }
+            var d = await r.json();
+            document.getElementById('simpleDebugBg').src = d.bg_url || '';
+            document.getElementById('simpleDebugFinal').src = d.final_url || '';
+            document.getElementById('simpleDebugBgPrompt').textContent = d.bg_prompt || '(vazio — imagem ainda não gerada?)';
+            document.getElementById('simpleDebugFinalPrompt').textContent = d.final_prompt || '(vazio)';
+            document.getElementById('simpleDebugRules').textContent = JSON.stringify(d.rules || {}, null, 2);
+            msg.textContent = 'status: ' + d.status + ' | bg: ' + (d.model_bg || '?') + ' | final: ' + (d.model_final || '?');
+        } catch (e) { msg.textContent = 'falha: ' + e.message; }
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
