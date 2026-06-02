@@ -41,14 +41,26 @@ Sua missão é resolver cada decisão de design seguindo ESTRITAMENTE esta hiera
 
 Para cada decisão, marque a ORIGEM: "modal" | "kb" | "criatividade".
 
+REGRA DE ZONA/ALINHAMENTO DE TEXTO:
+- Quando houver REFERÊNCIA DE LAYOUT (composicao/grid/texto_x_imagem), a zona_texto e o
+  alinhamento DEVEM vir dela: use texto_x_imagem.blocos (papel, alinhamento_paragrafo, cor,
+  peso) e grid.zonas (posições em %). NÃO invente posições se a referência define.
+- Sem referência de layout -> use a KB. Sem KB -> critério criativo.
+
+REGRA DE ELEMENTOS GRÁFICOS:
+- O único elemento gráfico permitido é o CTA (quando existir), em formato PILL. NÃO proponha
+  grafismos/overlays/formas/texturas decorativas. Em "elementos_graficos" descreva apenas o CTA pill
+  (ou deixe vazio se não houver CTA).
+
 Retorne APENAS um JSON válido (sem markdown, sem comentários) neste schema:
 {
   "logo": {"usar": true/false, "posicao": "string ou null", "origem": "modal|kb|criatividade"},
   "referencias": [{"objetivo": "string", "origem": "modal|kb"}],
   "paleta_hex": ["#RRGGBB"],
   "tipografia": "string (qual fonte/estilo usar e por quê)",
-  "zona_texto": "string (onde os textos devem ficar, respeitando a marca)",
-  "elementos_graficos": "string (overlays/formas/texturas, se houver)",
+  "zona_texto": "string (posição/alinhamento dos textos — derivado da referência de layout quando houver)",
+  "alinhamento_texto": "string (alinhamento por bloco: titulo/subtitulo/cta — da referência quando houver)",
+  "elementos_graficos": "string (apenas o CTA pill, se houver; senão vazio)",
   "diretrizes": "string (consolidação das regras de ouro + fallbacks aplicados)",
   "decisoes_livres": ["string (o que ficou a critério criativo do gerador)"]
 }"""
@@ -72,12 +84,14 @@ def _parse_json(text: str) -> dict:
     return {}
 
 
-def resolve_briefing(*, kb_summary, modal_selections, textos, formato):
+def resolve_briefing(*, kb_summary, modal_selections, textos, formato, reference_layout=None):
     """Resolve as regras do modal e devolve o briefing estruturado.
 
     modal_selections: dict com has_logo, logo_position, reference_aspects,
                       references_usage_description, reference_descriptions[]
     textos: dict com title/subtitle/cta da Fase 1
+    reference_layout: lista de dicts {composicao, grid, texto_x_imagem} dos dossies
+                      das refs com aspecto 'layout_composicao' (zona/alinhamento de texto)
     Retorna: dict (briefing). Em falha, devolve um briefing minimo seguro.
     """
     api_key = getattr(settings, 'OPENAI_API_KEY', '') or ''
@@ -87,12 +101,20 @@ def resolve_briefing(*, kb_summary, modal_selections, textos, formato):
     from openai import OpenAI
     client = OpenAI(api_key=api_key)
 
+    ref_layout_block = ''
+    if reference_layout:
+        ref_layout_block = (
+            '📌 REFERÊNCIA DE LAYOUT (zona/alinhamento de texto — USE como fonte)\n'
+            f'{json.dumps(reference_layout, ensure_ascii=False, indent=2)}\n\n'
+        )
+
     user_text = (
         '📌 SELEÇÕES DO MODAL\n'
         f'{json.dumps(modal_selections, ensure_ascii=False, indent=2)}\n\n'
         '📌 TEXTOS JÁ DEFINIDOS (Fase 1)\n'
         f'{json.dumps(textos, ensure_ascii=False, indent=2)}\n\n'
         f'📌 FORMATO FINAL\n{formato}\n\n'
+        f'{ref_layout_block}'
         '📌 BASE DE CONHECIMENTO DA MARCA (KB)\n'
         f'{kb_summary}\n'
     )

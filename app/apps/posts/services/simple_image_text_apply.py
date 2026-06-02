@@ -79,26 +79,54 @@ def _build_prompt(*, textos, briefing, formato_px, has_logo, logo_position,
         '',
         f'TÍTULO (texto exato): «{title}»' if title else 'TÍTULO: (nenhum)',
         f'SUBTÍTULO (texto exato): «{subtitle}»' if subtitle else 'SUBTÍTULO: (nenhum)',
-        (f'CTA (texto exato): «{cta}»' if cta else 'CTA: (nenhum — nao desenhar CTA)'),
         '',
         f'FORMATO FINAL: {formato_px} px.',
     ]
 
+    paleta_hex = briefing.get('paleta_hex') or []
+    paleta_str = ', '.join(paleta_hex) if paleta_hex else '(paleta da marca)'
+
+    # CTA — único elemento gráfico permitido, no formato pill
+    if cta:
+        lines += [
+            '',
+            f'CTA (texto exato): «{cta}»',
+            '  → Desenhe o CTA como um PILL: retângulo de cantos TOTALMENTE arredondados,',
+            '    com PADDING de respiro generoso nas laterais E em cima/baixo (o texto nunca encosta na borda).',
+            f'    Cor de preenchimento do pill: escolha UMA cor da paleta {paleta_str} que CONTRASTE',
+            '    com o fundo atrás dele; o texto do CTA em cor legível e contrastante sobre o pill.',
+        ]
+    else:
+        lines += ['', 'CTA: nenhum — NÃO desenhe CTA, botão ou selo.']
+
+    # Logo
     if has_logo:
         if logo_position:
-            lines.append(f'LOGO: aplique o logo ANEXADO na posicao OBRIGATORIA: {logo_position}.')
+            lines.append(f'LOGO: aplique o logo ANEXADO na posição OBRIGATÓRIA: {logo_position}.')
         else:
-            lines.append('LOGO: aplique o logo ANEXADO de forma harmonica (posicao a seu criterio).')
+            lines.append('LOGO: aplique o logo ANEXADO de forma harmônica (posição a seu critério).')
     else:
-        lines.append('LOGO: nao aplicar logo.')
+        lines.append('LOGO: não aplicar logo.')
 
+    # Restrição dura de elementos
+    permitidos = ['título', 'subtítulo']
+    if cta:
+        permitidos.append('CTA (pill)')
+    if has_logo:
+        permitidos.append('logo')
     lines += [
+        '',
+        'ELEMENTOS PERMITIDOS (CRÍTICO): adicione SOMENTE ' + ', '.join(permitidos) + '.',
+        'PROIBIDO adicionar QUALQUER outro elemento: grafismos, formas, ícones, molduras, '
+        'faixas, linhas, texturas, gradientes, sombras decorativas, selos, badges, overlays '
+        'ou efeitos visuais. Nada além do fundo intacto + os textos'
+        + (' + o CTA pill' if cta else '') + (' + o logo' if has_logo else '') + '.',
         '',
         'BRIEFING DE LAYOUT (regras de ouro + diretrizes):',
         json.dumps(briefing, ensure_ascii=False, indent=2),
         '',
-        'Respeite paleta (HEX), tipografia, zona de texto e elementos graficos do '
-        'briefing. Garanta legibilidade, hierarquia visual e contraste.',
+        'Respeite paleta (HEX), tipografia e a zona/alinhamento de texto do briefing. '
+        'Garanta legibilidade, hierarquia visual e contraste.',
     ]
     return '\n'.join(lines)
 

@@ -2609,9 +2609,22 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
             'reference_descriptions': ref_descs,
         }
         textos = {'title': post.title or '', 'subtitle': post.subtitle or '', 'cta': post.cta or ''}
+        # zona/alinhamento de texto DEVEM vir da referencia de layout quando houver:
+        # extrai composicao + grid + texto_x_imagem (papel/alinhamento/cor/peso) dos
+        # dossies das refs marcadas com aspecto 'layout_composicao'.
+        reference_layout = []
+        for d in kb_dossiers:
+            if 'layout_composicao' in (d.get('aspects') or []):
+                _dos = d.get('dossier') or {}
+                reference_layout.append({
+                    'composicao': _dos.get('composicao'),
+                    'grid': _dos.get('grid'),
+                    'texto_x_imagem': _dos.get('texto_x_imagem'),
+                })
         brief_result = resolve_briefing(
             kb_summary=_build_kb_summary(post.organization),
             modal_selections=modal_selections, textos=textos, formato=formato_px,
+            reference_layout=reference_layout,
         )
         briefing = brief_result['briefing']
         _log_usage(post, brief_result['model'], brief_result['usage'], purpose='simple_briefing')
@@ -2623,15 +2636,22 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
             if fp and fp not in font_paths:
                 font_paths.append(fp)
 
+        # Logo DETERMINISTICO: se o usuario selecionou logo no modal, USA. O LLM
+        # nao decide isso (so sugere posicao quando o modal nao definiu).
         logo_cfg = briefing.get('logo') or {}
-        logo_position = (logo_cfg.get('posicao') or ctx.get('logo_position') or '')
+        use_logo = bool(ctx.get('selected_logo_ids'))
+        logo_position = (ctx.get('logo_position') or logo_cfg.get('posicao') or '')  # modal = ouro
         logo_png = None
-        if logo_cfg.get('usar', bool(ctx.get('selected_logo_ids'))):
+        if use_logo:
             logos = list(_logos_from_org(post.organization, post=post))
             if logos:
                 b64, _m = _download_to_base64(logos[0])
                 if b64:
                     logo_png = _b64.b64decode(b64)
+        # Reflete a decisao real no briefing (debug coerente)
+        if isinstance(briefing.get('logo'), dict):
+            briefing['logo']['usar'] = use_logo
+            briefing['logo']['posicao'] = logo_position or briefing['logo'].get('posicao')
 
         apply_result = apply_text_to_image(
             background_png=bg_bytes, font_paths=font_paths, logo_png=logo_png,
