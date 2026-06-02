@@ -2376,3 +2376,104 @@ def _dominant_bg_from_dossiers(kb_dossiers: list) -> str:
             if c.get('papel') == 'dominante':
                 return c.get('hex') or ''
     return ''
+
+
+# =============================================================================
+# PIPELINE SIMPLES (v2) — agente unico via OpenAI gpt-4o-mini
+# Fase 1: apenas texto. Disparado por views_gerar_simples (pipeline_used='simple').
+# Reaproveita os helpers de contexto do pipeline local (_build_kb_summary etc.).
+# =============================================================================
+@shared_task(
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+)
+def generate_post_simple_task(self, post_id: int):
+    """Gera o TEXTO do post via agente unico OpenAI e salva no Post.
+
+    Espelha generate_post_text_task, mas usa simple_post_agent.generate_simple_post
+    (1 chamada, gpt-4o-mini). Status final 'pending' (texto pronto). Fase de
+    imagem fica para depois.
+    """
+    from apps.posts.models import Post
+    from apps.posts.services.simple_post_agent import generate_simple_post
+
+    try:
+        post = Post.objects.get(id=post_id)
+    except Post.DoesNotExist:
+        logger.error('[posts.simple] Post %s nao encontrado', post_id)
+        return {'success': False, 'error': 'post_not_found'}
+
+    post.status = 'generating'
+    post.save(update_fields=['status'])
+
+    # Contexto reaproveitado do pipeline local
+    kb_summary = _build_kb_summary(post.organization)
+    formato = _format_to_dict(post.post_format) if post.post_format else {
+        'name': post.formats[0] if post.formats else 'feed',
+        'aspect_ratio': '1:1',
+    }
+    logo_urls = list(_logos_from_org(post.organization, post=post))
+
+    ctx = post.local_pipeline_context or {}
+    refs_general = (ctx.get('references_usage_description', '') or '').strip()
+    reference_descriptions = []
+    if refs_general:
+        reference_descriptions.append(f'Observacao geral: {refs_general}')
+    for r in _reference_images_from_post(post):
+        desc = (r.get('usage_description') or '').strip()
+        utype = (r.get('usage_type') or '').strip()
+        if desc or utype:
+            reference_descriptions.append(
+                f'{r.get("name") or "imagem"} ({utype or "uso nao informado"}): {desc}'
+            )
+
+    try:
+        result = generate_simple_post(
+            kb_summary=kb_summary,
+            rede=post.social_network,
+            formato=formato.get('name', 'feed'),
+            is_carousel=post.is_carousel,
+            image_count=post.image_count,
+            tema=post.requested_theme,
+            cta_requested=post.cta_requested,
+            logo_urls=logo_urls,
+            reference_descriptions=reference_descriptions,
+        )
+    except Exception as exc:
+        logger.exception('[posts.simple] Falha OpenAI post_id=%s', post_id)
+        # Nao usa status 'failed' (fora dos choices do model). Re-tenta; ao
+        # esgotar retries mantem 'generating' para o usuario reabrir.
+        raise self.retry(exc=exc)
+
+    structured = result['structured']
+
+    # Normaliza hashtags: garante prefixo '#'
+    raw_hashtags = structured.get('hashtags') or []
+    structured['hashtags'] = [
+        h if str(h).startswith('#') else f'#{str(h).lstrip("#").strip()}'
+        for h in raw_hashtags if h
+    ]
+
+    post.title = structured.get('title', '') or ''
+    post.subtitle = structured.get('subtitle', '') or ''
+    post.image_prompt = structured.get('image_prompt', '') or ''
+    post.visual_brief = structured.get('visual_brief', '') or ''
+    post.caption = structured.get('caption', '') or ''
+    post.hashtags = structured.get('hashtags') or []
+    post.cta = structured.get('cta_text') or ''
+    # Guarda o payload bruto do agente para auditoria/comparacao entre pipelines
+    post.copy_payload = {'_simple_agent': structured}
+    post.ia_provider = 'openai'
+    post.ia_model_text = result['model']
+    post.status = 'pending'
+    post.save()
+
+    _log_usage(post, result['model'], result['usage'], purpose='generate_post_simple')
+
+    logger.info(
+        '[posts.simple] generate_post_simple_task OK post_id=%s tokens_in=%s tokens_out=%s cost=$%s',
+        post_id, result['usage'].get('input_tokens'),
+        result['usage'].get('output_tokens'), result['usage'].get('cost_usd'),
+    )
+    return {'success': True, 'post_id': post_id, 'model': result['model'], 'usage': result['usage']}

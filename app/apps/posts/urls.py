@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, views_upload, views_gerar, views_gerar_local, views_actions, views_webhook, views_api, views_overlay
+from . import views, views_upload, views_gerar, views_gerar_local, views_gerar_simples, views_actions, views_webhook, views_api, views_overlay
 
 app_name = 'posts'
 
@@ -15,7 +15,10 @@ urlpatterns = [
 
     # Pipeline interna (Celery + Claude + Gemini) — homol/dev apenas
     path('gerar-local/', views_gerar_local.gerar_post_local, name='gerar_local'),
-    
+
+    # Pipeline simples v2 (Celery + OpenAI, 1 agente) — homol/dev apenas
+    path('gerar-simples/', views_gerar_simples.gerar_post_simples, name='gerar_simples'),
+
     # N8N Webhook - Receber post processado
     path('webhook/callback/', views_webhook.n8n_post_callback, name='n8n_post_callback'),
     

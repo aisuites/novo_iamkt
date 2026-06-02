@@ -106,6 +106,7 @@ class Post(models.Model):
         choices=[
             ('n8n', 'N8N (workflow externo)'),
             ('local', 'Local (Celery interno)'),
+            ('simple', 'Simples (Celery + OpenAI, 1 agente)'),
         ],
         default='n8n',
         verbose_name='Pipeline usada',

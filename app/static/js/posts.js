@@ -826,9 +826,11 @@
    */
   async function requestPostFromAgent(payload, pipeline = 'n8n') {
     // Roteia para endpoint conforme pipeline escolhido pelo user no modal:
-    //   pipeline='n8n'   -> /posts/gerar/        (fluxo atual com N8N)
-    //   pipeline='local' -> /posts/gerar-local/  (Celery + Claude + Gemini, homol/dev)
-    const endpoint = pipeline === 'local' ? '/posts/gerar-local/' : '/posts/gerar/';
+    //   pipeline='n8n'    -> /posts/gerar/         (fluxo atual com N8N)
+    //   pipeline='local'  -> /posts/gerar-local/   (Celery + Claude + Gemini, homol/dev)
+    //   pipeline='simple' -> /posts/gerar-simples/ (Celery + OpenAI gpt-4o-mini, homol/dev)
+    const endpoints = { local: '/posts/gerar-local/', simple: '/posts/gerar-simples/' };
+    const endpoint = endpoints[pipeline] || '/posts/gerar/';
     
     // Obter post_format_id do select (NOVO)
     const postFormatId = dom.formatoSelect?.value || null;
@@ -889,8 +891,10 @@
     dom.formGerarPost.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      // Identifica qual botao disparou o submit (N8N ou Fluxo interno)
-      const pipeline = e.submitter?.dataset?.pipeline || 'n8n';
+      // Pipeline escolhido no seletor do modal (fallback: data-pipeline do botao
+      // / 'n8n' quando o seletor nao e renderizado no ambiente de producao)
+      const pipeline = document.getElementById('pipelineSelect')?.value
+        || e.submitter?.dataset?.pipeline || 'n8n';
 
       const rede = dom.redePost?.value || 'Instagram';
       const tema = dom.temaPost?.value.trim() || '';
@@ -977,6 +981,8 @@
         if (window.toaster) {
           const msg = pipeline === 'local'
             ? 'Post criado no fluxo interno. Texto sendo gerado via Claude...'
+            : pipeline === 'simple'
+            ? 'Post criado no fluxo simples. Texto sendo gerado via OpenAI...'
             : 'Post enviado ao agente! Aguarde o processamento.';
           window.toaster.success(msg);
         }

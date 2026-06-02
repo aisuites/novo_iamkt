@@ -412,17 +412,22 @@
             </div>
             
             <div class="modal-footer">
+                {% if enable_local_pipeline %}
+                <div class="pipeline-selector" style="margin-right:auto; display:flex; align-items:center; gap:8px;">
+                    <label for="pipelineSelect" style="font-size:13px; white-space:nowrap;">Motor de geração</label>
+                    <select id="pipelineSelect" class="form-control" style="min-width:220px;" title="Escolha qual pipeline gera este post">
+                        <option value="n8n">N8N (produção)</option>
+                        <option value="local">Local (Celery + Claude + Gemini)</option>
+                        <option value="simple">Simples v2 (OpenAI gpt-4o-mini)</option>
+                    </select>
+                </div>
+                {% endif %}
                 <button type="button" class="btn btn-outline-secondary" onclick="closeModal('modalGerarPost')">
                     Cancelar
                 </button>
                 <button type="submit" class="btn btn-primary" id="btnEnviarPost" data-pipeline="n8n">
-                    Enviar N8N
+                    Gerar Post
                 </button>
-                {% if enable_local_pipeline %}
-                <button type="submit" class="btn btn-warning" id="btnEnviarLocal" data-pipeline="local" title="Pipeline interna (Celery + Claude + Gemini) - disponivel apenas em homol/dev">
-                    Enviar Fluxo interno
-                </button>
-                {% endif %}
             </div>
         </form>
     </div>
