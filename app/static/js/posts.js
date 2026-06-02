@@ -182,6 +182,34 @@
     return `${day}/${month}/${year}`;
   }
 
+  // Injeta (uma vez) o CSS da barra de progresso de geração.
+  function ensureProgressStyle() {
+    if (document.getElementById('pg-bar-style')) return;
+    const s = document.createElement('style');
+    s.id = 'pg-bar-style';
+    s.textContent =
+      '@keyframes pgFill{from{width:0%}to{width:100%}}' +
+      '.pg-banner{display:flex;align-items:center;gap:12px}' +
+      '.pg-body{flex:1;min-width:0}' +
+      '.pg-label{font-size:14px;font-weight:600;color:#2e7d32;margin-bottom:6px}' +
+      '.pg-track{width:100%;height:8px;background:#e3e8e3;border-radius:999px;overflow:hidden}' +
+      '.pg-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#6a5cff,#2e7d32)}';
+    document.head.appendChild(s);
+  }
+
+  // Banner com barra de progresso (enche em durationSec) + botao Atualizar Status.
+  function buildProgressBanner(label, durationSec) {
+    ensureProgressStyle();
+    return (
+      '<div class="pg-body">' +
+        '<div class="pg-label">' + label + '</div>' +
+        '<div class="pg-track"><div class="pg-fill" style="animation:pgFill ' +
+          durationSec + 's linear forwards"></div></div>' +
+      '</div>' +
+      '<button type="button" class="btn btn-sm" onclick="window.location.reload()">Atualizar Status</button>'
+    );
+  }
+
   /**
    * Verifica se deve mostrar banner de geração de imagem
    */
@@ -1125,12 +1153,8 @@
     if (dom.postStatus && post.status === 'generating' && post.status !== 'image_generating' && bannerContainer) {
       console.log('[updatePostDetails] Mostrando banner de TEXTO');
       const textBanner = document.createElement('div');
-      textBanner.className = 'post-text-status-banner';
-      textBanner.innerHTML = `
-        <span class="status-icon">🔄</span>
-        <span class="status-text">Seu conteúdo será gerado em até 3 minutos.</span>
-        <button type="button" class="btn btn-sm" onclick="window.location.reload()">Atualizar Status</button>
-      `;
+      textBanner.className = 'post-text-status-banner pg-banner';
+      textBanner.innerHTML = buildProgressBanner('Gerando seu conteúdo...', 60);
       bannerContainer.insertBefore(textBanner, dom.postStatus.parentElement);
     }
     
@@ -1221,17 +1245,8 @@
     // Mostrar banner de geração de imagem se necessário
     if (shouldShowImageGenerationBanner(post)) {
       const banner = document.createElement('div');
-      banner.className = 'post-image-status-banner';
-      
-      // Calcular prazo de entrega
-      const deadline = calculateImageDeadline(post.created_at);
-      const deadlineText = formatDeadline(deadline);
-      
-      banner.innerHTML = `
-        <span class="status-icon">🔄</span>
-        <span class="status-text">Sua imagem será gerada até ${deadlineText}</span>
-        <button type="button" class="btn btn-sm" onclick="window.location.reload()">Atualizar Status</button>
-      `;
+      banner.className = 'post-image-status-banner pg-banner';
+      banner.innerHTML = buildProgressBanner('Gerando sua imagem...', 120);
       dom.postImageFrame.parentElement.insertBefore(banner, dom.postImageFrame);
     }
 

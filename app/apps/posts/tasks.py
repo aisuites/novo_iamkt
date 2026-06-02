@@ -2636,18 +2636,19 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
             if fp and fp not in font_paths:
                 font_paths.append(fp)
 
-        # Logo DETERMINISTICO: se o usuario selecionou logo no modal, USA. O LLM
-        # nao decide isso (so sugere posicao quando o modal nao definiu).
+        # Logo: aplicado SEMPRE que a org tiver um (igual ao fluxo interno).
+        # _logos_from_org filtra pelos selected_logo_ids quando houver; senao
+        # retorna todos ordenados por is_primary -> logos[0] = primario.
+        # O LLM nao decide 'usar' (corrige logo indo como null). Posicao do modal = ouro.
         logo_cfg = briefing.get('logo') or {}
-        use_logo = bool(ctx.get('selected_logo_ids'))
+        logos = list(_logos_from_org(post.organization, post=post))
+        use_logo = bool(logos)
         logo_position = (ctx.get('logo_position') or logo_cfg.get('posicao') or '')  # modal = ouro
         logo_png = None
         if use_logo:
-            logos = list(_logos_from_org(post.organization, post=post))
-            if logos:
-                b64, _m = _download_to_base64(logos[0])
-                if b64:
-                    logo_png = _b64.b64decode(b64)
+            b64, _m = _download_to_base64(logos[0])
+            if b64:
+                logo_png = _b64.b64decode(b64)
         # Reflete a decisao real no briefing (debug coerente)
         if isinstance(briefing.get('logo'), dict):
             briefing['logo']['usar'] = use_logo
