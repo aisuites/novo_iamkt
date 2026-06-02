@@ -145,42 +145,8 @@
     return `${year}-${month}-${day}`;
   }
 
-  /**
-   * Calcula prazo de entrega da imagem (3 dias úteis)
-   */
-  function calculateImageDeadline(createdAtStr) {
-    const created = new Date(createdAtStr);
-    
-    // Função auxiliar: adicionar dias úteis (pula fim de semana)
-    function addBusinessDays(date, days) {
-      let result = new Date(date);
-      let addedDays = 0;
-      
-      while (addedDays < days) {
-        result.setDate(result.getDate() + 1);
-        const dayOfWeek = result.getDay();
-        
-        // Se não é sábado (6) nem domingo (0)
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-          addedDays++;
-        }
-      }
-      
-      return result;
-    }
-    
-    return addBusinessDays(created, 3);
-  }
-
-  /**
-   * Formata prazo para exibição (DD/MM/YYYY)
-   */
-  function formatDeadline(date) {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
+  // (calculateImageDeadline / formatDeadline duplicadas removidas — as versões
+  //  vivas, que são as que o JS usa, estão mais abaixo no arquivo.)
 
   // Injeta (uma vez) o CSS da barra de progresso de geração.
   function ensureProgressStyle() {
@@ -210,16 +176,7 @@
     );
   }
 
-  /**
-   * Verifica se deve mostrar banner de geração de imagem
-   */
-  function shouldShowImageGenerationBanner(post) {
-    // Mostra banner se:
-    // 1. Status é 'image_generating' OU imageStatus é 'generating' E
-    // 2. Ainda não tem imagens
-    return (post.status === 'image_generating' || post.imageStatus === 'generating') 
-           && (!post.imagens || post.imagens.length === 0);
-  }
+  // (shouldShowImageGenerationBanner duplicada removida — versão viva mais abaixo.)
 
   /**
    * Verifica se deve mostrar banner de geração de texto
@@ -1813,63 +1770,7 @@
   /**
    * Inicia geração de imagem para o post
    */
-  async function startImageGeneration(post) {
-    const serverId = getServerId(post);
-    if (!serverId) {
-      window.toaster?.error('Não foi possível identificar o post selecionado.');
-      return;
-    }
-    
-    // Usar modal de confirmação
-    const confirmed = window.confirmModal 
-      ? await window.confirmModal.show('Deseja gerar a imagem para este post?', 'Gerar Imagem')
-      : confirm('Deseja gerar a imagem para este post?');
-    
-    if (!confirmed) return;
-    
-    const previousStatus = post.status;
-    const previousStatusLabel = post.statusLabel;
-    const previousImageStatus = post.imageStatus;
-    const previousImages = Array.isArray(post.images) ? post.images.slice() : null;
-    const previousImageChanges = post.imageChanges || 0;
-    
-    post.imageStatus = 'generating';
-    post.status = 'image_generating';
-    post.statusLabel = statusInfo.image_generating?.label || 'Agente Gerando Imagem';
-    renderPosts();
-    
-    try {
-      const response = await fetch(`/posts/${serverId}/generate-image/`, {
-        method: 'POST',
-        headers: {
-          'X-CSRFToken': CSRF_TOKEN,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ mensagem: '' }),
-      });
-      
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(data?.error || ('HTTP ' + response.status));
-      }
-      
-      post.status = data?.status || 'image_generating';
-      post.statusLabel = data?.statusLabel || statusInfo[post.status]?.label || statusInfo.image_generating?.label || 'Agente Gerando Imagem';
-      post.imageStatus = data?.imageStatus || 'generating';
-      if (typeof data?.imageChanges === 'number') post.imageChanges = data.imageChanges;
-      renderPosts();
-    } catch (error) {
-      console.error(error);
-      post.status = previousStatus;
-      post.statusLabel = previousStatusLabel;
-      post.imageStatus = previousImageStatus || 'none';
-      if (previousImages) post.images = previousImages;
-      post.imageChanges = previousImageChanges;
-      renderPosts();
-      window.toaster?.error(error.message || 'Não foi possível acionar a geração de imagem. Tente novamente.');
-    }
-  }
+  // (startImageGeneration duplicada removida — versão viva definida mais abaixo.)
 
   // ============================================================================
   // SOLICITAÇÕES DE ALTERAÇÃO
