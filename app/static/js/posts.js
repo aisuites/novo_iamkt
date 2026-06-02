@@ -145,53 +145,38 @@
     return `${year}-${month}-${day}`;
   }
 
-  /**
-   * Calcula prazo de entrega da imagem (3 dias úteis)
-   */
-  function calculateImageDeadline(createdAtStr) {
-    const created = new Date(createdAtStr);
-    
-    // Função auxiliar: adicionar dias úteis (pula fim de semana)
-    function addBusinessDays(date, days) {
-      let result = new Date(date);
-      let addedDays = 0;
-      
-      while (addedDays < days) {
-        result.setDate(result.getDate() + 1);
-        const dayOfWeek = result.getDay();
-        
-        // Se não é sábado (6) nem domingo (0)
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-          addedDays++;
-        }
-      }
-      
-      return result;
-    }
-    
-    return addBusinessDays(created, 3);
+  // (calculateImageDeadline / formatDeadline duplicadas removidas — as versões
+  //  vivas, que são as que o JS usa, estão mais abaixo no arquivo.)
+
+  // Injeta (uma vez) o CSS da barra de progresso de geração.
+  function ensureProgressStyle() {
+    if (document.getElementById('pg-bar-style')) return;
+    const s = document.createElement('style');
+    s.id = 'pg-bar-style';
+    s.textContent =
+      '@keyframes pgFill{from{width:0%}to{width:100%}}' +
+      '.pg-banner{display:flex;align-items:center;gap:12px}' +
+      '.pg-body{flex:1;min-width:0}' +
+      '.pg-label{font-size:14px;font-weight:600;color:#2e7d32;margin-bottom:6px}' +
+      '.pg-track{width:100%;height:8px;background:#e3e8e3;border-radius:999px;overflow:hidden}' +
+      '.pg-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#6a5cff,#2e7d32)}';
+    document.head.appendChild(s);
   }
 
-  /**
-   * Formata prazo para exibição (DD/MM/YYYY)
-   */
-  function formatDeadline(date) {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+  // Banner com barra de progresso (enche em durationSec) + botao Atualizar Status.
+  function buildProgressBanner(label, durationSec) {
+    ensureProgressStyle();
+    return (
+      '<div class="pg-body">' +
+        '<div class="pg-label">' + label + '</div>' +
+        '<div class="pg-track"><div class="pg-fill" style="animation:pgFill ' +
+          durationSec + 's linear forwards"></div></div>' +
+      '</div>' +
+      '<button type="button" class="btn btn-sm" onclick="window.location.reload()">Atualizar Status</button>'
+    );
   }
 
-  /**
-   * Verifica se deve mostrar banner de geração de imagem
-   */
-  function shouldShowImageGenerationBanner(post) {
-    // Mostra banner se:
-    // 1. Status é 'image_generating' OU imageStatus é 'generating' E
-    // 2. Ainda não tem imagens
-    return (post.status === 'image_generating' || post.imageStatus === 'generating') 
-           && (!post.imagens || post.imagens.length === 0);
-  }
+  // (shouldShowImageGenerationBanner duplicada removida — versão viva mais abaixo.)
 
   /**
    * Verifica se deve mostrar banner de geração de texto
@@ -586,20 +571,27 @@
    */
   function resetGerarPostForm() {
     if (!dom.formGerarPost) return;
-    
+
     dom.formGerarPost.reset();
     if (dom.refImgs) dom.refImgs.value = '';
-    
+
     const feedRadio = dom.formatOptions?.querySelector('input[value="feed"]');
     if (feedRadio) feedRadio.checked = true;
-    
+
     syncFormatUI();
     setCarrossel(false);
-    
+
     if (dom.carrosselQtyInput) dom.carrosselQtyInput.value = '3';
-    
+
     updateTemaCounter();
     updateRefsInfo();
+
+    // Reseta state de uploads acumulativos (Etapa multi-upload)
+    if (typeof uploadedImagesState !== 'undefined') {
+      uploadedImagesState.length = 0;
+      if (typeof renderUploadedImages === 'function') renderUploadedImages();
+      if (typeof updateRefImgsCounter === 'function') updateRefImgsCounter();
+    }
   }
 
   /**
@@ -817,10 +809,13 @@
   /**
    * Envia requisição para gerar post
    */
-  async function requestPostFromAgent(payload) {
-    // Enviar para endpoint Django /posts/gerar/
-    // O Django cria o post e envia para N8N com todos os dados necessários (knowledge_base, etc)
-    const endpoint = '/posts/gerar/';
+  async function requestPostFromAgent(payload, pipeline = 'n8n') {
+    // Roteia para endpoint conforme pipeline escolhido pelo user no modal:
+    //   pipeline='n8n'    -> /posts/gerar/         (fluxo atual com N8N)
+    //   pipeline='local'  -> /posts/gerar-local/   (Celery + Claude + Gemini, homol/dev)
+    //   pipeline='simple' -> /posts/gerar-simples/ (Celery + OpenAI gpt-4o-mini, homol/dev)
+    const endpoints = { local: '/posts/gerar-local/', simple: '/posts/gerar-simples/' };
+    const endpoint = endpoints[pipeline] || '/posts/gerar/';
     
     // Obter post_format_id do select (NOVO)
     const postFormatId = dom.formatoSelect?.value || null;
@@ -834,7 +829,13 @@
       is_carousel: payload.carrossel || false,
       image_count: payload.qtdImagens || 1,
       tema: payload.tema || '',
-      reference_images: payload.referenceImages || [] // Array de {s3_key, url, name}
+      reference_images: payload.referenceImages || [], // {s3_key, url, name, usage_type, usage_description}
+      // Etapa 4 — selecionados das galerias da KB + descricao geral de uso
+      selected_logo_ids: payload.selectedLogoIds || [],
+      selected_reference_ids: payload.selectedReferenceIds || [],
+      references_usage_description: payload.refsUsageDescription || '',
+      reference_aspects: payload.referenceAspects || {},
+      logo_position: payload.logoPosition || '',
     };
 
     logger.debug('[POSTS] Enviando post para Django:', endpoint, jsonPayload);
@@ -875,6 +876,11 @@
     dom.formGerarPost.addEventListener('submit', async (e) => {
       e.preventDefault();
 
+      // Pipeline: admin escolhe no seletor; demais usuarios (sem seletor) sempre
+      // 'simple'. Fallback final tambem 'simple' (fluxo padrao de producao).
+      const pipeline = document.getElementById('pipelineSelect')?.value
+        || e.submitter?.dataset?.pipeline || 'simple';
+
       const rede = dom.redePost?.value || 'Instagram';
       const tema = dom.temaPost?.value.trim() || '';
       const formatos = selectedFormats();
@@ -882,7 +888,13 @@
       const qtdImagens = carrossel ? (Number(dom.carrosselQtyInput?.value) || 3) : 1;
       const ctaRadio = document.querySelector('input[name="ctaOption"]:checked');
       const ctaRequested = ctaRadio?.value === 'sim';
-      const files = dom.refImgs?.files ? Array.from(dom.refImgs.files) : [];
+      // Lê files do state acumulativo (window.__ETAPA4_STATE__.uploadedImagesState),
+      // nao mais do dom.refImgs.files (que e limpo apos cada selecao individual
+      // no novo fluxo cumulativo). Fallback: refImgs.files para retrocompat.
+      const _state = window.__ETAPA4_STATE__?.uploadedImagesState || [];
+      const files = _state.length
+        ? _state.map(it => it.file)
+        : (dom.refImgs?.files ? Array.from(dom.refImgs.files) : []);
 
       try {
         // Upload de imagens de referência (se houver)
@@ -891,7 +903,7 @@
           if (window.toaster) {
             window.toaster.info(`Fazendo upload de ${files.length} ${files.length === 1 ? 'imagem' : 'imagens'}...`);
           }
-          
+
           try {
             referenceImages = await uploadReferenceImages(files);
             logger.debug('[POSTS] Imagens de referência enviadas:', referenceImages);
@@ -903,7 +915,33 @@
             return; // Abortar envio do post
           }
         }
-        
+
+        // Etapa 4 — anexa metadados estruturados (usage_type, usage_description)
+        // por imagem uploaded, casando por nome com o uploadedImagesState
+        const etapa4 = window.__ETAPA4_STATE__ || {};
+        const usMap = new Map();
+        (etapa4.uploadedImagesState || []).forEach((it) => {
+          usMap.set(it.name, {
+            usage_type: it.usageType || '',
+            usage_description: it.usageDescription || '',
+          });
+        });
+        referenceImages = referenceImages.map((r) => ({
+          ...r,
+          usage_type: (usMap.get(r.name) || {}).usage_type || '',
+          usage_description: (usMap.get(r.name) || {}).usage_description || '',
+        }));
+
+        const selectedLogoIds = Array.from(etapa4.orgAssetsState?.selectedLogoIds || []);
+        const selectedReferenceIds = Array.from(etapa4.orgAssetsState?.selectedRefIds || []);
+        const refsUsageDescription = etapa4.getRefsUsageDescription
+          ? etapa4.getRefsUsageDescription()
+          : '';
+        const referenceAspects = etapa4.getReferenceAspects
+          ? etapa4.getReferenceAspects()
+          : {};
+        const logoPosition = document.getElementById('logoPosition')?.value || '';
+
         const payload = {
           rede,
           tema,
@@ -912,21 +950,39 @@
           carrossel,
           qtdImagens,
           ctaRequested,
-          referenceImages
+          referenceImages,
+          selectedLogoIds,
+          selectedReferenceIds,
+          refsUsageDescription,
+          referenceAspects,
+          logoPosition,
         };
 
-        const result = await requestPostFromAgent(payload);
-        
-        logger.debug('[POSTS] Post gerado com sucesso:', result);
-        
+        const result = await requestPostFromAgent(payload, pipeline);
+
+        logger.debug('[POSTS] Post gerado com sucesso:', result, 'pipeline:', pipeline);
+
         // Usar toaster ao invés de alert
         if (window.toaster) {
-          window.toaster.success('Post enviado ao agente! Aguarde o processamento.');
+          const msg = pipeline === 'local'
+            ? 'Post criado no fluxo interno. Texto sendo gerado via Claude...'
+            : pipeline === 'simple'
+            ? 'Post criado no fluxo simples. Texto sendo gerado via OpenAI...'
+            : 'Post enviado ao agente! Aguarde o processamento.';
+          window.toaster.success(msg);
         }
-        
+
+        // Marca o post recem-criado como selecionado para o reload puxar ele.
+        // Sem isso, o restore do localStorage abriria o post selecionado ANTES
+        // de criar o novo, sem mostrar o que esta gerando.
+        try {
+          const newId = result && (result.id || result.post_id || result.serverId);
+          if (newId) localStorage.setItem('selectedPostId', String(newId));
+        } catch (_) { /* noop */ }
+
         closeModal('modalGerarPost');
         resetGerarPostForm();
-        
+
         // Recarregar página após 2 segundos
         setTimeout(() => {
           window.location.reload();
@@ -1054,12 +1110,8 @@
     if (dom.postStatus && post.status === 'generating' && post.status !== 'image_generating' && bannerContainer) {
       console.log('[updatePostDetails] Mostrando banner de TEXTO');
       const textBanner = document.createElement('div');
-      textBanner.className = 'post-text-status-banner';
-      textBanner.innerHTML = `
-        <span class="status-icon">🔄</span>
-        <span class="status-text">Seu conteúdo será gerado em até 3 minutos.</span>
-        <button type="button" class="btn btn-sm" onclick="window.location.reload()">Atualizar Status</button>
-      `;
+      textBanner.className = 'post-text-status-banner pg-banner';
+      textBanner.innerHTML = buildProgressBanner('Gerando seu conteúdo...', 60);
       bannerContainer.insertBefore(textBanner, dom.postStatus.parentElement);
     }
     
@@ -1100,7 +1152,13 @@
     if (dom.postCTA) dom.postCTA.textContent = post.cta || '—';
     
     if (dom.postDescricaoImagem) {
-      dom.postDescricaoImagem.textContent = post.image_prompt || post.description || '—';
+      // Preferir descricao em PT-BR (visual_brief / strategist.image_style)
+      // para o usuario. image_prompt e o prompt EN do Gemini — fallback so se
+      // nao houver PT-BR.
+      dom.postDescricaoImagem.textContent = post.image_description_ptbr
+        || post.image_prompt
+        || post.description
+        || '—';
       
       if (post.carousel && post.carousel_quantity > 1) {
         if (!dom.postDescricaoImagem.classList.contains('post-image-prompt')) {
@@ -1144,17 +1202,8 @@
     // Mostrar banner de geração de imagem se necessário
     if (shouldShowImageGenerationBanner(post)) {
       const banner = document.createElement('div');
-      banner.className = 'post-image-status-banner';
-      
-      // Calcular prazo de entrega
-      const deadline = calculateImageDeadline(post.created_at);
-      const deadlineText = formatDeadline(deadline);
-      
-      banner.innerHTML = `
-        <span class="status-icon">🔄</span>
-        <span class="status-text">Sua imagem será gerada até ${deadlineText}</span>
-        <button type="button" class="btn btn-sm" onclick="window.location.reload()">Atualizar Status</button>
-      `;
+      banner.className = 'post-image-status-banner pg-banner';
+      banner.innerHTML = buildProgressBanner('Gerando sua imagem...', 120);
       dom.postImageFrame.parentElement.insertBefore(banner, dom.postImageFrame);
     }
 
@@ -1176,12 +1225,16 @@
     if (post.imageStatus === 'ready' && post.imagens && post.imagens.length) {
       const index = Math.max(0, Math.min(post.imagens.length - 1, post.activeImageIndex || 0));
       post.activeImageIndex = index;
-      
+
+      // post.imagens vem como [{id, s3_key}] do backend (suporta legacy: array de strings)
+      const _keyOf = (item) => (item && typeof item === 'object') ? item.s3_key : item;
+      const _idOf  = (item) => (item && typeof item === 'object') ? item.id : null;
+
       // Mostrar imagem principal com lazyload
       dom.postImageFrame.style.position = 'relative';
       const img = document.createElement('img');
       img.src = '#';
-      img.setAttribute('data-lazy-load', post.imagens[index]);
+      img.setAttribute('data-lazy-load', _keyOf(post.imagens[index]));
       img.alt = `Pré-visualização da imagem ${index + 1}`;
       dom.postImageFrame.appendChild(img);
 
@@ -1193,7 +1246,7 @@
       dlBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
       dlBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const s3Key = post.imagens[post.activeImageIndex || 0];
+        const s3Key = _keyOf(post.imagens[post.activeImageIndex || 0]);
         try {
           dlBtn.style.opacity = '0.5';
           dlBtn.style.pointerEvents = 'none';
@@ -1227,28 +1280,52 @@
       // Galeria de miniaturas (se houver múltiplas imagens)
       if (post.imagens.length > 1 && dom.postGallery) {
         dom.postGallery.hidden = false;
-        post.imagens.forEach((s3Key, idx) => {
+        dom.postGallery.innerHTML = '';
+        const postServerId = post.serverId || post.id;
+        post.imagens.forEach((item, idx) => {
+          const s3Key   = _keyOf(item);
+          const imageId = _idOf(item);
+
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'gallery-thumb';
           if (idx === index) btn.classList.add('active');
-          
+          btn.dataset.imageIndex = idx;
+          if (imageId != null) btn.dataset.imageId = imageId;
+          if (s3Key) btn.dataset.s3Key = s3Key;
+
           const thumb = document.createElement('img');
           thumb.src = '#';
           thumb.setAttribute('data-lazy-load', s3Key);
           thumb.alt = `Miniatura ${idx + 1}`;
           btn.appendChild(thumb);
-          
+
+          // Botao X para deletar (so se tiver imageId — sem id nao da pra apagar)
+          if (imageId != null) {
+            const x = document.createElement('span');
+            x.className = 'btn-remove-image';
+            x.dataset.action = 'remove-post-image';
+            x.dataset.postId = postServerId;
+            x.dataset.imageId = imageId;
+            x.title = 'Remover imagem';
+            x.setAttribute('role', 'button');
+            x.tabIndex = 0;
+            x.innerHTML = '&times;';
+            btn.appendChild(x);
+          }
+
           // Ativar lazyload para miniatura
           if (window.postsImageLoader) {
             window.postsImageLoader.observe(thumb);
           }
-          
-          btn.addEventListener('click', () => {
+
+          btn.addEventListener('click', (e) => {
+            // Click no X nao deve trocar a imagem ativa
+            if (e.target.closest('.btn-remove-image')) return;
             post.activeImageIndex = idx;
             updatePostVisual(post);
           });
-          
+
           dom.postGallery.appendChild(btn);
         });
       }
@@ -1280,10 +1357,28 @@
           });
           dom.postImageActions.appendChild(btn);
         }
+
+        // Botão "Edição Avançada" — abre modal HTML overlay (novo pipeline).
+        // Visível apenas quando a imagem ATIVA no carrossel é a "editável"
+        // (PostImage cujo s3_key == post.image_s3_key — versão composta atual).
+        const activeImg = post.imagens[post.activeImageIndex || 0];
+        const isEditable = (activeImg && typeof activeImg === 'object')
+            ? !!activeImg.is_editable
+            : false;
+        if (isEditable && window.IS_ADMIN) {
+            const btnArteFinal = document.createElement('button');
+            btnArteFinal.type = 'button';
+            btnArteFinal.className = 'btn';
+            btnArteFinal.textContent = 'Edição Avançada';
+            btnArteFinal.addEventListener('click', () => {
+                if (typeof openArteFinal === 'function') openArteFinal(post.serverId || post.id);
+            });
+            dom.postImageActions.appendChild(btnArteFinal);
+        }
       }
       return;
     }
-    
+
     // Imagem gerando
     if (post.imageStatus === 'generating') {
       const span = document.createElement('span');
@@ -1675,63 +1770,7 @@
   /**
    * Inicia geração de imagem para o post
    */
-  async function startImageGeneration(post) {
-    const serverId = getServerId(post);
-    if (!serverId) {
-      window.toaster?.error('Não foi possível identificar o post selecionado.');
-      return;
-    }
-    
-    // Usar modal de confirmação
-    const confirmed = window.confirmModal 
-      ? await window.confirmModal.show('Deseja gerar a imagem para este post?', 'Gerar Imagem')
-      : confirm('Deseja gerar a imagem para este post?');
-    
-    if (!confirmed) return;
-    
-    const previousStatus = post.status;
-    const previousStatusLabel = post.statusLabel;
-    const previousImageStatus = post.imageStatus;
-    const previousImages = Array.isArray(post.images) ? post.images.slice() : null;
-    const previousImageChanges = post.imageChanges || 0;
-    
-    post.imageStatus = 'generating';
-    post.status = 'image_generating';
-    post.statusLabel = statusInfo.image_generating?.label || 'Agente Gerando Imagem';
-    renderPosts();
-    
-    try {
-      const response = await fetch(`/posts/${serverId}/generate-image/`, {
-        method: 'POST',
-        headers: {
-          'X-CSRFToken': CSRF_TOKEN,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ mensagem: '' }),
-      });
-      
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(data?.error || ('HTTP ' + response.status));
-      }
-      
-      post.status = data?.status || 'image_generating';
-      post.statusLabel = data?.statusLabel || statusInfo[post.status]?.label || statusInfo.image_generating?.label || 'Agente Gerando Imagem';
-      post.imageStatus = data?.imageStatus || 'generating';
-      if (typeof data?.imageChanges === 'number') post.imageChanges = data.imageChanges;
-      renderPosts();
-    } catch (error) {
-      console.error(error);
-      post.status = previousStatus;
-      post.statusLabel = previousStatusLabel;
-      post.imageStatus = previousImageStatus || 'none';
-      if (previousImages) post.images = previousImages;
-      post.imageChanges = previousImageChanges;
-      renderPosts();
-      window.toaster?.error(error.message || 'Não foi possível acionar a geração de imagem. Tente novamente.');
-    }
-  }
+  // (startImageGeneration duplicada removida — versão viva definida mais abaixo.)
 
   // ============================================================================
   // SOLICITAÇÕES DE ALTERAÇÃO
@@ -2274,10 +2313,529 @@
 
   console.log('[POSTS.JS] Total de posts:', window.INITIAL_POSTS.length);
   console.log('[POSTS.JS] Chamando renderPosts()...');
-  
+
   // Renderizar posts iniciais
   renderPosts();
-  
+
   console.log('[POSTS.JS] renderPosts() executado');
+
+  // ============================================================
+  // ETAPA 4 — Galerias de assets (logos + references) + Lightbox
+  // + Upload estruturado (usage_type + usage_description por imagem)
+  // ============================================================
+
+  const orgAssetsState = {
+    logos: [],
+    references: [],
+    selectedLogoIds: new Set(),
+    selectedRefIds: new Set(),
+    refAspects: {},   // { refId: ['layout_composicao', 'grafismos', ...] } (multi)
+    loaded: false,
+  };
+
+  // Aspecto a aproveitar de cada referencia (1 por imagem, exclusivo entre elas)
+  const REFERENCE_ASPECTS = [
+    { value: '', label: 'O que aproveitar...' },
+    { value: 'produto', label: 'Produto (enviar fiel ao Gemini)' },
+    { value: 'pessoa_modelo', label: 'Pessoa como modelo (fidelidade)' },
+    { value: 'layout_composicao', label: 'Layout / composicao' },
+    { value: 'iluminacao', label: 'Iluminacao' },
+    { value: 'estilo_pessoas', label: 'Estilo de pessoas (inspirar)' },
+    { value: 'estilo_ambiente', label: 'Estilo de ambiente' },
+    { value: 'grafismos', label: 'Grafismos' },
+  ];
+  // Aspectos exclusivos entre refs (1 ref por aspecto). produto/pessoa_modelo NAO
+  // entram aqui — varias refs podem ser enviadas como imagem ao Gemini (mesmo
+  // tratamento de fidelidade).
+  const NON_EXCLUSIVE_ASPECTS = new Set(['produto', 'pessoa_modelo']);
+
+  // Cada uploaded image: {file, dataUrl, name, usageType, usageDescription}
+  const uploadedImagesState = [];
+
+  const USAGE_TYPES = [
+    { value: '', label: 'Selecione o tipo de uso...' },
+    { value: 'produto', label: 'Produto (manter fiel ao original)' },
+    { value: 'pessoa', label: 'Pessoa / Speaker' },
+    { value: 'cenario', label: 'Cenario / Lugar' },
+    { value: 'referencia_estilo', label: 'Referencia de estilo' },
+    { value: 'icone', label: 'Icone / Elemento grafico' },
+    { value: 'fundo', label: 'Fundo / Textura' },
+    { value: 'outro', label: 'Outro' },
+  ];
+
+  async function loadOrgAssets() {
+    if (orgAssetsState.loaded) return;
+    try {
+      const resp = await fetch('/posts/api/org-assets/?type=all', {
+        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        credentials: 'same-origin',
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      orgAssetsState.logos = data.logos || [];
+      orgAssetsState.references = data.references || [];
+      orgAssetsState.loaded = true;
+      renderLogosGallery();
+      renderReferencesGallery();
+    } catch (err) {
+      console.error('[ETAPA4] Falha ao carregar org-assets:', err);
+      const containers = ['orgLogosGallery', 'orgRefsGallery'];
+      containers.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<div class="asset-gallery-loading">Erro ao carregar.</div>';
+      });
+    }
+  }
+
+  function renderLogosGallery() {
+    const container = document.getElementById('orgLogosGallery');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!orgAssetsState.logos.length) {
+      const empty = document.createElement('div');
+      empty.className = 'asset-gallery-loading';
+      empty.textContent = container.dataset.emptyText || 'Sem logos.';
+      container.appendChild(empty);
+      return;
+    }
+    orgAssetsState.logos.forEach((logo) => {
+      const thumb = buildAssetThumb({
+        id: logo.id,
+        url: logo.url,
+        title: logo.name,
+        badge: logo.is_primary ? 'principal' : logo.logo_type,
+        selectedSet: orgAssetsState.selectedLogoIds,
+        singleSelect: true,   // logo e UNICA: seleciona 1 e deselecionou os outros
+        galleryEl: container,
+      });
+      container.appendChild(thumb);
+    });
+  }
+
+  function renderReferencesGallery() {
+    const container = document.getElementById('orgRefsGallery');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!orgAssetsState.references.length) {
+      const empty = document.createElement('div');
+      empty.className = 'asset-gallery-loading';
+      empty.textContent = container.dataset.emptyText || 'Sem referencias.';
+      container.appendChild(empty);
+      return;
+    }
+    orgAssetsState.references.forEach((ref) => {
+      const thumb = buildAssetThumb({
+        id: ref.id,
+        url: ref.url,
+        title: ref.title || ref.description || 'referencia',
+        badge: '',
+        selectedSet: orgAssetsState.selectedRefIds,
+        onToggle: renderAspectsArea,
+      });
+      container.appendChild(thumb);
+    });
+    renderAspectsArea();
+  }
+
+  // Area de aspectos: 1 linha por ref SELECIONADA, com select exclusivo do
+  // que aproveitar daquela imagem.
+  function renderAspectsArea() {
+    const area = document.getElementById('refsAspectsArea');
+    if (!area) return;
+    const selectedIds = Array.from(orgAssetsState.selectedRefIds);
+
+    // Limpa aspectos de refs que foram desmarcadas
+    Object.keys(orgAssetsState.refAspects).forEach((rid) => {
+      if (!selectedIds.some((s) => String(s) === String(rid))) {
+        delete orgAssetsState.refAspects[rid];
+      }
+    });
+
+    area.innerHTML = '';
+    if (!selectedIds.length) {
+      const empty = document.createElement('div');
+      empty.className = 'refs-aspects-empty';
+      empty.textContent = area.dataset.emptyText || 'Selecione referencias acima.';
+      area.appendChild(empty);
+      return;
+    }
+
+    // aspecto -> refId que ja o utiliza (exclusividade cruzada entre imagens)
+    const owner = {};
+    Object.entries(orgAssetsState.refAspects).forEach(([rid, arr]) => {
+      (Array.isArray(arr) ? arr : []).forEach((a) => { if (a) owner[a] = rid; });
+    });
+
+    selectedIds.forEach((rid) => {
+      const ref = orgAssetsState.references.find((r) => String(r.id) === String(rid));
+      if (!ref) return;
+      const row = document.createElement('div');
+      row.className = 'refs-aspect-row';
+
+      const thumb = document.createElement('img');
+      thumb.className = 'refs-aspect-thumb';
+      thumb.src = ref.url;
+      thumb.alt = ref.title || '';
+      thumb.loading = 'lazy';
+      row.appendChild(thumb);
+
+      const name = document.createElement('span');
+      name.className = 'refs-aspect-name';
+      name.textContent = ref.title || ref.description || `Referencia ${rid}`;
+      row.appendChild(name);
+
+      // Multi-selecao: 1 checkbox por aspecto. Um aspecto exclusivo so pode
+      // pertencer a UMA imagem; 'produto' pode repetir em varias.
+      const chips = document.createElement('div');
+      chips.className = 'refs-aspect-chips';
+      const mine = Array.isArray(orgAssetsState.refAspects[rid])
+        ? orgAssetsState.refAspects[rid] : [];
+      REFERENCE_ASPECTS.forEach((o) => {
+        if (!o.value) return; // ignora placeholder
+        const label = document.createElement('label');
+        label.className = 'refs-aspect-chip';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = o.value;
+        const checkedHere = mine.includes(o.value);
+        cb.checked = checkedHere;
+        const ownedByOther = owner[o.value] && String(owner[o.value]) !== String(rid);
+        cb.disabled = !checkedHere && !NON_EXCLUSIVE_ASPECTS.has(o.value) && !!ownedByOther;
+        if (cb.disabled) label.classList.add('is-disabled');
+        cb.addEventListener('change', (e) => {
+          let arr = Array.isArray(orgAssetsState.refAspects[rid])
+            ? [...orgAssetsState.refAspects[rid]] : [];
+          if (e.target.checked) {
+            if (!arr.includes(o.value)) arr.push(o.value);
+          } else {
+            arr = arr.filter((x) => x !== o.value);
+          }
+          if (arr.length) orgAssetsState.refAspects[rid] = arr;
+          else delete orgAssetsState.refAspects[rid];
+          renderAspectsArea();
+        });
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(' ' + o.label));
+        chips.appendChild(label);
+      });
+      row.appendChild(chips);
+      area.appendChild(row);
+    });
+  }
+
+  function buildAssetThumb({ id, url, title, badge, selectedSet, singleSelect, galleryEl, onToggle }) {
+    const div = document.createElement('div');
+    div.className = 'asset-thumb';
+    div.dataset.id = String(id);
+    div.title = title || '';
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = title || '';
+    img.loading = 'lazy';
+    div.appendChild(img);
+
+    if (badge) {
+      const b = document.createElement('span');
+      b.className = 'asset-badge';
+      b.textContent = badge;
+      div.appendChild(b);
+    }
+
+    const check = document.createElement('span');
+    check.className = 'asset-check';
+    check.textContent = '✓';
+    div.appendChild(check);
+
+    // Toggle selecao no click; double-click abre lightbox.
+    let clickTimer = null;
+    div.addEventListener('click', (e) => {
+      // Se o user clicou diretamente na img com shift/alt, abre lightbox
+      if (e.shiftKey || e.altKey) {
+        openLightbox(url);
+        return;
+      }
+      // Single click = toggle; dblclick = lightbox
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+        openLightbox(url);
+        return;
+      }
+      clickTimer = setTimeout(() => {
+        clickTimer = null;
+        if (selectedSet.has(id)) {
+          selectedSet.delete(id);
+          div.classList.remove('selected');
+        } else {
+          // singleSelect=true: deseleciona os irmaos antes de marcar este
+          if (singleSelect && galleryEl) {
+            selectedSet.clear();
+            galleryEl.querySelectorAll('.asset-thumb.selected').forEach((el) => {
+              el.classList.remove('selected');
+            });
+          }
+          selectedSet.add(id);
+          div.classList.add('selected');
+        }
+        if (typeof onToggle === 'function') onToggle();
+      }, 220);
+    });
+
+    return div;
+  }
+
+  // ---- Lightbox ------------------------------------------------------
+
+  function openLightbox(url) {
+    const lb = document.getElementById('imageLightbox');
+    const img = document.getElementById('imageLightboxImg');
+    if (!lb || !img || !url) return;
+    img.src = url;
+    lb.classList.add('open');
+  }
+
+  function closeLightbox() {
+    const lb = document.getElementById('imageLightbox');
+    if (lb) lb.classList.remove('open');
+  }
+
+  function attachLightboxHandlers() {
+    const lb = document.getElementById('imageLightbox');
+    if (!lb) return;
+    const closeBtn = lb.querySelector('.lb-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeLightbox);
+    lb.addEventListener('click', (e) => {
+      if (e.target === lb) closeLightbox();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && lb.classList.contains('open')) closeLightbox();
+    });
+  }
+
+  // ---- Upload estruturado --------------------------------------------
+
+  function renderUploadedImages() {
+    const container = dom.refImgsPreview;
+    if (!container) return;
+    container.innerHTML = '';
+    uploadedImagesState.forEach((item, idx) => {
+      const card = document.createElement('div');
+      card.className = 'uploaded-image-card';
+
+      const thumb = document.createElement('div');
+      thumb.className = 'uic-thumb';
+      thumb.title = 'Click para ampliar';
+      const img = document.createElement('img');
+      img.src = item.dataUrl;
+      img.alt = item.name;
+      thumb.appendChild(img);
+      thumb.addEventListener('click', () => openLightbox(item.dataUrl));
+      card.appendChild(thumb);
+
+      const fields = document.createElement('div');
+      fields.className = 'uic-fields';
+
+      const headRow = document.createElement('div');
+      headRow.className = 'uic-row';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'uic-name';
+      nameSpan.textContent = item.name;
+      headRow.appendChild(nameSpan);
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'uic-remove';
+      removeBtn.title = 'Remover';
+      removeBtn.innerHTML = '&times;';
+      removeBtn.addEventListener('click', () => removeUploadedImage(idx));
+      headRow.appendChild(removeBtn);
+      fields.appendChild(headRow);
+
+      const typeSelect = document.createElement('select');
+      USAGE_TYPES.forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = t.value;
+        opt.textContent = t.label;
+        if (t.value === item.usageType) opt.selected = true;
+        typeSelect.appendChild(opt);
+      });
+      typeSelect.addEventListener('change', (e) => {
+        uploadedImagesState[idx].usageType = e.target.value;
+      });
+      fields.appendChild(typeSelect);
+
+      const ta = document.createElement('textarea');
+      ta.placeholder = 'Descreva como usar essa imagem (ex: produto que deve aparecer fielmente, foto do palestrante...)';
+      ta.value = item.usageDescription || '';
+      ta.rows = 2;
+      ta.maxLength = 300;
+      ta.addEventListener('input', (e) => {
+        uploadedImagesState[idx].usageDescription = e.target.value;
+      });
+      fields.appendChild(ta);
+
+      card.appendChild(fields);
+      container.appendChild(card);
+    });
+  }
+
+  function removeUploadedImage(idx) {
+    uploadedImagesState.splice(idx, 1);
+    renderUploadedImages();
+    updateRefImgsCounter();
+  }
+
+  const MAX_REF_IMAGES = 5;
+
+  // Acumula novos files no state (NAO sobrescreve). Respeita limite MAX.
+  function appendUploadedFiles(files) {
+    const available = MAX_REF_IMAGES - uploadedImagesState.length;
+    if (available <= 0) {
+      if (window.toaster) window.toaster.warning(`Limite de ${MAX_REF_IMAGES} imagens atingido.`);
+      return;
+    }
+    const filesToAdd = files.slice(0, available);
+    if (files.length > available && window.toaster) {
+      window.toaster.warning(`So foi possivel adicionar ${available} de ${files.length} imagens (limite ${MAX_REF_IMAGES}).`);
+    }
+    let pending = filesToAdd.length;
+    if (!pending) {
+      updateRefImgsCounter();
+      return;
+    }
+    filesToAdd.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        uploadedImagesState.push({
+          file,
+          dataUrl: e.target.result,
+          name: file.name,
+          usageType: '',
+          usageDescription: '',
+        });
+        pending -= 1;
+        if (pending === 0) {
+          renderUploadedImages();
+          updateRefImgsCounter();
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Atualiza contador X/5 + estado do botao "Adicionar imagem"
+  function updateRefImgsCounter() {
+    const counterEl = document.getElementById('refImgsCounter');
+    const btnAdd = document.getElementById('btnAddRefImg');
+    const count = uploadedImagesState.length;
+    if (counterEl) counterEl.textContent = `(${count}/${MAX_REF_IMAGES})`;
+    if (btnAdd) {
+      btnAdd.disabled = count >= MAX_REF_IMAGES;
+      btnAdd.classList.toggle('disabled', count >= MAX_REF_IMAGES);
+    }
+  }
+
+  // Atualiza contador apos remove (chamada de removeUploadedImage)
+  function refreshAfterRemoval() {
+    updateRefImgsCounter();
+  }
+
+  // Listener no input — captura UM arquivo por vez (input nao tem 'multiple'
+  // agora) e acumula no state. Limpa o input apos cada selecao para permitir
+  // re-selecionar o mesmo arquivo se preciso.
+  if (dom.refImgs) {
+    dom.refImgs.addEventListener('change', () => {
+      const files = Array.from(dom.refImgs.files || []);
+      appendUploadedFiles(files);
+      // Reseta input para permitir re-selecionar arquivos
+      try { dom.refImgs.value = ''; } catch (e) { /* noop */ }
+    });
+  }
+
+  // Expoe state pro form submit handler ler (ver requestPostFromAgent)
+  window.__ETAPA4_STATE__ = {
+    orgAssetsState,
+    uploadedImagesState,
+    getRefsUsageDescription: () =>
+      document.getElementById('refsUsageDescription')?.value.trim() || '',
+    // { refId: [aspectos] } apenas das refs efetivamente selecionadas
+    getReferenceAspects: () => {
+      const out = {};
+      const sel = orgAssetsState.selectedRefIds;
+      Object.entries(orgAssetsState.refAspects).forEach(([rid, arr]) => {
+        const list = (Array.isArray(arr) ? arr : []).filter(Boolean);
+        if (list.length && Array.from(sel).some((s) => String(s) === String(rid))) {
+          out[rid] = list;
+        }
+      });
+      return out;
+    },
+  };
+
+  /**
+   * Delete de miniatura — handler global delegated.
+   * Reusa showConfirm (confirm-modal.js) e o endpoint
+   * DELETE /posts/<post_id>/images/<image_id>/delete/ (views_actions.delete_post_image).
+   */
+  document.addEventListener('click', async (e) => {
+    const target = e.target.closest('[data-action="remove-post-image"]');
+    if (!target) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const postId  = target.dataset.postId;
+    const imageId = target.dataset.imageId;
+    if (!postId || !imageId) return;
+
+    const confirmed = typeof window.showConfirm === 'function'
+      ? await window.showConfirm(
+          'Esta acao nao pode ser desfeita. A imagem sera removida permanentemente.',
+          'Remover imagem?'
+        )
+      : window.confirm('Remover esta imagem? Acao irreversivel.');
+    if (!confirmed) return;
+
+    try {
+      const resp = await fetch(`/posts/${postId}/images/${imageId}/delete/`, {
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': CSRF_TOKEN },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) {
+        // Atualiza state em memoria e re-renderiza esse post
+        const post = (postsState && Array.isArray(postsState.items) ? postsState.items : [])
+          .find((p) => String(p.serverId || p.id) === String(postId));
+        if (post && Array.isArray(post.imagens)) {
+          post.imagens = post.imagens.filter((it) => {
+            const id = (it && typeof it === 'object') ? it.id : null;
+            return String(id) !== String(imageId);
+          });
+          // Mantem activeImageIndex valido
+          if (post.activeImageIndex >= post.imagens.length) {
+            post.activeImageIndex = Math.max(0, post.imagens.length - 1);
+          }
+          if (!post.imagens.length) {
+            post.imageStatus = 'none';
+            post.has_image = false;
+          }
+          updatePostVisual(post);
+        } else {
+          // fallback: reload pagina se o state nao bate
+          window.location.reload();
+        }
+        if (window.toaster) toaster.success('Imagem removida.');
+      } else {
+        const msg = (data && data.error) || 'Erro ao remover imagem.';
+        if (window.toaster) toaster.error(msg); else alert(msg);
+      }
+    } catch (err) {
+      logger.error('[posts] delete image falhou', err);
+      if (window.toaster) toaster.error('Erro ao remover imagem.');
+    }
+  });
+
+  // Bootstrap: carrega galerias e ativa lightbox
+  attachLightboxHandlers();
+  loadOrgAssets();
 
 })();

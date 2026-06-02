@@ -278,6 +278,32 @@ class KnowledgeBase(models.Model):
         verbose_name='Compilação N8N',
         help_text='Compilação final retornada pelo N8N (plano de marketing, avaliações)'
     )
+    # Spec de layout extraido das ReferenceImages via Claude Vision (Smart
+    # Pillow Overlay). Cacheado por org. Schema:
+    #   {
+    #     'analyzed_at': iso datetime,
+    #     'reference_image_ids': [42, 43],
+    #     'title_position': 'top-left' | 'top-center' | 'bottom-left' | ...,
+    #     'title_size_pct': 8 (% da altura do canvas),
+    #     'title_weight': 'bold' | 'regular' | 'medium',
+    #     'title_color_hint': 'auto_contrast' | 'white' | 'black' | 'brand_primary',
+    #     'subtitle_offset': 'below_title' | 'separate',
+    #     'subtitle_size_pct': 3,
+    #     'logo_position': 'top-right' | 'top-left' | 'bottom-right' | 'none',
+    #     'logo_size_pct': 12,
+    #     'cta_style': 'pill' | 'underline' | 'block' | 'none',
+    #     'cta_position': 'bottom-center' | 'bottom-left' | 'bottom-right',
+    #     'alignment': 'left' | 'center' | 'right',
+    #     'padding_pct': 5,
+    #     'background_treatment': 'none' | 'gradient' | 'color_block',
+    #     'design_rationale': 'string descritiva curta'
+    #   }
+    brand_layout_spec = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Spec de layout da marca',
+        help_text='Cache do layout analisado das references via Claude Vision'
+    )
     accepted_suggestions = models.JSONField(
         default=dict,
         blank=True,
@@ -757,6 +783,43 @@ class ReferenceImage(models.Model):
             ('avoid', 'EVITAR (não quero parecer com isso)'),
         ],
         verbose_name='Tipo de uso'
+    )
+
+    # ========================================
+    # DOSSIE VISUAL (analise objetiva via Claude Vision)
+    # ========================================
+    # Gerado UMA vez (no upload / sweep no save / fallback no post) e
+    # reutilizado em toda geracao de post. Descreve a imagem em si
+    # (composicao, iluminacao, grid, pessoas, ambiente, paleta, tipografia,
+    # texto x imagem, assets) + um recreation_prompt detalhado. Independe da
+    # intencao do usuario (essa e aplicada no momento do post).
+    visual_analysis = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Dossiê visual',
+        help_text='Análise objetiva da imagem (composição, iluminação, grid, etc.) gerada via IA'
+    )
+    analysis_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pendente'),
+            ('processing', 'Processando'),
+            ('completed', 'Concluída'),
+            ('error', 'Erro'),
+        ],
+        default='pending',
+        verbose_name='Status da análise visual'
+    )
+    analyzed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Analisada em'
+    )
+    analysis_cost_usd = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        default=0,
+        verbose_name='Custo da análise (USD)'
     )
 
     class Meta:
@@ -1376,6 +1439,41 @@ class BrandgraficModule(models.Model):
     )
     is_active = models.BooleanField(default=True, verbose_name='Ativo')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    # ========================================
+    # DOSSIE VISUAL (analise objetiva via Claude Vision)
+    # ========================================
+    # Mesmo padrao da ReferenceImage, mas o schema descreve um ELEMENTO
+    # grafico (forma/padrao/moldura/icone), nao uma cena. Gerado 1x e
+    # reutilizado. SVG e rasterizado para PNG antes da analise.
+    visual_analysis = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Dossiê visual',
+        help_text='Análise objetiva do grafismo (tipo, cores, aplicação) gerada via IA'
+    )
+    analysis_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pendente'),
+            ('processing', 'Processando'),
+            ('completed', 'Concluída'),
+            ('error', 'Erro'),
+        ],
+        default='pending',
+        verbose_name='Status da análise visual'
+    )
+    analyzed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Analisada em'
+    )
+    analysis_cost_usd = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        default=0,
+        verbose_name='Custo da análise (USD)'
+    )
 
     class Meta:
         verbose_name = 'Módulo de Grafismo'

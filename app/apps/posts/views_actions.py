@@ -11,7 +11,7 @@ import json
 import logging
 import requests
 
-from .models import Post
+from .models import Post, PostImage
 from apps.core.services.s3_service import S3Service
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,8 @@ def generate_image(request, post_id):
         
         # Verificar limite de alterações de imagem (configurável por organização)
         max_revisions = post.organization.max_image_revisions
-        
+        image_change_count = 0  # default — evita UnboundLocalError se max_revisions==0
+
         # Se max_revisions = 0, permite ilimitado
         if max_revisions > 0:
             image_change_count = post.change_requests.filter(
@@ -167,6 +168,43 @@ def generate_image(request, post_id):
         except Exception as exc:
             logger.warning(f'Erro ao enviar email de solicitação: {exc}')
         
+        # Pipeline SIMPLES v2 (Celery + Gemini Nano Banana) — pipeline_used='simple'
+        if post.pipeline_used == 'simple':
+            from apps.posts.tasks import generate_post_simple_image_task
+            generate_post_simple_image_task.delay(post.id, message or '')
+            logger.info('[posts.simple] generate_post_simple_image_task disparado post_id=%s', post.id)
+            return JsonResponse({
+                'success': True,
+                'id': post.id,
+                'serverId': post.id,
+                'status': post.status,
+                'statusLabel': post.get_status_display(),
+                'imageStatus': 'generating',
+                'imageChanges': image_change_count,
+                'imageRequestedAt': change_request.created_at.isoformat(),
+                'pipeline': 'simple',
+            })
+
+        # Pipeline INTERNA (Celery + Gemini) — disparada se o post foi criado
+        # via "Enviar Fluxo interno" (pipeline_used='local')
+        if post.pipeline_used == 'local':
+            from apps.posts.tasks import generate_post_image_task
+            generate_post_image_task.delay(post.id, message or '')
+            logger.info(
+                '[posts.local] generate_post_image_task disparado post_id=%s', post.id
+            )
+            return JsonResponse({
+                'success': True,
+                'id': post.id,
+                'serverId': post.id,
+                'status': post.status,
+                'statusLabel': post.get_status_display(),
+                'imageStatus': 'generating',
+                'imageChanges': image_change_count,
+                'imageRequestedAt': change_request.created_at.isoformat(),
+                'pipeline': 'local',
+            })
+
         # Enviar para N8N (webhook de geração de imagem)
         if hasattr(settings, 'N8N_WEBHOOK_GERAR_IMAGEM') and settings.N8N_WEBHOOK_GERAR_IMAGEM:
             try:
@@ -656,3 +694,47 @@ def approve_post(request, post_id):
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+
+@login_required
+@require_http_methods(["DELETE"])
+def delete_post_image(request, post_id, image_id):
+    """
+    Deleta uma imagem gerada de um post (banco + S3).
+
+    DELETE /posts/<post_id>/images/<image_id>/delete/
+
+    Returns:
+        {'success': bool, 'remaining': int}  # qtd de imagens restantes no post
+    """
+    try:
+        image = PostImage.objects.select_related('post').get(
+            id=image_id,
+            post_id=post_id,
+            post__organization=request.organization,
+        )
+    except PostImage.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Imagem nao encontrada'}, status=404)
+
+    post = image.post
+    s3_key = image.s3_key
+
+    try:
+        if s3_key:
+            S3Service.delete_file(s3_key)
+    except Exception:
+        logger.exception('[posts] falha S3 delete image=%s key=%s', image_id, s3_key)
+        # nao bloqueia o delete do banco — orfaos em S3 sao lidos pelo cleanup
+
+    image.delete()
+
+    # Se a imagem principal apontava para essa key, limpa os campos do Post
+    if post.image_s3_key and post.image_s3_key == s3_key:
+        post.image_s3_key = ''
+        post.image_s3_url = ''
+        post.has_image = False
+        post.save(update_fields=['image_s3_key', 'image_s3_url', 'has_image'])
+
+    remaining = post.images.count()
+    return JsonResponse({'success': True, 'remaining': remaining})

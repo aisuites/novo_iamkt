@@ -49,14 +49,25 @@ def posts_list(request):
     posts_json = []
     for post in posts.prefetch_related('images', 'change_requests').order_by('-created_at'):
         try:
-            # Buscar imagens do post (enviar s3_keys para usar com lazyload)
+            # Buscar imagens do post (id + s3_key para lazyload + delete + edit-flag).
+            # is_editable=True para a PostImage que e a "versao atual" composta
+            # (s3_key == post.image_s3_key). So nessa o botao "Edicao Avancada"
+            # aparece no front — abre o modal que sempre carrega a versao atual.
+            current_main_key = (post.image_s3_key or '').strip()
             post_images = post.images.all().order_by('order')
-            imagens_keys = [img.s3_key for img in post_images if img.s3_key]
-            
+            imagens_data = [
+                {
+                    'id': img.id,
+                    's3_key': img.s3_key,
+                    'is_editable': bool(current_main_key) and img.s3_key == current_main_key,
+                }
+                for img in post_images if img.s3_key
+            ]
+
             # Calcular imageStatus baseado no status do post e se tem imagens
             if post.status == 'image_generating':
                 image_status = 'generating'
-            elif post.status == 'image_ready' or (imagens_keys and post.status in ['approved', 'pending']):
+            elif post.status == 'image_ready' or (imagens_data and post.status in ['approved', 'pending']):
                 image_status = 'ready'
             else:
                 image_status = 'none'
@@ -69,7 +80,17 @@ def posts_list(request):
             
             # Obter limite de alterações da organização
             max_image_revisions = post.organization.max_image_revisions if post.organization else 1
-            
+
+            # Descricao da imagem em PT-BR para o front (image_prompt e o prompt EN
+            # enviado ao Gemini — nao deve ir pro user).
+            # Prioridade: visual_brief (curto, PT-BR) -> strategist.visual_direction.image_style
+            image_description_ptbr = (post.visual_brief or '').strip()
+            if not image_description_ptbr:
+                sp = (post.copy_payload or {}).get('_strategic_payload') or {}
+                image_description_ptbr = (
+                    (sp.get('visual_direction') or {}).get('image_style') or ''
+                ).strip()
+
             posts_json.append({
                 'id': post.id,
                 'title': post.title or '',
@@ -78,6 +99,7 @@ def posts_list(request):
                 'hashtags': list(post.hashtags) if post.hashtags else [],
                 'cta': post.cta or '',
                 'image_prompt': post.image_prompt or '',
+                'image_description_ptbr': image_description_ptbr,
                 'status': post.status,
                 'social_network': post.social_network,
                 'rede': post.social_network,
@@ -86,7 +108,7 @@ def posts_list(request):
                 'qtdImagens': int(post.image_count) if post.is_carousel else 1,
                 'created_at': post.created_at.isoformat() if post.created_at else '',
                 'has_image': bool(post.has_image),
-                'imagens': imagens_keys,
+                'imagens': imagens_data,
                 'imageStatus': image_status,
                 'imageChanges': image_changes,
                 'maxImageRevisions': max_image_revisions,
@@ -104,6 +126,13 @@ def posts_list(request):
         'knowledge_base': knowledge_base,
         'posts_json': posts_json,
         'posts_webhook_url': settings.N8N_WEBHOOK_GERAR_POST,
+        'enable_local_pipeline': settings.ENABLE_LOCAL_PIPELINE,
+        # Admin = superuser ou profile 'admin'. Controla o seletor de pipeline
+        # e o botao "Edicao Avancada" (Pillow) — demais usuarios so veem o simples.
+        'is_admin': bool(
+            request.user.is_superuser
+            or getattr(request.user, 'profile', '') == 'admin'
+        ),
     }
-    
+
     return render(request, 'posts/posts_list.html', context)

@@ -51,7 +51,14 @@ def gerar_post(request):
         image_count = data.get('image_count', 1)
         tema = data.get('tema', '').strip()
         reference_images = data.get('reference_images', [])
-        
+        # Sanity: limita a 5 imagens (mesmo limite da UI)
+        if isinstance(reference_images, list) and len(reference_images) > 5:
+            logger.warning(
+                'reference_images excedeu limite (%d) — truncando para 5',
+                len(reference_images),
+            )
+            reference_images = reference_images[:5]
+
         # Validar campos obrigatórios
         if not rede_social:
             return JsonResponse({
@@ -151,6 +158,7 @@ def gerar_post(request):
                 hashtags=[],
                 ia_provider='openai',
                 ia_model_text='gpt-4',
+                pipeline_used='n8n',
             )
             
             # Salvar imagens de referência em PostReferenceImage

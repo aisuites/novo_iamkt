@@ -456,7 +456,23 @@ def knowledge_save_all(request):
         
         print("=" * 80, flush=True)
         # Não bloquear o fluxo se N8N falhar
-        
+
+        # ========================================
+        # SWEEP: garantir dossiê visual das imagens de referência
+        # ========================================
+        try:
+            from apps.knowledge.tasks import (
+                analyze_pending_reference_images_task,
+                analyze_pending_brandgrafic_modules_task,
+            )
+            analyze_pending_reference_images_task.delay(kb.id)
+            analyze_pending_brandgrafic_modules_task.delay(kb.id)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                'Falha ao enfileirar sweep de análise visual (save_all)'
+            )
+
         # ========================================
         # ONBOARDING: Marcar como concluído
         # ========================================

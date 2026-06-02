@@ -4,7 +4,7 @@
 {% block title %}Posts{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/posts.css' %}?v=20260302-0033">
+<link rel="stylesheet" href="{% static 'css/posts.css' %}?v=20260528-0100">
 <link rel="stylesheet" href="{% static 'css/posts-detail.css' %}?v=20260202-1323">
 <link rel="stylesheet" href="{% static 'css/confirm-modal.css' %}?v=20260202-1008">
 <link rel="stylesheet" href="{% static 'css/toaster.css' %}?v=20260202-1008">
@@ -199,12 +199,14 @@
                     <p id="postCTA">{{ post.cta|default:"—" }}</p>
                 </div>
 
-                <!-- Descrição da Imagem -->
+                <!-- Descrição da Imagem (PT-BR para o usuario; prompt EN vai para o Gemini separadamente) -->
                 <div class="post-section">
                     <h4>Descrição da imagem a ser gerada</h4>
+                    {% with image_desc_pt=post.visual_brief|default:"" %}
                     <p id="postDescricaoImagem" {% if post.is_carousel and post.image_count > 1 %}class="post-image-prompt"{% endif %}>
-                        {{ post.image_prompt|default:"—" }}
+                        {% if image_desc_pt %}{{ image_desc_pt }}{% else %}{{ post.image_prompt|default:"—" }}{% endif %}
                     </p>
+                    {% endwith %}
                 </div>
 
                 <!-- Caixa de Solicitação de Alteração de Texto -->
@@ -245,8 +247,9 @@
                 <div class="post-gallery" id="postGallery" {% if post.images.count <= 1 %}hidden{% endif %}>
                     {% if post.images.count > 1 %}
                         {% for img in post.images.all %}
-                        <button type="button" class="gallery-thumb {% if forloop.first %}active{% endif %}" data-image-index="{{ forloop.counter0 }}" data-s3-key="{{ img.s3_key }}">
+                        <button type="button" class="gallery-thumb {% if forloop.first %}active{% endif %}" data-image-index="{{ forloop.counter0 }}" data-image-id="{{ img.id }}" data-s3-key="{{ img.s3_key }}">
                             <img src="#" alt="Miniatura {{ forloop.counter }}" data-lazy-load="{{ img.s3_key }}" data-s3-url="{{ img.s3_url }}">
+                            <span class="btn-remove-image" data-action="remove-post-image" data-post-id="{{ post.id }}" data-image-id="{{ img.id }}" title="Remover imagem" role="button" tabindex="0">&times;</span>
                         </button>
                         {% endfor %}
                     {% endif %}
@@ -356,28 +359,74 @@
                           maxlength="3000" placeholder="Restrições, exemplos, referências..." required></textarea>
             </div>
             
-            <!-- LINHA 4: Imagens de Referência -->
+            <!-- LINHA 4: Logos da marca -->
             <div class="field">
-                <label for="refImgs">Imagens de Referência</label>
+                <label>Logo a ser aplicado (escolha apenas 1)</label>
+                <div id="orgLogosGallery" class="asset-gallery" data-empty-text="Nenhum logo cadastrado na KB.">
+                    <div class="asset-gallery-loading">Carregando logos...</div>
+                </div>
+                <small class="asset-hint">Clique para escolher o logo. Duplo-click para ampliar. Apenas 1 logo por post — sera aplicado fielmente sem alteracao.</small>
+                <div class="field" style="margin-top: 8px;">
+                    <label for="logoPosition" class="small-label">Posicao do logo na arte</label>
+                    <select id="logoPosition" name="logoPosition" class="form-input-filter">
+                        <option value="">Automatica (segue a referencia)</option>
+                        <option value="top-left">Topo / Esquerda</option>
+                        <option value="top-center">Topo / Centro</option>
+                        <option value="top-right">Topo / Direita</option>
+                        <option value="middle-left">Meio / Esquerda</option>
+                        <option value="middle-center">Meio / Centro</option>
+                        <option value="middle-right">Meio / Direita</option>
+                        <option value="bottom-left">Base / Esquerda</option>
+                        <option value="bottom-center">Base / Centro</option>
+                        <option value="bottom-right">Base / Direita</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- LINHA 5: Referencias da KB -->
+            <div class="field">
+                <label>Imagens de referencia existentes</label>
+                <div id="orgRefsGallery" class="asset-gallery" data-empty-text="Nenhuma imagem de referencia na KB.">
+                    <div class="asset-gallery-loading">Carregando referencias...</div>
+                </div>
+                <div id="refsAspectsArea" class="refs-aspects-area" data-empty-text="Selecione uma ou mais referencias acima e escolha o que aproveitar de cada uma.">
+                    <div class="refs-aspects-empty">Selecione uma ou mais referencias acima e escolha o que aproveitar de cada uma.</div>
+                </div>
+            </div>
+
+            <!-- LINHA 6: Upload de novas imagens (acumulativo, com descricao estruturada) -->
+            <div class="field">
+                <label>Adicionar novas imagens de referencia <span id="refImgsCounter" class="upload-counter">(0/5)</span></label>
                 <div class="upload-area">
-                    <input type="file" id="refImgs" accept=".jpg,.jpeg,.png" multiple style="display: none;">
-                    <button type="button" class="btn-upload" onclick="document.getElementById('refImgs').click()">
-                        <i class="fas fa-cloud-upload-alt mr-2"></i>
-                        Escolher Imagens
+                    <input type="file" id="refImgs" accept=".jpg,.jpeg,.png" style="display: none;">
+                    <button type="button" id="btnAddRefImg" class="btn-upload" onclick="document.getElementById('refImgs').click()">
+                        <i class="fas fa-plus mr-2"></i>
+                        Adicionar imagem
                     </button>
                     <div id="refImgsInfo" class="upload-info">
-                        Nenhum arquivo selecionado — Máx. 5 imagens (.JPG ou .PNG)
+                        Voce pode adicionar ate 5 imagens. Cada uma pode ter um uso diferente (produto, pessoa, cenario...).
                     </div>
                     <div id="refImgsPreview" class="upload-preview"></div>
                 </div>
+                <small class="asset-hint">Para cada imagem, indique o tipo de uso e descreva como usar. Combinacoes mistas (ex: 2 produtos + 1 pessoa) sao suportadas.</small>
             </div>
             
             <div class="modal-footer">
+                {% if is_admin %}
+                <div class="pipeline-selector" style="margin-right:auto; display:flex; align-items:center; gap:8px;">
+                    <label for="pipelineSelect" style="font-size:13px; white-space:nowrap;">Motor de geração</label>
+                    <select id="pipelineSelect" class="form-control" style="min-width:220px;" title="Escolha qual pipeline gera este post (admin)">
+                        <option value="simple">Simples v2 (OpenAI + orquestrador)</option>
+                        <option value="local">Local (Celery + Claude + Gemini)</option>
+                        <option value="n8n">N8N (produção legada)</option>
+                    </select>
+                </div>
+                {% endif %}
                 <button type="button" class="btn btn-outline-secondary" onclick="closeModal('modalGerarPost')">
                     Cancelar
                 </button>
-                <button type="submit" class="btn btn-primary" id="btnEnviarPost">
-                    Enviar ao agente
+                <button type="submit" class="btn btn-primary" id="btnEnviarPost" data-pipeline="simple">
+                    Gerar Post
                 </button>
             </div>
         </form>
@@ -425,13 +474,204 @@
         </form>
     </div>
 </div>
+
+<!-- Lightbox global (Etapa 4) -->
+<div id="imageLightbox" class="image-lightbox" role="dialog" aria-modal="true" aria-label="Visualizacao da imagem">
+    <button type="button" class="lb-close" aria-label="Fechar">&times;</button>
+    <img id="imageLightboxImg" src="" alt="Visualizacao ampliada">
+</div>
+
+<!-- Modal Arte Final — editor visual -->
+<div id="modalArteFinal" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="max-width:1280px;width:97vw;padding:0;max-height:97vh;display:flex;flex-direction:column;">
+        <div class="modal-header" style="flex-shrink:0;">
+            <h3>Arte Final</h3>
+            <button type="button" class="modal-close" id="btnCloseArteFinal">&times;</button>
+        </div>
+        <div style="display:flex;flex:1;overflow:hidden;">
+            <!-- Imagem -->
+            <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:16px;background:#f0f0f0;overflow:hidden;">
+                <div id="arteFinalContainer" style="position:relative;overflow:hidden;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,.25);background:#fff;">
+                    <img id="arteFinalBg" src="" alt="Fundo" style="display:block;width:100%;height:100%;object-fit:contain;">
+                    <div id="arteFinalOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;"></div>
+                </div>
+            </div>
+            <!-- Painel de propriedades -->
+            <div id="arteFinalPanel" style="width:280px;flex-shrink:0;border-left:1px solid #e0e0e0;display:flex;flex-direction:column;overflow-y:auto;background:#fff;">
+                <!-- Barra de ações global (sempre visivel) -->
+                <div id="panelToolbar" style="display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid #eee;background:#fafafa;flex-wrap:wrap;">
+                    <button type="button" id="btnUndo" title="Desfazer (Ctrl+Z)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">↶ Desfazer</button>
+                    <button type="button" id="btnRedo" title="Refazer (Ctrl+Shift+Z)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">↷ Refazer</button>
+                    <button type="button" id="btnAddImage" title="Adicionar imagem (sticker)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Imagem</button>
+                    <input type="file" id="stickerFileInput" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" style="display:none;">
+                </div>
+                <div id="panelEmpty" style="padding:24px 16px;color:#888;font-size:13px;text-align:center;">
+                    <div style="font-size:28px;margin-bottom:8px;">↖</div>
+                    Clique em um elemento para editar
+                </div>
+                <div id="panelControls" style="display:none;padding:14px;flex:1;">
+                    <!-- Header do elemento + ações por elemento -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:6px;">
+                        <span id="panelRoleLabel" style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;">Elemento</span>
+                        <div style="display:flex;gap:4px;">
+                            <button type="button" id="btnToggleVisible" title="Mostrar / Ocultar" style="width:28px;height:28px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:14px;padding:0;">\u{1F441}</button>
+                            <button type="button" id="btnLayerUp" title="Trazer pra frente" style="width:28px;height:28px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:13px;padding:0;">↑</button>
+                            <button type="button" id="btnLayerDown" title="Enviar pra trás" style="width:28px;height:28px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:13px;padding:0;">↓</button>
+                            <button type="button" id="btnDuplicate" title="Duplicar (Ctrl+D)" style="width:28px;height:28px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:13px;padding:0;">⧉</button>
+                            <button type="button" id="btnDelete" title="Excluir (Delete)" style="width:28px;height:28px;border:1px solid #f1c0c4;border-radius:4px;background:#fff;color:#c1123a;cursor:pointer;font-size:14px;padding:0;">×</button>
+                        </div>
+                    </div>
+
+                    <!-- Texto (com quebra de linha por Enter) -->
+                    <div id="ctrlTextWrap" style="margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Texto (Enter quebra linha)</label>
+                        <textarea id="ctrlText" rows="3" style="width:100%;font-size:13px;border:1px solid #ddd;border-radius:4px;padding:6px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+                    </div>
+
+                    <!-- Tamanho da fonte -->
+                    <div id="ctrlSizeWrap" style="margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Tamanho <span id="ctrlSizeVal">55</span>px</label>
+                        <input type="range" id="ctrlSize" min="8" max="300" step="1" style="width:100%;accent-color:#471811;">
+                    </div>
+
+                    <!-- Cor do texto -->
+                    <div id="ctrlColorWrap" style="margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Cor do texto</label>
+                        <input type="color" id="ctrlColor" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                    </div>
+
+                    <!-- Cor de fundo (CTA com background, grafismo) -->
+                    <div id="ctrlBgColorWrap" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;align-items:center;">
+                            <span>Cor do fundo</span>
+                            <button type="button" id="btnRemoveBg" title="Remover fundo" style="border:none;background:none;cursor:pointer;font-size:11px;color:#999;padding:0;">remover</button>
+                        </label>
+                        <input type="color" id="ctrlBgColor" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                    </div>
+
+                    <!-- Raio (CTA / grafismo) -->
+                    <div id="ctrlRadiusWrap" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Raio <span id="ctrlRadiusVal">0</span>%</label>
+                        <input type="range" id="ctrlRadius" min="0" max="50" step="0.5" style="width:100%;accent-color:#471811;">
+                    </div>
+
+                    <!-- Peso + alinhamento -->
+                    <div id="ctrlStyleWrap" style="margin-bottom:12px;display:flex;gap:8px;">
+                        <div style="flex:1;">
+                            <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Peso</label>
+                            <button id="ctrlBold" type="button" style="width:100%;padding:5px;border:1px solid #ddd;border-radius:4px;background:#fff;font-weight:bold;cursor:pointer;">B</button>
+                        </div>
+                        <div style="flex:2;">
+                            <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Alinhamento</label>
+                            <div style="display:flex;gap:4px;">
+                                <button data-align="left"   class="align-btn" type="button" style="flex:1;padding:5px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:11px;">Esq</button>
+                                <button data-align="center" class="align-btn" type="button" style="flex:1;padding:5px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:11px;">Cen</button>
+                                <button data-align="right"  class="align-btn" type="button" style="flex:1;padding:5px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:11px;">Dir</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Posicao XY -->
+                    <div style="margin-bottom:10px;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Posição</label>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                            <div><label style="font-size:10px;color:#999;">X %</label><input type="number" id="ctrlX" min="-50" max="150" step="0.5" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:12px;box-sizing:border-box;"></div>
+                            <div><label style="font-size:10px;color:#999;">Y %</label><input type="number" id="ctrlY" min="-50" max="150" step="0.5" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:12px;box-sizing:border-box;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tamanho WxH -->
+                    <div style="margin-bottom:10px;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Tamanho da caixa</label>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                            <div><label style="font-size:10px;color:#999;">Largura %</label><input type="number" id="ctrlW" min="1" max="150" step="0.5" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:12px;box-sizing:border-box;"></div>
+                            <div><label style="font-size:10px;color:#999;">Altura %</label><input type="number" id="ctrlH" min="1" max="150" step="0.5" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:12px;box-sizing:border-box;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Painel inline para solicitar nova imagem de fundo -->
+        <div id="bgRequestBox" style="display:none;flex-shrink:0;padding:12px 20px;border-top:1px solid #e0e0e0;background:#fafafa;">
+            <label for="bgRequestText" style="display:block;font-size:12px;color:#444;margin-bottom:6px;font-weight:600;">Descreva o que você quer alterar na imagem de fundo:</label>
+            <textarea id="bgRequestText" rows="2" maxlength="600" placeholder="Ex: foto mais clara, prato visto de cima, sem o talher na esquerda..." style="width:100%;border:1px solid #ddd;border-radius:4px;padding:8px;font-size:13px;box-sizing:border-box;resize:vertical;font-family:inherit;"></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end;">
+                <button type="button" class="btn ghost" id="btnBgRequestCancel">Cancelar</button>
+                <button type="button" class="btn" id="btnBgRequestSubmit">Gerar nova imagem</button>
+            </div>
+        </div>
+        <div style="flex-shrink:0;padding:12px 20px;border-top:1px solid #e0e0e0;display:flex;align-items:center;gap:10px;background:#fff;flex-wrap:wrap;">
+            <button type="button" id="btnExportPng" class="btn">Baixar PNG</button>
+            <button type="button" id="btnRequestNewBg" class="btn">Solicitar alteração na imagem de fundo</button>
+            <button type="button" id="btnRestoreBg" class="btn" style="display:none;">← Voltar imagem anterior</button>
+            <button type="button" class="btn" id="btnCloseArteFinal2">Fechar</button>
+            <p id="arteFinalStatus" style="margin:0;font-size:13px;color:#666;flex:1;text-align:right;min-width:200px;"></p>
+        </div>
+    </div>
+</div>
+
+{% if is_admin %}
+<!-- ===================================================================== -->
+<!-- ÁREA DE DEBUG — pipeline simples v2 (fundo × final + prompts). ADMIN-ONLY -->
+<!-- Visível em prod apenas para administradores. -->
+<!-- ===================================================================== -->
+<section id="simpleDebugArea" style="margin:32px auto;max-width:1100px;padding:16px;border:2px dashed #c00;border-radius:8px;background:#fff7f7;">
+    <h3 style="margin:0 0 8px;color:#c00;">🧪 Debug pipeline simples v2 <small style="font-weight:normal;color:#999;">(temporário)</small></h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+        <label style="font-size:13px;">Post ID:</label>
+        <input id="simpleDebugId" type="number" style="width:120px;padding:6px;" placeholder="ex: 42">
+        <button id="simpleDebugLoad" type="button" class="btn btn-primary">Carregar</button>
+        <span id="simpleDebugMsg" style="font-size:13px;color:#666;"></span>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:300px;">
+            <strong style="font-size:13px;">Fundo (sem texto)</strong>
+            <img id="simpleDebugBg" style="width:100%;border:1px solid #ddd;border-radius:6px;margin-top:4px;" alt="fundo">
+        </div>
+        <div style="flex:1;min-width:300px;">
+            <strong style="font-size:13px;">Imagem final (com texto)</strong>
+            <img id="simpleDebugFinal" style="width:100%;border:1px solid #ddd;border-radius:6px;margin-top:4px;" alt="final">
+        </div>
+    </div>
+    <div style="margin-top:12px;">
+        <strong style="font-size:13px;">Prompt do fundo</strong>
+        <pre id="simpleDebugBgPrompt" style="white-space:pre-wrap;background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;max-height:200px;overflow:auto;font-size:12px;"></pre>
+        <strong style="font-size:13px;">Prompt final (aplicação de texto)</strong>
+        <pre id="simpleDebugFinalPrompt" style="white-space:pre-wrap;background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;max-height:200px;overflow:auto;font-size:12px;"></pre>
+        <strong style="font-size:13px;">JSON do agente de regras</strong>
+        <pre id="simpleDebugRules" style="white-space:pre-wrap;background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;max-height:240px;overflow:auto;font-size:12px;"></pre>
+    </div>
+</section>
+<script>
+(function () {
+    var btn = document.getElementById('simpleDebugLoad');
+    if (!btn) return;
+    btn.addEventListener('click', async function () {
+        var id = (document.getElementById('simpleDebugId').value || '').trim();
+        var msg = document.getElementById('simpleDebugMsg');
+        if (!id) { msg.textContent = 'informe um Post ID'; return; }
+        msg.textContent = 'carregando...';
+        try {
+            var r = await fetch('/posts/' + id + '/simple-debug/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!r.ok) { msg.textContent = 'erro ' + r.status + ' (post é pipeline simple?)'; return; }
+            var d = await r.json();
+            document.getElementById('simpleDebugBg').src = d.bg_url || '';
+            document.getElementById('simpleDebugFinal').src = d.final_url || '';
+            document.getElementById('simpleDebugBgPrompt').textContent = d.bg_prompt || '(vazio — imagem ainda não gerada?)';
+            document.getElementById('simpleDebugFinalPrompt').textContent = d.final_prompt || '(vazio)';
+            document.getElementById('simpleDebugRules').textContent = JSON.stringify(d.rules || {}, null, 2);
+            msg.textContent = 'status: ' + d.status + ' | bg: ' + (d.model_bg || '?') + ' | final: ' + (d.model_final || '?');
+        } catch (e) { msg.textContent = 'falha: ' + e.message; }
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'js/confirm-modal.js' %}?v=20260202-1008"></script>
 <script src="{% static 'js/toaster.js' %}?v=20260202-1008"></script>
 <script src="{% static 'js/logger.js' %}?v=20260202-1008"></script>
-<script src="{% static 'js/image-preview-loader.js' %}?v=20260202-1008"></script>
 
 <script>
 // ============================================================================
@@ -451,16 +691,14 @@ try {
 }
 
 window.CURRENT_USER = "{{ request.user.email|default:''|escapejs }}";
+window.IS_ADMIN = {{ is_admin|yesno:"true,false" }};
 window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 </script>
 
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260303-0334"></script>
-<!-- Temporariamente desabilitados para debug -->
-<!-- <script src="{% static 'js/posts-modal.js' %}?v=20260203-0129"></script> -->
-<!-- <script src="{% static 'js/posts-gallery.js' %}?v=20260203-0129"></script> -->
+<script src="{% static 'js/posts.js' %}?v=20260602-2200"></script>
 
 <script>
 // Inicializar lazyload para imagens dos posts com endpoint correto
@@ -579,5 +817,713 @@ function toggleCarrossel() {
     
     console.log('✅ Carrossel atualizado - display:', carrosselQtyField.style.display);
 }
+</script>
+
+<script>
+// ============================================================================
+// MODAL ARTE FINAL — editor visual com controles por elemento
+// Suporta: edicao de texto/cor/tamanho/posicao/largura/altura,
+// quebra de linha, visibilidade (olhinho), duplicar, deletar, z-order,
+// undo/redo, e CTA unificado (texto + background + radius juntos).
+// ============================================================================
+(function () {
+    'use strict';
+
+    const modal      = document.getElementById('modalArteFinal');
+    const bgEl       = document.getElementById('arteFinalBg');
+    const overlay    = document.getElementById('arteFinalOverlay');
+    const btnExport  = document.getElementById('btnExportPng');
+    const statusEl   = document.getElementById('arteFinalStatus');
+    const panelEmpty    = document.getElementById('panelEmpty');
+    const panelControls = document.getElementById('panelControls');
+    const panelRoleLabel= document.getElementById('panelRoleLabel');
+    const ctrlText      = document.getElementById('ctrlText');
+    const ctrlTextWrap  = document.getElementById('ctrlTextWrap');
+    const ctrlSize      = document.getElementById('ctrlSize');
+    const ctrlSizeVal   = document.getElementById('ctrlSizeVal');
+    const ctrlSizeWrap  = document.getElementById('ctrlSizeWrap');
+    const ctrlColor     = document.getElementById('ctrlColor');
+    const ctrlColorWrap = document.getElementById('ctrlColorWrap');
+    const ctrlBgColor   = document.getElementById('ctrlBgColor');
+    const ctrlBgColorWrap = document.getElementById('ctrlBgColorWrap');
+    const btnRemoveBg   = document.getElementById('btnRemoveBg');
+    const ctrlRadius    = document.getElementById('ctrlRadius');
+    const ctrlRadiusVal = document.getElementById('ctrlRadiusVal');
+    const ctrlRadiusWrap= document.getElementById('ctrlRadiusWrap');
+    const ctrlBold      = document.getElementById('ctrlBold');
+    const ctrlStyleWrap = document.getElementById('ctrlStyleWrap');
+    const ctrlX         = document.getElementById('ctrlX');
+    const ctrlY         = document.getElementById('ctrlY');
+    const ctrlW         = document.getElementById('ctrlW');
+    const ctrlH         = document.getElementById('ctrlH');
+    const btnToggleVisible = document.getElementById('btnToggleVisible');
+    const btnLayerUp    = document.getElementById('btnLayerUp');
+    const btnLayerDown  = document.getElementById('btnLayerDown');
+    const btnDuplicate  = document.getElementById('btnDuplicate');
+    const btnDelete     = document.getElementById('btnDelete');
+    const btnUndo       = document.getElementById('btnUndo');
+    const btnRedo       = document.getElementById('btnRedo');
+
+    let currentPostId = null;
+    let elements  = [];
+    let selectedIdx = null;
+    let canvasW = 1080, canvasH = 1080, scale = 1;
+    let titleFont = 'serif', logoUrl = null;
+    let fontFamilyByRole = { titulo: 'serif', subtitulo: 'serif', cta: 'serif' };
+    // History stack para undo/redo. Cada snapshot e um JSON.stringify(elements).
+    let history = [];
+    let historyIdx = -1;
+    const HISTORY_MAX = 100;
+    let _suppressHistory = false;  // evita push durante undo/redo
+    // Background regeneration tracking
+    let currentRawKey = '';
+    let bgPollTimer = null;
+
+    const ROLE_LABELS = { titulo:'Título', subtitulo:'Subtítulo', cta:'CTA', grafismo:'Pill/Fundo', logo:'Logo', image:'Imagem' };
+
+    // ── History ────────────────────────────────────────────────────────────
+    function _snapshotElements() {
+        if (_suppressHistory) return;
+        const snap = JSON.stringify(elements);
+        // Se estavamos no meio do historico (undid algo), corta dali
+        history = history.slice(0, historyIdx + 1);
+        // Nao duplica snapshot identico ao topo
+        if (history.length && history[history.length - 1] === snap) return;
+        history.push(snap);
+        if (history.length > HISTORY_MAX) history.shift();
+        historyIdx = history.length - 1;
+        _updateUndoRedoButtons();
+    }
+    function _undo() {
+        if (historyIdx <= 0) return;
+        historyIdx--;
+        _restoreFromHistory();
+    }
+    function _redo() {
+        if (historyIdx >= history.length - 1) return;
+        historyIdx++;
+        _restoreFromHistory();
+    }
+    function _restoreFromHistory() {
+        try {
+            _suppressHistory = true;
+            elements = JSON.parse(history[historyIdx]);
+            if (selectedIdx !== null && selectedIdx >= elements.length) selectedIdx = null;
+            _renderAll();
+            _updatePanel();
+            _updateUndoRedoButtons();
+        } finally {
+            _suppressHistory = false;
+        }
+    }
+    function _updateUndoRedoButtons() {
+        btnUndo.disabled = historyIdx <= 0;
+        btnRedo.disabled = historyIdx >= history.length - 1;
+        btnUndo.style.opacity = btnUndo.disabled ? '.4' : '1';
+        btnRedo.style.opacity = btnRedo.disabled ? '.4' : '1';
+    }
+
+    // ── Abrir ──────────────────────────────────────────────────────────────
+    window.openArteFinal = async function (postId) {
+        currentPostId = postId; selectedIdx = null; elements = [];
+        history = []; historyIdx = -1;
+        statusEl.textContent = 'Carregando…';
+        overlay.innerHTML = ''; bgEl.src = '';
+        _showPanel(false);
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        try {
+            const resp = await fetch(`/posts/${postId}/overlay-data/`, { headers:{'X-CSRFToken':window.CSRF_TOKEN} });
+            if (!resp.ok) throw new Error('not_ready');
+            const data = await resp.json();
+            canvasW = data.canvas_w; canvasH = data.canvas_h;
+            logoUrl = data.logo_url;
+            titleFont = (data.font_names && data.font_names.titulo) || 'serif';
+            elements = JSON.parse(JSON.stringify(data.elements));
+            bgEl.src = data.raw_image_url;
+            currentRawKey = data.raw_image_s3_key || '';
+            _updateRestoreBtn(data.background_history_size || 0);
+            fontFamilyByRole = _registerPostFonts(postId, data.font_urls || {}, data.font_names || {});
+            // Aguarda imagem de fundo carregar — fitContainer depende de naturalWidth/Height
+            await new Promise((resolve) => {
+                if (bgEl.complete && bgEl.naturalWidth > 0) return resolve();
+                const done = () => resolve();
+                bgEl.addEventListener('load', done, { once: true });
+                bgEl.addEventListener('error', done, { once: true });
+                setTimeout(done, 5000);
+            });
+            try {
+                await Promise.race([
+                    document.fonts.ready,
+                    new Promise(r => setTimeout(r, 1500)),
+                ]);
+            } catch(_) {}
+            await new Promise(r => requestAnimationFrame(r));
+            await new Promise(r => requestAnimationFrame(r));
+            _fitContainer();
+            _renderAll();
+            _snapshotElements();   // baseline (history[0])
+            statusEl.textContent = '';
+        } catch(e) {
+            statusEl.textContent = 'Arte final não disponível para este post.';
+            console.error('[arteFinal]', e);
+        }
+    };
+
+    function _fitContainer() {
+        const container = document.getElementById('arteFinalContainer');
+        const panel     = document.getElementById('arteFinalPanel');
+        const availW = modal.querySelector('.modal-content').offsetWidth - panel.offsetWidth - 48;
+        const availH = window.innerHeight - 160;  // header + footer + padding
+        // Preferir proporcao REAL da imagem (bgEl.naturalWidth/Height) sobre canvasW/H.
+        // Quando a imagem renderiza com object-fit:contain dentro de um container
+        // de proporcao diferente, sobra letterbox e os overlays (posicionados em %
+        // do container) descompassam da imagem. Casar a proporcao do container
+        // com a da imagem garante alinhamento pixel-perfect.
+        let imgRatio = canvasW / canvasH;
+        if (bgEl && bgEl.naturalWidth > 0 && bgEl.naturalHeight > 0) {
+            imgRatio = bgEl.naturalWidth / bgEl.naturalHeight;
+        }
+        let w = Math.min(availW, availH * imgRatio);
+        let h = w / imgRatio;
+        if (h > availH) { h = availH; w = h * imgRatio; }
+        container.style.width  = Math.round(w) + 'px';
+        container.style.height = Math.round(h) + 'px';
+        // Scale ainda baseado em canvasW (que e o sistema de coordenadas dos elements)
+        scale = w / canvasW;
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────────
+    function _renderAll() { overlay.innerHTML = ''; elements.forEach((el,i) => _renderOne(el,i)); }
+
+    function _renderOne(el, idx) {
+        // Visibilidade: respeita visible=false (olhinho)
+        if (el.visible === false) return;
+        const role = (el.role||'').toLowerCase();
+        let dom;
+
+        if (role === 'grafismo') {
+            const forma = (el.forma||'').toLowerCase();
+            if (!['faixa','pill','retangulo'].includes(forma)) return;
+            dom = document.createElement('div');
+            const raio = ((el.raio_pct||0)/100*canvasW*scale).toFixed(1);
+            Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
+                width:el.width_pct+'%', height:el.height_pct+'%',
+                background:el.cor||'#000', borderRadius:raio+'px', boxSizing:'border-box', cursor:'pointer' });
+
+        } else if (role === 'logo' && logoUrl) {
+            dom = document.createElement('img');
+            dom.src = logoUrl; dom.alt = 'Logo';
+            Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
+                width:el.width_pct+'%', height:el.height_pct+'%',
+                objectFit:'contain', objectPosition:'left center', cursor:'pointer' });
+
+        } else if (role === 'image' && el.url) {
+            // Sticker — implementado em fase seguinte
+            dom = document.createElement('img');
+            dom.src = el.url;
+            Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
+                width:el.width_pct+'%', height:el.height_pct+'%',
+                objectFit:'contain', cursor:'pointer' });
+
+        } else if (['titulo','subtitulo','cta'].includes(role)) {
+            if (!el.content && !(role==='cta' && el.background_color)) return;
+            dom = document.createElement('div');
+            const fsPx = ((el.font_size_pct||5)/100*canvasH*scale).toFixed(1);
+            const fam = fontFamilyByRole[role] || fontFamilyByRole.titulo || 'serif';
+            Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
+                width:el.width_pct+'%',
+                color:el.color||'#000', fontSize:fsPx+'px',
+                fontWeight:el.weight==='bold'?'bold':'normal', textAlign:el.align||'left',
+                fontFamily:fam, lineHeight:'1.2', cursor:'pointer', userSelect:'none',
+                boxSizing:'border-box', whiteSpace:'pre-line' });
+            if (el.height_pct) dom.style.height = el.height_pct + '%';
+            // CTA unificado: background_color + radius_pct + padding
+            if (role==='cta' && el.background_color) {
+                dom.style.background = el.background_color;
+                const r = ((el.radius_pct||0)/100*canvasW*scale).toFixed(1);
+                dom.style.borderRadius = r + 'px';
+                const ph = ((el.padding_h_pct||0)/100*canvasW*scale).toFixed(1);
+                const pv = ((el.padding_v_pct||0)/100*canvasH*scale).toFixed(1);
+                dom.style.padding = `${pv}px ${ph}px`;
+            }
+            if (role==='cta') {
+                dom.style.display='flex'; dom.style.alignItems='center'; dom.style.justifyContent='center';
+            }
+            dom.textContent = el.content || '';
+        } else return;
+
+        if (idx === selectedIdx) {
+            dom.style.outline='2px dashed #0078d4';
+            dom.style.outlineOffset='2px';
+        }
+        dom.addEventListener('click', e => { e.stopPropagation(); _selectElement(idx); });
+        overlay.appendChild(dom);
+    }
+
+    function _selectElement(idx) { selectedIdx = idx; _renderAll(); _updatePanel(); }
+
+    overlay.addEventListener('click', () => { selectedIdx = null; _renderAll(); _showPanel(false); });
+
+    // ── Painel ─────────────────────────────────────────────────────────────
+    function _showPanel(show) {
+        panelEmpty.style.display    = show ? 'none'  : 'block';
+        panelControls.style.display = show ? 'block' : 'none';
+    }
+
+    function _updatePanel() {
+        if (selectedIdx === null) { _showPanel(false); return; }
+        const el   = elements[selectedIdx];
+        const role = (el.role||'').toLowerCase();
+        _showPanel(true);
+        panelRoleLabel.textContent = ROLE_LABELS[role] || role;
+
+        const isText = ['titulo','subtitulo','cta'].includes(role);
+        const isGraf = role === 'grafismo';
+        const isCta  = role === 'cta';
+        const isLogo = role === 'logo';
+        const isImg  = role === 'image';
+
+        ctrlTextWrap.style.display    = isText ? 'block' : 'none';
+        ctrlSizeWrap.style.display    = isText ? 'block' : 'none';
+        ctrlColorWrap.style.display   = isText ? 'block' : 'none';
+        ctrlStyleWrap.style.display   = isText ? 'flex'  : 'none';
+        // Cor de fundo: CTA sempre (pode adicionar) ou grafismo
+        ctrlBgColorWrap.style.display = (isGraf || isCta) ? 'block' : 'none';
+        // Raio: grafismo (raio_pct) ou CTA (radius_pct)
+        ctrlRadiusWrap.style.display  = (isGraf || isCta) ? 'block' : 'none';
+
+        if (isText) {
+            ctrlText.value  = el.content || '';
+            ctrlColor.value = _toHex6(el.color||'#000000');
+            ctrlBold.style.background = el.weight==='bold' ? '#471811' : '#fff';
+            ctrlBold.style.color      = el.weight==='bold' ? '#fff'    : '#333';
+            document.querySelectorAll('.align-btn').forEach(b => {
+                b.style.background = b.dataset.align===(el.align||'left') ? '#e8e8e8' : '#fff';
+            });
+            const curPx = Math.round((el.font_size_pct||5)/100*canvasH);
+            ctrlSize.value = curPx; ctrlSizeVal.textContent = curPx;
+        }
+        // Fundo do CTA / grafismo
+        if (isCta) {
+            ctrlBgColor.value = _toHex6(el.background_color||'#00AC46');
+            const rp = +(el.radius_pct||0).toFixed(1);
+            ctrlRadius.value = rp; ctrlRadiusVal.textContent = rp;
+            btnRemoveBg.style.display = el.background_color ? 'inline' : 'none';
+        } else if (isGraf) {
+            ctrlBgColor.value = _toHex6(el.cor||'#000000');
+            const rp = +(el.raio_pct||0).toFixed(1);
+            ctrlRadius.value = rp; ctrlRadiusVal.textContent = rp;
+            btnRemoveBg.style.display = 'none';
+        }
+
+        ctrlX.value = +(el.x_pct||0).toFixed(1);
+        ctrlY.value = +(el.y_pct||0).toFixed(1);
+        ctrlW.value = +(el.width_pct||0).toFixed(1);
+        ctrlH.value = +(el.height_pct||0).toFixed(1);
+
+        // Olhinho
+        btnToggleVisible.textContent = (el.visible === false) ? '\u{1F441}‍\u{1F5E8}' : '\u{1F441}';
+        btnToggleVisible.style.opacity = (el.visible === false) ? '.5' : '1';
+    }
+
+    // ── Listeners controles de texto ───────────────────────────────────────
+    let _typingTimer = null;
+    function _bumpHistoryDebounced() {
+        clearTimeout(_typingTimer);
+        _typingTimer = setTimeout(_snapshotElements, 500);
+    }
+    ctrlText.addEventListener('input', () => {
+        if(selectedIdx===null) return;
+        elements[selectedIdx].content = ctrlText.value;
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlSize.addEventListener('input', () => {
+        if(selectedIdx===null)return;
+        const px=+ctrlSize.value;
+        ctrlSizeVal.textContent=px;
+        elements[selectedIdx].font_size_pct=(px/canvasH*100);
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlColor.addEventListener('input', () => {
+        if(selectedIdx===null)return;
+        elements[selectedIdx].color=ctrlColor.value;
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlBgColor.addEventListener('input', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        const role = (el.role||'').toLowerCase();
+        if (role === 'cta') el.background_color = ctrlBgColor.value;
+        else if (role === 'grafismo') el.cor = ctrlBgColor.value;
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    btnRemoveBg.addEventListener('click', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        if ((el.role||'').toLowerCase() === 'cta') {
+            delete el.background_color;
+            delete el.radius_pct;
+            delete el.padding_h_pct;
+            delete el.padding_v_pct;
+            _renderAll(); _updatePanel(); _snapshotElements();
+        }
+    });
+    ctrlRadius.addEventListener('input', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        const r = +ctrlRadius.value;
+        ctrlRadiusVal.textContent = r;
+        if ((el.role||'').toLowerCase() === 'cta') el.radius_pct = r;
+        else if ((el.role||'').toLowerCase() === 'grafismo') el.raio_pct = r;
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlBold.addEventListener('click', () => {
+        if(selectedIdx===null)return;
+        const el=elements[selectedIdx];
+        el.weight=el.weight==='bold'?'regular':'bold';
+        _updatePanel(); _renderAll(); _snapshotElements();
+    });
+    document.querySelectorAll('.align-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if(selectedIdx===null)return;
+            elements[selectedIdx].align=btn.dataset.align;
+            _updatePanel(); _renderAll(); _snapshotElements();
+        });
+    });
+    // X/Y/W/H — usa change para snapshot apos terminar (em vez de input que dispara muito)
+    [['x_pct', ctrlX], ['y_pct', ctrlY], ['width_pct', ctrlW], ['height_pct', ctrlH]].forEach(([prop, input]) => {
+        input.addEventListener('input', () => {
+            if(selectedIdx===null)return;
+            const v = parseFloat(input.value);
+            if (Number.isFinite(v)) {
+                elements[selectedIdx][prop] = v;
+                _renderAll();
+            }
+        });
+        input.addEventListener('change', () => _snapshotElements());
+    });
+
+    // ── Acoes por elemento ─────────────────────────────────────────────────
+    function _toggleVisible() {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        el.visible = el.visible === false ? true : false;
+        _renderAll(); _updatePanel(); _snapshotElements();
+    }
+    function _layerUp() {
+        if(selectedIdx===null || selectedIdx >= elements.length - 1) return;
+        const i = selectedIdx;
+        [elements[i], elements[i+1]] = [elements[i+1], elements[i]];
+        selectedIdx = i + 1;
+        _renderAll(); _updatePanel(); _snapshotElements();
+    }
+    function _layerDown() {
+        if(selectedIdx===null || selectedIdx <= 0) return;
+        const i = selectedIdx;
+        [elements[i], elements[i-1]] = [elements[i-1], elements[i]];
+        selectedIdx = i - 1;
+        _renderAll(); _updatePanel(); _snapshotElements();
+    }
+    function _duplicate() {
+        if(selectedIdx===null)return;
+        const copy = JSON.parse(JSON.stringify(elements[selectedIdx]));
+        // Pequeno offset para nao sobrepor
+        copy.x_pct = +((copy.x_pct||0) + 3).toFixed(2);
+        copy.y_pct = +((copy.y_pct||0) + 3).toFixed(2);
+        elements.splice(selectedIdx + 1, 0, copy);
+        selectedIdx = selectedIdx + 1;
+        _renderAll(); _updatePanel(); _snapshotElements();
+    }
+    function _deleteSelected() {
+        if(selectedIdx===null)return;
+        elements.splice(selectedIdx, 1);
+        selectedIdx = null;
+        _renderAll(); _showPanel(false); _snapshotElements();
+    }
+    btnToggleVisible.addEventListener('click', _toggleVisible);
+    btnLayerUp.addEventListener('click', _layerUp);
+    btnLayerDown.addEventListener('click', _layerDown);
+    btnDuplicate.addEventListener('click', _duplicate);
+    btnDelete.addEventListener('click', _deleteSelected);
+    btnUndo.addEventListener('click', _undo);
+    btnRedo.addEventListener('click', _redo);
+
+    // ── Sticker (upload de imagem no canvas) ───────────────────────────────
+    const btnAddImage = document.getElementById('btnAddImage');
+    const stickerInput = document.getElementById('stickerFileInput');
+    btnAddImage.addEventListener('click', () => {
+        if (!currentPostId) return;
+        stickerInput.value = '';
+        stickerInput.click();
+    });
+    stickerInput.addEventListener('change', async () => {
+        const file = stickerInput.files && stickerInput.files[0];
+        if (!file || !currentPostId) return;
+        const oldStatus = statusEl.textContent;
+        statusEl.textContent = 'Enviando imagem…';
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const resp = await fetch(`/posts/${currentPostId}/stickers/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+                body: fd,
+            });
+            if (!resp.ok) {
+                const j = await resp.json().catch(() => ({}));
+                throw new Error(j.error || 'falha_upload');
+            }
+            const data = await resp.json();
+            // Default: centro do canvas, 30% de largura, altura proporcional 1:1
+            const newEl = {
+                role: 'image',
+                s3_key: data.s3_key,
+                url: data.url,
+                x_pct: 35, y_pct: 35,
+                width_pct: 30, height_pct: 30,
+                visible: true,
+            };
+            elements.push(newEl);
+            selectedIdx = elements.length - 1;
+            _renderAll(); _updatePanel(); _snapshotElements();
+            statusEl.textContent = 'Imagem adicionada — arraste pelos campos X/Y/W/H.';
+            setTimeout(() => { if (statusEl.textContent.startsWith('Imagem adicionada')) statusEl.textContent = oldStatus; }, 3000);
+        } catch (e) {
+            console.error('[sticker]', e);
+            statusEl.textContent = 'Erro ao enviar imagem.';
+        }
+    });
+
+    // ── Atalhos de teclado ─────────────────────────────────────────────────
+    document.addEventListener('keydown', (e) => {
+        if (modal.style.display === 'none') return;
+        const target = e.target;
+        const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+        // Enter no textarea = quebra de linha (default do textarea — nao bloqueamos)
+        if (e.key === 'Escape') { closeModal(); return; }
+        if (e.ctrlKey || e.metaKey) {
+            if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); _undo(); return; }
+            if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); _redo(); return; }
+            if (e.key === 'd') { e.preventDefault(); _duplicate(); return; }
+        }
+        // Delete/Backspace deleta elemento — SO se nao estiver editando input/textarea
+        if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput && selectedIdx !== null) {
+            e.preventDefault(); _deleteSelected(); return;
+        }
+    });
+
+    // ── Fechar ─────────────────────────────────────────────────────────────
+    function _saveElements(postId, els) {
+        if (!postId || !els || !els.length) return;
+        fetch(`/posts/${postId}/save-elements/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ elements: els }),
+        }).catch(() => {});
+    }
+    function closeModal() {
+        const pid = currentPostId;
+        const els = elements.slice();
+        _stopBgPolling();
+        modal.style.display='none'; document.body.style.overflow='';
+        currentPostId=null; selectedIdx=null;
+        history = []; historyIdx = -1;
+        if (bgRequestBox) bgRequestBox.style.display = 'none';
+        _saveElements(pid, els);
+    }
+    document.getElementById('btnCloseArteFinal').addEventListener('click', closeModal);
+    document.getElementById('btnCloseArteFinal2').addEventListener('click', closeModal);
+
+    // ── Solicitar nova imagem de fundo (regerar Gemini) ────────────────────
+    const btnRequestNewBg   = document.getElementById('btnRequestNewBg');
+    const bgRequestBox      = document.getElementById('bgRequestBox');
+    const bgRequestText     = document.getElementById('bgRequestText');
+    const btnBgRequestCancel= document.getElementById('btnBgRequestCancel');
+    const btnBgRequestSubmit= document.getElementById('btnBgRequestSubmit');
+
+    function _openBgRequest() {
+        bgRequestBox.style.display = 'block';
+        bgRequestText.value = '';
+        setTimeout(() => bgRequestText.focus(), 50);
+    }
+    function _closeBgRequest() {
+        bgRequestBox.style.display = 'none';
+    }
+    btnRequestNewBg.addEventListener('click', _openBgRequest);
+    btnBgRequestCancel.addEventListener('click', _closeBgRequest);
+
+    btnBgRequestSubmit.addEventListener('click', async () => {
+        if (!currentPostId) return;
+        const message = (bgRequestText.value || '').trim();
+        if (!message) {
+            statusEl.textContent = 'Descreva o que voce quer alterar.';
+            return;
+        }
+        btnBgRequestSubmit.disabled = true;
+        btnBgRequestSubmit.textContent = 'Enviando…';
+        statusEl.textContent = 'Solicitando nova imagem…';
+        try {
+            // Endpoint regenerate-background: SO troca a foto de fundo,
+            // mantem _layout_elements (textos, posicoes, etc).
+            const resp = await fetch(`/posts/${currentPostId}/regenerate-background/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message }),
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data.success) {
+                throw new Error(data.error || 'falha_solicitar');
+            }
+            _closeBgRequest();
+            statusEl.textContent = 'Gerando nova imagem de fundo… isso pode levar 30-60s.';
+            _startBgPolling();
+        } catch (e) {
+            console.error('[bg-request]', e);
+            statusEl.textContent = 'Erro ao solicitar nova imagem.';
+        } finally {
+            btnBgRequestSubmit.disabled = false;
+            btnBgRequestSubmit.textContent = 'Gerar nova imagem';
+        }
+    });
+
+    // Voltar para imagem de fundo anterior
+    const btnRestoreBg = document.getElementById('btnRestoreBg');
+    function _updateRestoreBtn(historySize) {
+        if (!btnRestoreBg) return;
+        btnRestoreBg.style.display = historySize > 0 ? 'inline-block' : 'none';
+    }
+    btnRestoreBg.addEventListener('click', async () => {
+        if (!currentPostId) return;
+        const confirmed = typeof window.showConfirm === 'function'
+            ? await window.showConfirm(
+                'Voltar para a imagem de fundo anterior? A imagem atual fica salva no historico (pode trazer de volta depois).',
+                'Voltar imagem')
+            : window.confirm('Voltar para a imagem de fundo anterior?');
+        if (!confirmed) return;
+        statusEl.textContent = 'Restaurando…';
+        try {
+            const resp = await fetch(`/posts/${currentPostId}/restore-background/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'Content-Type': 'application/json' },
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data.success) throw new Error(data.error || 'restore_falhou');
+            currentRawKey = data.raw_image_s3_key || '';
+            bgEl.src = data.raw_image_url;
+            await new Promise((res) => {
+                if (bgEl.complete && bgEl.naturalWidth > 0) return res();
+                bgEl.addEventListener('load', res, { once: true });
+                setTimeout(res, 5000);
+            });
+            _fitContainer(); _renderAll();
+            _updateRestoreBtn(data.history_remaining || 0);
+            statusEl.textContent = 'Imagem anterior restaurada.';
+            setTimeout(() => { if (statusEl.textContent === 'Imagem anterior restaurada.') statusEl.textContent = ''; }, 4000);
+        } catch (e) {
+            console.error('[restore-bg]', e);
+            statusEl.textContent = 'Erro ao restaurar imagem.';
+        }
+    });
+
+    function _startBgPolling() {
+        _stopBgPolling();
+        const startedAt = Date.now();
+        const MAX_MS = 5 * 60 * 1000;   // 5 minutos hard cap
+        bgPollTimer = setInterval(async () => {
+            if (!currentPostId) { _stopBgPolling(); return; }
+            if (Date.now() - startedAt > MAX_MS) {
+                _stopBgPolling();
+                statusEl.textContent = 'Tempo esgotado. Recarregue o modal para ver o resultado.';
+                return;
+            }
+            try {
+                const r = await fetch(`/posts/${currentPostId}/overlay-data/`, { headers:{'X-CSRFToken':window.CSRF_TOKEN} });
+                if (!r.ok) return;
+                const d = await r.json();
+                const newKey = d.raw_image_s3_key || '';
+                // Quando a key mudar (Gemini gerou outra imagem), recarrega bg
+                if (newKey && newKey !== currentRawKey) {
+                    currentRawKey = newKey;
+                    // IMPORTANTE: nao recarrega elements (regenerate-background nao
+                    // altera _layout_elements). Mantem o que o usuario editou.
+                    bgEl.src = d.raw_image_url;
+                    await new Promise((res) => {
+                        if (bgEl.complete && bgEl.naturalWidth > 0) return res();
+                        bgEl.addEventListener('load', res, { once: true });
+                        setTimeout(res, 5000);
+                    });
+                    _fitContainer(); _renderAll();
+                    _updateRestoreBtn(d.background_history_size || 0);
+                    statusEl.textContent = 'Nova imagem aplicada!';
+                    _stopBgPolling();
+                    setTimeout(() => { if (statusEl.textContent === 'Nova imagem aplicada!') statusEl.textContent = ''; }, 4000);
+                }
+            } catch (_) {}
+        }, 5000);
+    }
+    function _stopBgPolling() {
+        if (bgPollTimer) { clearInterval(bgPollTimer); bgPollTimer = null; }
+    }
+
+    // ── Exportar PNG ───────────────────────────────────────────────────────
+    btnExport.addEventListener('click', async () => {
+        if (!currentPostId) return;
+        statusEl.textContent = 'Gerando PNG…';
+        btnExport.disabled = true;
+        try {
+            const resp = await fetch(`/posts/${currentPostId}/export-png/`, {
+                method:'POST', headers:{'X-CSRFToken':window.CSRF_TOKEN,'Content-Type':'application/json'},
+                body: JSON.stringify({ elements }),
+            });
+            if (!resp.ok) throw new Error('failed');
+            const blob = await resp.blob();
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href=url; a.download=`post-${currentPostId}-arte.png`; a.click();
+            URL.revokeObjectURL(url);
+            statusEl.textContent = 'PNG baixado!';
+        } catch(e) { statusEl.textContent = 'Erro ao gerar PNG.'; }
+        finally { btnExport.disabled=false; }
+    });
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    function _registerPostFonts(postId, fontUrls, fontNames) {
+        const roles = ['titulo','subtitulo','cta'];
+        const families = {};
+        const styleId = `postfonts-${postId}`;
+        let styleEl = document.getElementById(styleId);
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+        const css = [];
+        roles.forEach(role => {
+            const url = fontUrls && fontUrls[role];
+            if (url) {
+                const family = `IAMKT_${postId}_${role}`;
+                css.push(`@font-face{font-family:'${family}';src:url('${url}') format('truetype');font-display:swap;}`);
+                families[role] = `'${family}', '${(fontNames && fontNames[role]) || 'serif'}', serif`;
+            } else {
+                families[role] = `'${(fontNames && fontNames[role]) || 'serif'}', serif`;
+            }
+        });
+        styleEl.textContent = css.join('\n');
+        return families;
+    }
+    function _toHex6(c) {
+        if (/^#[0-9a-f]{6}$/i.test(c)) return c;
+        const d=document.createElement('div'); d.style.color=c; document.body.appendChild(d);
+        const v=getComputedStyle(d).color; document.body.removeChild(d);
+        const m=v.match(/\d+/g); if(!m) return '#000000';
+        return '#'+m.slice(0,3).map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
+    }
+})();
 </script>
 {% endblock %}

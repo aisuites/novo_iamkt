@@ -558,6 +558,7 @@ select.form-input-filter:disabled {
 }
 
 .post-gallery button {
+  position: relative;
   border: 1px solid var(--posts-border);
   background: var(--posts-bg);
   border-radius: 10px;
@@ -580,6 +581,39 @@ select.form-input-filter:disabled {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* Botao X para remover miniatura (mesmo padrao do .btn-remove-reference do knowledge) */
+.btn-remove-image {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  background: rgba(193, 18, 58, 0.95);
+  color: #fff;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.post-gallery button:hover .btn-remove-image,
+.post-gallery button:focus-within .btn-remove-image {
+  opacity: 1;
+}
+
+.btn-remove-image:hover {
+  background: #c1123a;
+  transform: scale(1.08);
 }
 
 /* ========================================
@@ -2026,4 +2060,324 @@ select.form-input-filter:disabled {
   color: #6366f1;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   transform: scale(1.05);
+}
+
+/* ============================================================
+   ASSET GALLERIES no modal Gerar Post (Etapa 4)
+   ============================================================ */
+
+.asset-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  background: #f7f7fb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  min-height: 72px;
+  align-items: flex-start;
+}
+
+.asset-gallery:empty::before,
+.asset-gallery-empty {
+  content: attr(data-empty-text);
+  color: #9ca3af;
+  font-size: 13px;
+  font-style: italic;
+  padding: 12px 0;
+  width: 100%;
+  text-align: center;
+}
+
+.asset-gallery-loading {
+  color: #9ca3af;
+  font-size: 13px;
+  font-style: italic;
+  padding: 12px 0;
+  width: 100%;
+  text-align: center;
+}
+
+.asset-thumb {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: #ffffff;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, transform 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.asset-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.asset-thumb:hover {
+  transform: scale(1.04);
+  border-color: #a5b4fc;
+}
+
+.asset-thumb.selected {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+}
+
+.asset-thumb .asset-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  background: #6366f1;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.asset-thumb.selected .asset-check {
+  display: flex;
+}
+
+.asset-thumb .asset-badge {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 9px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.asset-hint {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: 6px;
+  font-style: italic;
+}
+
+.small-label {
+  font-size: 13px;
+  color: #4b5563;
+  font-weight: 500;
+}
+
+/* Upload preview com fields estruturados */
+.uploaded-image-card {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 10px;
+  padding: 10px;
+  background: #fafbff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-top: 8px;
+  align-items: start;
+}
+
+.uploaded-image-card .uic-thumb {
+  width: 80px;
+  height: 80px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid #e5e7eb;
+}
+
+.uploaded-image-card .uic-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.uploaded-image-card .uic-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.uploaded-image-card .uic-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.uploaded-image-card .uic-name {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uploaded-image-card .uic-remove {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 14px;
+}
+
+.uploaded-image-card select,
+.uploaded-image-card textarea {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  width: 100%;
+  resize: vertical;
+}
+
+.uploaded-image-card textarea {
+  min-height: 32px;
+  font-family: inherit;
+}
+
+/* Lightbox para visualizar thumb em tamanho grande */
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+}
+
+.image-lightbox.open {
+  display: flex;
+}
+
+.image-lightbox img {
+  max-width: 95vw;
+  max-height: 95vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+}
+
+.image-lightbox .lb-close {
+  position: absolute;
+  top: 18px;
+  right: 24px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #ffffff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-lightbox .lb-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Contador X/5 e botao desabilitado no upload multi (Etapa multi-upload) */
+.upload-counter {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+.btn-upload.disabled,
+.btn-upload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ===== Area de aspectos das referencias selecionadas (Etapa 4) ===== */
+.refs-aspects-area {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.refs-aspects-empty {
+  font-size: 12px;
+  opacity: 0.7;
+  padding: 4px 2px;
+}
+.refs-aspect-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.refs-aspect-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+.refs-aspect-name {
+  flex: 0 0 auto;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 28%;
+  padding-top: 4px;
+}
+.refs-aspect-select {
+  flex: 0 0 auto;
+  min-width: 180px;
+  height: 38px;
+}
+.refs-aspect-chips {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.refs-aspect-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color, #d0d0d0);
+  border-radius: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.refs-aspect-chip input {
+  margin: 0;
+  cursor: pointer;
+}
+.refs-aspect-chip.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.refs-aspect-chip.is-disabled input {
+  cursor: not-allowed;
 }

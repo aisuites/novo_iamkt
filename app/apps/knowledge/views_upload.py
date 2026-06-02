@@ -445,9 +445,21 @@ def create_reference_image(request):
             uploaded_by=request.user
         )
         
+        # Gatilho 1 — analise visual em background. countdown absorve o caso
+        # "subiu errado e deleta rapido" sem gastar IA; a guarda na task torna
+        # a corrida um no-op se a imagem ja tiver sido removida.
+        try:
+            from apps.knowledge.tasks import analyze_reference_image_task
+            analyze_reference_image_task.apply_async((reference.id,), countdown=15)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                'Falha ao enfileirar analise visual da ReferenceImage %s', reference.id
+            )
+
         # Gerar URL de preview
         preview_url = S3Service.generate_presigned_download_url(s3_key)
-        
+
         return JsonResponse({
             'success': True,
             'data': {

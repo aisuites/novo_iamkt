@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, views_upload, views_gerar, views_actions, views_webhook, views_api
+from . import views, views_upload, views_gerar, views_gerar_local, views_gerar_simples, views_actions, views_webhook, views_api, views_overlay
 
 app_name = 'posts'
 
@@ -8,10 +8,17 @@ urlpatterns = [
     
     # API
     path('api/formatos/', views_api.get_post_formats, name='api_formatos'),
+    path('api/org-assets/', views_api.get_org_assets, name='api_org_assets'),
     
     # Gerar Post
     path('gerar/', views_gerar.gerar_post, name='gerar'),
-    
+
+    # Pipeline interna (Celery + Claude + Gemini) — homol/dev apenas
+    path('gerar-local/', views_gerar_local.gerar_post_local, name='gerar_local'),
+
+    # Pipeline simples v2 (Celery + OpenAI, 1 agente) — homol/dev apenas
+    path('gerar-simples/', views_gerar_simples.gerar_post_simples, name='gerar_simples'),
+
     # N8N Webhook - Receber post processado
     path('webhook/callback/', views_webhook.n8n_post_callback, name='n8n_post_callback'),
     
@@ -29,4 +36,17 @@ urlpatterns = [
     path('<int:post_id>/request-text-change/', views_actions.request_text_change, name='request_text_change'),
     path('<int:post_id>/request-image-change/', views_actions.request_image_change, name='request_image_change'),
     path('<int:post_id>/edit/', views_actions.edit_post, name='edit'),
+    path('<int:post_id>/images/<int:image_id>/delete/', views_actions.delete_post_image, name='delete_image'),
+
+    # HTML Overlay — preview com textos + export PNG
+    path('<int:post_id>/overlay-data/', views_overlay.overlay_data, name='overlay_data'),
+    path('<int:post_id>/export-png/', views_overlay.export_png, name='export_png'),
+    path('<int:post_id>/save-elements/', views_overlay.save_elements, name='save_elements'),
+    path('<int:post_id>/fonts/<str:role>/', views_overlay.font_file, name='font_file'),
+    path('<int:post_id>/stickers/', views_overlay.upload_sticker, name='upload_sticker'),
+    path('<int:post_id>/regenerate-background/', views_overlay.regenerate_background, name='regenerate_background'),
+    path('<int:post_id>/restore-background/', views_overlay.restore_background, name='restore_background'),
+
+    # DEBUG temporário — validação do pipeline simples v2 (fundo×final + prompts)
+    path('<int:post_id>/simple-debug/', views_overlay.simple_debug, name='simple_debug'),
 ]

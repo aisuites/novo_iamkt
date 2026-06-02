@@ -14,6 +14,26 @@ CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv())
 # ENVIRONMENT
 ENVIRONMENT = config('ENVIRONMENT', default='production')
 
+# Pipeline interna de geracao de post (Celery + Claude + Gemini) — substitui N8N.
+# Visivel apenas em ambientes nao-producao, salvo override explicito.
+ENABLE_LOCAL_PIPELINE = config(
+    'ENABLE_LOCAL_PIPELINE',
+    default=(ENVIRONMENT != 'production'),
+    cast=bool,
+)
+
+# Pipeline SIMPLES (v2): fluxo padrao de TODOS os usuarios (inclusive em prod).
+# Kill-switch opcional — habilitado por padrao.
+ENABLE_SIMPLE_PIPELINE = config(
+    'ENABLE_SIMPLE_PIPELINE',
+    default=True,
+    cast=bool,
+)
+
+# Cotacao USD -> BRL usada nos custos de IA registrados em Post.ai_usage_log
+# Atualizar via env conforme variacao do dolar. Default = 5.80 (mai/2026)
+USD_TO_BRL_RATE = config('USD_TO_BRL_RATE', default=5.80, cast=float)
+
 # APPLICATION DEFINITION
 DJANGO_APPS = [
     'django.contrib.admin',

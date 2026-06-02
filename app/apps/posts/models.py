@@ -93,11 +93,25 @@ class Post(models.Model):
         choices=[
             ('openai', 'OpenAI'),
             ('gemini', 'Google Gemini'),
+            ('anthropic', 'Anthropic'),
         ],
         verbose_name='Provider IA'
     )
     ia_model_text = models.CharField(max_length=50, verbose_name='Modelo IA Texto')
     ia_model_image = models.CharField(max_length=50, blank=True, verbose_name='Modelo IA Imagem')
+
+    # Pipeline usada (N8N externo ou Celery local). Permite A/B em homol.
+    pipeline_used = models.CharField(
+        max_length=10,
+        choices=[
+            ('n8n', 'N8N (workflow externo)'),
+            ('local', 'Local (Celery interno)'),
+            ('simple', 'Simples (Celery + OpenAI, 1 agente)'),
+        ],
+        default='n8n',
+        verbose_name='Pipeline usada',
+        help_text='Qual pipeline foi acionado: N8N externo (producao) ou Celery local (homol)'
+    )
     
     # Conteúdo gerado
     caption = models.TextField(verbose_name='Legenda')
@@ -194,6 +208,68 @@ class Post(models.Model):
     image_prompt = models.TextField(blank=True, verbose_name='Prompt da Imagem')
     image_width = models.IntegerField(null=True, blank=True, verbose_name='Largura')
     image_height = models.IntegerField(null=True, blank=True, verbose_name='Altura')
+
+    # Instrucao curta para o gerador de imagem (complementa image_prompt com
+    # diretrizes de marca: logo, paleta, key visual). Preenchido pelo Claude
+    # no fluxo interno; opcional na pipeline N8N.
+    visual_brief = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Visual brief',
+        help_text='Diretrizes de marca para o gerador de imagem'
+    )
+
+    # Para posts em carrossel, lista de slides com title/subtitle/image_prompt
+    # de cada slide. Vazio em post unico.
+    slides_data = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Slides (carrossel)',
+        help_text='Lista de slides com title/subtitle/image_prompt para carrossel'
+    )
+
+    # Contexto extra da pipeline local: logos e references selecionados da KB,
+    # descricao geral de uso. Usado por Claude (texto) e Gemini (imagem).
+    # Schema:
+    #   {
+    #     'selected_logo_ids': [1, 2],
+    #     'selected_reference_ids': [42],
+    #     'references_usage_description': 'texto livre'
+    #   }
+    local_pipeline_context = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Contexto pipeline local',
+        help_text='Logos/refs selecionados + descricao de uso (somente pipeline local)'
+    )
+
+    # ============================================================
+    # CUSTOS DE IA — totalizadores agregados + historico granular
+    # ============================================================
+    total_text_cost_usd = models.DecimalField(
+        max_digits=10, decimal_places=6, default=0,
+        verbose_name='Custo total texto (USD)',
+        help_text='Acumulado de todas as chamadas de IA para gerar texto'
+    )
+    total_image_cost_usd = models.DecimalField(
+        max_digits=10, decimal_places=6, default=0,
+        verbose_name='Custo total imagem (USD)',
+        help_text='Acumulado de todas as chamadas de IA para gerar imagem'
+    )
+    total_cost_usd = models.DecimalField(
+        max_digits=10, decimal_places=6, default=0,
+        verbose_name='Custo total (USD)',
+        help_text='Soma de todos os custos de IA deste post (multiplas geracoes incluidas)'
+    )
+    ai_usage_log = models.JSONField(
+        default=list, blank=True,
+        verbose_name='Log de uso de IA',
+        help_text=(
+            'Historico granular de cada chamada (Claude/Gemini). '
+            'Cada entry: {timestamp, step, model, input_tokens, output_tokens, '
+            'images_generated, cost_usd, cost_brl}'
+        )
+    )
     
     # Status e aprovação
     status = models.CharField(
@@ -206,6 +282,7 @@ class Post(models.Model):
             ('approved', 'Aprovado'),
             ('agent', 'Agente Alterando — Aguarde'),
             ('rejected', 'Rejeitado'),
+            ('failed', 'Falhou'),
         ],
         default='pending',
         verbose_name='Status'
@@ -272,6 +349,30 @@ class Post(models.Model):
         max_length=500,
         blank=True,
         verbose_name='Chave S3 da imagem raw'
+    )
+
+    # ============================================================
+    # PIPELINE 2-AGENTES (copywriter + designer) — coexiste com pipeline antigo
+    # via env POST_USE_NEW_PIPELINE. Default off.
+    # ============================================================
+    copy_payload = models.JSONField(
+        default=dict, blank=True,
+        verbose_name='Payload do copywriter agent',
+        help_text='Output do copywriter: variants, recommended_variant, design_hints, metrics'
+    )
+    designer_payload = models.JSONField(
+        default=dict, blank=True,
+        verbose_name='Payload do designer agent',
+        help_text='Output do designer: wireframe_plan, image_prompts, approval, flags'
+    )
+    wireframe_s3_url = models.URLField(
+        max_length=1000, blank=True,
+        verbose_name='URL S3 do wireframe PNG',
+        help_text='Preview visual do plano antes do Gemini — base do canvas editavel'
+    )
+    wireframe_s3_key = models.CharField(
+        max_length=500, blank=True,
+        verbose_name='Chave S3 do wireframe PNG'
     )
 
     # Timestamps
