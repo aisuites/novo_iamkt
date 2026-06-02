@@ -2479,6 +2479,75 @@ def generate_post_simple_task(self, post_id: int):
     return {'success': True, 'post_id': post_id, 'model': result['model'], 'usage': result['usage']}
 
 
+# --- Fonte unica do mapa "uso -> forma de envio" do pipeline simples ---
+# image-first (produto/pessoa) vao como IMAGEM ao Gemini; os demais usos
+# (cenario, iluminacao, layout, grafismos, estilo, fundo...) viram SPEC textual.
+_IMAGE_FIRST_USES = {'produto', 'pessoa_modelo', 'pessoa'}
+
+
+def _aspect_delivery(aspect: str) -> str:
+    return 'image' if (aspect or '').strip().lower() in _IMAGE_FIRST_USES else 'spec'
+
+
+def _collect_simple_reference_specs(kb, post) -> list:
+    """SPECS textuais das referencias de uso 'spec' (nao image-first).
+
+    - KB: lookup do dossie ja gravado (visual_analysis), filtrado pelo aspecto.
+    - Uploads: analise EFEMERA via analyze_reference_image (Claude), sem persistir.
+    Retorna [{source, aspects, usage_description, spec}] e loga o custo da analise.
+    """
+    specs = []
+    try:
+        for d in _collect_kb_dossiers(kb=kb, post=post):
+            spec_aspects = [a for a in (d.get('aspects') or []) if _aspect_delivery(a) == 'spec']
+            if spec_aspects and d.get('dossier'):
+                specs.append({
+                    'source': 'kb', 'aspects': spec_aspects,
+                    'usage_description': d.get('usage_description', ''),
+                    'spec': d['dossier'],
+                })
+    except Exception:
+        logger.exception('[posts.simple] falha ao coletar dossie KB')
+
+    try:
+        from apps.knowledge.services.visual_asset_analyzer import analyze_reference_image
+        from apps.core.services.s3_service import S3Service
+        for ref in post.reference_image_files.all():
+            utype = (ref.usage_type or '').strip().lower()
+            if not ref.s3_key or _aspect_delivery(utype) != 'spec':
+                continue
+            try:
+                url = S3Service.generate_presigned_download_url(ref.s3_key, expires_in=3600)
+                res = analyze_reference_image(url)
+            except Exception:
+                logger.exception('[posts.simple] falha analise efemera upload %s', ref.id)
+                continue
+            if res and res.get('structured'):
+                specs.append({
+                    'source': 'upload', 'aspects': [utype or 'outro'],
+                    'usage_description': (ref.usage_description or '').strip(),
+                    'spec': res['structured'],
+                })
+                if res.get('usage'):
+                    _log_usage(post, res.get('model', ''), res['usage'], purpose='simple_ref_analysis')
+    except Exception:
+        logger.exception('[posts.simple] falha ao analisar uploads')
+
+    return specs
+
+
+def _specs_directives_text(specs: list) -> str:
+    """Resumo textual das specs para anexar ao prompt do fundo."""
+    if not specs:
+        return ''
+    import json as _json
+    bits = []
+    for s in specs:
+        asp = ', '.join(s.get('aspects') or [])
+        bits.append(f'- [{asp}] {_json.dumps(s.get("spec") or {}, ensure_ascii=False)[:600]}')
+    return 'DIRETRIZES DAS REFERENCIAS (por uso):\n' + '\n'.join(bits)
+
+
 @shared_task(
     bind=True,
     max_retries=2,
@@ -2522,20 +2591,36 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
     publico_alvo = (kb.publico_externo if kb else '') or ''
     marketing_input_summary = _kb_summary_marketing(kb)
     formato_px = _formato_px(post)
+    # Termos da marca a sanitizar no prompt do fundo: citar a marca (ex.
+    # "Thermomix") ativa priors do Gemini e degrada a fidelidade quando ha
+    # imagem de produto selecionada. Mesma lista usada no pipeline local.
+    brand_keywords = _brand_keywords_from_kb(kb)
     ctx = post.local_pipeline_context or {}
+
+    # Referencias por uso: image-first (produto/pessoa) vao como IMAGEM ao
+    # Gemini; os demais usos viram SPEC textual (KB: dossie ja gravado;
+    # uploads: analise efemera via Claude). Em modo 'pillow' o logo nao entra.
+    _all_refs = _collect_references(kb=kb, post=post, text_render_mode='pillow')
+    references = [r for r in _all_refs if _aspect_delivery(r.get('tipo', '')) == 'image']
+    reference_specs = _collect_simple_reference_specs(kb=kb, post=post)
+    _specs_text = _specs_directives_text(reference_specs)
+    bg_image_prompt = post.image_prompt or ''
+    if _specs_text:
+        bg_image_prompt = f'{bg_image_prompt}\n\n{_specs_text}'
 
     try:
         # -------- Etapa 1: fundo SEM texto (reuso) --------
         bg_result = generate_post_image(
             post=post,
-            references=[],
+            references=references,
             paleta=paleta,
             tipografia=tipografia,
             publico_alvo=publico_alvo,
             marketing_input_summary=marketing_input_summary,
             formato_px=formato_px,
             text_render_mode='pillow',
-            image_prompt_override=post.image_prompt or '',
+            brand_keywords=brand_keywords,
+            image_prompt_override=bg_image_prompt,
         )
         bg_bytes = bg_result.get('raw_png_bytes') or bg_result.get('png_bytes')
         bg_prompt = bg_result.get('prompt_text', '')
@@ -2563,6 +2648,8 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
             'reference_aspects': ctx.get('reference_aspects') or {},
             'references_usage_description': ctx.get('references_usage_description') or '',
             'reference_descriptions': ref_descs,
+            # Specs ja extraidas (KB dossie + analise efemera de uploads)
+            'reference_specs': reference_specs,
         }
         textos = {'title': post.title or '', 'subtitle': post.subtitle or '', 'cta': post.cta or ''}
         brief_result = resolve_briefing(
@@ -2627,6 +2714,7 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
         'bg_prompt': bg_prompt,
         'final_prompt': final_prompt,
         'rules': briefing,
+        'reference_specs': reference_specs,
         'model_bg': bg_result.get('model', ''),
         'model_final': apply_result['model'],
         'created_at': _tz.now().isoformat(),
