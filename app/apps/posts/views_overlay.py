@@ -87,11 +87,16 @@ def overlay_data(request, post_id):
 @login_required
 @require_GET
 def simple_debug(request, post_id):
-    """Área de validação (TEMPORÁRIA) do pipeline simples v2.
+    """Área de validação do pipeline simples v2 (ADMIN-ONLY).
 
     Retorna o fundo SEM texto, a imagem final e os prompts/JSON usados, para
-    comparação visual durante os testes. Restrito a pipeline_used='simple'.
+    comparação visual. Disponível em prod apenas para administradores.
     """
+    is_admin = bool(
+        request.user.is_superuser or getattr(request.user, 'profile', '') == 'admin'
+    )
+    if not is_admin:
+        return JsonResponse({'error': 'forbidden'}, status=403)
     post = get_object_or_404(Post, id=post_id, organization=request.organization)
     if post.pipeline_used != 'simple':
         return JsonResponse({'error': 'not_simple_pipeline'}, status=404)

@@ -610,10 +610,10 @@
     </div>
 </div>
 
-{% if enable_local_pipeline %}
+{% if is_admin %}
 <!-- ===================================================================== -->
-<!-- ÁREA DE DEBUG TEMPORÁRIA — pipeline simples v2 (fundo × final + prompts) -->
-<!-- REMOVER após validação dos testes. -->
+<!-- ÁREA DE DEBUG — pipeline simples v2 (fundo × final + prompts). ADMIN-ONLY -->
+<!-- Visível em prod apenas para administradores. -->
 <!-- ===================================================================== -->
 <section id="simpleDebugArea" style="margin:32px auto;max-width:1100px;padding:16px;border:2px dashed #c00;border-radius:8px;background:#fff7f7;">
     <h3 style="margin:0 0 8px;color:#c00;">🧪 Debug pipeline simples v2 <small style="font-weight:normal;color:#999;">(temporário)</small></h3>
