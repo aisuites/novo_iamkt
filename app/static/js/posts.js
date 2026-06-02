@@ -919,10 +919,10 @@
     dom.formGerarPost.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      // Pipeline escolhido no seletor do modal (fallback: data-pipeline do botao
-      // / 'n8n' quando o seletor nao e renderizado no ambiente de producao)
+      // Pipeline: admin escolhe no seletor; demais usuarios (sem seletor) sempre
+      // 'simple'. Fallback final tambem 'simple' (fluxo padrao de producao).
       const pipeline = document.getElementById('pipelineSelect')?.value
-        || e.submitter?.dataset?.pipeline || 'n8n';
+        || e.submitter?.dataset?.pipeline || 'simple';
 
       const rede = dom.redePost?.value || 'Instagram';
       const tema = dom.temaPost?.value.trim() || '';
@@ -1408,7 +1408,7 @@
         const isEditable = (activeImg && typeof activeImg === 'object')
             ? !!activeImg.is_editable
             : false;
-        if (isEditable) {
+        if (isEditable && window.IS_ADMIN) {
             const btnArteFinal = document.createElement('button');
             btnArteFinal.type = 'button';
             btnArteFinal.className = 'btn';

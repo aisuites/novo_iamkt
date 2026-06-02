@@ -127,6 +127,12 @@ def posts_list(request):
         'posts_json': posts_json,
         'posts_webhook_url': settings.N8N_WEBHOOK_GERAR_POST,
         'enable_local_pipeline': settings.ENABLE_LOCAL_PIPELINE,
+        # Admin = superuser ou profile 'admin'. Controla o seletor de pipeline
+        # e o botao "Edicao Avancada" (Pillow) — demais usuarios so veem o simples.
+        'is_admin': bool(
+            request.user.is_superuser
+            or getattr(request.user, 'profile', '') == 'admin'
+        ),
     }
-    
+
     return render(request, 'posts/posts_list.html', context)

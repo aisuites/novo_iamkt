@@ -37,7 +37,7 @@ _NON_EXCLUSIVE = {'produto', 'pessoa_modelo'}
 @require_http_methods(['POST'])
 def gerar_post_simples(request):
     """Cria Post com pipeline_used='simple' e dispara generate_post_simple_task."""
-    if not getattr(settings, 'ENABLE_LOCAL_PIPELINE', False):
+    if not getattr(settings, 'ENABLE_SIMPLE_PIPELINE', True):
         return JsonResponse(
             {'success': False, 'error': 'Pipeline simples desabilitada neste ambiente'},
             status=403,

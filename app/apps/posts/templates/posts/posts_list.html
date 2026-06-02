@@ -412,20 +412,20 @@
             </div>
             
             <div class="modal-footer">
-                {% if enable_local_pipeline %}
+                {% if is_admin %}
                 <div class="pipeline-selector" style="margin-right:auto; display:flex; align-items:center; gap:8px;">
                     <label for="pipelineSelect" style="font-size:13px; white-space:nowrap;">Motor de geração</label>
-                    <select id="pipelineSelect" class="form-control" style="min-width:220px;" title="Escolha qual pipeline gera este post">
-                        <option value="n8n">N8N (produção)</option>
+                    <select id="pipelineSelect" class="form-control" style="min-width:220px;" title="Escolha qual pipeline gera este post (admin)">
+                        <option value="simple">Simples v2 (OpenAI + orquestrador)</option>
                         <option value="local">Local (Celery + Claude + Gemini)</option>
-                        <option value="simple">Simples v2 (OpenAI gpt-4o-mini)</option>
+                        <option value="n8n">N8N (produção legada)</option>
                     </select>
                 </div>
                 {% endif %}
                 <button type="button" class="btn btn-outline-secondary" onclick="closeModal('modalGerarPost')">
                     Cancelar
                 </button>
-                <button type="submit" class="btn btn-primary" id="btnEnviarPost" data-pipeline="n8n">
+                <button type="submit" class="btn btn-primary" id="btnEnviarPost" data-pipeline="simple">
                     Gerar Post
                 </button>
             </div>
@@ -691,13 +691,14 @@ try {
 }
 
 window.CURRENT_USER = "{{ request.user.email|default:''|escapejs }}";
+window.IS_ADMIN = {{ is_admin|yesno:"true,false" }};
 window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 </script>
 
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260602-2000"></script>
+<script src="{% static 'js/posts.js' %}?v=20260602-2100"></script>
 <!-- Temporariamente desabilitados para debug -->
 <!-- <script src="{% static 'js/posts-modal.js' %}?v=20260203-0129"></script> -->
 <!-- <script src="{% static 'js/posts-gallery.js' %}?v=20260203-0129"></script> -->
