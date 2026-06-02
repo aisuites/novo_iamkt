@@ -231,20 +231,33 @@ def _format_to_dict(post_format) -> dict:
 
 def _logos_from_org(organization, post=None):
     """
-    Retorna URLs dos logos cadastrados na KB da org.
+    Retorna URLs PRESIGNED dos logos cadastrados na KB da org (primario primeiro).
     Se post tiver local_pipeline_context.selected_logo_ids, filtra.
+
+    Presigna por s3_key (o bucket e privado — a s3_url crua da 403 no download).
     """
     from apps.knowledge.models import KnowledgeBase, Logo
+    from apps.core.services.s3_service import S3Service
     kb = KnowledgeBase.objects.filter(organization=organization).first()
     if not kb:
         return []
-    qs = Logo.objects.filter(knowledge_base=kb)
+    qs = Logo.objects.filter(knowledge_base=kb).order_by('-is_primary', 'id')
     if post is not None:
         ctx = post.local_pipeline_context or {}
         selected_ids = ctx.get('selected_logo_ids') or []
         if selected_ids:
             qs = qs.filter(id__in=selected_ids)
-    return [l.s3_url for l in qs if l.s3_url]
+    out = []
+    for l in qs:
+        if l.s3_key:
+            try:
+                out.append(S3Service.generate_presigned_download_url(l.s3_key, expires_in=86400))
+                continue
+            except Exception:
+                pass
+        if l.s3_url:
+            out.append(l.s3_url)
+    return out
 
 
 def _reference_images_from_post(post):
