@@ -515,12 +515,17 @@ class PostReferenceImage(models.Model):
         verbose_name='Importância'
     )
     usage_type = models.CharField(
-        max_length=10,
-        default='inspire',
+        max_length=32,
+        default='',
+        blank=True,
         choices=[
-            ('inspire', 'Inspirar'),
-            ('mimic', 'Seguir fielmente'),
-            ('avoid', 'EVITAR'),
+            ('produto', 'Produto (manter fiel ao original)'),
+            ('pessoa', 'Pessoa / Speaker'),
+            ('cenario', 'Cenario / Lugar'),
+            ('referencia_estilo', 'Referencia de estilo'),
+            ('icone', 'Icone / Elemento grafico'),
+            ('fundo', 'Fundo / Textura'),
+            ('outro', 'Outro'),
         ],
         verbose_name='Tipo de uso'
     )

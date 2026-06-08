@@ -1312,13 +1312,26 @@ def _dossier_to_gemini_brief(dossier: dict, aspects: list) -> str:
                     f"alinhamento={b.get('alinhamento_paragrafo')}"
                 )
     if 'grafismos' in aspects:
-        lines.append('GRAFISMOS (replicar FIELMENTE forma e cor):')
+        lines.append('GRAFISMOS (replicar FIELMENTE forma, curva e cor — '
+                     'em especial os que ficam ATRAS do texto, que sao o fundo da arte):')
         for g in (dossier.get('assets_grafismos') or []):
-            lines.append(
-                f"  - {g.get('tipo')} cor={g.get('cor')} | "
-                f"estilo={g.get('estilo')} | funcao={g.get('funcao')} | "
-                f"posicao={g.get('posicao')}"
-            )
+            partes = [f"{g.get('tipo')}"]
+            if g.get('geometria'):
+                partes.append(f"geometria={g.get('geometria')}")
+            if g.get('cor'):
+                partes.append(f"cor={g.get('cor')}")
+            if g.get('area_cobertura_pct'):
+                partes.append(f"cobertura={g.get('area_cobertura_pct')}%")
+            if g.get('estilo'):
+                partes.append(f"estilo={g.get('estilo')}")
+            if g.get('posicao'):
+                partes.append(f"posicao={g.get('posicao')}")
+            if g.get('atras_do_texto'):
+                partes.append('FICA ATRAS DO TEXTO (camada de fundo da arte)')
+            linha = '  - ' + ' | '.join(p for p in partes if p)
+            if g.get('forma_detalhada'):
+                linha += f"\n      forma: {g.get('forma_detalhada')}"
+            lines.append(linha)
     lines.append('')
     lines.append('IGNORE COMPLETAMENTE na imagem de referencia:')
     lines.append('  - O TEXTO VISIVEL dentro das faixas e selos (e exemplo).')

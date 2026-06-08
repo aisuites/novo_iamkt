@@ -180,6 +180,45 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
     references = _collect_references(kb=kb, post=post, text_render_mode='pillow')
     kb_dossiers = _collect_kb_dossiers(kb=kb, post=post)
 
+    # Cenario 2 (ref composta, sem asset isolado): anexa a imagem da ref KB de
+    # 'grafismos'/'layout_composicao' ao Gemini como referencia_layout — ele
+    # replica APENAS o grafismo de fundo (forma/curva/cor) e ignora
+    # pessoa/produto/texto. O brief vem do DOSSIE (ja melhorado: geometria,
+    # forma_detalhada, cobertura, atras_do_texto). Mesma logica do fluxo interno
+    # (tasks.py); aqui o grafismo precisa nascer na ETAPA 1 (fundo), pois no
+    # simples nao ha overlay Pillow. Anexado ANTES do orquestrador e do bg-gen
+    # para que ambos vejam a imagem.
+    if kb_dossiers:
+        try:
+            from apps.core.services.s3_service import S3Service
+            from apps.knowledge.models import ReferenceImage
+            for _d in kb_dossiers:
+                _aspects = _d.get('aspects') or []
+                if not any(a in _aspects for a in ('layout_composicao', 'grafismos')):
+                    continue
+                _kb_ref = ReferenceImage.objects.filter(id=_d.get('id')).first()
+                if not _kb_ref or not _kb_ref.s3_key:
+                    continue
+                try:
+                    _url = S3Service.generate_presigned_download_url(
+                        _kb_ref.s3_key, expires_in=86400
+                    )
+                except Exception:
+                    continue
+                # SEM brief textual do grafismo: a fidelidade vem da IMAGEM em si
+                # (role GRAPHIC REFERENCE) + reforco na scene. Nao descrevemos
+                # forma/cor/posicao em texto — isso so faz o Gemini "inventar"
+                # variacoes. O grafismo deve sair da imagem de referencia.
+                references.append({
+                    'tipo': 'referencia_layout',
+                    'url': _url,
+                    'usage_description': '',
+                })
+                logger.info('[posts.simple] ref KB %s anexada ao Gemini como '
+                            'referencia_layout (grafismo da imagem, sem brief)', _kb_ref.id)
+        except Exception:
+            logger.exception('[posts.simple] falha ao anexar ref KB grafismo')
+
     try:
         # -------- Etapa 1: FUNDO SEM TEXTO — reuso do FLUXO INTERNO --------
         # O orquestrador (Claude) escreve a CENA (produto em cena + luz/composicao

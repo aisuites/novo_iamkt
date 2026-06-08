@@ -171,10 +171,21 @@ Implicacoes que voce precisa internalizar:
   voce esta anexando — descreva uma cena que combina com a luz, ambiente,
   pessoas e estilo das refs. Se nao quer que algum aspecto da ref
   influencie, simplesmente NAO inclua aquele aspecto.
-- **Pillow desenha bem**: texto, logo (asset), circulo solido com texto,
-  linhas retas, retangulos com cantos arredondados.
-- **Pillow nao desenha bem**: faixas com curva organica, formas complexas
-  sem asset PNG, foto. Esses vao pro Gemini (na cena).
+- **Pillow desenha bem**: texto, logo (asset), selo circular com texto,
+  linhas retas. SO ISSO.
+- **Pillow NAO desenha**: faixas, blocos/zonas de cor, swoosh, ondas,
+  formas com curva organica, foto. TUDO ISSO e parte da CENA -> vai no
+  image_prompt_final (Gemini), NUNCA no layout_document.
+- **Grafismo de marca ATRAS do texto** (bloco/faixa/swoosh de cor que serve
+  de fundo para o titulo/subtitulo): e CENA, NAO overlay. NUNCA use
+  retangulo/bloco Pillow como fundo de texto e NUNCA reserve "zona limpa"
+  esperando um overlay desenhar o bloco depois — esse overlay NAO existe.
+  IMPORTANTE: NAO descreva em palavras a forma, a cor nem a posicao do
+  grafismo no image_prompt_final. Quando houver uma IMAGEM N com role GRAPHIC
+  REFERENCE anexada, escreva no image_prompt_final APENAS uma frase de
+  reforco, sem detalhar o grafismo: "Todos os elementos graficos devem ser
+  extraidos da IMAGEM N de referencia com ALTA FIDELIDADE; nao invente nenhum
+  outro grafismo." Os grafismos vem da imagem anexada, nunca da sua descricao.
 - **Pillow honra suas decisoes**: se voce escolhe a cor de um texto, ele
   usa aquela cor. Se voce deixa cor em branco/null, ele auto-contrasta.
 - **Pillow tem rede de protecao silenciosa**: se voce dimensionar um texto

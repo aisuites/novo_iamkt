@@ -307,8 +307,11 @@ def _normalize_tipo(tipo: str) -> str:
         return 'cenario'
     if 'fundo' in t or 'background' in t or 'textura' in t:
         return 'fundo'
-    if 'icone' in t or 'ícone' in t:
-        return 'icone'
+    # Cenario 1: asset de marca isolado que o user sobe no modal (usage_type
+    # 'icone'/'Elemento grafico'). Tratado como GRAPHIC REFERENCE para ser
+    # aplicado FIELMENTE (forma/curva/cor preservadas), em vez de "icone solto".
+    if 'icone' in t or 'ícone' in t or 'elemento grafico' in t or 'grafismo' in t:
+        return 'referencia_layout'
     if 'referencia_layout' in t or 'layout' in t:
         return 'referencia_layout'
     if 'refer' in t:
@@ -743,17 +746,22 @@ def _build_prompt_text(
             _layout_refs = [(i, r) for i, r in enumerate(sorted_refs, 1)
                             if _normalize_tipo(str(r.get('tipo','')).lower()) == 'referencia_layout']
             if _layout_refs:
-                lines_rf = ['[PRE-GENERATION — MANDATORY STEP]',
-                            'Before generating anything: carefully examine the following attached image(s):']
+                lines_rf = ['[PRE-GENERATION — MANDATORY IMAGE ANALYSIS]',
+                            'STEP 1 (REQUIRED): Before generating anything, you MUST visually '
+                            'ANALYZE the attached reference image(s) below:']
                 for idx, ref in _layout_refs:
                     lines_rf.append(
-                        f'  → Image {idx} (GRAPHIC & LAYOUT REFERENCE): '
-                        f'study every graphic element visible — exact shape, color, position and style.'
+                        f'  → Image {idx} (GRAPHIC & LAYOUT REFERENCE): extract EVERY graphic '
+                        f'element present (shapes, bands, swooshes, color blocks, curves) — '
+                        f'its exact shape, curvature, color and position.'
                     )
                 lines_rf.extend([
-                    'These graphic elements MUST appear in your output exactly as you observe them '
-                    'in the attached image(s). Do not invent, approximate or relocate them.',
-                    'Replicate what you SEE in the image, reinforced by the brief in [REFERENCE ROLES].',
+                    'STEP 2: Reproduce those graphic elements in the final artwork with HIGH '
+                    'FIDELITY, exactly as they appear in the attached image. Do NOT invent, '
+                    'approximate, relocate, restyle, or add ANY graphic element that is not '
+                    'present in the reference image.',
+                    'ALL graphic elements come strictly from the ATTACHED IMAGE — never from '
+                    'imagination or from a text description.',
                 ])
                 _grafismo_reinforcement = '\n'.join(lines_rf)
 

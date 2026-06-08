@@ -87,8 +87,33 @@ O QUE EXTRAIR (preencha tudo que for observavel)
   - contraste_fundo: descreva.
 - logo_na_referencia: {presente (bool), posicao (9 ancoras), tamanho_relativo,
   aplicacao (sobre_foto/area_solida/transparente), fundo}. Vazio se nao ha logo.
-- assets_grafismos: lista de elementos graficos (formas, faixas, padroes,
-  icones, molduras): {tipo, posicao, cor, estilo, funcao}.
+- assets_grafismos: lista de elementos graficos NAO-FOTOGRAFICOS (formas,
+  faixas, blocos de cor solida, ondas/swoosh, padroes, icones, molduras,
+  divisores). ATENCAO ESPECIAL aos blocos/formas de cor que servem de FUNDO
+  para o texto ou o logo — sao grafismos de marca importantes, descreva-os com
+  precisao (nao os trate como "parede" ou parte da foto). Para cada elemento:
+  - tipo: nome curto (ex: "bloco de cor", "faixa", "onda/swoosh", "selo",
+    "moldura", "divisor").
+  - geometria: "reta" | "curva" | "organica" | "mista". TRACE com o olhar a
+    borda que separa o grafismo do resto da arte, de ponta a ponta. Se essa
+    borda for um segmento de RETA do inicio ao fim -> "reta". Se ela ARQUEIA
+    em qualquer trecho (arco, concava, convexa, em S, swoosh) -> "curva",
+    mesmo que a curvatura seja suave. ATENCAO: blocos de fundo de marca quase
+    sempre usam SWOOSH / onda curva, nao diagonal reta — diante de uma faixa
+    de cor grande, a hipotese default e "curva"; so marque "reta" se voce
+    confirmar que a borda e um segmento de reta perfeito. NUNCA escreva
+    "diagonal", "trapezoidal" ou "borda diagonal" para uma borda que arqueia.
+    Em forma_detalhada, descreva explicitamente o sentido da curvatura.
+  - forma_detalhada: 1 frase sobre a forma real e como ela corta o canvas
+    (ex: "swoosh de borda concava descendo do canto superior esquerdo ate o
+    centro-direita, cobrindo o quadrante superior-esquerdo").
+  - posicao: regiao/ancora que ocupa (ex: "metade superior-esquerda").
+  - area_cobertura_pct: estimativa 0-100 de quanto do canvas o elemento cobre.
+  - atras_do_texto: true se o elemento fica ATRAS do bloco de texto ou do logo
+    (serve de fundo para eles); senao false.
+  - cor: cor dominante do elemento em #RRGGBB aproximado.
+  - estilo: "flat/solido" | "gradiente" | "contorno" | "textura".
+  - funcao: papel na composicao (ex: "zona de texto", "acento", "separador").
 - grid: {colunas (estimativa), zonas: lista de {nome, x_pct, y_pct,
   largura_pct, altura_pct, conteudo}, alinhamento_geral, margens_pct}.
   As zonas sao um mapa matematico aproximado (0-100) de onde cada bloco de
@@ -115,7 +140,7 @@ FORMATO DE SAIDA (JSON puro, sem markdown)
   "tipografia_observada": {"presente": false, "estilo": "", "peso": "", "caixa": "", "descricao": ""},
   "texto_x_imagem": {"ha_texto": false, "posicao_texto": "", "alinhamento_paragrafo": "", "blocos": [{"papel": "titulo", "texto_aprox": "", "alinhamento_paragrafo": "esquerda", "caixa": "mista", "peso": "bold", "cor": "#RRGGBB"}], "relacao_com_sujeito": "", "contraste_fundo": ""},
   "logo_na_referencia": {"presente": false, "posicao": "", "tamanho_relativo": "", "aplicacao": "", "fundo": ""},
-  "assets_grafismos": [{"tipo": "...", "posicao": "...", "cor": "...", "estilo": "...", "funcao": "..."}],
+  "assets_grafismos": [{"tipo": "...", "geometria": "reta|curva|organica|mista", "forma_detalhada": "...", "posicao": "...", "area_cobertura_pct": 0, "atras_do_texto": false, "cor": "#RRGGBB", "estilo": "...", "funcao": "..."}],
   "grid": {"colunas": 0, "zonas": [{"nome": "...", "x_pct": 0, "y_pct": 0, "largura_pct": 0, "altura_pct": 0, "conteudo": "..."}], "alinhamento_geral": "", "margens_pct": 0},
   "mood": "...",
   "estilo_visual": "...",
