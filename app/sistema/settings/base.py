@@ -258,3 +258,9 @@ N8N_RATE_LIMIT_PER_ORG = config('N8N_RATE_LIMIT_PER_ORG', default='5/minute')
 N8N_MAX_RETRIES = config('N8N_MAX_RETRIES', default=3, cast=int)
 N8N_RETRY_DELAY = config('N8N_RETRY_DELAY', default=5, cast=int)
 # N8N_INTERNAL_TOKEN removido - usar N8N_WEBHOOK_SECRET para autenticação
+
+# SITE INTEGRATION (cadastro vindo de iamkt.com.br -> app.iamkt.com.br)
+# Segredo próprio, separado do N8N. Header esperado: X-INTERNAL-TOKEN
+SITE_WEBHOOK_SECRET = config('SITE_WEBHOOK_SECRET', default='')
+SITE_ALLOWED_IPS = config('SITE_ALLOWED_IPS', default='')  # CSV; vazio = não filtra por IP
+SITE_RATE_LIMIT_PER_IP = config('SITE_RATE_LIMIT_PER_IP', default='30/minute')

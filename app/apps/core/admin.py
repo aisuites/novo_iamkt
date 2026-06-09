@@ -126,9 +126,10 @@ class OrganizationAdmin(admin.ModelAdmin):
         'name', 'status_badge', 'plan_type', 'modules_summary', 'uso_hoje',
         'billing_cycle_day', 'created_at'
     ]
-    list_filter = ['plan_type', 'is_active', 'suspension_reason', 'created_at']
-    search_fields = ['name', 'slug']
-    readonly_fields = ['created_at', 'updated_at', 'approved_at', 'approved_by']
+    list_filter = ['plan_type', 'is_active', 'suspension_reason', 'requested_plan', 'created_at']
+    search_fields = ['name', 'slug', 'cpf']
+    readonly_fields = ['created_at', 'updated_at', 'approved_at', 'approved_by',
+                       'requested_plan', 'payment_reference']
     
     actions = [
         'approve_with_template',
@@ -147,6 +148,11 @@ class OrganizationAdmin(admin.ModelAdmin):
         }),
         ('Plano e Status', {
             'fields': ('plan_type', 'is_active', 'suspension_reason', 'approved_at', 'approved_by')
+        }),
+        ('Cadastro e Cobrança', {
+            'fields': ('cpf', 'requested_plan', 'payment_reference'),
+            'description': 'CPF do responsável e dados do cadastro vindo do site '
+                           '(plano solicitado e referência do pagamento são preenchidos pelo fluxo)'
         }),
         ('Módulos e Ferramentas', {
             'fields': (

@@ -146,9 +146,9 @@ def register_view(request):
     if request.method == 'POST':
         from django.contrib.auth.password_validation import validate_password
         from django.core.exceptions import ValidationError
-        from django.utils.text import slugify
-        from .models import User, Organization
+        from .models import User
         from .emails import send_registration_confirmation, send_registration_notification
+        from .services.signup_service import create_pending_signup, SignupError
         import re
         
         # Capturar dados do formulário
@@ -210,40 +210,15 @@ def register_view(request):
         
         # Criar organização e usuário
         try:
-            # 1. Criar Organization (pendente de aprovação)
-            organization = Organization.objects.create(
-                name=company_name,
-                slug=slugify(company_name),
-                is_active=False,  # Aguardando aprovação
-                plan_type='pending',
-                suspension_reason='pending_approval',
-                quota_pautas_dia=0,
-                quota_posts_dia=0,
-                quota_posts_mes=0
-            )
-            
-            # 2. Dividir nome completo em first_name e last_name
-            name_parts = full_name.split()
-            first_name = name_parts[0] if name_parts else ''
-            last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
-            
-            # 3. Criar User (inativo, vinculado à organização)
-            user = User.objects.create(
-                username=email,  # Email é o username
+            # Cria Organization (pendente) + User admin (inativo) via serviço único
+            organization, user = create_pending_signup(
+                full_name=full_name,
                 email=email,
-                first_name=first_name,
-                last_name=last_name,
-                organization=organization,
-                profile='admin',  # Primeiro usuário é admin da organização
-                is_active=False  # Aguardando aprovação
+                company_name=company_name,
+                password=password,
+                phone=phone,
             )
-            user.set_password(password)
-            user.save()
-            
-            # 3.1. Definir usuário como owner da organização
-            organization.owner = user
-            organization.save()
-            
+
             # 4. Enviar emails
             email_user_sent = send_registration_confirmation(user, organization)
             email_team_sent = send_registration_notification(user, organization)
@@ -260,12 +235,23 @@ def register_view(request):
             # 5. Redirecionar para página de sucesso
             return redirect('register_success')
             
+        except SignupError as e:
+            # Erro previsível (ex: email já cadastrado) — mostrar mensagem amigável
+            messages.error(request, e.message)
+            context = {
+                'full_name': full_name,
+                'email': email,
+                'company_name': company_name,
+                'phone': phone,
+            }
+            return render(request, 'auth/register.html', context)
+
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f'Erro ao criar cadastro: {str(e)}')
             messages.error(request, 'Ocorreu um erro ao processar seu cadastro. Tente novamente.')
-            
+
             context = {
                 'full_name': full_name,
                 'email': email,

@@ -366,6 +366,30 @@ class Organization(TimeStampedModel):
     name = models.CharField(max_length=160, verbose_name='Nome')
     slug = models.SlugField(max_length=160, unique=True, verbose_name='Slug')
     tagline = models.CharField(max_length=255, blank=True, verbose_name='Tagline')
+
+    # Documento de cobrança (preenchido no cadastro vindo do site iamkt.com.br)
+    cpf = models.CharField(
+        max_length=11,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="CPF do responsável pela conta (somente dígitos). Usado para cobrança.",
+        verbose_name='CPF'
+    )
+    requested_plan = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text="Plano escolhido no site no cadastro (aplicado na confirmação de pagamento). Ex: starter, pro",
+        verbose_name='Plano Solicitado'
+    )
+    payment_reference = models.CharField(
+        max_length=120,
+        blank=True,
+        default='',
+        help_text="Referência do pagamento (ex: ID do Mercado Pago) que liberou a conta.",
+        verbose_name='Referência de Pagamento'
+    )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
