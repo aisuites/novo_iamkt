@@ -1145,20 +1145,22 @@
       });
     }
     
-    if (dom.postTitulo) dom.postTitulo.textContent = post.title || '—';
-    if (dom.postSubtitulo) dom.postSubtitulo.textContent = post.subtitle || '—';
-    if (dom.postLegenda) dom.postLegenda.textContent = post.caption || '—';
-    if (dom.postHashtags) dom.postHashtags.textContent = (post.hashtags && post.hashtags.length) ? post.hashtags.join(' ') : '—';
-    if (dom.postCTA) dom.postCTA.textContent = post.cta || '—';
-    
+    // Enquanto o agente esta gerando o texto (status 'generating'), NENHUM campo
+    // de texto deve aparecer — todos surgem JUNTOS quando o conteudo fica pronto.
+    const isGen = post.status === 'generating';
+    if (dom.postTitulo) dom.postTitulo.textContent = isGen ? '' : (post.title || '—');
+    if (dom.postSubtitulo) dom.postSubtitulo.textContent = isGen ? '' : (post.subtitle || '—');
+    if (dom.postLegenda) dom.postLegenda.textContent = isGen ? '' : (post.caption || '—');
+    if (dom.postHashtags) dom.postHashtags.textContent = isGen ? '' : ((post.hashtags && post.hashtags.length) ? post.hashtags.join(' ') : '—');
+    if (dom.postCTA) dom.postCTA.textContent = isGen ? '' : (post.cta || '—');
+
     if (dom.postDescricaoImagem) {
-      // Preferir descricao em PT-BR (visual_brief / strategist.image_style)
-      // para o usuario. image_prompt e o prompt EN do Gemini — fallback so se
-      // nao houver PT-BR.
-      dom.postDescricaoImagem.textContent = post.image_description_ptbr
+      // Descricao da imagem = a CENA do orquestrador (post.image_prompt /
+      // image_description_ptbr). Em 'generating', fica vazia ate tudo terminar.
+      dom.postDescricaoImagem.textContent = isGen ? '' : (post.image_description_ptbr
         || post.image_prompt
         || post.description
-        || '—';
+        || '—');
       
       if (post.carousel && post.carousel_quantity > 1) {
         if (!dom.postDescricaoImagem.classList.contains('post-image-prompt')) {

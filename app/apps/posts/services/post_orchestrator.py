@@ -295,6 +295,7 @@ def orchestrate_post(
     formato_px: str = '',
     aspect_ratio: str = '',
     kb_dossiers: Optional[List[Dict[str, Any]]] = None,
+    gemini_only: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """
     Roda o orquestrador Claude Sonnet 4.5 multimodal.
@@ -334,14 +335,33 @@ def orchestrate_post(
     content_blocks: List[Dict[str, Any]] = []
     image_meta_lines = []
 
+    # Papel EXPLICITO de cada imagem (o aspecto que o user escolheu no form).
+    # Sem isso o Claude "interpreta" a imagem (ex.: trata um PRODUTO como mood).
+    _ROLE_HINT = {
+        'produto': ('PRODUTO — use esta imagem APENAS para a identidade do produto '
+                    '(mesmo modelo, cor, rotulo, materiais, detalhes). Pode variar '
+                    'angulo/posicao para integrar a cena. NAO extraia dela iluminacao, '
+                    'mood, ambiente, composicao nem qualquer outro aspecto — ela NAO e '
+                    'referencia de estilo. NUNCA troque o produto por outro objeto.'),
+        'logo': ('LOGO — use APENAS como o logo (aplicar como esta, sem distorcer/'
+                 'recolorir). Nao extraia estilo/cor/ambiente dela.'),
+        'pessoa': ('PESSOA — use APENAS para a identidade da pessoa (rosto, cabelo, '
+                   'tom de pele). Pose/angulo podem variar. Nao extraia ambiente/mood dela.'),
+        'referencia_layout': ('GRAFISMO/LAYOUT — use APENAS para replicar os elementos '
+                              'graficos (formas, cores, posicoes) com fidelidade. NAO '
+                              'copie pessoas/produtos/textos nem o ambiente dela.'),
+        'referencia': ('REFERENCIA DE ESTILO — inspiracao de estilo/luz/mood APENAS; '
+                       'nao copiar nenhum elemento especifico.'),
+    }
     for i, ref in enumerate(references, 1):
         url = ref.get('url')
         tipo = str(ref.get('tipo', 'desconhecido')).lower()
         usage_desc = (ref.get('usage_description') or '').strip()
 
-        meta = f'IMAGEM {i}: tipo_original={tipo}'
+        role_hint = _ROLE_HINT.get(tipo, f'tipo={tipo}')
+        meta = f'IMAGEM {i}: papel={role_hint}'
         if usage_desc:
-            meta += f' | uso indicado pelo user: "{usage_desc}"'
+            meta += f' | observacao do user: "{usage_desc}"'
         image_meta_lines.append(meta)
 
         if not url:
@@ -357,6 +377,15 @@ def orchestrate_post(
         except Exception as exc:
             logger.warning('[orchestrator] falha download imagem %d: %s', i, exc)
 
+    # Regra dura: cada imagem serve SO ao papel acima. Sem emprestar aspectos.
+    if image_meta_lines:
+        image_meta_lines.append(
+            'REGRA: use CADA imagem SOMENTE para o papel indicado. NUNCA tome '
+            'emprestado outros aspectos (iluminacao, mood, ambiente, composicao, '
+            'cor) de uma imagem cujo papel nao seja esse. Se precisar de luz/mood/'
+            'ambiente, defina voce mesmo na cena — nao tire de uma imagem de produto/logo.'
+        )
+
     # Texto final com briefing e metadados
     user_text = _build_user_text(
         post=post,
@@ -369,6 +398,19 @@ def orchestrate_post(
         aspect_ratio=aspect_ratio,
         kb_dossiers=kb_dossiers,
     )
+    if gemini_only:
+        user_text += (
+            '\n\n== MODO DESTE FLUXO (CRITICO) ==\n'
+            'NESTE fluxo NAO existe etapa Pillow. TUDO — produto, pessoas, '
+            'grafismos e cena — e desenhado pelo Gemini a partir do seu '
+            '`image_prompt_final`. Consequencias OBRIGATORIAS:\n'
+            '- TODA imagem de PRODUTO ou PESSOA selecionada DEVE aparecer na cena, '
+            'referenciada como "o produto da IMAGEM N" / "a pessoa da IMAGEM N". '
+            'NUNCA mande para Pillow e NUNCA omita o produto/pessoa.\n'
+            '- Os grafismos tambem entram na cena (image_prompt_final), extraidos '
+            'da imagem de referencia. Nao conte com overlay Pillow para nada.\n'
+            '- O `layout_document` pode ir vazio; aqui so o `image_prompt_final` importa.'
+        )
     content_blocks.append({'type': 'text', 'text': user_text})
 
     # System como LIST: [skill cacheada 1h, system_prompt cacheado 1h].

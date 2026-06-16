@@ -18,6 +18,148 @@ from celery import shared_task
 
 logger = logging.getLogger(__name__)
 
+# Quantas imagens do KB anexar como referencia visual quando o form nao traz
+# nenhuma. Limite provisorio — a validacao de "uso de cada imagem" vem depois.
+_KB_FALLBACK_REF_LIMIT = 5
+
+
+def _aspects_to_tipo(aspects):
+    """Mapeia os aspectos escolhidos no form -> papel (tipo) usado pelo
+    orquestrador/Gemini para tratar a imagem (fidelidade de produto, grafismo
+    de layout, pessoa ou referencia generica de estilo)."""
+    aspects = [a for a in (aspects or []) if a]
+    if 'produto' in aspects:
+        return 'produto'
+    if 'pessoa_modelo' in aspects:
+        return 'pessoa'
+    if any(a in aspects for a in ('grafismos', 'layout_composicao')):
+        return 'referencia_layout'
+    return 'referencia'
+
+
+def _simple_build_references(post, kb):
+    """Conjunto de referencias do pipeline simples, PERSISTIDO para que a
+    Fase 1 (orquestrador) e a Fase 2 (Gemini) usem EXATAMENTE as mesmas
+    imagens, na mesma ordem (a cena fala "IMAGEM 1/2..." — tem que casar).
+
+    Prioridade:
+      1. uploads de arquivo do form (PostReferenceImage);
+      2. referencias do KB SELECIONADAS no form (selected_reference_ids), com o
+         papel derivado do aspecto escolhido (produto/grafismo/pessoa/...);
+      3. so se NADA for selecionado: ate N imagens do KB como referencia
+         visual GENERICA (fallback).
+
+    Guarda os s3_key em local_pipeline_context['simple_refs'] (URLs presignadas
+    expiram — guardamos a key e geramos a URL na hora de usar).
+
+    Retorna lista de dicts {s3_key, tipo, usage_description}.
+    """
+    from apps.posts.tasks import _reference_images_from_post
+
+    ctx = post.local_pipeline_context or {}
+    saved = ctx.get('simple_refs')
+    if saved is not None:
+        return saved
+
+    refs = []
+    # 1) uploads de arquivo do form (refs do proprio post)
+    for r in _reference_images_from_post(post):
+        if r.get('s3_key'):
+            refs.append({
+                's3_key': r['s3_key'],
+                'tipo': (r.get('usage_type') or 'referencia').strip().lower() or 'referencia',
+                'usage_description': (r.get('usage_description') or '').strip(),
+            })
+
+    # 2) referencias do KB SELECIONADAS no form (preserva a ordem de selecao)
+    selected_ids = list(ctx.get('selected_reference_ids') or [])
+    if selected_ids and kb:
+        from apps.knowledge.models import ReferenceImage
+        reference_aspects = ctx.get('reference_aspects') or {}
+        by_id = {r.id: r for r in ReferenceImage.objects.filter(
+            knowledge_base=kb, id__in=selected_ids)}
+        for rid in selected_ids:
+            ref = by_id.get(rid)
+            if not ref or not ref.s3_key:
+                continue
+            aspects = reference_aspects.get(str(rid)) or reference_aspects.get(rid) or []
+            refs.append({
+                's3_key': ref.s3_key,
+                'tipo': _aspects_to_tipo(aspects),
+                'usage_description': (getattr(ref, 'usage_description', '') or '').strip(),
+            })
+
+    # 3) fallback: ate N imagens do KB, como referencia visual generica
+    #    (SO quando o user nao selecionou nada no form)
+    if not refs and kb:
+        from apps.knowledge.models import ReferenceImage
+        qs = ReferenceImage.objects.filter(knowledge_base=kb).order_by('id')[:_KB_FALLBACK_REF_LIMIT]
+        for ref in qs:
+            if ref.s3_key:
+                refs.append({'s3_key': ref.s3_key, 'tipo': 'referencia',
+                             'usage_description': ''})
+        logger.info('[posts.simple] sem refs no form — usando %d refs genericas do KB', len(refs))
+
+    ctx['simple_refs'] = refs
+    post.local_pipeline_context = ctx
+    post.save(update_fields=['local_pipeline_context'])
+    return refs
+
+
+def _simple_refs_to_payload(refs):
+    """Presigna os s3_key guardados em refs -> payload {tipo, url, usage_description}
+    pronto para o orquestrador e o gerador de imagem."""
+    from apps.core.services.s3_service import S3Service
+    out = []
+    for r in refs or []:
+        try:
+            url = S3Service.generate_presigned_download_url(r['s3_key'], expires_in=86400)
+        except Exception:
+            logger.warning('[posts.simple] falha ao presignar ref %s', r.get('s3_key'))
+            continue
+        out.append({'tipo': r.get('tipo') or 'referencia', 'url': url,
+                    'usage_description': r.get('usage_description') or ''})
+    return out
+
+
+def _simple_orchestrate_into_image_prompt(post):
+    """FASE 1 — roda o orquestrador (Claude) e grava a CENA em post.image_prompt
+    (texto que o usuario aprova). NAO chama o Gemini aqui. Em caso de falha,
+    mantem o image_prompt vindo da OpenAI como fallback."""
+    from apps.knowledge.models import KnowledgeBase
+    from apps.posts.services.post_orchestrator import orchestrate_post
+    from apps.posts.tasks import (
+        _kb_colors, _kb_typography, _formato_px, _build_kb_summary, _record_ai_usage,
+    )
+
+    kb = KnowledgeBase.objects.filter(organization=post.organization).first()
+    references = _simple_refs_to_payload(_simple_build_references(post, kb))
+    ctx = post.local_pipeline_context or {}
+    orch = orchestrate_post(
+        post=post,
+        references=references,
+        kb_summary=_build_kb_summary(post.organization),
+        paleta=_kb_colors(kb),
+        tipografia=_kb_typography(kb),
+        references_usage_description=ctx.get('references_usage_description', '') or '',
+        formato_px=_formato_px(post),
+        aspect_ratio=(post.post_format.aspect_ratio if post.post_format else '') or '',
+        kb_dossiers=[],
+        gemini_only=True,
+    )
+    if orch and orch.get('orchestration'):
+        scene = (orch['orchestration'].get('image_prompt_final') or '').strip()
+        if scene:
+            # NAO salva aqui — o caller (Fase 1) persiste TODOS os campos juntos
+            # no save final, para nada de texto aparecer antes de terminar.
+            post.image_prompt = scene
+            logger.info('[posts.simple] orquestrador (Fase 1) gerou image_prompt post=%s', post.id)
+        _record_ai_usage(post, step='text_generation',
+                         model=orch.get('model', 'claude-sonnet-4-6'),
+                         usage_dict=orch.get('usage') or {}, purpose='orchestrator')
+    else:
+        logger.info('[posts.simple] orquestrador (Fase 1) sem saida — mantem image_prompt da OpenAI post=%s', post.id)
+
 
 @shared_task(
     bind=True,
@@ -95,10 +237,12 @@ def generate_post_simple_task(self, post_id: int):
         for h in raw_hashtags if h
     ]
 
+    # Define TODOS os campos em MEMORIA, sem salvar ainda. Enquanto o orquestrador
+    # roda (status 'generating'), nenhum texto deve aparecer no front — so um
+    # UNICO save no fim revela todos os campos juntos.
     post.title = structured.get('title', '') or ''
     post.subtitle = structured.get('subtitle', '') or ''
-    post.image_prompt = structured.get('image_prompt', '') or ''
-    post.visual_brief = structured.get('visual_brief', '') or ''
+    post.image_prompt = ''  # sera a CENA do orquestrador (ou fallback da OpenAI)
     post.caption = structured.get('caption', '') or ''
     post.hashtags = structured.get('hashtags') or []
     post.cta = structured.get('cta_text') or ''
@@ -106,10 +250,23 @@ def generate_post_simple_task(self, post_id: int):
     post.copy_payload = {'_simple_agent': structured}
     post.ia_provider = 'openai'
     post.ia_model_text = result['model']
-    post.status = 'pending'
-    post.save()
 
     _log_usage(post, result['model'], result['usage'], purpose='generate_post_simple')
+
+    # FASE 1 (parte 2): orquestrador cria a CENA (image_prompt). Le os textos da
+    # MEMORIA (ainda nao salvos). NAO envia ao Gemini aqui.
+    try:
+        _simple_orchestrate_into_image_prompt(post)
+    except Exception:
+        logger.exception('[posts.simple] orquestrador Fase 1 falhou post=%s', post_id)
+
+    if not (post.image_prompt or '').strip():
+        # orquestrador pulou/falhou -> fallback para o image_prompt cru da OpenAI
+        post.image_prompt = structured.get('image_prompt', '') or ''
+
+    # UM unico save: textos + cena + status, tudo de uma vez.
+    post.status = 'pending'
+    post.save()
 
     logger.info(
         '[posts.simple] generate_post_simple_task OK post_id=%s tokens_in=%s tokens_out=%s cost=$%s',
@@ -174,84 +331,18 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
     brand_keywords = _brand_keywords_from_kb(kb)
     ctx = post.local_pipeline_context or {}
 
-    # Coleta de referencias e dossies — IGUAL ao fluxo interno (sem reinventar).
-    # _collect_references: produto/pessoa/uploads como imagem; logo fora em pillow.
-    # _collect_kb_dossiers: dossies (luz/composicao/ambiente) consumidos pelo orquestrador.
-    references = _collect_references(kb=kb, post=post, text_render_mode='pillow')
-    kb_dossiers = _collect_kb_dossiers(kb=kb, post=post)
-
-    # Cenario 2 (ref composta, sem asset isolado): anexa a imagem da ref KB de
-    # 'grafismos'/'layout_composicao' ao Gemini como referencia_layout — ele
-    # replica APENAS o grafismo de fundo (forma/curva/cor) e ignora
-    # pessoa/produto/texto. O brief vem do DOSSIE (ja melhorado: geometria,
-    # forma_detalhada, cobertura, atras_do_texto). Mesma logica do fluxo interno
-    # (tasks.py); aqui o grafismo precisa nascer na ETAPA 1 (fundo), pois no
-    # simples nao ha overlay Pillow. Anexado ANTES do orquestrador e do bg-gen
-    # para que ambos vejam a imagem.
-    if kb_dossiers:
-        try:
-            from apps.core.services.s3_service import S3Service
-            from apps.knowledge.models import ReferenceImage
-            for _d in kb_dossiers:
-                _aspects = _d.get('aspects') or []
-                if not any(a in _aspects for a in ('layout_composicao', 'grafismos')):
-                    continue
-                _kb_ref = ReferenceImage.objects.filter(id=_d.get('id')).first()
-                if not _kb_ref or not _kb_ref.s3_key:
-                    continue
-                try:
-                    _url = S3Service.generate_presigned_download_url(
-                        _kb_ref.s3_key, expires_in=86400
-                    )
-                except Exception:
-                    continue
-                # SEM brief textual do grafismo: a fidelidade vem da IMAGEM em si
-                # (role GRAPHIC REFERENCE) + reforco na scene. Nao descrevemos
-                # forma/cor/posicao em texto — isso so faz o Gemini "inventar"
-                # variacoes. O grafismo deve sair da imagem de referencia.
-                references.append({
-                    'tipo': 'referencia_layout',
-                    'url': _url,
-                    'usage_description': '',
-                })
-                logger.info('[posts.simple] ref KB %s anexada ao Gemini como '
-                            'referencia_layout (grafismo da imagem, sem brief)', _kb_ref.id)
-        except Exception:
-            logger.exception('[posts.simple] falha ao anexar ref KB grafismo')
+    # Referencias: AS MESMAS persistidas na Fase 1 (uploads do form OU ate N do
+    # KB). O Gemini precisa receber as mesmas imagens/ordem que o orquestrador
+    # viu, pois a cena aprovada fala "IMAGEM 1/2..." e tem que casar.
+    references = _simple_refs_to_payload(_simple_build_references(post, kb))
 
     try:
-        # -------- Etapa 1: FUNDO SEM TEXTO — reuso do FLUXO INTERNO --------
-        # O orquestrador (Claude) escreve a CENA (produto em cena + luz/composicao
-        # via dossie). Usamos APENAS o image_prompt_final dele; ignoramos
-        # text_render_mode/layout_document (no simples o texto vai por LLM, nao Pillow).
+        # -------- Etapa 1: FUNDO SEM TEXTO --------
+        # O orquestrador JA rodou na FASE 1 e gravou a CENA em post.image_prompt
+        # (aprovada/editada pelo usuario no front). Aqui NAO re-orquestramos:
+        # mandamos a cena aprovada direto ao Gemini.
         scene_prompt = post.image_prompt or ''
         orchestration_dbg = None
-        try:
-            from apps.posts.services.post_orchestrator import orchestrate_post
-            _aspect = (post.post_format.aspect_ratio if post.post_format else '') or ''
-            orch = orchestrate_post(
-                post=post,
-                references=references,
-                kb_summary=marketing_input_summary,
-                paleta=paleta,
-                tipografia=tipografia,
-                references_usage_description=ctx.get('references_usage_description', '') or '',
-                formato_px=formato_px,
-                aspect_ratio=_aspect,
-                kb_dossiers=kb_dossiers,
-            )
-            if orch and orch.get('orchestration'):
-                orchestration_dbg = orch['orchestration']
-                _scene = (orchestration_dbg.get('image_prompt_final') or '').strip()
-                if _scene:
-                    scene_prompt = _scene
-                _record_ai_usage(
-                    post, step='text_generation',
-                    model=orch.get('model', 'claude-sonnet-4-6'),
-                    usage_dict=orch.get('usage') or {}, purpose='orchestrator',
-                )
-        except Exception:
-            logger.exception('[posts.simple] orquestrador falhou — usa image_prompt da Fase 1')
 
         # Gera a cena via Gemini em modo pillow e pega o RAW (sem texto/overlay).
         bg_result = generate_post_image(
@@ -294,18 +385,9 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
             'reference_descriptions': ref_descs,
         }
         textos = {'title': post.title or '', 'subtitle': post.subtitle or '', 'cta': post.cta or ''}
-        # zona/alinhamento de texto DEVEM vir da referencia de layout quando houver:
-        # extrai composicao + grid + texto_x_imagem (papel/alinhamento/cor/peso) dos
-        # dossies das refs marcadas com aspecto 'layout_composicao'.
+        # No fluxo simples atual nao usamos dossie de layout (refs sao genericas);
+        # a zona/alinhamento de texto fica a cargo das regras do briefing + KB.
         reference_layout = []
-        for d in kb_dossiers:
-            if 'layout_composicao' in (d.get('aspects') or []):
-                _dos = d.get('dossier') or {}
-                reference_layout.append({
-                    'composicao': _dos.get('composicao'),
-                    'grid': _dos.get('grid'),
-                    'texto_x_imagem': _dos.get('texto_x_imagem'),
-                })
         brief_result = resolve_briefing(
             kb_summary=_build_kb_summary(post.organization),
             modal_selections=modal_selections, textos=textos, formato=formato_px,

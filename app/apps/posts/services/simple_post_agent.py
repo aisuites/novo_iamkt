@@ -3,7 +3,7 @@ Pipeline SIMPLES (v2) — agente unico de texto via OpenAI.
 
 Substitui a cadeia strategist->copywriter->designer (pipeline 'local') por
 UMA unica chamada a um "Diretor de Arte + Redator" que devolve title,
-subtitle, visual_brief, image_prompt, cta_text, caption e hashtags.
+subtitle, image_prompt, cta_text, caption e hashtags.
 
 Modelo: gpt-4o-mini | temperature=1.00 | top_p=1.00 (parametros fixos por
 decisao de produto para este experimento paralelo).
@@ -104,7 +104,6 @@ Schema json obrigatório de saida:
 {
   "title": "string",
   "subtitle": "string",
-  "visual_brief": "string",
   "image_prompt": "string",
   "cta_text": "string",
   "caption": "string",

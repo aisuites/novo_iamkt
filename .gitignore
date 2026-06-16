@@ -9,6 +9,9 @@ backups/
 *.backup
 *.bak
 *_backup_*
+backup_*.sql
+*.sql.gz
+*.dump
 *.old
 *.orig
 
