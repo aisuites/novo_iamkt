@@ -1467,19 +1467,25 @@
       console.log('[DEBUG] Status é pending/image_generating/image_ready - criando botões');
       console.log('[DEBUG] post.images:', post.images);
       
-      // Botão Rejeitar
+      // Botão Gerar Novamente (reroda TUDO do zero: textos + cena)
       const btnReject = document.createElement('button');
       btnReject.type = 'button';
       btnReject.className = 'btn btn-outline-danger';
-      btnReject.textContent = 'Rejeitar';
-      btnReject.addEventListener('click', () => rejectPost(post));
-      
-      // Botão Solicitar Alteração
+      btnReject.textContent = 'Gerar Novamente';
+      btnReject.addEventListener('click', () => regeneratePost(post));
+
+      // Botão Alterar Cena - IA (revisa a cena via IA, limitado a 1)
       const btnRequest = document.createElement('button');
       btnRequest.type = 'button';
       btnRequest.className = 'btn btn-outline-secondary';
-      btnRequest.textContent = 'Solicitar Alteração';
+      btnRequest.textContent = 'Alterar Cena - IA';
+      const cenaRestantes = (typeof post.revisoesTextoRestantes === 'number') ? post.revisoesTextoRestantes : 1;
+      if (cenaRestantes <= 0) {
+        btnRequest.disabled = true;
+        btnRequest.title = 'Limite de alterações de cena atingido';
+      }
       btnRequest.addEventListener('click', () => {
+        if (btnRequest.disabled) return;
         post.textRequestOpen = true;
         post.pendingTextRequest = '';
         updatePostDetails(post);
@@ -1736,6 +1742,45 @@
   }
 
   /**
+   * Gerar Novamente — reroda TUDO do zero (textos + cena). Local, sem n8n.
+   */
+  async function regeneratePost(post) {
+    const serverId = getServerId(post);
+    if (!serverId) {
+      window.toaster?.error('Não foi possível identificar o post selecionado.');
+      return;
+    }
+    const confirmed = window.confirmModal
+      ? await window.confirmModal.show('Isto vai gerar TUDO de novo (textos e cena) e descartar o conteúdo atual. Continuar?', 'Gerar Novamente')
+      : confirm('Isto vai gerar tudo de novo. Continuar?');
+    if (!confirmed) return;
+
+    const previousStatus = post.status;
+    post.status = 'generating';
+    post.statusLabel = statusInfo.generating?.label || 'Agente Gerando Conteúdo';
+    renderPosts();
+    try {
+      const response = await fetch(`/posts/${serverId}/regenerate/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN, 'Accept': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      post.status = data.status || 'generating';
+      post.statusLabel = data.statusLabel || 'Agente Gerando Conteúdo';
+      post.revisoesTextoRestantes = 1; // conteudo novo zera o budget
+      renderPosts();
+      window.toaster?.success('Gerando novamente...');
+    } catch (error) {
+      console.error(error);
+      post.status = previousStatus;
+      renderPosts();
+      window.toaster?.error('Não foi possível gerar novamente. Tente novamente.');
+    }
+  }
+
+  /**
    * Aprova um post
    */
   async function approvePost(post) {
@@ -1824,15 +1869,18 @@
       if (typeof data.revisoesRestantes === 'number') {
         post.remaining_revisions = data.revisoesRestantes;
       }
+      if (typeof data.revisoesTextoRestantes === 'number') {
+        post.revisoesTextoRestantes = data.revisoesTextoRestantes;
+      }
       if (typeof data.imageChanges === 'number') {
         post.imageChanges = data.imageChanges;
       }
-      
+
       post.pendingTextRequest = '';
       if (dom.textRequestInput) dom.textRequestInput.value = '';
-      
+
       renderPosts();
-      window.toaster?.success('Solicitação enviada ao agente.');
+      window.toaster?.success('Alterando a cena com IA...');
       
     } catch (error) {
       console.error(error);
@@ -2220,6 +2268,9 @@
         post.caption = data.legenda || '';
         post.cta = data.cta || '';
         post.image_prompt = data.descricaoImagem || '';
+        // O display da descricao usa image_description_ptbr || image_prompt — sem
+        // atualizar este aqui, a descricao editada nao reflete na tela.
+        post.image_description_ptbr = data.descricaoImagem || '';
         post.hashtags = Array.isArray(data.hashtags) ? data.hashtags : normalizeHashtags(data.hashtags);
         if (data.status) post.status = data.status;
         if (data.statusLabel) post.statusLabel = data.statusLabel;
@@ -2236,6 +2287,7 @@
           originalPost.caption = post.caption;
           originalPost.cta = post.cta;
           originalPost.image_prompt = post.image_prompt;
+          originalPost.image_description_ptbr = post.image_description_ptbr;
           originalPost.hashtags = post.hashtags;
           originalPost.status = post.status;
           originalPost.statusLabel = post.statusLabel;

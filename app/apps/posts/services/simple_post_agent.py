@@ -3,7 +3,8 @@ Pipeline SIMPLES (v2) — agente unico de texto via OpenAI.
 
 Substitui a cadeia strategist->copywriter->designer (pipeline 'local') por
 UMA unica chamada a um "Diretor de Arte + Redator" que devolve title,
-subtitle, image_prompt, cta_text, caption e hashtags.
+subtitle, cta_text, caption e hashtags. A CENA da imagem (image_prompt) NAO
+vem mais daqui — quem a cria e o orquestrador (Claude) na Fase 1.
 
 Modelo: gpt-4o-mini | temperature=1.00 | top_p=1.00 (parametros fixos por
 decisao de produto para este experimento paralelo).
@@ -52,41 +53,6 @@ Proíba o uso de marcas concorrentes, nomes próprios de terceiros ou logotipos 
 
 Retorne APENAS um JSON válido conforme o schema descrito abaixo (sem explicações extras).
 
-🖌️ REGRAS ESPECÍFICAS PARA O CAMPO image_prompt
-Leve em consideração, para que mantenha unidade e identidade visual da marca, as informações recebidas sobre input_marketing_summary além de usar Base de referência visual para desenvolver a sugestão da imagem final do post
-
-Descreva como o designer deve compor a arte final, incluindo:
-
-Ambiente (local, atmosfera, fundo, iluminação, profundidade)
-
-Personagens/objetos (quantidade, posicionamento, expressões)
-
-Cores predominantes e harmonia com a paleta da marca -> SEMPRE INDIQUE AS CORES DA PALETA HEX
-
-DEIXE EXPLÍCITO AS CORES DE BACKGROUND E APLICAÇÕES E ELEMENTOS VISUAIS -> SEMPRE INDIQUE CORES DA PALETA HEX PARA MANTER A IDENTIDADE VISUAL QUE ESTÃO DESCRITAS NA Base de referência visual.
-
-Deixe explícito, caso tenha na descrição Base de referência visual, elementos visuais/gráficos que serão utilizados bem como overlays, formatos, linhas, texturas, sombras, degrades...)
-
-Deixe explícito as proporções entre texto e imagem respeitando, caso tenha, a descrição Base de referência visual
-
-Deixe explícito, posicionamento de texto e imagem, sempre respeitando caso tenha na descrição Base de referência visual
-
-DEIXE EXPLICITO O Estilo da imagem (fotográfica, realista, minimalista, editorial, futurista etc.)
-
-DEIXE EXPLÍCITO A TIPOGRAFIA QUE SERÁ UTILIZADA - sempre respeitando caso tenha na descrição Base de referência visual, seja google ou ttf/otf anexados
-
-Hierarquia visual e legibilidade
-
-Posicionamento e tamanho do logotipo
-
-Disposição dos textos (título, subtítulo, CTA)
-
-Estilo do CTA (forma, cor, contraste, local)
-
-Tom emocional e propósito visual da arte
-
-O texto deve permitir que um AGENTE DE IA gere a imagem final sem ambiguidade.
-
 📱 FOCO POR REDE
 
 LinkedIn → tom institucional, técnico e inspirador.
@@ -104,7 +70,6 @@ Schema json obrigatório de saida:
 {
   "title": "string",
   "subtitle": "string",
-  "image_prompt": "string",
   "cta_text": "string",
   "caption": "string",
   "hashtags": ["string"]

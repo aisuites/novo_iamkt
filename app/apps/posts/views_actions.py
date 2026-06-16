@@ -420,8 +420,10 @@ def generate_image(request, post_id):
 @require_http_methods(["POST"])
 def request_text_change(request, post_id):
     """
-    Solicitar alteração no texto do post
-    
+    ALTERAR CENA - IA: revisa a CENA (image_prompt) LOCALMENTE via orquestrador
+    (Claude), continuando a conversa com cache. SEM n8n. Limitado a
+    MAX_TEXT_REVISIONS por post.
+
     POST /posts/<id>/request-text-change/
     Body: { "mensagem": "..." }
     """
@@ -430,88 +432,45 @@ def request_text_change(request, post_id):
             id=post_id,
             organization=request.organization
         )
-        
-        # Parse body
+
         data = json.loads(request.body)
-        mensagem = data.get('mensagem', '').strip()
-        
+        mensagem = (data.get('mensagem') or '').strip()
         if not mensagem:
             return JsonResponse({
-                'success': False,
-                'error': 'Mensagem é obrigatória'
+                'success': False, 'error': 'Mensagem é obrigatória'
             }, status=400)
-        
-        # Verificar limite de revisões
-        if post.revisions_remaining <= 0:
+
+        from apps.posts.models import PostChangeRequest
+        from apps.posts.tasks_simple import MAX_TEXT_REVISIONS, revise_scene_task
+
+        # Limite: espelha a alteracao de imagem (conta pedidos de texto nao-iniciais)
+        usadas = PostChangeRequest.objects.filter(
+            post=post, change_type='text', is_initial=False
+        ).count()
+        if usadas >= MAX_TEXT_REVISIONS:
             return JsonResponse({
-                'success': False,
-                'error': 'Limite de revisões atingido'
+                'success': False, 'error': 'Limite de alterações de cena atingido'
             }, status=400)
-        
-        # Atualizar status
+
+        PostChangeRequest.objects.create(
+            post=post, message=mensagem,
+            change_type='text', is_initial=False,
+            requester_email=getattr(request.user, 'email', '') or '',
+        )
+
         post.status = 'generating'
-        post.revisions_remaining -= 1
-        post.save()
-        
-        # Integrar com N8N para solicitar alteração
-        n8n_success = False
-        n8n_error = None
-        
-        if settings.N8N_WEBHOOK_GERAR_POST:
-            try:
-                logger.info(f"Enviando solicitação de alteração do post {post.id} para N8N...")
-                
-                # Preparar payload para N8N
-                n8n_payload = {
-                    'action': 'request_changes',
-                    'post_id': str(post.id),
-                    'thread_id': post.thread_id or '',
-                    'empresa': request.user.email,
-                    'usuario': request.user.email,
-                    'organization_id': post.organization.id,
-                    'mensagem': mensagem,
-                    'rede': post.social_network.capitalize() if post.social_network else 'Instagram',
-                    'formato': post.content_type or 'post'
-                }
-                
-                logger.debug(f"Payload N8N (alteração): {n8n_payload}")
-                
-                # Enviar para N8N
-                response = requests.post(
-                    settings.N8N_WEBHOOK_GERAR_POST,
-                    json=n8n_payload,
-                    timeout=settings.N8N_WEBHOOK_TIMEOUT,
-                    headers={
-                        'Content-Type': 'application/json',
-                        'X-Webhook-Secret': settings.N8N_WEBHOOK_SECRET
-                    }
-                )
-                
-                response.raise_for_status()
-                n8n_success = True
-                logger.info(f"Solicitação de alteração do post {post.id} enviada para N8N com sucesso")
-                
-            except requests.exceptions.Timeout:
-                n8n_error = 'Timeout ao enviar para N8N'
-                logger.error(f"Timeout ao enviar alteração do post {post.id} para N8N")
-            except requests.exceptions.RequestException as e:
-                n8n_error = f'Erro ao enviar para N8N: {str(e)}'
-                logger.error(f"Erro ao enviar alteração do post {post.id} para N8N: {e}", exc_info=True)
-            except Exception as e:
-                n8n_error = f'Erro inesperado: {str(e)}'
-                logger.error(f"Erro inesperado ao enviar alteração do post {post.id} para N8N: {e}", exc_info=True)
-        else:
-            logger.warning("N8N_WEBHOOK_GERAR_POST não configurado - alteração registrada mas não enviada para processamento")
-        
+        post.save(update_fields=['status'])
+
+        # Dispara a revisao local (Celery). NAO chama n8n.
+        revise_scene_task.delay(post.id, mensagem)
+
         return JsonResponse({
             'success': True,
             'status': post.status,
             'statusLabel': post.get_status_display(),
-            'revisoesRestantes': post.revisions_remaining,
-            'n8n_success': n8n_success,
-            'n8n_error': n8n_error
+            'revisoesTextoRestantes': max(0, MAX_TEXT_REVISIONS - usadas - 1),
         })
-        
+
     except Post.DoesNotExist:
         return JsonResponse({
             'success': False,
@@ -527,6 +486,40 @@ def request_text_change(request, post_id):
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def regenerate_post(request, post_id):
+    """GERAR NOVAMENTE: o usuario nao gostou de nada — reroda a Fase 1 (textos
+    OpenAI + cena do orquestrador) do zero, LOCALMENTE. Conteudo novo zera o
+    budget de "Alterar Cena - IA". Sem n8n.
+
+    POST /posts/<id>/regenerate/
+    """
+    try:
+        post = Post.objects.get(id=post_id, organization=request.organization)
+
+        from apps.posts.models import PostChangeRequest
+        from apps.posts.tasks_simple import generate_post_simple_task
+
+        # Conteudo novo = novo budget de alteracao de cena
+        PostChangeRequest.objects.filter(post=post, change_type='text').delete()
+
+        post.status = 'generating'
+        post.save(update_fields=['status'])
+
+        generate_post_simple_task.delay(post.id)
+
+        return JsonResponse({
+            'success': True,
+            'status': post.status,
+            'statusLabel': post.get_status_display(),
+        })
+    except Post.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Post não encontrado'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 @login_required
@@ -622,7 +615,14 @@ def edit_post(request, post_id):
         if 'legenda' in data:
             post.caption = data['legenda']
         if 'hashtags' in data:
-            post.hashtags = data['hashtags']
+            raw = data['hashtags']
+            # Front manda string ("#a #b" ou "a, b"); o campo e JSONField (lista).
+            # Sem normalizar, list(post.hashtags) vira lista de CARACTERES.
+            if isinstance(raw, str):
+                parts = raw.replace(',', ' ').split()
+                raw = [p if p.startswith('#') else '#' + p.lstrip('#')
+                       for p in parts if p.strip()]
+            post.hashtags = raw
         if 'cta' in data:
             post.cta = data['cta']
         if 'descricaoImagem' in data:

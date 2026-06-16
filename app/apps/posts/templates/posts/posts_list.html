@@ -211,11 +211,11 @@
 
                 <!-- Caixa de Solicitação de Alteração de Texto -->
                 <div class="post-request" id="textRequestBox" hidden>
-                    <label class="sr-only" for="textRequestInput">Solicitação de alteração</label>
-                    <textarea id="textRequestInput" maxlength="400" placeholder="Digite aqui o que gostaria de alterar..."></textarea>
+                    <label class="sr-only" for="textRequestInput">Alterar cena com IA</label>
+                    <textarea id="textRequestInput" maxlength="400" placeholder="Descreva a alteração da CENA (ex.: fundo mais clean, produto maior, mais luz natural)..."></textarea>
                     <div class="request-actions">
                         <button type="button" class="btn ghost" data-action="cancel-text-request">Cancelar</button>
-                        <button type="button" class="btn" data-action="submit-text-request">Enviar</button>
+                        <button type="button" class="btn" data-action="submit-text-request">Alterar Cena</button>
                     </div>
                 </div>
 
@@ -698,7 +698,7 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260616-0400"></script>
+<script src="{% static 'js/posts.js' %}?v=20260616-0600"></script>
 
 <script>
 // Inicializar lazyload para imagens dos posts com endpoint correto

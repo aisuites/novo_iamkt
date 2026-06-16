@@ -31,6 +31,7 @@ urlpatterns = [
     
     # Ações de Posts
     path('<int:post_id>/reject/', views_actions.reject_post, name='reject'),
+    path('<int:post_id>/regenerate/', views_actions.regenerate_post, name='regenerate'),
     path('<int:post_id>/approve/', views_actions.approve_post, name='approve'),
     path('<int:post_id>/generate-image/', views_actions.generate_image, name='generate_image'),
     path('<int:post_id>/request-text-change/', views_actions.request_text_change, name='request_text_change'),

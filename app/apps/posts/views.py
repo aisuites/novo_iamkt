@@ -77,9 +77,16 @@ def posts_list(request):
                 change_type='image',
                 is_initial=False
             ).count()
-            
+
             # Obter limite de alterações da organização
             max_image_revisions = post.organization.max_image_revisions if post.organization else 1
+
+            # Alterações de CENA ("Alterar Cena - IA") restantes (limite local)
+            from apps.posts.tasks_simple import MAX_TEXT_REVISIONS
+            text_changes = post.change_requests.filter(
+                change_type='text', is_initial=False
+            ).count()
+            revisoes_texto_restantes = max(0, MAX_TEXT_REVISIONS - text_changes)
 
             # Descricao da imagem mostrada/aprovada no front.
             # Pipeline SIMPLES (novo): image_prompt e a CENA PT-BR aprovada pelo user.
@@ -117,6 +124,7 @@ def posts_list(request):
                 'imageChanges': image_changes,
                 'maxImageRevisions': max_image_revisions,
                 'revisoesRestantes': 3,
+                'revisoesTextoRestantes': revisoes_texto_restantes,
             })
         except Exception:
             continue

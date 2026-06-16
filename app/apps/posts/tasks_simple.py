@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 # nenhuma. Limite provisorio — a validacao de "uso de cada imagem" vem depois.
 _KB_FALLBACK_REF_LIMIT = 5
 
+# Quantas vezes o usuario pode pedir "Alterar Cena - IA" por post (espelha o
+# limite de alteracao de imagem). Constante para nao exigir migration.
+MAX_TEXT_REVISIONS = 1
+
 
 def _aspects_to_tipo(aspects):
     """Mapeia os aspectos escolhidos no form -> papel (tipo) usado pelo
@@ -123,9 +127,11 @@ def _simple_refs_to_payload(refs):
 
 
 def _simple_orchestrate_into_image_prompt(post):
-    """FASE 1 — roda o orquestrador (Claude) e grava a CENA em post.image_prompt
-    (texto que o usuario aprova). NAO chama o Gemini aqui. Em caso de falha,
-    mantem o image_prompt vindo da OpenAI como fallback."""
+    """FASE 1 — roda o orquestrador (Claude), FONTE UNICA da cena. Grava a CENA
+    em post.image_prompt (texto que o usuario aprova) e PERSISTE a conversa em
+    local_pipeline_context['orch_conversa'] para o "Alterar Cena - IA" continuar
+    o contexto. NAO chama o Gemini. Nao salva (o caller persiste tudo no fim).
+    Retorna True se gerou a cena, False caso contrario."""
     from apps.knowledge.models import KnowledgeBase
     from apps.posts.services.post_orchestrator import orchestrate_post
     from apps.posts.tasks import (
@@ -147,18 +153,28 @@ def _simple_orchestrate_into_image_prompt(post):
         kb_dossiers=[],
         gemini_only=True,
     )
-    if orch and orch.get('orchestration'):
-        scene = (orch['orchestration'].get('image_prompt_final') or '').strip()
-        if scene:
-            # NAO salva aqui — o caller (Fase 1) persiste TODOS os campos juntos
-            # no save final, para nada de texto aparecer antes de terminar.
-            post.image_prompt = scene
-            logger.info('[posts.simple] orquestrador (Fase 1) gerou image_prompt post=%s', post.id)
-        _record_ai_usage(post, step='text_generation',
-                         model=orch.get('model', 'claude-sonnet-4-6'),
-                         usage_dict=orch.get('usage') or {}, purpose='orchestrator')
-    else:
-        logger.info('[posts.simple] orquestrador (Fase 1) sem saida — mantem image_prompt da OpenAI post=%s', post.id)
+    if not (orch and orch.get('orchestration')):
+        logger.warning('[posts.simple] orquestrador (Fase 1) sem saida post=%s', post.id)
+        return False
+
+    _record_ai_usage(post, step='text_generation',
+                     model=orch.get('model', 'claude-sonnet-4-6'),
+                     usage_dict=orch.get('usage') or {}, purpose='orchestrator')
+
+    scene = (orch['orchestration'].get('image_prompt_final') or '').strip()
+    if not scene:
+        return False
+
+    post.image_prompt = scene
+    # Persiste a conversa (sem base64 — user_text ja tem a descricao das imgs)
+    ctx = post.local_pipeline_context or {}
+    ctx['orch_conversa'] = {
+        'user_text': orch.get('user_text') or '',
+        'assistant_text': orch.get('assistant_text') or '',
+    }
+    post.local_pipeline_context = ctx
+    logger.info('[posts.simple] orquestrador (Fase 1) gerou cena + conversa post=%s', post.id)
+    return True
 
 
 @shared_task(
@@ -242,7 +258,7 @@ def generate_post_simple_task(self, post_id: int):
     # UNICO save no fim revela todos os campos juntos.
     post.title = structured.get('title', '') or ''
     post.subtitle = structured.get('subtitle', '') or ''
-    post.image_prompt = ''  # sera a CENA do orquestrador (ou fallback da OpenAI)
+    post.image_prompt = ''  # sera a CENA do orquestrador (FONTE UNICA)
     post.caption = structured.get('caption', '') or ''
     post.hashtags = structured.get('hashtags') or []
     post.cta = structured.get('cta_text') or ''
@@ -253,16 +269,19 @@ def generate_post_simple_task(self, post_id: int):
 
     _log_usage(post, result['model'], result['usage'], purpose='generate_post_simple')
 
-    # FASE 1 (parte 2): orquestrador cria a CENA (image_prompt). Le os textos da
-    # MEMORIA (ainda nao salvos). NAO envia ao Gemini aqui.
+    # FASE 1 (parte 2): orquestrador cria a CENA (image_prompt) — FONTE UNICA.
+    # Le os textos da MEMORIA (ainda nao salvos). NAO envia ao Gemini aqui.
+    scene_ok = False
     try:
-        _simple_orchestrate_into_image_prompt(post)
+        scene_ok = _simple_orchestrate_into_image_prompt(post)
     except Exception:
         logger.exception('[posts.simple] orquestrador Fase 1 falhou post=%s', post_id)
 
-    if not (post.image_prompt or '').strip():
-        # orquestrador pulou/falhou -> fallback para o image_prompt cru da OpenAI
-        post.image_prompt = structured.get('image_prompt', '') or ''
+    if not scene_ok or not (post.image_prompt or '').strip():
+        # Sem fallback da OpenAI: o orquestrador e a fonte unica. Falha rara
+        # (erro de API/parse) -> re-tenta a Fase 1 inteira.
+        logger.error('[posts.simple] sem cena do orquestrador post=%s — retry', post_id)
+        raise self.retry(countdown=30)
 
     # UM unico save: textos + cena + status, tudo de uma vez.
     post.status = 'pending'
@@ -471,3 +490,59 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
 
     logger.info('[posts.simple] generate_post_simple_image_task OK post_id=%s', post_id)
     return {'success': True, 'post_id': post_id, 'final_model': apply_result['model']}
+
+
+@shared_task(
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+)
+def revise_scene_task(self, post_id: int, message: str = ''):
+    """ALTERAR CENA - IA: revisa a CENA (image_prompt) via orquestrador, LOCAL
+    (sem n8n), continuando a conversa do orquestrador (text-only, com cache).
+    Grava a nova cena, registra o custo (com cache) e volta o post para
+    'pending' (reaprovacao). O limite de 1 alteracao e validado na view."""
+    from apps.posts.models import Post
+    from apps.posts.services.post_orchestrator import revise_scene
+    from apps.posts.tasks import _record_ai_usage
+
+    try:
+        post = Post.objects.get(id=post_id)
+    except Post.DoesNotExist:
+        logger.error('[posts.simple] revise_scene_task: post %s nao existe', post_id)
+        return {'success': False, 'error': 'post_not_found'}
+
+    post.status = 'generating'
+    post.save(update_fields=['status'])
+
+    try:
+        result = revise_scene(post, message)
+    except Exception:
+        logger.exception('[posts.simple] revise_scene falhou post=%s', post_id)
+        result = None
+
+    if not result:
+        # Falha (API/parse). Volta para 'pending' sem aplicar.
+        post.status = 'pending'
+        post.save(update_fields=['status'])
+        return {'success': False, 'post_id': post_id, 'error': 'revise_failed'}
+
+    # Registra o CUSTO da alteracao (com cache_status) no ai_usage_log.
+    _record_ai_usage(post, step='text_generation',
+                     model=result.get('model', 'claude-sonnet-4-6'),
+                     usage_dict=result.get('usage') or {}, purpose='orchestrator_revision')
+
+    scene = (result['orchestration'].get('image_prompt_final') or '').strip()
+    if scene:
+        post.image_prompt = scene
+        # Atualiza a conversa (assistant_text) — util se um dia encadear revisoes.
+        ctx = post.local_pipeline_context or {}
+        conv = ctx.get('orch_conversa') or {}
+        conv['assistant_text'] = result.get('assistant_text') or conv.get('assistant_text', '')
+        ctx['orch_conversa'] = conv
+        post.local_pipeline_context = ctx
+
+    post.status = 'pending'
+    post.save()
+    logger.info('[posts.simple] revise_scene_task OK post_id=%s', post_id)
+    return {'success': True, 'post_id': post_id}

@@ -324,7 +324,9 @@ def orchestrate_post(
         logger.warning('[orchestrator] ANTHROPIC_API_KEY ausente')
         return None
 
-    if not references and not kb_dossiers:
+    # No fluxo simples (gemini_only) o orquestrador e a FONTE UNICA da cena —
+    # nunca pula, mesmo sem imagens (roda text-only a partir do briefing/KB).
+    if not references and not kb_dossiers and not gemini_only:
         logger.info('[orchestrator] sem refs nem dossies — skip orchestration')
         return None
 
@@ -469,6 +471,92 @@ def orchestrate_post(
         'orchestration': orchestration,
         'usage': usage,
         'model': MODEL,
+        # Conversa (para "Alterar Cena - IA" continuar o contexto sem reenviar
+        # base64: o user_text ja contem a descricao textual das imagens).
+        'user_text': user_text,
+        'assistant_text': raw,
+    }
+
+
+def revise_scene(post, change_message: str) -> Optional[Dict[str, Any]]:
+    """ALTERAR CENA - IA: continua a conversa do orquestrador (TEXT-ONLY, com
+    cache) para revisar a CENA (image_prompt) conforme o pedido do usuario.
+
+    NAO reenvia base64 — o user_text persistido em orch_conversa ja contem a
+    descricao textual das imagens (papeis/observacoes). Os blocos de system
+    (skill + system prompt) sao cacheados 1h e GLOBAIS, entao a revisao le-os
+    a 0,1x quando o cache esta quente.
+
+    Retorna {orchestration, usage, model, assistant_text} ou None em falha.
+    """
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        logger.warning('[revise_scene] ANTHROPIC_API_KEY ausente')
+        return None
+
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+
+    ctx = post.local_pipeline_context or {}
+    conv = ctx.get('orch_conversa') or {}
+    user_text = (conv.get('user_text') or '').strip()
+    assistant_text = (conv.get('assistant_text') or '').strip()
+    cena_atual = (post.image_prompt or '').strip()
+
+    pedido = (
+        'PEDIDO DE ALTERACAO DA CENA (do usuario): "'
+        + (change_message or '').strip() + '"\n\n'
+        'CENA ATUAL (pode ter sido editada manualmente — e a base a revisar):\n'
+        + cena_atual + '\n\n'
+        'Revise a cena atendendo ao pedido, mudando SO o necessario e mantendo o '
+        'resto. Devolva o MESMO JSON completo (mesmo schema do system), com o '
+        '`image_prompt_final` atualizado. Retorne APENAS o JSON.'
+    )
+
+    system_blocks = [
+        {'type': 'text', 'text': DESIGNER_SKILL,
+         'cache_control': {'type': 'ephemeral', 'ttl': '1h'}},
+        {'type': 'text', 'text': SYSTEM_PROMPT,
+         'cache_control': {'type': 'ephemeral', 'ttl': '1h'}},
+    ]
+    if user_text and assistant_text:
+        messages = [
+            {'role': 'user', 'content': user_text},
+            {'role': 'assistant', 'content': assistant_text},
+            {'role': 'user', 'content': pedido},
+        ]
+    else:
+        # Sem conversa salva (ex.: post antigo) -> revisao single-shot
+        messages = [{'role': 'user', 'content': 'CENA ATUAL:\n' + cena_atual + '\n\n' + pedido}]
+
+    try:
+        resp = client.messages.create(
+            model=MODEL, max_tokens=MAX_TOKENS,
+            system=system_blocks, messages=messages,
+        )
+    except Exception:
+        logger.exception('[revise_scene] erro Claude')
+        return None
+
+    raw = ''.join(
+        blk.text for blk in resp.content if getattr(blk, 'type', None) == 'text'
+    )
+    orchestration = _parse_json(raw)
+    if not orchestration or 'image_prompt_final' not in orchestration:
+        logger.error('[revise_scene] parse falhou / sem image_prompt_final. Raw: %s', raw[:300])
+        return None
+
+    usage = _extract_usage(resp, cache_ttl='1h')
+    logger.info(
+        '[revise_scene] post=%s tokens=%d cost=$%s cache_read=%d cache_write=%d',
+        post.id, usage.get('total_tokens', 0), usage.get('cost_usd', 0),
+        usage.get('cache_read_input_tokens', 0), usage.get('cache_creation_input_tokens', 0),
+    )
+    return {
+        'orchestration': orchestration,
+        'usage': usage,
+        'model': MODEL,
+        'assistant_text': raw,
     }
 
 

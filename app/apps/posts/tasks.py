@@ -2412,4 +2412,5 @@ def _dominant_bg_from_dossiers(kb_dossiers: list) -> str:
 from apps.posts.tasks_simple import (  # noqa: E402,F401
     generate_post_simple_task,
     generate_post_simple_image_task,
+    revise_scene_task,
 )
