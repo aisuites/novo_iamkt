@@ -546,3 +546,100 @@ def revise_scene_task(self, post_id: int, message: str = ''):
     post.save()
     logger.info('[posts.simple] revise_scene_task OK post_id=%s', post_id)
     return {'success': True, 'post_id': post_id}
+
+
+@shared_task(
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+)
+def revise_image_task(self, post_id: int, message: str = '', source_s3_key: str = ''):
+    """ALTERACAO DE IMAGEM (image-to-image), LOCAL — sem n8n.
+
+    Etapa A: gpt-4o-mini (visao) le a imagem-FONTE + o pedido do usuario e
+    escreve um PROMPT DE EDICAO claro. Etapa B: Gemini edita essa imagem com
+    esse prompt. Persiste a nova imagem e registra o custo das duas etapas.
+
+    source_s3_key: a imagem que o usuario via no PREVIEW GRANDE (ativa). Se
+    vazia/invalida, usa a principal (post.image_s3_key)."""
+    import base64 as _b64
+    from apps.posts.models import Post, PostImage
+    from apps.core.services.s3_service import S3Service
+    from apps.posts.services.gemini_image_generator import _download_to_base64
+    from apps.posts.services.simple_image_revise import (
+        generate_edit_prompt, edit_image_with_gemini,
+    )
+    from apps.posts.tasks import _upload_image_to_s3, _log_usage_gemini, _record_ai_usage
+
+    try:
+        post = Post.objects.get(id=post_id)
+    except Post.DoesNotExist:
+        logger.error('[posts.simple] revise_image_task: post %s nao existe', post_id)
+        return {'success': False, 'error': 'post_not_found'}
+
+    # Imagem-fonte = a do preview (source_s3_key) SE pertencer ao post; senao a
+    # principal. Valida contra as imagens do post (seguranca).
+    valid_keys = set(post.images.values_list('s3_key', flat=True))
+    src_key = source_s3_key if (source_s3_key and source_s3_key in valid_keys) else (post.image_s3_key or '')
+    if not src_key:
+        logger.error('[posts.simple] revise_image_task: post %s sem imagem', post_id)
+        return {'success': False, 'error': 'sem_imagem'}
+
+    post.status = 'image_generating'
+    post.save(update_fields=['status'])
+
+    try:
+        # Baixa a imagem-FONTE (a do preview)
+        url = S3Service.generate_presigned_download_url(src_key, expires_in=600)
+        b64, _mime = _download_to_base64(url)
+        if not b64:
+            raise RuntimeError('falha ao baixar a imagem final')
+        img_bytes = _b64.b64decode(b64)
+
+        # Etapa A: prompt de edicao (gpt-4o-mini visao)
+        a = generate_edit_prompt(img_bytes, message)
+        _record_ai_usage(post, step='image_generation', model=a['model'],
+                         usage_dict=a['usage'], purpose='image_edit_prompt')
+        edit_prompt = a['prompt']
+
+        # Etapa B: Gemini edita a imagem final
+        b = edit_image_with_gemini(img_bytes, edit_prompt)
+        _log_usage_gemini(post, b['model'], b['usage'].get('cost_usd', 0),
+                          {'promptTokenCount': b['usage'].get('input_tokens', 0)})
+    except Exception:
+        logger.exception('[posts.simple] revise_image falhou post=%s', post_id)
+        # Reverte o status (mantem a imagem atual) — falha nao trava o post.
+        post.status = 'image_ready'
+        post.save(update_fields=['status'])
+        return {'success': False, 'post_id': post_id, 'error': 'revise_image_failed'}
+
+    # Persiste a nova imagem como a final
+    s3_key, s3_url = _upload_image_to_s3(
+        org_id=post.organization.id, post_id=post.id,
+        png_bytes=b['png_bytes'], mime_type='image/png',
+    )
+    from django.db.models import Max
+    max_order = post.images.aggregate(Max('order'))['order__max']
+    PostImage.objects.create(
+        post=post, s3_key=s3_key, s3_url=s3_url,
+        order=(max_order if max_order is not None else -1) + 1,
+    )
+    post.image_s3_key = s3_key
+    post.image_s3_url = s3_url
+    post.has_image = True
+    existing = post.generated_images if isinstance(post.generated_images, list) else []
+    existing.append({'s3_key': s3_key, 'url': s3_url})
+    post.generated_images = existing
+
+    _ctx = post.local_pipeline_context or {}
+    _ctx['simple_image_edit'] = {
+        'edit_prompt': edit_prompt,
+        'model_prompt': a['model'],
+        'model_img': b['model'],
+        'pedido_usuario': message,
+    }
+    post.local_pipeline_context = _ctx
+    post.status = 'image_ready'
+    post.save()
+    logger.info('[posts.simple] revise_image_task OK post=%s', post_id)
+    return {'success': True, 'post_id': post_id}

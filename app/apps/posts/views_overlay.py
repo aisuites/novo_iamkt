@@ -92,9 +92,9 @@ def simple_debug(request, post_id):
     Retorna o fundo SEM texto, a imagem final e os prompts/JSON usados, para
     comparação visual. Disponível em prod apenas para administradores.
     """
-    is_admin = bool(
-        request.user.is_superuser or getattr(request.user, 'profile', '') == 'admin'
-    )
+    # Equipe INTERNA apenas (superuser/staff). profile=='admin' e o admin da
+    # empresa-CLIENTE — nao deve ver o debug.
+    is_admin = bool(request.user.is_superuser or request.user.is_staff)
     if not is_admin:
         return JsonResponse({'error': 'forbidden'}, status=403)
     post = get_object_or_404(Post, id=post_id, organization=request.organization)

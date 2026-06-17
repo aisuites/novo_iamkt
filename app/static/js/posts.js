@@ -1941,7 +1941,14 @@
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ mensagem: text }),
+        body: JSON.stringify({
+          mensagem: text,
+          // Edita a imagem que está NO PREVIEW GRANDE (ativa), não sempre a principal.
+          source_s3_key: (() => {
+            const it = (post.imagens || [])[post.activeImageIndex || 0];
+            return (it && typeof it === 'object') ? (it.s3_key || '') : (it || '');
+          })(),
+        }),
       });
       
       const data = await response.json().catch(() => null);
@@ -1956,34 +1963,10 @@
       if (typeof data?.imageChanges === 'number') post.imageChanges = data.imageChanges;
       post.pendingImageRequest = '';
       if (dom.imageRequestInput) dom.imageRequestInput.value = '';
+      // A barra de progresso ('Gerando sua imagem...') aparece via
+      // updatePostDetails -> shouldShowImageGenerationBanner (status image_generating).
       renderPosts();
-      
-      // Mostrar mensagem de sucesso com prazo recalculado
-      setTimeout(() => {
-        const bannerContainer = dom.postImageFrame?.parentElement;
-        if (!bannerContainer) return;
-        
-        // Remover banner anterior se existir
-        const existingBanner = bannerContainer.querySelector('.post-image-status-banner');
-        if (existingBanner) existingBanner.remove();
-        
-        // Calcular prazo de entrega usando data da solicitação (não data de criação)
-        const requestedAt = data?.imageRequestedAt || new Date().toISOString();
-        const deadline = calculateImageDeadline(requestedAt);
-        const deadlineText = formatDeadline(deadline);
-        
-        // Criar novo banner
-        const imageBanner = document.createElement('div');
-        imageBanner.className = 'post-image-status-banner';
-        imageBanner.innerHTML = `
-          <span class="status-icon">🔄</span>
-          <span class="status-text">Sua imagem será gerada até ${deadlineText}</span>
-          <button type="button" class="btn btn-sm" onclick="window.location.reload()">Atualizar Status</button>
-        `;
-        bannerContainer.insertBefore(imageBanner, dom.postImageFrame);
-      }, 100);
-      
-      window.toaster?.success('Solicitação enviada ao agente.');
+      window.toaster?.success('Alteração de imagem solicitada...');
     } catch (error) {
       console.error(error);
       // Rollback em caso de erro
@@ -2079,100 +2062,14 @@
    * Idêntico ao resumo.html
    */
   function shouldShowImageGenerationBanner(post) {
-    return (post.status === 'image_generating' || post.imageStatus === 'generating') 
-           && (!post.images || post.images.length === 0);
+    // Mostra a barra de progresso SEMPRE que estiver gerando imagem — inclusive
+    // em ALTERACOES (onde ja existe uma imagem). Antes exigia 0 imagens, o que
+    // escondia a barra na alteracao.
+    return (post.status === 'image_generating' || post.imageStatus === 'generating');
   }
 
-  /**
-   * Calcula prazo de entrega da imagem (6 horas úteis)
-   * EXATAMENTE IDÊNTICO ao resumo.html
-   */
-  function calculateImageDeadline(createdAtStr) {
-    const created = new Date(createdAtStr);
-    
-    // Função auxiliar: adicionar dias úteis (pula fim de semana)
-    function addBusinessDays(date, days) {
-      const result = new Date(date);
-      let added = 0;
-      while (added < days) {
-        result.setDate(result.getDate() + 1);
-        const dayOfWeek = result.getDay();
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Não é sábado ou domingo
-          added++;
-        }
-      }
-      return result;
-    }
-    
-    // Função auxiliar: ir para próximo dia útil às 09:00
-    function nextBusinessDay09(date) {
-      const result = new Date(date);
-      result.setDate(result.getDate() + 1);
-      result.setHours(9, 0, 0, 0);
-      
-      // Se cair em fim de semana, ir para segunda
-      while (result.getDay() === 0 || result.getDay() === 6) {
-        result.setDate(result.getDate() + 1);
-      }
-      return result;
-    }
-    
-    // PASSO 1: Normalizar horário de início
-    let startTime = new Date(created);
-    const dayOfWeek = startTime.getDay();
-    const hour = startTime.getHours();
-    
-    // Se é fim de semana (sábado=6, domingo=0) → próxima segunda às 09:00
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      startTime = new Date(created);
-      // Ir para segunda-feira
-      const daysToAdd = dayOfWeek === 0 ? 1 : 2; // domingo=1, sábado=2
-      startTime.setDate(startTime.getDate() + daysToAdd);
-      startTime.setHours(9, 0, 0, 0);
-    }
-    // Se antes das 09:00 → contar como 09:00 do mesmo dia
-    else if (hour < 9) {
-      startTime.setHours(9, 0, 0, 0);
-    }
-    // Se depois das 17:00 → próximo dia útil às 09:00
-    else if (hour >= 17) {
-      startTime = nextBusinessDay09(startTime);
-    }
-    
-    // PASSO 2: Adicionar 6 horas ao horário normalizado
-    const deadline = new Date(startTime);
-    deadline.setHours(deadline.getHours() + 6);
-    
-    // PASSO 3: Aplicar regras de resultado
-    const deadlineHour = deadline.getHours();
-    
-    // Se horário normalizado >= 16:00 → próximo dia 15:00
-    if (startTime.getHours() >= 16) {
-      const nextDay = addBusinessDays(startTime, 1);
-      nextDay.setHours(15, 0, 0, 0);
-      return nextDay;
-    }
-    
-    // Se resultado > 17:00 → próximo dia 09:00
-    if (deadlineHour > 17) {
-      return nextBusinessDay09(startTime);
-    }
-    
-    return deadline;
-  }
-
-  /**
-   * Formata data de prazo para exibição (DD/MM/YY às HH:MM)
-   * EXATAMENTE IDÊNTICO ao resumo.html
-   */
-  function formatDeadline(date) {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
-    const hour = String(date.getHours()).padStart(2, '0');
-    const minute = String(date.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} às ${hour}:${minute}`;
-  }
+  // (Removido: calculateImageDeadline / formatDeadline — a "previsão de tempo"
+  //  da imagem não é mais usada; o status de geração mostra a barra de progresso.)
 
   // ============================================================================
   // MODAL DE EDIÇÃO DE POST

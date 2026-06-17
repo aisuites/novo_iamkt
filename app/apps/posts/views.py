@@ -139,11 +139,12 @@ def posts_list(request):
         'posts_json': posts_json,
         'posts_webhook_url': settings.N8N_WEBHOOK_GERAR_POST,
         'enable_local_pipeline': settings.ENABLE_LOCAL_PIPELINE,
-        # Admin = superuser ou profile 'admin'. Controla o seletor de pipeline
-        # e o botao "Edicao Avancada" (Pillow) — demais usuarios so veem o simples.
+        # Equipe INTERNA = superuser ou staff. Controla o seletor de pipeline,
+        # o botao "Edicao Avancada" (Pillow) e a area de Debug. NAO usar
+        # profile=='admin': esse e o admin da empresa-CLIENTE (nao a equipe).
         'is_admin': bool(
             request.user.is_superuser
-            or getattr(request.user, 'profile', '') == 'admin'
+            or request.user.is_staff
         ),
     }
 

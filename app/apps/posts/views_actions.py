@@ -103,7 +103,9 @@ def generate_image(request, post_id):
             payload_data = request.POST.dict()
         
         message = (payload_data.get('mensagem') or payload_data.get('message') or '').strip()
-        
+        # Imagem-fonte da alteracao = a que esta no PREVIEW GRANDE (ativa) no front.
+        source_s3_key = (payload_data.get('source_s3_key') or '').strip()
+
         # Verificar limite de alterações de imagem (configurável por organização)
         max_revisions = post.organization.max_image_revisions
         image_change_count = 0  # default — evita UnboundLocalError se max_revisions==0
@@ -170,9 +172,19 @@ def generate_image(request, post_id):
         
         # Pipeline SIMPLES v2 (Celery + Gemini Nano Banana) — pipeline_used='simple'
         if post.pipeline_used == 'simple':
-            from apps.posts.tasks import generate_post_simple_image_task
-            generate_post_simple_image_task.delay(post.id, message or '')
-            logger.info('[posts.simple] generate_post_simple_image_task disparado post_id=%s', post.id)
+            from apps.posts.tasks import (
+                generate_post_simple_image_task, revise_image_task,
+            )
+            if message:
+                # ALTERACAO de imagem (image-to-image): gpt-4o-mini -> prompt ->
+                # Gemini edita a imagem do preview. Local, sem n8n.
+                revise_image_task.delay(post.id, message, source_s3_key)
+                logger.info('[posts.simple] revise_image_task disparado post_id=%s key=%s',
+                            post.id, source_s3_key or '(principal)')
+            else:
+                # Geracao INICIAL da imagem (cena aprovada -> Gemini).
+                generate_post_simple_image_task.delay(post.id)
+                logger.info('[posts.simple] generate_post_simple_image_task disparado post_id=%s', post.id)
             return JsonResponse({
                 'success': True,
                 'id': post.id,
