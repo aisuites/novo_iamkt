@@ -132,6 +132,11 @@ def gerar_post(request):
         else:
             content_type = 'post'
         
+        # Quota: limite DIARIO/MENSAL de posts da organizacao.
+        can_create, _qcode, qmsg = request.user.organization.can_create_post()
+        if not can_create:
+            return JsonResponse({'success': False, 'error': qmsg}, status=403)
+
         # Criar Post com transaction
         with transaction.atomic():
             post = Post.objects.create(

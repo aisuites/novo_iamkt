@@ -152,6 +152,11 @@ def gerar_post_local(request):
         else ('story' if formato == 'stories' else 'post')
     )
 
+    # Quota: limite DIARIO/MENSAL de posts da organizacao.
+    can_create, _qcode, qmsg = request.user.organization.can_create_post()
+    if not can_create:
+        return JsonResponse({'success': False, 'error': qmsg}, status=403)
+
     # ---- Cria Post + dispara task ----
     try:
         with transaction.atomic():

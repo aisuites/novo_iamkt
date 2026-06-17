@@ -136,6 +136,12 @@ def gerar_post_simples(request):
         else ('story' if formato == 'stories' else 'post')
     )
 
+    # Quota: respeita o limite DIARIO/MENSAL de posts da organizacao
+    # (can_create_post valida dia + mes + suspensao/aprovacao).
+    can_create, _qcode, qmsg = request.user.organization.can_create_post()
+    if not can_create:
+        return JsonResponse({'success': False, 'error': qmsg}, status=403)
+
     try:
         with transaction.atomic():
             post = Post.objects.create(
