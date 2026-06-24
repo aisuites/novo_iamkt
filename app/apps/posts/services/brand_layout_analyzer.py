@@ -189,7 +189,18 @@ def _download_to_base64(url: str):
     except Exception as exc:
         logger.warning('Falha download ref: %s', exc)
         return None, 'image/png'
-    if ct not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
+    # Detecta o tipo REAL pelos magic bytes. O Content-Type do S3 mente com
+    # frequencia (ex.: JPEG salvo/servido como image/png); o Anthropic valida
+    # os bytes contra o media_type declarado e rejeita com 400 se divergir.
+    if data[:8] == b'\x89PNG\r\n\x1a\n':
+        ct = 'image/png'
+    elif data[:3] == b'\xff\xd8\xff':
+        ct = 'image/jpeg'
+    elif data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        ct = 'image/webp'
+    elif data[:6] in (b'GIF87a', b'GIF89a'):
+        ct = 'image/gif'
+    elif ct not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
         ct = 'image/png'
     return base64.b64encode(data).decode('ascii'), ct
 
