@@ -331,8 +331,11 @@ def _text_el(z, content_text, color_hex, *, y=None, h=None):
     """Monta um elemento de texto. Cor None -> contraste sobre o campo/faixa, e
     nesse caso ativa a CENTRALIZACAO VERTICAL na caixa (background_color dispara
     o has_bg do render_layout_document; para role != 'cta' nao desenha pill)."""
+    # Sem quebras explicitas: tanto o Pillow quanto o editor quebram por LARGURA.
+    # Um '\n' no conteudo seria ignorado pelo Pillow mas forcado pelo editor
+    # (pre-line) -> divergencia. Colapsa qualquer quebra/espaco em espaco unico.
     el = {
-        'role': z['role'], 'content': str(content_text).replace('\\n', '\n'),
+        'role': z['role'], 'content': ' '.join(str(content_text).replace('\\n', ' ').split()),
         'x_pct': z['x'], 'y_pct': z['y'] if y is None else y, 'width_pct': z['w'],
         'height_pct': z['h'] if h is None else h, 'font_size_pct': z['fs'],
         'weight': 'black' if z['role'] == 'titulo' else 'regular',

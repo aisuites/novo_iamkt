@@ -510,6 +510,15 @@ def _get_logo_url(post: Post) -> str:
 def _get_canvas(post: Post):
     if post.post_format:
         return post.post_format.width or 1080, post.post_format.height or 1080
+    # TODXS: sem post_format -> deriva do formato salvo no contexto (feed 4:5 /
+    # story 9:16). Sem isso o canvas viraria 1080x1080 e desalinharia o editor.
+    px = ((post.local_pipeline_context or {}).get('todxs') or {}).get('formato_px')
+    if px:
+        try:
+            w, h = (int(x) for x in str(px).lower().split('x'))
+            return w, h
+        except Exception:
+            pass
     return 1080, 1080
 
 
