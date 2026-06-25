@@ -518,8 +518,54 @@ def regenerate_post(request, post_id):
         # Conteudo novo = novo budget de alteracao de cena
         PostChangeRequest.objects.filter(post=post, change_type='text').delete()
 
+        # Reroda do ZERO: limpa o cache de texto (simple_text_saved) e o motivo
+        # de falha, para a task gerar novos textos no OpenAI (e nao reaproveitar
+        # os anteriores) e sair de qualquer estado 'failed' anterior.
+        ctx = post.local_pipeline_context or {}
+        ctx.pop('simple_text_saved', None)
+        ctx.pop('last_error', None)
+        post.local_pipeline_context = ctx
+
         post.status = 'generating'
-        post.save(update_fields=['status'])
+        post.save(update_fields=['status', 'local_pipeline_context'])
+
+        generate_post_simple_task.delay(post.id)
+
+        return JsonResponse({
+            'success': True,
+            'status': post.status,
+            'statusLabel': post.get_status_display(),
+        })
+    except Post.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Post não encontrado'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def retry_post(request, post_id):
+    """TENTAR DE NOVO: usado quando o post falhou (ex.: orquestrador Claude
+    sobrecarregado). Os textos do OpenAI JA estao salvos (a falha e posterior),
+    entao NAO limpa o cache de texto — a task reaproveita os textos e so re-roda
+    o orquestrador (a cena), gastando menos. Difere do 'Gerar Novamente', que
+    descarta tudo e re-gera do zero.
+
+    POST /posts/<id>/retry/
+    """
+    try:
+        post = Post.objects.get(id=post_id, organization=request.organization)
+
+        from apps.posts.tasks_simple import generate_post_simple_task
+
+        # Limpa SO o motivo de falha; mantem simple_text_saved + copy_payload
+        # para a task pular o OpenAI e reaproveitar os textos ja gerados.
+        ctx = post.local_pipeline_context or {}
+        ctx.pop('last_error', None)
+        post.local_pipeline_context = ctx
+
+        post.status = 'generating'
+        post.save(update_fields=['status', 'local_pipeline_context'])
 
         generate_post_simple_task.delay(post.id)
 

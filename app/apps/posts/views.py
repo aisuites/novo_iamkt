@@ -112,6 +112,7 @@ def posts_list(request):
                 'image_prompt': post.image_prompt or '',
                 'image_description_ptbr': image_description_ptbr,
                 'status': post.status,
+                'lastError': (post.local_pipeline_context or {}).get('last_error', '') or '',
                 'social_network': post.social_network,
                 'rede': post.social_network,
                 'formats': list(post.formats) if post.formats else [],

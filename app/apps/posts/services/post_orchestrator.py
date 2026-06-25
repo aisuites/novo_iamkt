@@ -331,7 +331,10 @@ def orchestrate_post(
         return None
 
     import anthropic
-    client = anthropic.Anthropic(api_key=api_key)
+    # max_retries=6: o SDK ja re-tenta 408/409/429/5xx/529 com backoff
+    # exponencial + jitter respeitando retry-after. Cobre picos de sobrecarga
+    # transitoria (529 Overloaded) de segundos ate ~1-2 min sem mais nada.
+    client = anthropic.Anthropic(api_key=api_key, max_retries=6)
 
     # Monta content multimodal: lista de imagens + meta de cada + texto final
     content_blocks: List[Dict[str, Any]] = []
@@ -440,8 +443,16 @@ def orchestrate_post(
                 {'role': 'user', 'content': content_blocks},
             ],
         )
+    except anthropic.APIStatusError:
+        # Erro de API com status (429/5xx/529 transitorio OU 400 permanente).
+        # PROPAGA para o caller (task) distinguir transitorio de permanente —
+        # antes virava None e tudo era tratado igual. O SDK ja esgotou os
+        # max_retries internos antes de chegar aqui.
+        logger.exception('[orchestrator] erro de status na API Claude')
+        raise
     except Exception:
-        logger.exception('[orchestrator] erro Claude')
+        # Erro inesperado (rede sem status, etc.): mantem o fallback brando.
+        logger.exception('[orchestrator] erro inesperado Claude')
         return None
 
     # Sonnet 4.6 nao aceita prefill de assistant; _parse_json extrai o JSON
@@ -495,7 +506,10 @@ def revise_scene(post, change_message: str) -> Optional[Dict[str, Any]]:
         return None
 
     import anthropic
-    client = anthropic.Anthropic(api_key=api_key)
+    # max_retries=6: o SDK ja re-tenta 408/409/429/5xx/529 com backoff
+    # exponencial + jitter respeitando retry-after. Cobre picos de sobrecarga
+    # transitoria (529 Overloaded) de segundos ate ~1-2 min sem mais nada.
+    client = anthropic.Anthropic(api_key=api_key, max_retries=6)
 
     ctx = post.local_pipeline_context or {}
     conv = ctx.get('orch_conversa') or {}
@@ -760,7 +774,10 @@ def adapt_layout_spec(
         return None
 
     import anthropic
-    client = anthropic.Anthropic(api_key=api_key)
+    # max_retries=6: o SDK ja re-tenta 408/409/429/5xx/529 com backoff
+    # exponencial + jitter respeitando retry-after. Cobre picos de sobrecarga
+    # transitoria (529 Overloaded) de segundos ate ~1-2 min sem mais nada.
+    client = anthropic.Anthropic(api_key=api_key, max_retries=6)
 
     user = (
         f'LAYOUT_SPEC (origem aspect_ratio={source_ar}):\n'

@@ -26,6 +26,22 @@ _KB_FALLBACK_REF_LIMIT = 5
 # limite de alteracao de imagem). Constante para nao exigir migration.
 MAX_TEXT_REVISIONS = 1
 
+# Mensagem GENERICA de falha exibida ao usuario (nao expoe provedores/modelos).
+GENERATION_FAILED_MESSAGE = (
+    'Nao foi possivel gerar o conteudo agora. Tente novamente em instantes.'
+)
+
+
+def _mark_post_failed(post, mensagem=GENERATION_FAILED_MESSAGE):
+    """Marca o post como 'failed' com um motivo, em vez de travar eternamente em
+    'generating'. O motivo vai em local_pipeline_context['last_error'] para o
+    front exibir + oferecer 'tentar de novo' (endpoint regenerate_post)."""
+    ctx = post.local_pipeline_context or {}
+    ctx['last_error'] = mensagem
+    post.local_pipeline_context = ctx
+    post.status = 'failed'
+    post.save(update_fields=['status', 'local_pipeline_context'])
+
 
 def _aspects_to_tipo(aspects):
     """Mapeia os aspectos escolhidos no form -> papel (tipo) usado pelo
@@ -179,8 +195,10 @@ def _simple_orchestrate_into_image_prompt(post):
 
 @shared_task(
     bind=True,
-    max_retries=2,
-    default_retry_delay=30,
+    max_retries=5,
+    retry_backoff=True,        # 30 -> 60 -> 120 ... (cresce a cada retry)
+    retry_backoff_max=600,     # teto de 10 min entre tentativas
+    retry_jitter=True,         # espalha os retries (evita thundering herd)
 )
 def generate_post_simple_task(self, post_id: int):
     """Gera o TEXTO do post via agente unico OpenAI e salva no Post.
@@ -189,6 +207,7 @@ def generate_post_simple_task(self, post_id: int):
     (1 chamada, gpt-4o-mini). Status final 'pending' (texto pronto). Fase de
     imagem fica para depois.
     """
+    import anthropic
     from apps.posts.models import Post
     from apps.posts.services.simple_post_agent import generate_simple_post
     from apps.posts.tasks import (
@@ -205,94 +224,136 @@ def generate_post_simple_task(self, post_id: int):
     post.status = 'generating'
     post.save(update_fields=['status'])
 
-    # Contexto reaproveitado do pipeline local
-    kb_summary = _build_kb_summary(post.organization)
-    formato = _format_to_dict(post.post_format) if post.post_format else {
-        'name': post.formats[0] if post.formats else 'feed',
-        'aspect_ratio': '1:1',
-    }
-    logo_urls = list(_logos_from_org(post.organization, post=post))
-
     ctx = post.local_pipeline_context or {}
-    refs_general = (ctx.get('references_usage_description', '') or '').strip()
-    reference_descriptions = []
-    if refs_general:
-        reference_descriptions.append(f'Observacao geral: {refs_general}')
-    for r in _reference_images_from_post(post):
-        desc = (r.get('usage_description') or '').strip()
-        utype = (r.get('usage_type') or '').strip()
-        if desc or utype:
-            reference_descriptions.append(
-                f'{r.get("name") or "imagem"} ({utype or "uso nao informado"}): {desc}'
+
+    # CACHE DE TEXTO (entre retries): se uma tentativa anterior ja gerou e
+    # PERSISTIU os textos do OpenAI, NAO re-chama o agente (evita re-gerar e
+    # re-cobrar a cada retry da Fase 1 do orquestrador). Os textos ficam salvos
+    # nos campos do post; o status segue 'generating', entao o front so revela
+    # tudo quando a cena fica pronta e o status vira 'pending'.
+    text_already_saved = bool(ctx.get('simple_text_saved')) and bool(
+        (post.copy_payload or {}).get('_simple_agent')
+    )
+
+    if text_already_saved:
+        text_model = post.ia_model_text or 'gpt-4o-mini'
+        logger.info('[posts.simple] textos OpenAI reaproveitados (retry) post=%s', post_id)
+    else:
+        # Contexto reaproveitado do pipeline local
+        kb_summary = _build_kb_summary(post.organization)
+        formato = _format_to_dict(post.post_format) if post.post_format else {
+            'name': post.formats[0] if post.formats else 'feed',
+            'aspect_ratio': '1:1',
+        }
+        logo_urls = list(_logos_from_org(post.organization, post=post))
+
+        refs_general = (ctx.get('references_usage_description', '') or '').strip()
+        reference_descriptions = []
+        if refs_general:
+            reference_descriptions.append(f'Observacao geral: {refs_general}')
+        for r in _reference_images_from_post(post):
+            desc = (r.get('usage_description') or '').strip()
+            utype = (r.get('usage_type') or '').strip()
+            if desc or utype:
+                reference_descriptions.append(
+                    f'{r.get("name") or "imagem"} ({utype or "uso nao informado"}): {desc}'
+                )
+
+        try:
+            result = generate_simple_post(
+                kb_summary=kb_summary,
+                rede=post.social_network,
+                formato=formato.get('name', 'feed'),
+                is_carousel=post.is_carousel,
+                image_count=post.image_count,
+                tema=post.requested_theme,
+                cta_requested=post.cta_requested,
+                logo_urls=logo_urls,
+                reference_descriptions=reference_descriptions,
             )
+        except Exception as exc:
+            logger.exception('[posts.simple] Falha OpenAI post_id=%s', post_id)
+            if self.request.retries >= self.max_retries:
+                _mark_post_failed(post)
+                return {'success': False, 'post_id': post_id, 'error': 'openai_failed'}
+            raise self.retry(exc=exc)
 
-    try:
-        result = generate_simple_post(
-            kb_summary=kb_summary,
-            rede=post.social_network,
-            formato=formato.get('name', 'feed'),
-            is_carousel=post.is_carousel,
-            image_count=post.image_count,
-            tema=post.requested_theme,
-            cta_requested=post.cta_requested,
-            logo_urls=logo_urls,
-            reference_descriptions=reference_descriptions,
-        )
-    except Exception as exc:
-        logger.exception('[posts.simple] Falha OpenAI post_id=%s', post_id)
-        # Nao usa status 'failed' (fora dos choices do model). Re-tenta; ao
-        # esgotar retries mantem 'generating' para o usuario reabrir.
-        raise self.retry(exc=exc)
+        structured = result['structured']
 
-    structured = result['structured']
+        # Normaliza hashtags: garante prefixo '#'
+        raw_hashtags = structured.get('hashtags') or []
+        structured['hashtags'] = [
+            h if str(h).startswith('#') else f'#{str(h).lstrip("#").strip()}'
+            for h in raw_hashtags if h
+        ]
 
-    # Normaliza hashtags: garante prefixo '#'
-    raw_hashtags = structured.get('hashtags') or []
-    structured['hashtags'] = [
-        h if str(h).startswith('#') else f'#{str(h).lstrip("#").strip()}'
-        for h in raw_hashtags if h
-    ]
+        post.title = structured.get('title', '') or ''
+        post.subtitle = structured.get('subtitle', '') or ''
+        post.image_prompt = ''  # sera a CENA do orquestrador (FONTE UNICA)
+        post.caption = structured.get('caption', '') or ''
+        post.hashtags = structured.get('hashtags') or []
+        post.cta = structured.get('cta_text') or ''
+        # Guarda o payload bruto do agente para auditoria/comparacao entre pipelines
+        post.copy_payload = {'_simple_agent': structured}
+        post.ia_provider = 'openai'
+        post.ia_model_text = result['model']
+        text_model = result['model']
 
-    # Define TODOS os campos em MEMORIA, sem salvar ainda. Enquanto o orquestrador
-    # roda (status 'generating'), nenhum texto deve aparecer no front — so um
-    # UNICO save no fim revela todos os campos juntos.
-    post.title = structured.get('title', '') or ''
-    post.subtitle = structured.get('subtitle', '') or ''
-    post.image_prompt = ''  # sera a CENA do orquestrador (FONTE UNICA)
-    post.caption = structured.get('caption', '') or ''
-    post.hashtags = structured.get('hashtags') or []
-    post.cta = structured.get('cta_text') or ''
-    # Guarda o payload bruto do agente para auditoria/comparacao entre pipelines
-    post.copy_payload = {'_simple_agent': structured}
-    post.ia_provider = 'openai'
-    post.ia_model_text = result['model']
+        # PERSISTE os textos agora (status SEGUE 'generating' — front so revela
+        # quando o status virar 'pending'). Marca o cache para os retros nao
+        # re-chamarem o OpenAI.
+        ctx['simple_text_saved'] = True
+        post.local_pipeline_context = ctx
+        post.save(update_fields=[
+            'title', 'subtitle', 'image_prompt', 'caption', 'hashtags', 'cta',
+            'copy_payload', 'ia_provider', 'ia_model_text', 'local_pipeline_context',
+        ])
 
-    _log_usage(post, result['model'], result['usage'], purpose='generate_post_simple')
+        _log_usage(post, result['model'], result['usage'], purpose='generate_post_simple')
 
     # FASE 1 (parte 2): orquestrador cria a CENA (image_prompt) — FONTE UNICA.
-    # Le os textos da MEMORIA (ainda nao salvos). NAO envia ao Gemini aqui.
+    # NAO envia ao Gemini aqui.
     scene_ok = False
     try:
         scene_ok = _simple_orchestrate_into_image_prompt(post)
+    except anthropic.APIStatusError as exc:
+        # Diferencia transitorio (429/5xx/529 — sobrecarga) de permanente (400 —
+        # ex.: saldo de credito, requisicao invalida). O SDK ja esgotou seus
+        # max_retries internos antes de chegar aqui.
+        code = getattr(exc, 'status_code', 0) or 0
+        transient = isinstance(exc, anthropic.RateLimitError) or code >= 500
+        if not transient:
+            logger.error('[posts.simple] Claude erro permanente (status=%s) post=%s', code, post_id)
+            _mark_post_failed(post)
+            return {'success': False, 'post_id': post_id, 'error': 'claude_permanent'}
+        if self.request.retries >= self.max_retries:
+            logger.error('[posts.simple] Claude sobrecarregado — retries esgotados post=%s', post_id)
+            _mark_post_failed(post)
+            return {'success': False, 'post_id': post_id, 'error': 'claude_overloaded'}
+        logger.warning('[posts.simple] Claude transitorio (status=%s) — backoff post=%s', code, post_id)
+        raise self.retry(exc=exc)
     except Exception:
         logger.exception('[posts.simple] orquestrador Fase 1 falhou post=%s', post_id)
 
     if not scene_ok or not (post.image_prompt or '').strip():
-        # Sem fallback da OpenAI: o orquestrador e a fonte unica. Falha rara
-        # (erro de API/parse) -> re-tenta a Fase 1 inteira.
-        logger.error('[posts.simple] sem cena do orquestrador post=%s — retry', post_id)
-        raise self.retry(countdown=30)
+        # Falha branda (parse/saida invalida do orquestrador): re-tenta com
+        # backoff. Ao ESGOTAR os retries, marca 'failed' com mensagem generica
+        # (em vez de travar em 'generating'). Os textos ja estao salvos.
+        if self.request.retries >= self.max_retries:
+            logger.error('[posts.simple] sem cena apos retries — falha post=%s', post_id)
+            _mark_post_failed(post)
+            return {'success': False, 'post_id': post_id, 'error': 'no_scene'}
+        logger.warning('[posts.simple] sem cena do orquestrador post=%s — retry %s',
+                       post_id, self.request.retries)
+        raise self.retry()
 
-    # UM unico save: textos + cena + status, tudo de uma vez.
+    # Save final: cena + conversa do orquestrador + status 'pending' (revela tudo).
     post.status = 'pending'
     post.save()
 
-    logger.info(
-        '[posts.simple] generate_post_simple_task OK post_id=%s tokens_in=%s tokens_out=%s cost=$%s',
-        post_id, result['usage'].get('input_tokens'),
-        result['usage'].get('output_tokens'), result['usage'].get('cost_usd'),
-    )
-    return {'success': True, 'post_id': post_id, 'model': result['model'], 'usage': result['usage']}
+    logger.info('[posts.simple] generate_post_simple_task OK post_id=%s model=%s reused_text=%s',
+                post_id, text_model, text_already_saved)
+    return {'success': True, 'post_id': post_id, 'model': text_model}
 
 
 @shared_task(

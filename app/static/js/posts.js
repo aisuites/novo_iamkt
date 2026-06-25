@@ -197,7 +197,8 @@
     agent: { label: 'Agente Alterando — Aguarde', className: 'is-agent' },
     generating: { label: 'Agente Gerando Conteúdo', className: 'is-agent' },
     image_generating: { label: 'Agente Gerando Imagem', className: 'is-agent' },
-    image_ready: { label: 'Imagem Disponível', className: 'is-approved' }
+    image_ready: { label: 'Imagem Disponível', className: 'is-approved' },
+    failed: { label: 'Falhou', className: 'is-rejected' }
   };
 
   // ============================================================================
@@ -1462,6 +1463,23 @@
       return;
     }
     
+    // Status: failed - Mostrar motivo + botão "Tentar de novo" (reroda a Fase 1)
+    if (post.status === 'failed') {
+      const msg = document.createElement('p');
+      msg.className = 'badge-danger';
+      msg.style.marginBottom = '8px';
+      msg.textContent = post.lastError || 'Não foi possível gerar o conteúdo agora. Tente novamente em instantes.';
+      actionsContainer.appendChild(msg);
+
+      const btnRetry = document.createElement('button');
+      btnRetry.type = 'button';
+      btnRetry.className = 'btn btn-outline-danger';
+      btnRetry.textContent = 'Tentar de novo';
+      btnRetry.addEventListener('click', () => retryPost(post));
+      actionsContainer.appendChild(btnRetry);
+      return;
+    }
+
     // Status: pending - Mostrar botões (idêntico ao resumo.html)
     if (post.status === 'pending') {
       console.log('[DEBUG] Status é pending/image_generating/image_ready - criando botões');
@@ -1777,6 +1795,42 @@
       post.status = previousStatus;
       renderPosts();
       window.toaster?.error('Não foi possível gerar novamente. Tente novamente.');
+    }
+  }
+
+  /**
+   * Tentar de novo — usado quando o post FALHOU (erro do Claude). Reaproveita os
+   * textos do OpenAI ja gerados e so re-roda o orquestrador (a cena), gastando
+   * menos. Difere de "Gerar Novamente", que descarta tudo.
+   */
+  async function retryPost(post) {
+    const serverId = getServerId(post);
+    if (!serverId) {
+      window.toaster?.error('Não foi possível identificar o post selecionado.');
+      return;
+    }
+    const previousStatus = post.status;
+    post.status = 'generating';
+    post.statusLabel = statusInfo.generating?.label || 'Agente Gerando Conteúdo';
+    renderPosts();
+    try {
+      const response = await fetch(`/posts/${serverId}/retry/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN, 'Accept': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      post.status = data.status || 'generating';
+      post.statusLabel = data.statusLabel || 'Agente Gerando Conteúdo';
+      post.lastError = '';
+      renderPosts();
+      window.toaster?.success('Tentando novamente...');
+    } catch (error) {
+      console.error(error);
+      post.status = previousStatus;
+      renderPosts();
+      window.toaster?.error('Não foi possível tentar de novo. Tente novamente.');
     }
   }
 

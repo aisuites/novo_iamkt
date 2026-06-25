@@ -202,3 +202,144 @@ class ParseJsonTests(TestCase):
         self.assertEqual(_parse_json('```json\n{"a": 2}\n```'), {'a': 2})
         self.assertEqual(_parse_json('prosa {"a": 3} fim'), {'a': 3})
         self.assertEqual(_parse_json('sem json'), {})
+
+
+def _anthropic_status_error(status, message='erro', cls=None):
+    """Constroi um anthropic.APIStatusError (ou subclasse) com um status HTTP
+    arbitrario, sem tocar a rede."""
+    import httpx
+    import anthropic
+    req = httpx.Request('POST', 'https://api.anthropic.com/v1/messages')
+    resp = httpx.Response(status, request=req)
+    cls = cls or anthropic.APIStatusError
+    return cls(message, response=resp, body=None)
+
+
+class ClaudeOverloadRetryTests(TestCase):
+    """Cobre a correcao do 529: orquestrador sobrecarregado -> backoff/retry da
+    task; 400 permanente -> falha rapida; cache de texto entre retries; e o
+    estado de falha (sem travar em 'generating')."""
+
+    def setUp(self):
+        self.org, self.user = make_org_user(slug='org-529', email='r@test.com')
+        # Post com os textos do OpenAI JA persistidos (simula 1a tentativa que
+        # gerou o texto) -> a task pula o OpenAI e vai direto ao orquestrador.
+        self.post = make_simple_post(
+            self.org, self.user, status='generating',
+            ia_model_text='gpt-4o-mini',
+            copy_payload={'_simple_agent': {'title': 'T', 'subtitle': 'S',
+                                            'caption': 'c', 'hashtags': ['#x'],
+                                            'cta_text': 'CTA'}},
+            local_pipeline_context={'simple_text_saved': True},
+        )
+
+    @patch('apps.posts.services.simple_post_agent.generate_simple_post')
+    @patch('apps.posts.tasks_simple._simple_orchestrate_into_image_prompt')
+    def test_529_transitorio_faz_retry_sem_falhar(self, mock_orch, mock_openai):
+        from celery.exceptions import Retry
+        from apps.posts.tasks_simple import generate_post_simple_task
+        mock_orch.side_effect = _anthropic_status_error(529, 'overloaded')
+
+        with patch.object(generate_post_simple_task, 'retry', side_effect=Retry()) as m_retry:
+            with self.assertRaises(Retry):
+                generate_post_simple_task.run(self.post.id)
+        m_retry.assert_called_once()
+        mock_openai.assert_not_called()  # cache: nao re-chamou o OpenAI
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.status, 'generating')  # NAO falhou (transitorio)
+
+    @patch('apps.posts.services.simple_post_agent.generate_simple_post')
+    @patch('apps.posts.tasks_simple._simple_orchestrate_into_image_prompt')
+    def test_400_permanente_falha_rapido(self, mock_orch, mock_openai):
+        import anthropic
+        from apps.posts.tasks_simple import generate_post_simple_task, GENERATION_FAILED_MESSAGE
+        mock_orch.side_effect = _anthropic_status_error(
+            400, 'credit balance too low', cls=anthropic.BadRequestError)
+
+        with patch.object(generate_post_simple_task, 'retry') as m_retry:
+            res = generate_post_simple_task.run(self.post.id)
+        m_retry.assert_not_called()  # permanente: NAO queima retries
+        self.assertFalse(res['success'])
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.status, 'failed')
+        self.assertEqual(self.post.local_pipeline_context.get('last_error'),
+                         GENERATION_FAILED_MESSAGE)
+
+    @patch('apps.posts.services.simple_post_agent.generate_simple_post')
+    @patch('apps.posts.tasks_simple._simple_orchestrate_into_image_prompt')
+    def test_529_retries_esgotados_marca_failed(self, mock_orch, mock_openai):
+        from apps.posts.tasks_simple import generate_post_simple_task, GENERATION_FAILED_MESSAGE
+        mock_orch.side_effect = _anthropic_status_error(529, 'overloaded')
+
+        # Simula a ULTIMA tentativa (retries == max_retries).
+        generate_post_simple_task.push_request(retries=generate_post_simple_task.max_retries)
+        try:
+            with patch.object(generate_post_simple_task, 'retry') as m_retry:
+                res = generate_post_simple_task.run(self.post.id)
+        finally:
+            generate_post_simple_task.pop_request()
+        m_retry.assert_not_called()  # esgotado: nao re-tenta, marca falha
+        self.assertFalse(res['success'])
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.status, 'failed')
+        self.assertEqual(self.post.local_pipeline_context.get('last_error'),
+                         GENERATION_FAILED_MESSAGE)
+
+    @patch('apps.posts.services.simple_post_agent.generate_simple_post')
+    @patch('apps.posts.tasks_simple._simple_orchestrate_into_image_prompt')
+    def test_cache_texto_nao_rechama_openai(self, mock_orch, mock_openai):
+        from apps.posts.tasks_simple import generate_post_simple_task
+
+        def _orch_ok(post):
+            post.image_prompt = 'cena gerada'
+            return True
+        mock_orch.side_effect = _orch_ok
+
+        res = generate_post_simple_task.run(self.post.id)
+        self.assertTrue(res['success'])
+        mock_openai.assert_not_called()  # texto reaproveitado do cache
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.status, 'pending')
+        self.assertEqual(self.post.image_prompt, 'cena gerada')
+
+
+class RetryVsRegenerateTests(TestCase):
+    """Contrato dos dois botoes:
+    - 'Tentar de novo' (retry_post): REAPROVEITA o texto -> preserva
+      simple_text_saved, limpa so o last_error. A task pula o OpenAI (gasta menos).
+    - 'Gerar Novamente' (regenerate_post): descarta tudo -> limpa o cache de
+      texto, forcando a task a re-gerar no OpenAI."""
+
+    def setUp(self):
+        self.org, self.user = make_org_user(slug='org-retry', email='rt@test.com')
+        self.post = make_simple_post(
+            self.org, self.user, status='failed',
+            copy_payload={'_simple_agent': {'title': 'T'}},
+            local_pipeline_context={'simple_text_saved': True,
+                                    'last_error': 'sobrecarga'},
+        )
+        self.client.force_login(self.user)
+
+    @patch('apps.posts.tasks_simple.generate_post_simple_task')
+    def test_retry_preserva_cache_de_texto(self, mock_task):
+        resp = self.client.post(reverse('posts:retry', args=[self.post.id]),
+                                content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.status, 'generating')
+        ctx = self.post.local_pipeline_context or {}
+        self.assertTrue(ctx.get('simple_text_saved'))   # cache PRESERVADO (reaproveita)
+        self.assertIsNone(ctx.get('last_error'))        # erro limpo
+        mock_task.delay.assert_called_once_with(self.post.id)
+
+    @patch('apps.posts.tasks_simple.generate_post_simple_task')
+    def test_regenerate_limpa_cache_de_texto(self, mock_task):
+        resp = self.client.post(reverse('posts:regenerate', args=[self.post.id]),
+                                content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.post.refresh_from_db()
+        ctx = self.post.local_pipeline_context or {}
+        self.assertIsNone(ctx.get('simple_text_saved'))  # cache LIMPO (gera do zero)
+        self.assertIsNone(ctx.get('last_error'))
+        mock_task.delay.assert_called_once_with(self.post.id)
