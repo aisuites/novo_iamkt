@@ -73,17 +73,18 @@ WIREFRAMES = {
         'marca_desc': 'no symbol and no logo — the solid color and the big title ARE the piece.',
         'zonas': {
             'feed': [
-                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'top-left',
-                 'x': 6, 'y': 6, 'w': 60, 'h': 6, 'fs': 2.4, 'font': 'caps_small',
-                 'caps': True, 'align': 'left', 'color': None},
-                # Bloco titulo+apoio agrupado no MEIO-SUPERIOR (ref "NOSSOS PROJETOS"):
-                # vazio fica embaixo, nao em cima.
-                {'key': 'titulo', 'role': 'titulo', 'pos': 'upper-middle, big display, 2 lines',
-                 'x': 6, 'y': 36, 'w': 90, 'h': 22, 'fs': 11, 'font': 'display',
-                 'caps': True, 'align': 'left', 'color': None},
-                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'just below the title, left column ~50%',
+                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'top-left, small light highlight',
+                 'x': 6, 'y': 7, 'w': 60, 'h': 5, 'fs': 2.3, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': None, 'max_linhas': 1},
+                # Bloco titulo+apoio agrupado no MEIO-SUPERIOR (ref "NOSSOS PROJETOS").
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'upper-middle, huge display, dominates',
+                 'x': 6, 'y': 36, 'w': 92, 'h': 40, 'fs': 15, 'font': 'display',
+                 'caps': True, 'align': 'left', 'color': None, 'max_linhas': 3},
+                # apoio FLUI logo abaixo do titulo (y calculado, nao fixo).
+                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'flows right below the title, left col ~50%',
                  'x': 6, 'y': 60, 'w': 50, 'h': 14, 'fs': 3.0, 'font': 'regular',
-                 'caps': False, 'align': 'left', 'color': None},
+                 'caps': False, 'align': 'left', 'color': None, 'max_linhas': 4,
+                 'flow_after': 'titulo', 'gap_pct': 2.5, 'y_max': 94},
             ],
         },
         'avoid': ['no photo', 'no color band', 'no symbol/seal', 'no logo/wordmark',
@@ -93,21 +94,22 @@ WIREFRAMES = {
         'name': 'Foto + faixa de cor inferior',
         'formatos': ['feed', 'story'],
         'fundo': 'photo',              # Gemini gera a foto; Pillow desenha a faixa
-        'usa': {'selo': True, 'wordmark': {'feed': False, 'story': True}, 'specimen': False},
+        # feed (peca 02): wordmark top-left, SEM selo, SEM kicker.
+        # story (peca 04): selo top-left + wordmark na assinatura (rodape direito).
+        'usa': {'selo': {'feed': False, 'story': True},
+                'wordmark': {'feed': True, 'story': True}, 'specimen': False},
         'bg_prompt': ('full-bleed editorial COLOR photo of {PESSOA}, sharp focus throughout, '
                       'subject in the upper-center of the frame; documentary, vibrant, natural '
                       'light, evenly composed; NO blurred bands or strips, NO text, NO logo, '
                       'NO color band, NO graphic overlays.'),
-        'marca_desc': f'{SELO_DESC} over the photo.',
-        'band': {'feed': {'y': 70}, 'story': {'y': 52}},   # faixa do y% ate 100%
+        'marca_desc': ('feed: the "TODXS" wordmark at top-left over the photo. '
+                       f'story: {SELO_DESC} at top-left + the wordmark in the bottom signature.'),
+        'band': {'feed': {'y': 69}, 'story': {'y': 52}},   # faixa do y% ate 100%
         'zonas': {
             'feed': [
-                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'top-left over photo',
-                 'x': 6, 'y': 5, 'w': 60, 'h': 6, 'fs': 2.4, 'font': 'caps_small',
-                 'caps': True, 'align': 'left', 'color': '#F4F1D9'},
                 {'key': 'titulo', 'role': 'titulo', 'pos': 'inside the bottom color band',
-                 'x': 6, 'y': 71, 'w': 88, 'h': 26, 'fs': 9.0, 'font': 'medium',
-                 'caps': True, 'align': 'left', 'color': None},
+                 'x': 6, 'y': 72, 'w': 88, 'h': 24, 'fs': 9.0, 'font': 'medium',
+                 'caps': True, 'align': 'left', 'color': None, 'center_v': True},
             ],
             'story': [
                 {'key': 'titulo', 'role': 'titulo', 'pos': 'inside the band (top)',
@@ -121,10 +123,10 @@ WIREFRAMES = {
                  'caps': True, 'align': 'left', 'color': None},
             ],
         },
-        'seal': {'feed': {'x': 82, 'y': 4, 'w': 13}, 'story': {'x': 7, 'y': 3, 'w': 15}},
-        'wordmark': {'story': {'x': 70, 'y': 92, 'w': 23}},  # assinatura direita
+        'seal': {'story': {'x': 7, 'y': 3, 'w': 15}},
+        'wordmark': {'feed': {'x': 6, 'y': 5, 'w': 22}, 'story': {'x': 70, 'y': 92, 'w': 23}},
         'avoid': ['straight horizontal cut between photo and band',
-                  'feed: ONLY kicker + title (NO support text, NO bottom wordmark)'],
+                  'feed: wordmark top-left + title in the band ONLY (no kicker, no seal)'],
     },
     'C': {
         'name': 'Manchete em cima - foto emoldurada',
@@ -174,7 +176,8 @@ WIREFRAMES = {
             'story': [
                 {'key': 'blocos', 'role': 'titulo', 'pos': 'stacked equal-weight blocks',
                  'x': 7, 'y': 18, 'w': 86, 'h': 64, 'fs': 9.5, 'font': 'medium',
-                 'caps': True, 'align': 'left', 'color': None, 'is_blocks': True},
+                 'caps': True, 'align': 'left', 'color': None, 'is_blocks': True,
+                 'center_v': True},
             ],
         },
         'seal': {'story': {'x': 7, 'y': 4, 'w': 15}},
@@ -344,10 +347,14 @@ def _text_el(z, content_text, color_hex, *, y=None, h=None):
         'weight': 'black' if z['role'] == 'titulo' else 'regular',
         'case': 'upper' if z.get('caps') else 'none',
         'align': z['align'], 'color': z['color'],
+        '_font': z.get('font'),  # peso de uso -> pillow_render resolve _font_path
     }
     if z['color'] is None:
         el['color'] = _contrast_on(color_hex)
-        el['background_color'] = color_hex  # so p/ centralizar vertical (sem pill)
+        # Centralizacao vertical na caixa SO quando a zona pede (center_v). Caso
+        # contrario o texto alinha no topo e FLUI (titulo seguido do apoio).
+        if z.get('center_v'):
+            el['background_color'] = color_hex  # dispara has_bg (sem pill p/ titulo)
     return el
 
 

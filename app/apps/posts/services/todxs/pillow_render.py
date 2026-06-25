@@ -63,6 +63,30 @@ def resolve_todxs_fonts(kb) -> dict:
     return fonts
 
 
+def resolve_todxs_weights(kb) -> dict:
+    """Mapa peso-de-uso -> caminho da fonte (hierarquia tipografica do doc).
+    display=Black, medium=Medium, regular=Regular, caps_small=Light (stand-in da
+    Vinila Condensed Light ate subirmos a Vinila)."""
+    from apps.posts.services.font_resolver import _load_custom_font
+    by = {c.name.lower(): c for c in kb.custom_fonts.all()}
+
+    def path(*needles):
+        for n in needles:
+            for name, cf in by.items():
+                if n in name:
+                    p = _load_custom_font(cf)
+                    if p:
+                        return p
+        return None
+
+    return {
+        'display': path('black', 'bold'),
+        'medium': path('medium', 'semibold', 'bold'),
+        'regular': path('regular', 'medium'),
+        'caps_small': path('light', 'extralight', 'regular'),  # ~ Vinila Condensed Light
+    }
+
+
 def _download_bytes(url):
     import urllib.request
     try:
@@ -156,26 +180,110 @@ def _expand_seals(elements, x_png_bytes):
     return out
 
 
+# ----------------------------------------------------------------------------
+# Desenhador DEDICADO (Pillow puro) — NAO usa o motor do fluxo simples.
+# Desenha exatamente o que o layout determinou (posicao/tamanho ja resolvidos).
+# ----------------------------------------------------------------------------
+
+def _draw_text_el(draw, el, W, H):
+    from PIL import ImageFont
+    basis = min(W, H)
+    size = max(8, int(float(el.get('font_size_pct', 5)) / 100.0 * basis))
+    path = el.get('_font_path')
+    try:
+        font = ImageFont.truetype(path, size)
+    except Exception:
+        font = ImageFont.load_default()
+    x = float(el.get('x_pct', 0)) / 100.0 * W
+    y = float(el.get('y_pct', 0)) / 100.0 * H
+    bw = float(el.get('width_pct', 60)) / 100.0 * W
+    align = (el.get('align') or 'left').lower()
+    color = _hex_to_rgb(el.get('color') or '#000000')
+    line_h = size * 1.16
+    for line in str(el.get('content', '')).split('\n'):
+        lw = draw.textlength(line, font=font)
+        lx = x + (bw - lw) / 2 if align == 'center' else (x + bw - lw if align == 'right' else x)
+        draw.text((lx, y), line, font=font, fill=color)
+        y += line_h
+
+
+def _paste_contain(base, sticker_rgba, el, W, H):
+    from PIL import Image
+    x = int(float(el.get('x_pct', 0)) / 100.0 * W)
+    y = int(float(el.get('y_pct', 0)) / 100.0 * H)
+    bw = max(8, int(float(el.get('width_pct', 10)) / 100.0 * W))
+    bh = max(8, int(float(el.get('height_pct', el.get('width_pct', 10))) / 100.0 * H))
+    iw, ih = sticker_rgba.size
+    s = min(bw / iw, bh / ih)
+    nw, nh = max(1, int(iw * s)), max(1, int(ih * s))
+    sticker_rgba = sticker_rgba.resize((nw, nh), Image.LANCZOS)
+    base.alpha_composite(sticker_rgba, (x, y))  # ancora no topo-esquerda do box
+
+
+def draw_todxs(bg_png, elements, W, H, logo_url=None):
+    """Desenha a arte final: faixa -> selo/logo -> texto. Pillow puro."""
+    from PIL import Image, ImageDraw
+    img = Image.open(io.BytesIO(bg_png)).convert('RGBA')
+    draw = ImageDraw.Draw(img)
+
+    # 1) faixa (grafismo retangulo)
+    for el in elements:
+        if (el.get('role') or '') == 'grafismo':
+            x = int(float(el.get('x_pct', 0)) / 100 * W)
+            y = int(float(el.get('y_pct', 0)) / 100 * H)
+            w = int(float(el.get('width_pct', 0)) / 100 * W)
+            h = int(float(el.get('height_pct', 0)) / 100 * H)
+            draw.rectangle([x, y, x + w, y + h],
+                           fill=_hex_to_rgb(el.get('cor') or el.get('color') or '#000000'))
+
+    # 2) selo (image data URI) e logo (wordmark PNG)
+    for el in elements:
+        role = (el.get('role') or '')
+        if role == 'image' and (el.get('url') or '').startswith('data:'):
+            try:
+                _, _, payload = el['url'].partition(',')
+                st = Image.open(io.BytesIO(base64.b64decode(payload))).convert('RGBA')
+                _paste_contain(img, st, el, W, H)
+            except Exception:
+                logger.warning('[todxs.draw] selo falhou', exc_info=True)
+        elif role == 'logo' and logo_url:
+            try:
+                lb = _download_bytes(logo_url)
+                if lb:
+                    logo = Image.open(io.BytesIO(lb)).convert('RGBA')
+                    logo = _recolor_opaque(logo, _hex_to_rgb(el.get('logo_color') or '#F4F1D9'))
+                    _paste_contain(img, logo, el, W, H)
+            except Exception:
+                logger.warning('[todxs.draw] logo falhou', exc_info=True)
+
+    # 3) texto (por cima)
+    for el in elements:
+        if (el.get('role') or '') in ('titulo', 'subtitulo', 'cta') and el.get('content'):
+            _draw_text_el(draw, el, W, H)
+
+    buf = io.BytesIO()
+    img.convert('RGB').save(buf, 'PNG')
+    return buf.getvalue()
+
+
 def render_todxs(*, archetype, content, color_hex, fmt, formato_px, kb,
                  paleta=None, photo_png=None, x_png_bytes=None, logo_url=None):
     """
-    Renderiza a arte final da TODXS via Pillow.
+    Renderiza a arte final da TODXS via desenhador DEDICADO (Pillow puro).
+    Layout 100% explicito (compute_layout) -> sem motor do fluxo simples.
     Retorna dict: {raw_png, final_png, elements, fonts_resolved}.
     """
-    from apps.posts.services.gemini_image_generator import render_layout_document
-    from .wireframes import wireframe_elements
+    from .layout import compute_layout
 
+    W, H = _parse_px(formato_px)
     raw_png = build_background(archetype, fmt, color_hex, formato_px, photo_png=photo_png)
-    elements = wireframe_elements(archetype, content, color_hex, fmt)
-    elements = _expand_seals(elements, x_png_bytes)
-    fonts = resolve_todxs_fonts(kb)
-
-    final_png = render_layout_document(
-        raw_png, elements, paleta=paleta, fonts=fonts, logo_url=logo_url,
-    )
+    weights = resolve_todxs_weights(kb)
+    elements = compute_layout(archetype, content, color_hex, fmt, W, H, weights)
+    elements = _expand_seals(elements, x_png_bytes)  # seal -> image (data URI)
+    final_png = draw_todxs(raw_png, elements, W, H, logo_url=logo_url)
     return {
         'raw_png': raw_png,
         'final_png': final_png,
         'elements': elements,
-        'fonts_resolved': sorted(fonts.keys()),
+        'fonts_resolved': [k for k, v in weights.items() if v],
     }

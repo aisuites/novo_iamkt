@@ -185,30 +185,6 @@ def generate_post_todxs_task(self, post_id: int):
     s3_key, s3_url = _upload_image_to_s3(
         org_id=org.id, post_id=post.id, png_bytes=pr['final_png'], mime_type='image/png')
 
-    # ---------------- Etapa 2b (DEBUG): single-shot Gemini com texto ----------------
-    # So para comparacao na area de debug (NAO publica). Best-effort.
-    single_shot_prompt = build_singleshot_prompt(archetype, content, color_hex, color_name, fmt)
-    gemini_debug = None
-    try:
-        dbg_inputs = []
-        ref = todxs_assets.get_reference_image(kb, structured.get('reference_id'))
-        if ref:
-            rb64, rmime = _download_to_base64(ref['url'])
-            if rb64:
-                dbg_inputs.append({'b64': rb64, 'mime': rmime,
-                                   'role': 'REFERENCIA_LAYOUT', 'name': ref['name']})
-        gemd = generate_singleshot(prompt_text=single_shot_prompt, image_inputs=dbg_inputs)
-        gk, gu = _upload_image_to_s3(org_id=org.id, post_id=post.id,
-                                     png_bytes=gemd['png_bytes'], mime_type='image/png')
-        gemini_debug = {'s3_key': gk, 'url': gu, 'model': gemd.get('model'),
-                        'usage': gemd.get('usage'), 'prompt': single_shot_prompt,
-                        'response': gemd['debug']['response']}
-        _record_ai_usage(post, step='image_generation', model=gemd.get('model'),
-                         usage_dict=gemd.get('usage') or {},
-                         purpose='todxs_gemini_text_debug', images_generated=1)
-    except Exception:
-        logger.warning('[todxs] gemini-text (debug) falhou — ignorado', exc_info=True)
-
     # ---------------- Persistencia ----------------
     max_order = post.images.aggregate(Max('order'))['order__max']
     PostImage.objects.create(
@@ -227,20 +203,15 @@ def generate_post_todxs_task(self, post_id: int):
     trace.append({'etapa': '3_pillow_render', 'elements': pr['elements'],
                   'fonts': pr['fonts_resolved'], 'final_s3_key': s3_key,
                   'final_url': s3_url, 'at': dj_tz.now().isoformat()})
-    if gemini_debug:
-        trace.append({'etapa': '2b_gemini_text_debug', **gemini_debug,
-                      'at': dj_tz.now().isoformat()})
 
-    # refs das 3 imagens (fundo, gemini-texto, pillow) p/ inspecao rapida no debug
-    todxs_ctx['debug_images'] = {
-        'fundo': raw_url, 'gemini_texto': (gemini_debug or {}).get('url'), 'pillow': s3_url,
-    }
+    # imagens p/ inspecao no debug (sem Gemini-texto: o render e 100% Pillow)
+    todxs_ctx['debug_images'] = {'fundo': raw_url, 'gemini_texto': None, 'pillow': s3_url}
 
     post.title = (_titulo or '').replace('\n', ' ') or post.title
     post.subtitle = content.get('apoio') or content.get('kicker') or ''
     post.caption = structured.get('caption') or ''
     post.hashtags = structured.get('hashtags') or []
-    post.image_prompt = single_shot_prompt
+    post.image_prompt = f"TODXS arquetipo {archetype} ({fmt}) — render Pillow deterministico"
     post.image_s3_key = s3_key
     post.image_s3_url = s3_url
     post.has_image = True
