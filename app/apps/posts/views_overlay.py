@@ -193,24 +193,27 @@ def export_png(request, post_id):
         logger.error('[overlay] imagem não pôde ser baixada para export post=%s', post_id)
         return JsonResponse({'error': 'image_download_failed'}, status=500)
 
-    # Stickers (role='image'): baixa cada um e injeta data URI no elemento.
-    # Playwright headless nao busca URLs externas, entao precisa data URI inline.
+    # Stickers (role='image'): injeta data URI inline (mesma normalizacao).
     elements = _prepare_stickers_for_export(elements)
 
-    from apps.posts.services.html_renderer import build_html
-    html = build_html(
-        elements=elements,
-        raw_image_url=raw_image_data,
-        logo_url=logo_data,
-        canvas_w=canvas_w,
-        canvas_h=canvas_h,
-        font_paths=font_paths,
-    )
-
+    # Render via PILLOW (render_layout_document) — MESMO motor da publicacao, para
+    # que o "Baixar PNG" seja IDENTICO ao que aparece publicado. Antes usava
+    # Playwright (regras de tamanho/centralizacao diferentes -> divergia).
+    import base64 as _b64
     try:
-        png_bytes = asyncio.run(_playwright_screenshot(html, canvas_w, canvas_h))
+        _, _, _payload = (raw_image_data or '').partition(',')
+        bg_bytes = _b64.b64decode(_payload)
     except Exception:
-        logger.exception('[overlay] Playwright falhou post=%s', post_id)
+        logger.error('[overlay] base do fundo invalida para export post=%s', post_id)
+        return JsonResponse({'error': 'image_download_failed'}, status=500)
+
+    from apps.posts.services.gemini_image_generator import render_layout_document
+    try:
+        png_bytes = render_layout_document(
+            bg_bytes, elements, paleta=None, fonts=font_paths, logo_url=logo_url,
+        )
+    except Exception:
+        logger.exception('[overlay] render Pillow (export) falhou post=%s', post_id)
         return JsonResponse({'error': 'render_failed'}, status=500)
 
     response = HttpResponse(png_bytes, content_type='image/png')

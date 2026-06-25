@@ -999,7 +999,21 @@ function toggleCarrossel() {
     }
 
     // ── Render ─────────────────────────────────────────────────────────────
-    function _renderAll() { overlay.innerHTML = ''; elements.forEach((el,i) => _renderOne(el,i)); }
+    function _renderAll() {
+        overlay.innerHTML = '';
+        elements.forEach((el,i) => _renderOne(el,i));
+        // Fit pass: replica o auto-fit do Pillow (encolhe a fonte ate caber na caixa).
+        requestAnimationFrame(_fitTextToBoxes);
+    }
+    function _fitTextToBoxes() {
+        overlay.querySelectorAll('[data-fit="1"]').forEach(function (dom) {
+            if (!dom.clientHeight) return;  // modal ainda nao layoutado: nao encolher
+            var guard = 0, fs = parseFloat(dom.style.fontSize) || 0;
+            while (dom.scrollHeight > dom.clientHeight + 1 && fs > 8 && guard < 240) {
+                fs -= 1; dom.style.fontSize = fs + 'px'; guard++;
+            }
+        });
+    }
 
     function _renderOne(el, idx) {
         // Visibilidade: respeita visible=false (olhinho)
@@ -1034,8 +1048,12 @@ function toggleCarrossel() {
         } else if (['titulo','subtitulo','cta'].includes(role)) {
             if (!el.content && !(role==='cta' && el.background_color)) return;
             dom = document.createElement('div');
-            const fsPx = ((el.font_size_pct||5)/100*canvasH*scale).toFixed(1);
+            // REGRA PILLOW: tamanho da fonte tem base no MENOR lado (largura no
+            // feed/story), nao na altura — assim o editor bate com o publicado.
+            const basis = Math.min(canvasW, canvasH);
+            const fsPx = ((el.font_size_pct||5)/100*basis*scale).toFixed(1);
             const fam = fontFamilyByRole[role] || fontFamilyByRole.titulo || 'serif';
+            const alignH = (el.align==='center')?'center':((el.align==='right')?'flex-end':'flex-start');
             Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
                 width:el.width_pct+'%',
                 color:el.color||'#000', fontSize:fsPx+'px',
@@ -1043,7 +1061,7 @@ function toggleCarrossel() {
                 fontFamily:fam, lineHeight:'1.2', cursor:'pointer', userSelect:'none',
                 boxSizing:'border-box', whiteSpace:'pre-line' });
             if (el.height_pct) dom.style.height = el.height_pct + '%';
-            // CTA unificado: background_color + radius_pct + padding
+            // CTA unificado: background_color + radius_pct + padding (so o CTA pinta fundo)
             if (role==='cta' && el.background_color) {
                 dom.style.background = el.background_color;
                 const r = ((el.radius_pct||0)/100*canvasW*scale).toFixed(1);
@@ -1052,9 +1070,17 @@ function toggleCarrossel() {
                 const pv = ((el.padding_v_pct||0)/100*canvasH*scale).toFixed(1);
                 dom.style.padding = `${pv}px ${ph}px`;
             }
-            if (role==='cta') {
-                dom.style.display='flex'; dom.style.alignItems='center'; dom.style.justifyContent='center';
+            // REGRA PILLOW: centraliza VERTICAL na caixa quando ha background_color
+            // (mesma condicao has_bg do render_layout_document). Para titulo/subtitulo
+            // nao pinta fundo — so usa o flag para centralizar.
+            if (role==='cta' || el.background_color) {
+                dom.style.display='flex'; dom.style.flexDirection='column';
+                dom.style.justifyContent='center';
+                dom.style.alignItems = (role==='cta') ? 'center' : alignH;
             }
+            // REGRA PILLOW: encolher-pra-caber — se houver caixa (height), o fit pass
+            // reduz a fonte ate o texto caber na altura (como o auto-fit do Pillow).
+            if (el.height_pct) { dom.dataset.fit = '1'; dom.style.overflow = 'hidden'; }
             dom.textContent = el.content || '';
         } else return;
 
@@ -1106,7 +1132,7 @@ function toggleCarrossel() {
             document.querySelectorAll('.align-btn').forEach(b => {
                 b.style.background = b.dataset.align===(el.align||'left') ? '#e8e8e8' : '#fff';
             });
-            const curPx = Math.round((el.font_size_pct||5)/100*canvasH);
+            const curPx = Math.round((el.font_size_pct||5)/100*Math.min(canvasW,canvasH));
             ctrlSize.value = curPx; ctrlSizeVal.textContent = curPx;
         }
         // Fundo do CTA / grafismo
@@ -1148,7 +1174,7 @@ function toggleCarrossel() {
         if(selectedIdx===null)return;
         const px=+ctrlSize.value;
         ctrlSizeVal.textContent=px;
-        elements[selectedIdx].font_size_pct=(px/canvasH*100);
+        elements[selectedIdx].font_size_pct=(px/Math.min(canvasW,canvasH)*100);
         _renderAll();
         _bumpHistoryDebounced();
     });
