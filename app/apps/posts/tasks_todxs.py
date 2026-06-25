@@ -123,127 +123,117 @@ def generate_post_todxs_task(self, post_id: int):
     _record_ai_usage(post, step='text_generation', model=brain.get('model'),
                      usage_dict=brain.get('usage') or {}, purpose='todxs_skill_brain')
 
-    # Prompt single-shot DETERMINISTICO, montado a partir do wireframe do arquetipo
-    # (zonas/posicoes/tamanhos/cores do doc) + o conteudo travado pelo skill brain.
     from apps.posts.services.todxs.wireframes import (
-        WIREFRAMES, build_singleshot_prompt, archetypes_for_format,
+        WIREFRAMES, archetypes_for_format, background_mode,
+        build_singleshot_prompt, build_background_prompt,
     )
+    from apps.posts.services.todxs import pillow_render
+    from django.db.models import Max
+
     if archetype not in WIREFRAMES or archetype not in archetypes_for_format(fmt):
-        # fallback seguro: 1o arquetipo valido do formato
-        archetype = archetypes_for_format(fmt)[0]
+        archetype = archetypes_for_format(fmt)[0]  # fallback seguro
         todxs_ctx['archetype'] = archetype
-    single_shot_prompt = build_singleshot_prompt(
-        archetype=archetype, content=content, color_hex=color_hex,
-        color_name=color_name, fmt=fmt,
-    )
-
-    # ---------------- Etapa 2: single-shot (Gemini) ----------------
-    image_inputs = []
-
-    # Referencia de aplicacao escolhida pelo skill brain: entra PRIMEIRO (guia de
-    # layout/estilo) e a explicacao do que extrair vai no topo do prompt.
-    ref_block = ''
-    ref = todxs_assets.get_reference_image(kb, structured.get('reference_id'))
-    if ref:
-        b64, mime = _download_to_base64(ref['url'])
-        if b64:
-            image_inputs.append({'b64': b64, 'mime': mime, 'role': 'REFERENCIA_LAYOUT', 'name': ref['name']})
-            usage = (structured.get('reference_usage') or '').strip()
-            ref_block = (
-                'REFERENCE LAYOUT IMAGE attached (role=REFERENCIA_LAYOUT). Use it '
-                'STRICTLY as a layout/style/application guide: replicate its structure '
-                '— reserved text zones, the SOLID COLOR BLOCK behind the text, the '
-                'position of the X seal/wordmark, and the font hierarchy/relative sizes. '
-                'Apply OUR locked text and OUR chosen accent color from the spec below. '
-                "Do NOT copy the reference's photo/subject and do NOT use the "
-                "reference's colors. " + usage + '\n\n'
-            )
-
-    # contagem de posts todxs ja gerados -> rotaciona o grafismo
-    post_count = Post.objects.filter(organization=org, pipeline_used='todxs').count()
-    graf = todxs_assets.pick_grafismo_x(kb, rotate_seed=post_count)
-    if graf:
-        b64, mime = _download_to_base64(graf['url'])
-        if b64:
-            image_inputs.append({'b64': b64, 'mime': mime, 'role': 'GRAFISMO_X', 'name': graf['name']})
-
-    logos = list(_logos_from_org(org, post=post))
-    if logos:
-        b64, mime = _download_to_base64(logos[0])
-        if b64:
-            image_inputs.append({'b64': b64, 'mime': mime, 'role': 'LOGO', 'name': 'logo primario'})
 
     _titulo = content.get('titulo') or (content.get('blocos') or [''])[0] or ''
-    specimen = todxs_assets.render_ana_banana_specimen(kb, (_titulo or '').replace('\n', ' '))
-    if specimen:
-        image_inputs.append({
-            'b64': base64.b64encode(specimen).decode('ascii'),
-            'mime': 'image/png', 'role': 'FONT_SPECIMEN_ANA_BANANA',
-            'name': 'specimen Ana Banana Black',
-        })
+    paleta = _kb_colors(kb)
+    mode = background_mode(archetype)
 
-    # Bloco de FIDELIDADE dos assets de marca anexados: o modelo deve reproduzi-los
-    # exatamente (logo e grafismo X), nao redesenhar.
-    roles = {i['role'] for i in image_inputs}
-    asset_lines = []
-    if 'LOGO' in roles:
-        asset_lines.append(
-            '- role=LOGO: the exact TODXS logo/wordmark provided. Reproduce it '
-            'FAITHFULLY — same letterforms, the four-petal "X" glyph and proportions. '
-            'Do NOT redraw, restyle or distort it. Recolor ONLY to off-white #F4F1D9 '
-            'or black for contrast.')
-    if 'GRAFISMO_X' in roles:
-        asset_lines.append(
-            '- role=GRAFISMO_X: the exact four-petal "X" graphic provided. Use THIS '
-            'exact shape for the X seal/blob; do NOT invent a different X. Recolor to '
-            'the chosen accent color or off-white/black as needed.')
-    if 'FONT_SPECIMEN_ANA_BANANA' in roles:
-        asset_lines.append(
-            '- role=FONT_SPECIMEN_ANA_BANANA: a specimen of the headline typeface. '
-            'Match its letterform style (deep ink-traps, rounded counters, heavy weight).')
-    assets_block = ''
-    if asset_lines:
-        assets_block = (
-            'BRAND ASSETS attached — reproduce them FAITHFULLY, do not redraw or '
-            'restyle:\n' + '\n'.join(asset_lines) + '\n\n'
-        )
+    # Assets de marca: X (p/ o selo, rotaciona) + logo (p/ wordmark)
+    post_count = Post.objects.filter(organization=org, pipeline_used='todxs').count()
+    graf = todxs_assets.pick_grafismo_x(kb, rotate_seed=post_count)
+    x_png_bytes = None
+    if graf:
+        gb64, _ = _download_to_base64(graf['url'])
+        if gb64:
+            x_png_bytes = base64.b64decode(gb64)
+    logos = list(_logos_from_org(org, post=post))
+    logo_url = logos[0] if logos else None
 
-    final_prompt = ref_block + assets_block + single_shot_prompt
+    # ---------------- Etapa 2: FUNDO ----------------
+    # solid -> Pillow desenha o campo de cor; photo/solid_photo/image -> Gemini gera
+    # a foto/cena (sem texto), e o Pillow aplica faixa/texto por cima.
+    photo_png = None
+    bg_info = {'mode': mode}
+    if mode in ('photo', 'solid_photo', 'image'):
+        bg_prompt = build_background_prompt(archetype, content, color_hex, fmt)
+        try:
+            bg = generate_singleshot(prompt_text=bg_prompt, image_inputs=[])
+            photo_png = bg['png_bytes']
+            bg_info.update({'prompt': bg_prompt, 'model': bg.get('model'),
+                            'usage': bg.get('usage'), 'response': bg['debug']['response']})
+            _record_ai_usage(post, step='image_generation', model=bg.get('model'),
+                             usage_dict=bg.get('usage') or {}, purpose='todxs_background',
+                             images_generated=1)
+        except Exception as exc:
+            logger.exception('[todxs] fundo (Gemini) falhou post=%s', post_id)
+            raise self.retry(exc=exc)
 
+    # ---------------- Etapa 3: PILLOW (render publicado) ----------------
     try:
-        gem = generate_singleshot(prompt_text=final_prompt, image_inputs=image_inputs)
+        pr = pillow_render.render_todxs(
+            archetype=archetype, content=content, color_hex=color_hex, fmt=fmt,
+            formato_px=formato_px, kb=kb, paleta=paleta,
+            photo_png=photo_png, x_png_bytes=x_png_bytes, logo_url=logo_url,
+        )
     except Exception as exc:
-        logger.exception('[todxs] etapa 2 (gemini single-shot) falhou post=%s', post_id)
-        trace.append({
-            'etapa': '2_gemini_singleshot', 'erro': str(exc),
-            'at': dj_tz.now().isoformat(),
-        })
-        todxs_ctx['trace'] = trace
-        ctx['todxs'] = todxs_ctx
-        post.local_pipeline_context = ctx
-        post.save(update_fields=['local_pipeline_context'])
+        logger.exception('[todxs] pillow render falhou post=%s', post_id)
         raise self.retry(exc=exc)
 
-    trace.append({
-        'etapa': '2_gemini_singleshot',
-        'model': gem.get('model'),
-        'request': gem['debug']['request'],
-        'response': gem['debug']['response'],
-        'usage': gem.get('usage'),
-        'at': dj_tz.now().isoformat(),
-    })
-
-    # ---------------- Persistencia da arte ----------------
+    raw_key, raw_url = _upload_image_to_s3(
+        org_id=org.id, post_id=post.id, png_bytes=pr['raw_png'], mime_type='image/png')
     s3_key, s3_url = _upload_image_to_s3(
-        org_id=org.id, post_id=post.id,
-        png_bytes=gem['png_bytes'], mime_type=gem.get('mime_type', 'image/png'),
-    )
-    from django.db.models import Max
+        org_id=org.id, post_id=post.id, png_bytes=pr['final_png'], mime_type='image/png')
+
+    # ---------------- Etapa 2b (DEBUG): single-shot Gemini com texto ----------------
+    # So para comparacao na area de debug (NAO publica). Best-effort.
+    single_shot_prompt = build_singleshot_prompt(archetype, content, color_hex, color_name, fmt)
+    gemini_debug = None
+    try:
+        dbg_inputs = []
+        ref = todxs_assets.get_reference_image(kb, structured.get('reference_id'))
+        if ref:
+            rb64, rmime = _download_to_base64(ref['url'])
+            if rb64:
+                dbg_inputs.append({'b64': rb64, 'mime': rmime,
+                                   'role': 'REFERENCIA_LAYOUT', 'name': ref['name']})
+        gemd = generate_singleshot(prompt_text=single_shot_prompt, image_inputs=dbg_inputs)
+        gk, gu = _upload_image_to_s3(org_id=org.id, post_id=post.id,
+                                     png_bytes=gemd['png_bytes'], mime_type='image/png')
+        gemini_debug = {'s3_key': gk, 'url': gu, 'model': gemd.get('model'),
+                        'usage': gemd.get('usage'), 'prompt': single_shot_prompt,
+                        'response': gemd['debug']['response']}
+        _record_ai_usage(post, step='image_generation', model=gemd.get('model'),
+                         usage_dict=gemd.get('usage') or {},
+                         purpose='todxs_gemini_text_debug', images_generated=1)
+    except Exception:
+        logger.warning('[todxs] gemini-text (debug) falhou — ignorado', exc_info=True)
+
+    # ---------------- Persistencia ----------------
     max_order = post.images.aggregate(Max('order'))['order__max']
     PostImage.objects.create(
         post=post, s3_key=s3_key, s3_url=s3_url,
         order=(max_order if max_order is not None else -1) + 1,
     )
+
+    # designer_payload -> a edicao avancada (canvas modal) consome estes elementos
+    dp = post.designer_payload if isinstance(post.designer_payload, dict) else {}
+    dp['_layout_elements'] = pr['elements']
+    post.designer_payload = dp
+    post.raw_image_s3_key = raw_key
+
+    trace.append({'etapa': '2_background', **bg_info,
+                  'raw_s3_key': raw_key, 'raw_url': raw_url, 'at': dj_tz.now().isoformat()})
+    trace.append({'etapa': '3_pillow_render', 'elements': pr['elements'],
+                  'fonts': pr['fonts_resolved'], 'final_s3_key': s3_key,
+                  'final_url': s3_url, 'at': dj_tz.now().isoformat()})
+    if gemini_debug:
+        trace.append({'etapa': '2b_gemini_text_debug', **gemini_debug,
+                      'at': dj_tz.now().isoformat()})
+
+    # refs das 3 imagens (fundo, gemini-texto, pillow) p/ inspecao rapida no debug
+    todxs_ctx['debug_images'] = {
+        'fundo': raw_url, 'gemini_texto': (gemini_debug or {}).get('url'), 'pillow': s3_url,
+    }
 
     post.title = (_titulo or '').replace('\n', ' ') or post.title
     post.subtitle = content.get('apoio') or content.get('kicker') or ''
@@ -253,7 +243,7 @@ def generate_post_todxs_task(self, post_id: int):
     post.image_s3_key = s3_key
     post.image_s3_url = s3_url
     post.has_image = True
-    post.ia_model_image = gem.get('model')
+    post.ia_model_image = 'todxs-pillow'
     existing = post.generated_images if isinstance(post.generated_images, list) else []
     existing.append({'s3_key': s3_key, 'url': s3_url})
     post.generated_images = existing
@@ -264,9 +254,6 @@ def generate_post_todxs_task(self, post_id: int):
     post.status = 'image_ready'
     post.save()
 
-    _record_ai_usage(post, step='image_generation', model=gem.get('model'),
-                     usage_dict=gem.get('usage') or {}, purpose='todxs_singleshot',
-                     images_generated=1)
-
-    logger.info('[todxs] post=%s OK arquetipo=%s cor=%s', post_id, archetype, color_hex)
+    logger.info('[todxs] post=%s OK arquetipo=%s cor=%s mode=%s render=pillow',
+                post_id, archetype, color_hex, mode)
     return {'success': True, 'post_id': post_id, 'archetype': archetype}

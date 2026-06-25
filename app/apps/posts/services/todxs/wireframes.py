@@ -2,155 +2,246 @@
 Sistema de wireframes da TODXS (fonte: TODXS_wireframes — especificacao de layout).
 
 Encoda os 6 ARQUETIPOS (A-F) x 2 FORMATOS (feed 4:5, story 9:16) com zonas
-nomeadas, posicoes/tamanhos relativos, fontes, cor e regras globais. E a FONTE
-UNICA DE VERDADE que dirige:
-  1) a geracao do FUNDO (receita por arquetipo);
-  2) a aplicacao do TEXTO via Gemini (wireframe explicito: zonas + tamanhos).
+nomeadas, COORDENADAS NUMERICAS (x/y/w/h/fs em %), fontes, cor e regras globais.
+E a FONTE UNICA DE VERDADE que dirige:
+  1) o FUNDO (campo de cor solido desenhado no Pillow, ou foto/cena via Gemini);
+  2) a aplicacao de TEXTO/LOGO/SELO via Pillow (render_layout_document), com a
+     fonte real (Ana Banana) e coordenadas exatas;
+  3) (debug) um prompt single-shot para o Gemini renderizar com texto, so para
+     comparacao na area de debug.
 
-Manutencao em prod = editar este dado, sem mexer em logica. 100% isolado.
+Coordenadas: x/y = canto superior-esquerdo da caixa, w/h = largura/altura, todos
+em % do canvas. fs = font_size_pct (% do menor lado, como o render_layout_document
+espera). Cada zona declara seu `role` no schema de _layout_elements:
+  titulo | subtitulo | bloco(->titulo) | assinatura(->subtitulo) | logo | image | grafismo
 
-Tamanhos sao % da LARGURA do canvas (px do doc / largura de referencia:
-640 no feed, 360 no story). Posicoes sao descritivas (o modelo nao honra px,
-mas segue zonas/altura/alinhamento com fidelidade).
+Manutencao em prod = editar este dado. 100% isolado (nenhum codigo existente muda).
 """
 
-# Vocabulario fixo de zonas (do doc): Background, Asset/Foto, Faixa de cor,
-# Formas organicas, Marca (simbolo), Logotipo (wordmark), Kicker/Tema, Titulo,
-# Texto de apoio, Assinatura.
-
 FORMATOS = {
-    'feed': {'label': 'Feed 4:5', 'ratio': '4:5', 'px': '1080x1350', 'ref_w': 640},
-    'story': {'label': 'Story 9:16', 'ratio': '9:16', 'px': '1080x1920', 'ref_w': 360},
+    'feed': {'label': 'Feed 4:5', 'ratio': '4:5', 'px': '1080x1350'},
+    'story': {'label': 'Story 9:16', 'ratio': '9:16', 'px': '1080x1920'},
 }
 
-# Regras globais (valem para TODAS as pecas).
+# Regras globais (do doc) — entram no prompt do Gemini-debug.
 GLOBAL_RULES = [
-    'MARGIN: safety margin ~5% on every side; text, kicker and logo never touch the edge.',
+    'MARGIN: safety margin ~5%; text/kicker/logo never touch the edge.',
     'ALIGNMENT: everything left-aligned. Only exception: a centered watermark wordmark.',
-    'HIERARCHY: Kicker -> Title -> Support -> Signature. One zone dominates (almost always the title).',
+    'HIERARCHY: Kicker -> Title -> Support -> Signature. One zone dominates (the title).',
     'CASE: TITLES IN ALL CAPS; support text in normal case.',
-    'BRAND MARK: use the four-petal "X" SEAL when there is a photo or full-color top; '
-    'use the "TODXS" WORDMARK on headlines and covers.',
-    'COLOR: if the photo is duotone, the duotone uses the SAME color as the band/accent '
-    '(monochrome, cohesive piece). No gradients. No pure-white background.',
+    'COLOR: duotone uses the SAME color as the band/accent. No gradients. No pure white bg.',
 ]
 
-# Papeis tipograficos -> descricao de estilo (as fontes reais nao existem no modelo).
-FONTS = {
-    'display_black': 'very heavy grotesque display sans-serif (Ana Banana Black style): '
-                     'CAPS, tight tracking, deep ink-traps, flared bell-mouth terminals, '
-                     'rounded smiling counters; bold 1970s queer-press poster feel',
-    'sans_medium': 'medium/condensed grotesque sans-serif, CAPS, high legibility',
-    'sans_regular': 'clean grotesque sans-serif, regular weight, normal case',
-    'sans_caps_small': 'small condensed grotesque sans-serif, CAPS, wide tracking',
+# Negativos globais (reforco para o Gemini-debug; o Pillow ja so desenha as zonas).
+GLOBAL_AVOID = [
+    'gradients', 'pure white background', 'any color outside the palette',
+    'lorem ipsum', 'garbled or misspelled text',
+    'any thin outline, stroke, frame or border around the canvas or any zone '
+    '(a solid color BAND is allowed; a hairline border is NOT)',
+    'any logo, wordmark or seal anywhere other than the positions specified',
+    'any text/label/paragraph not listed in the text zones',
+]
+
+# Papeis tipograficos -> descricao de estilo (para o Gemini-debug).
+FONTS_DESC = {
+    'display': 'very heavy grotesque display sans (Ana Banana Black): CAPS, tight tracking, '
+               'deep ink-traps, rounded counters, 1970s queer-press poster feel',
+    'medium': 'medium grotesque sans, CAPS, high legibility',
+    'regular': 'clean grotesque sans, regular weight, normal case',
+    'caps_small': 'small grotesque sans, CAPS, wide tracking',
 }
 
-# Cada arquetipo: formatos validos, receita de fundo, e zonas de texto.
-# size = % da largura do canvas de referencia. content_key = chave em `content`.
+# Definicao do SELO da marca (corrige "X sem circulo preto").
+SELO_DESC = ('the TODXS seal: a SOLID BLACK CIRCLE with the four-petal butterfly "X" '
+             'reversed out in off-white #F4F1D9 centered inside it')
+
+
+def _band_color(_hex):
+    return _hex
+
+
+# Cada arquetipo: formato unico (exceto B), modo de fundo, marca/assets usados e
+# zonas com coordenadas numericas. Para B (dual), zonas e coords sao por formato.
 WIREFRAMES = {
     'A': {
         'name': 'Capa tipografica - fundo solido',
         'formatos': ['feed'],
-        'tem_foto': False,
-        'background': 'solid flat {COR} color field (no photo). The color is the protagonist.',
-        'marca': 'small black circular seal with a four-petal "X" in {COR} at top-left.',
-        'zonas': [
-            {'key': 'kicker', 'label': 'kicker/tema', 'pos': 'top-left, inside ~5% margin',
-             'font': 'sans_caps_small', 'size': 2.0, 'caps': True, 'align': 'left'},
-            {'key': 'titulo', 'label': 'title (display, up to 2 lines)',
-             'pos': 'lower third, NOT starting at the top (breathing space above), left-aligned',
-             'font': 'display_black', 'size': 13.8, 'caps': True, 'align': 'left', 'leading': 0.92},
-            {'key': 'apoio', 'label': 'support text', 'pos': 'right column (~50% width), bottom, left-aligned',
-             'font': 'sans_regular', 'size': 3.4, 'caps': False, 'align': 'left', 'leading': 1.35},
-        ],
-        'color_note': 'title in black on the solid color field.',
+        'fundo': 'solid',              # Pillow desenha campo de cor
+        'usa': {'selo': True, 'wordmark': False, 'specimen': True},
+        'bg_prompt': '',               # solid: sem Gemini
+        'marca_desc': f'a small {SELO_DESC} at top-right.',
+        'zonas': {
+            'feed': [
+                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'top-left',
+                 'x': 6, 'y': 6, 'w': 60, 'h': 6, 'fs': 2.4, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': None},
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'lower third, breathing space above',
+                 'x': 6, 'y': 55, 'w': 90, 'h': 28, 'fs': 12, 'font': 'display',
+                 'caps': True, 'align': 'left', 'color': None},
+                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'right column, bottom',
+                 'x': 52, 'y': 84, 'w': 42, 'h': 12, 'fs': 3.0, 'font': 'regular',
+                 'caps': False, 'align': 'left', 'color': None},
+            ],
+        },
+        'seal': {'feed': {'x': 82, 'y': 4, 'w': 12}},
+        'avoid': ['no photo', 'no color band', 'title in BLACK on the color field'],
     },
     'B': {
         'name': 'Foto + faixa de cor inferior',
         'formatos': ['feed', 'story'],
-        'tem_foto': True,
-        'split': {'feed': {'foto_pct': 70, 'faixa_pct': 30},
-                  'story': {'foto_pct': 52, 'faixa_pct': 48}},
-        'background': 'TOP {FOTO_PCT}% = photo of {PESSOA}; BOTTOM {FAIXA_PCT}% = solid {COR} band. '
-                      'Straight horizontal cut, no overlap. Optional duotone on the photo using {COR}.',
-        'marca': 'four-petal "X" SEAL at top-right over the photo; wordmark may appear in the signature line.',
-        'zonas': [
-            {'key': 'kicker', 'label': 'kicker/tema', 'pos': 'top-left over the photo',
-             'font': 'sans_caps_small', 'size': 1.9, 'caps': True, 'align': 'left'},
-            {'key': 'titulo', 'label': 'title (up to 3 lines)',
-             'pos': 'entirely INSIDE the bottom color band, left-aligned, equal top/bottom padding (>=4%)',
-             'font': 'sans_medium', 'size': 7.0, 'caps': True, 'align': 'left', 'leading': 1.05},
-            {'key': 'apoio', 'label': 'support text (story only)',
-             'pos': 'inside the band, below the title (~16px gap), left-aligned',
-             'font': 'sans_regular', 'size': 4.2, 'caps': False, 'align': 'left', 'leading': 1.4},
-            {'key': 'assinatura', 'label': 'signature line (story only)',
-             'pos': 'bottom of the band: tema at left + "TODXS" wordmark at right',
-             'font': 'sans_caps_small', 'size': 3.3, 'caps': True, 'align': 'left'},
-        ],
-        'color_note': 'dark title over the warm/colored band; if duotone, photo shares the band color.',
+        'fundo': 'photo',              # Gemini gera a foto; Pillow desenha a faixa
+        'usa': {'selo': True, 'wordmark': {'feed': False, 'story': True}, 'specimen': False},
+        'bg_prompt': ('full-bleed editorial COLOR photo of {PESSOA}; subject framed in the '
+                      'UPPER two-thirds, the lower area calmer; documentary, vibrant, natural '
+                      'light; NO text, NO logo, NO color band, NO graphic overlays.'),
+        'marca_desc': f'{SELO_DESC} over the photo.',
+        'band': {'feed': {'y': 70}, 'story': {'y': 52}},   # faixa do y% ate 100%
+        'zonas': {
+            'feed': [
+                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'top-left over photo',
+                 'x': 6, 'y': 5, 'w': 60, 'h': 6, 'fs': 2.4, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': '#F4F1D9'},
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'inside the bottom color band',
+                 'x': 6, 'y': 74, 'w': 88, 'h': 22, 'fs': 7.0, 'font': 'medium',
+                 'caps': True, 'align': 'left', 'color': None},
+            ],
+            'story': [
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'inside the band (top)',
+                 'x': 7, 'y': 56, 'w': 86, 'h': 14, 'fs': 6.0, 'font': 'medium',
+                 'caps': True, 'align': 'left', 'color': None},
+                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'inside the band, below title',
+                 'x': 7, 'y': 72, 'w': 86, 'h': 14, 'fs': 3.2, 'font': 'regular',
+                 'caps': False, 'align': 'left', 'color': None},
+                {'key': 'assinatura', 'role': 'subtitulo', 'pos': 'band bottom-left (tema)',
+                 'x': 7, 'y': 93, 'w': 50, 'h': 4, 'fs': 2.4, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': None},
+            ],
+        },
+        'seal': {'feed': {'x': 82, 'y': 4, 'w': 13}, 'story': {'x': 7, 'y': 3, 'w': 15}},
+        'wordmark': {'story': {'x': 70, 'y': 92, 'w': 23}},  # assinatura direita
+        'avoid': ['straight horizontal cut between photo and band',
+                  'feed: ONLY kicker + title (NO support text, NO bottom wordmark)'],
     },
     'C': {
-        'name': 'Manchete em cima - foto no miolo/base',
+        'name': 'Manchete em cima - foto emoldurada',
         'formatos': ['feed'],
-        'tem_foto': True,
-        'background': 'solid {COR} color field holding everything; a color american-shot PHOTO of '
-                      '{PESSOA} is framed in the middle/lower area with equal side margins (~5%), '
-                      '"framed" by the color field.',
-        'marca': 'kicker at top-left and "TODXS" wordmark at top-right on the same baseline.',
-        'zonas': [
-            {'key': 'kicker', 'label': 'kicker (e.g. NOTICIA)', 'pos': 'top-left header',
-             'font': 'sans_caps_small', 'size': 2.0, 'caps': True, 'align': 'left'},
-            {'key': 'titulo', 'label': 'news headline (large)',
-             'pos': 'right below the header, left-aligned, nearly full width',
-             'font': 'display_black', 'size': 7.5, 'caps': True, 'align': 'left', 'leading': 1.0},
-            {'key': 'apoio', 'label': 'support text', 'pos': 'below the photo, left-aligned, within bottom margin',
-             'font': 'sans_regular', 'size': 2.7, 'caps': False, 'align': 'left', 'leading': 1.4},
-        ],
-        'color_note': 'black text on the solid color field.',
+        'fundo': 'solid_photo',        # Pillow: campo de cor + foto colada (emoldurada)
+        'usa': {'selo': False, 'wordmark': True, 'specimen': True},
+        'bg_prompt': ('full-bleed editorial COLOR photo of {PESSOA}, american shot, vibrant; '
+                      'NO text, NO logo, NO border.'),
+        'marca_desc': 'the "TODXS" wordmark at top-right.',
+        'photo_frame': {'feed': {'x': 6, 'y': 40, 'w': 88, 'h': 40}},
+        'zonas': {
+            'feed': [
+                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'top-left header',
+                 'x': 6, 'y': 5, 'w': 50, 'h': 5, 'fs': 2.4, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': None},
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'below header, large',
+                 'x': 6, 'y': 12, 'w': 88, 'h': 24, 'fs': 9.0, 'font': 'display',
+                 'caps': True, 'align': 'left', 'color': None},
+                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'below the photo',
+                 'x': 6, 'y': 84, 'w': 88, 'h': 10, 'fs': 2.8, 'font': 'regular',
+                 'caps': False, 'align': 'left', 'color': None},
+            ],
+        },
+        'wordmark': {'feed': {'x': 66, 'y': 4, 'w': 28}},
+        'avoid': ['no band', 'black text on the color field'],
     },
     'D': {
-        'name': 'Retrato full-bleed + logotipo gigante (peca de marca, SEM texto)',
+        'name': 'Retrato full-bleed + wordmark gigante (peca de marca, SEM texto)',
         'formatos': ['feed'],
-        'tem_foto': True,
-        'background': 'black-and-white cut-out PORTRAIT of {PESSOA} over organic {COR} shapes on a gray field; '
-                      'GIANT "TODXS" wordmark bleeding off the sides at the top, with the head/hair of the '
-                      'portrait overlapping the letters (intentional). The "X" of the wordmark may be cropped.',
-        'marca': 'the giant wordmark IS the graphic element.',
-        'zonas': [],  # sem texto de leitura
-        'color_note': 'brand/identity cover, no reading text. Eyes of the portrait in the upper-central third.',
+        'fundo': 'image',              # Gemini entrega a peca inteira
+        'usa': {'selo': False, 'wordmark': False, 'specimen': False},
+        'bg_prompt': ('brand cover: black-and-white CUT-OUT portrait of {PESSOA} over organic '
+                      '{COR} shapes on a gray field; GIANT "TODXS" wordmark bleeding off the '
+                      'sides at the top, the head/hair overlapping the letters. NO reading text.'),
+        'marca_desc': 'the giant wordmark IS the graphic.',
+        'zonas': {'feed': []},
+        'avoid': ['no reading text', 'no kicker', 'no band'],
     },
     'E': {
         'name': 'Story tipografico - lista de blocos',
         'formatos': ['story'],
-        'tem_foto': False,
-        'background': 'solid flat {COR} color field with a rounded inner frame (radius ~6%).',
-        'marca': 'four-petal "X" SEAL at top-left, inside the rounded frame.',
-        'zonas': [
-            {'key': 'blocos', 'label': '2-3 text blocks of EQUAL weight, stacked, generous gap (~9%) between them',
-             'pos': 'left-aligned column, generous vertical gaps (the gap creates the "list" reading)',
-             'font': 'sans_medium', 'size': 8.3, 'caps': True, 'align': 'left', 'leading': 1.05},
-            {'key': 'assinatura', 'label': 'tema/signature', 'pos': 'fixed at bottom-left within the safety margin',
-             'font': 'sans_caps_small', 'size': 3.3, 'caps': True, 'align': 'left'},
-        ],
-        'color_note': 'black text on the solid color field; all blocks share the same style (no numbering).',
+        'fundo': 'solid',
+        'usa': {'selo': True, 'wordmark': False, 'specimen': False},
+        'bg_prompt': '',
+        'marca_desc': f'{SELO_DESC} at top-left.',
+        'zonas': {
+            'story': [
+                {'key': 'blocos', 'role': 'titulo', 'pos': 'stacked equal-weight blocks',
+                 'x': 7, 'y': 20, 'w': 86, 'h': 60, 'fs': 6.5, 'font': 'medium',
+                 'caps': True, 'align': 'left', 'color': None, 'is_blocks': True},
+                {'key': 'assinatura', 'role': 'subtitulo', 'pos': 'bottom-left (tema)',
+                 'x': 7, 'y': 93, 'w': 60, 'h': 4, 'fs': 2.4, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': None},
+            ],
+        },
+        'seal': {'story': {'x': 7, 'y': 4, 'w': 15}},
+        'avoid': ['no photo', 'no frame/border', 'black text on the color field',
+                  'all blocks same style, no numbering'],
     },
     'F': {
         'name': 'Story duotone + marca d agua (peca de transicao, SEM texto)',
         'formatos': ['story'],
-        'tem_foto': True,
-        'background': 'full-bleed black-and-white PHOTO of {PESSOA} with a flat {COR} multiply DUOTONE, '
-                      'inside a rounded frame (radius ~6%). Organic {COR} X-petal shapes bite 2-4 corners.',
-        'marca': 'four-petal "X" SEAL at top-left; centered "TODXS" WORDMARK as a tonal watermark '
-                 '(same color as the photo, low opacity ~35-50%) — the ONLY centered case.',
-        'zonas': [],  # sem texto de leitura
-        'color_note': 'transition/breather piece, no reading text.',
+        'fundo': 'image',
+        'usa': {'selo': True, 'wordmark': True, 'specimen': False},
+        'bg_prompt': ('full-bleed black-and-white photo of {PESSOA} with a flat {COR} duotone; '
+                      'organic {COR} X-petal shapes bite 2-3 corners. NO reading text.'),
+        'marca_desc': f'{SELO_DESC} at top-left, plus a centered "TODXS" wordmark watermark '
+                      '(tonal, low opacity).',
+        'zonas': {'story': []},
+        'seal': {'story': {'x': 7, 'y': 4, 'w': 14}},
+        'avoid': ['no reading text', 'no thin border'],
     },
 }
 
 
+# ----------------------------------------------------------------------------
+# Helpers de leitura
+# ----------------------------------------------------------------------------
+
 def archetypes_for_format(fmt: str) -> list:
-    """Letras de arquetipos validos para o formato ('feed' ou 'story')."""
     return [k for k, v in WIREFRAMES.items() if fmt in v['formatos']]
+
+
+def _uso(val, fmt):
+    """Resolve um campo de `usa` que pode ser bool ou {fmt: bool}."""
+    if isinstance(val, dict):
+        return bool(val.get(fmt, False))
+    return bool(val)
+
+
+def assets_needed(archetype: str, fmt: str) -> dict:
+    """Quais assets de marca o arquetipo/formato realmente usa (gating)."""
+    usa = WIREFRAMES[archetype]['usa']
+    return {
+        'selo': _uso(usa.get('selo'), fmt),
+        'wordmark': _uso(usa.get('wordmark'), fmt),
+        'specimen': _uso(usa.get('specimen'), fmt),
+    }
+
+
+def background_mode(archetype: str) -> str:
+    """'solid' (Pillow desenha), 'photo' (Gemini foto + Pillow faixa),
+    'solid_photo' (Pillow cor + foto colada), 'image' (Gemini peca inteira)."""
+    return WIREFRAMES[archetype].get('fundo', 'solid')
+
+
+def zones_for(archetype: str, fmt: str) -> list:
+    return WIREFRAMES[archetype].get('zonas', {}).get(fmt, [])
+
+
+def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: str) -> str:
+    """Prompt para o Gemini gerar o FUNDO (foto/cena), sem texto. '' = sem Gemini."""
+    w = WIREFRAMES[archetype]
+    tmpl = w.get('bg_prompt') or ''
+    if not tmpl:
+        return ''
+    pessoa = content.get('pessoa') or 'a diverse LGBTQIA+ person, expressive, natural'
+    f = FORMATOS[fmt]
+    body = tmpl.replace('{PESSOA}', pessoa).replace('{COR}', color_hex)
+    return (f"{f['ratio']} ({f['px']}) {body} Editorial documentary photography for TODXS, "
+            f"a Brazilian LGBTQIA+ NGO. No watermark, no caption, no UI.")
 
 
 def describe_for_brain(fmt: str) -> str:
@@ -158,69 +249,130 @@ def describe_for_brain(fmt: str) -> str:
     lines = []
     for k in archetypes_for_format(fmt):
         w = WIREFRAMES[k]
-        zonas = ', '.join(z['key'] for z in w['zonas']) or '(sem texto de leitura)'
-        lines.append(f"  {k} — {w['name']} | foto={'sim' if w['tem_foto'] else 'nao'} | zonas: {zonas}")
+        keys = [z['key'] for z in zones_for(k, fmt)]
+        zonas = ', '.join(keys) or '(sem texto de leitura)'
+        lines.append(f"  {k} — {w['name']} | fundo={w['fundo']} | zonas: {zonas}")
     return '\n'.join(lines)
 
 
-def _zone_instruction(z: dict, content: dict, color_hex: str) -> str:
-    """Monta a linha de uma zona com a string travada citada (PT, com acentos)."""
+# ----------------------------------------------------------------------------
+# Prompt single-shot (Gemini-DEBUG: arte com texto embutido, so p/ comparacao)
+# ----------------------------------------------------------------------------
+
+def _zone_instruction(z: dict, content: dict) -> str:
     val = content.get(z['key'])
     if not val:
         return ''
-    font = FONTS.get(z['font'], z['font'])
-    extra = []
-    if z.get('leading'):
-        extra.append(f"leading {z['leading']}")
-    extra_s = (', ' + ', '.join(extra)) if extra else ''
-    if z['key'] == 'blocos' and isinstance(val, list):
-        blocos = '; '.join(f'"{b}"' for b in val)
-        return (f"- {z['label']} [{z['pos']}]: render each block exactly, stacked: {blocos} "
-                f"— {font}, ~{z['size']}% of width{extra_s}.")
-    return (f"- {z['label']} [{z['pos']}]: \"{val}\" — {font}, "
-            f"~{z['size']}% of width, {'CAPS' if z.get('caps') else 'normal case'}, "
-            f"align {z['align']}{extra_s}.")
+    font = FONTS_DESC.get(z['font'], z['font'])
+    if z.get('is_blocks') and isinstance(val, list):
+        blocos = '; '.join(f'"{b}"' for b in val if b)
+        return (f"- stacked blocks [{z['pos']}], equal weight, generous gaps: {blocos} "
+                f"— {font}, left-aligned, CAPS.")
+    if isinstance(val, list):
+        val = ' '.join(str(v) for v in val if v)
+    return (f"- {z['key']} [{z['pos']}]: \"{val}\" — {font}, "
+            f"{'CAPS' if z.get('caps') else 'normal case'}, align {z['align']}.")
 
 
 def build_singleshot_prompt(archetype: str, content: dict, color_hex: str,
-                            color_name: str, fmt: str, pessoa_hint: str = '') -> str:
-    """
-    Monta o prompt single-shot DETERMINISTICO a partir do wireframe do arquetipo.
-    content: {kicker, titulo, apoio, assinatura, blocos, footer, pessoa}.
-    """
+                            color_name: str, fmt: str) -> str:
     w = WIREFRAMES[archetype]
     f = FORMATOS[fmt]
-    split = w.get('split', {}).get(fmt, {})
-    pessoa = content.get('pessoa') or pessoa_hint or 'a diverse LGBTQIA+ person, american/medium shot, expressive'
-
-    bg = w['background'].replace('{COR}', color_hex).replace('{PESSOA}', pessoa)
-    if split:
-        bg = bg.replace('{FOTO_PCT}', str(split.get('foto_pct', ''))).replace(
-            '{FAIXA_PCT}', str(split.get('faixa_pct', '')))
-    marca = w['marca'].replace('{COR}', color_hex)
+    pessoa = content.get('pessoa') or 'a diverse LGBTQIA+ person, expressive'
+    band = w.get('band', {}).get(fmt)
 
     parts = [
         f"{f['ratio']} ({f['px']}) editorial social media {fmt} for TODXS, a Brazilian "
-        f"LGBTQIA+ NGO. Bold editorial poster style inspired by 1970s queer print press "
-        f"(Lampiao da Esquina). Archetype {archetype}: {w['name']}.",
-        f"BACKGROUND: {bg}",
-        f"BRAND MARK / GRAPHIC: {marca}",
-        f"ACCENT COLOR: {color_name} {color_hex}. {w['color_note']}",
+        f"LGBTQIA+ NGO. 1970s queer print-press poster style. Archetype {archetype}: {w['name']}.",
     ]
-
-    zone_lines = [_zone_instruction(z, content, color_hex) for z in w['zonas']]
-    zone_lines = [z for z in zone_lines if z]
-    if zone_lines:
-        parts.append('TEXT ZONES (render exactly, do not paraphrase, do not alter spelling):\n'
-                     + '\n'.join(zone_lines))
+    if w['fundo'] == 'solid':
+        parts.append(f"BACKGROUND: flat solid {color_hex} color field. No photo.")
+    elif w['fundo'] in ('photo', 'solid_photo'):
+        parts.append(f"BACKGROUND: editorial color photo of {pessoa}.")
     else:
-        parts.append('NO reading text on this piece (brand/cover piece).')
+        parts.append(f"BACKGROUND: {w.get('bg_prompt','').replace('{PESSOA}', pessoa).replace('{COR}', color_hex)}")
+    if band:
+        parts.append(f"COLOR BAND: solid {color_hex} band from {band['y']}% height to the bottom; "
+                     f"straight horizontal cut.")
+    parts.append(f"BRAND MARK: {w['marca_desc'].replace('{COR}', color_hex)}")
+    parts.append(f"ACCENT COLOR: {color_name} {color_hex}.")
 
-    parts.append(
-        'All visible text is in Brazilian Portuguese, spelled exactly as written, preserving '
-        'every diacritic (á é í ó ú â ê ô ã õ à ç) and all punctuation.')
+    zlines = [_zone_instruction(z, content) for z in zones_for(archetype, fmt)]
+    zlines = [z for z in zlines if z]
+    if zlines:
+        parts.append('TEXT ZONES (render exactly, preserve every PT-BR diacritic):\n' + '\n'.join(zlines))
+    else:
+        parts.append('NO reading text on this piece.')
+
     parts.append(f'Palette: ONLY {color_hex} + black #000000 + off-white #F4F1D9.')
     parts.append('GLOBAL RULES:\n' + '\n'.join(f'- {r}' for r in GLOBAL_RULES))
-    parts.append('AVOID: gradients, pure white background, extra logos, watermark text other than '
-                 'the wordmark, lorem ipsum, garbled or misspelled text, any color outside the palette.')
+    avoid = (w.get('avoid') or []) + GLOBAL_AVOID
+    parts.append('AVOID: ' + '; '.join(avoid) + '.')
     return '\n\n'.join(parts)
+
+
+# ----------------------------------------------------------------------------
+# Elementos para o Pillow (render_layout_document) — schema _layout_elements
+# ----------------------------------------------------------------------------
+
+def wireframe_elements(archetype: str, content: dict, color_hex: str, fmt: str) -> list:
+    """
+    Converte as zonas do wireframe em _layout_elements (o MESMO schema que o
+    editor avancado consome). Inclui: faixa de cor (grafismo), selo (marcado como
+    role='seal' p/ o pillow_render compor circulo+X), texto e wordmark.
+    """
+    w = WIREFRAMES[archetype]
+    els = []
+
+    # 1) Faixa de cor (B): grafismo retangulo do y% ate o fim, corte reto.
+    band = w.get('band', {}).get(fmt)
+    if band:
+        els.append({
+            'role': 'grafismo', 'forma': 'retangulo', 'color': color_hex,
+            'x_pct': 0, 'y_pct': band['y'], 'width_pct': 100,
+            'height_pct': 100 - band['y'], 'raio_pct': 0, 'opacidade': 100,
+        })
+
+    # 2) Zonas de texto
+    for z in zones_for(archetype, fmt):
+        val = content.get(z['key'])
+        if not val:
+            continue
+        if z.get('is_blocks') and isinstance(val, list):
+            blocos = [b for b in val if b]
+            n = len(blocos) or 1
+            top, span = z['y'], z['h']
+            step = span / n
+            for i, b in enumerate(blocos):
+                els.append({
+                    'role': 'titulo', 'content': b,
+                    'x_pct': z['x'], 'y_pct': top + i * step, 'width_pct': z['w'],
+                    'height_pct': max(4, step - 4), 'font_size_pct': z['fs'],
+                    'weight': 'black', 'case': 'upper', 'align': z['align'],
+                    'color': z['color'],
+                })
+            continue
+        if isinstance(val, list):
+            val = ' '.join(str(v) for v in val if v)
+        els.append({
+            'role': z['role'], 'content': str(val).replace('\\n', '\n'),
+            'x_pct': z['x'], 'y_pct': z['y'], 'width_pct': z['w'],
+            'height_pct': z['h'], 'font_size_pct': z['fs'],
+            'weight': 'black' if z['role'] == 'titulo' else 'regular',
+            'case': 'upper' if z.get('caps') else 'none',
+            'align': z['align'], 'color': z['color'],
+        })
+
+    # 3) Selo (circulo preto + X) — pillow_render expande 'seal'
+    need = assets_needed(archetype, fmt)
+    seal = w.get('seal', {}).get(fmt)
+    if need['selo'] and seal:
+        els.append({'role': 'seal', 'x_pct': seal['x'], 'y_pct': seal['y'],
+                    'width_pct': seal['w']})
+
+    # 4) Wordmark (logo real)
+    wm = w.get('wordmark', {}).get(fmt)
+    if need['wordmark'] and wm:
+        els.append({'role': 'logo', 'x_pct': wm['x'], 'y_pct': wm['y'], 'width_pct': wm['w']})
+
+    return els

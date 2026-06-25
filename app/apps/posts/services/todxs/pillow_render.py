@@ -1,0 +1,181 @@
+"""
+Render Pillow da TODXS — aplica texto/logo/selo/faixa sobre o fundo usando
+render_layout_document (o MESMO motor do editor avancado), com a fonte real
+(Ana Banana via CustomFont). Garante a fonte correta e abre na edicao avancada.
+
+Fluxo: wireframe_elements (zonas -> _layout_elements) -> compoe o SELO (circulo
+preto + X off-white) -> resolve fontes -> render_layout_document -> PNG final.
+
+100% isolado: reusa apenas helpers low-level (render_layout_document,
+_load_custom_font) sem alterar nada do fluxo existente.
+"""
+import base64
+import io
+import logging
+
+logger = logging.getLogger(__name__)
+
+_OFFWHITE = (244, 241, 217)
+
+
+def _hex_to_rgb(h):
+    h = (h or '#000000').lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    try:
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    except Exception:
+        return (0, 0, 0)
+
+
+def _parse_px(formato_px, default=(1080, 1350)):
+    try:
+        w, h = (int(x) for x in str(formato_px).lower().split('x'))
+        return w, h
+    except Exception:
+        return default
+
+
+def resolve_todxs_fonts(kb) -> dict:
+    """{role: caminho_ttf}. titulo=Ana Banana Black; subtitulo=peso mais leve."""
+    from apps.posts.services.font_resolver import _load_custom_font
+    fonts = {}
+    cfs = list(kb.custom_fonts.all())
+    by_name = {c.name.lower(): c for c in cfs}
+
+    def find(*needles):
+        for n in needles:
+            for name, cf in by_name.items():
+                if n in name:
+                    return cf
+        return None
+
+    black = find('black') or find('bold') or (cfs[0] if cfs else None)
+    light = find('medium') or find('regular') or find('semibold') or black
+    if black:
+        p = _load_custom_font(black)
+        if p:
+            fonts['titulo'] = p
+    if light:
+        p = _load_custom_font(light)
+        if p:
+            fonts['subtitulo'] = p
+    return fonts
+
+
+def _download_bytes(url):
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 IAMKT'})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
+    except Exception:
+        logger.warning('[todxs.pillow] download falhou: %s', (url or '')[:80], exc_info=True)
+        return None
+
+
+def _recolor_opaque(img, rgb):
+    """Recolore todos os pixels opacos para `rgb`, preservando o canal alpha."""
+    from PIL import Image
+    img = img.convert('RGBA')
+    alpha = img.split()[3]
+    solid = Image.new('RGBA', img.size, rgb + (255,))
+    solid.putalpha(alpha)
+    return solid
+
+
+def compose_seal_datauri(x_png_bytes, diameter=420):
+    """Compoe o SELO da marca: circulo preto + X (off-white) centrado.
+    Retorna data URI (image/png) para usar como sticker editavel."""
+    from PIL import Image, ImageDraw
+    D = diameter
+    seal = Image.new('RGBA', (D, D), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(seal)
+    draw.ellipse([0, 0, D - 1, D - 1], fill=(0, 0, 0, 255))
+    if x_png_bytes:
+        try:
+            x = Image.open(io.BytesIO(x_png_bytes)).convert('RGBA')
+            x = _recolor_opaque(x, _OFFWHITE)
+            target = int(D * 0.58)
+            iw, ih = x.size
+            scale = min(target / iw, target / ih)
+            x = x.resize((max(1, int(iw * scale)), max(1, int(ih * scale))), Image.LANCZOS)
+            seal.alpha_composite(x, ((D - x.size[0]) // 2, (D - x.size[1]) // 2))
+        except Exception:
+            logger.warning('[todxs.pillow] falha ao compor X no selo', exc_info=True)
+    buf = io.BytesIO()
+    seal.save(buf, 'PNG')
+    return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode('ascii')
+
+
+def _cover(img, W, H):
+    """Redimensiona (cover) e corta no centro para WxH."""
+    from PIL import Image
+    img = img.convert('RGB')
+    iw, ih = img.size
+    scale = max(W / iw, H / ih)
+    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+    img = img.resize((nw, nh), Image.LANCZOS)
+    left, top = (nw - W) // 2, (nh - H) // 2
+    return img.crop((left, top, left + W, top + H))
+
+
+def build_background(archetype, fmt, color_hex, formato_px, photo_png=None):
+    """Constroi o fundo (raw): 'solid' = campo de cor; 'photo'/'image' = foto/cena
+    do Gemini (cover). Retorna PNG bytes."""
+    from PIL import Image
+    from .wireframes import background_mode
+    W, H = _parse_px(formato_px)
+    mode = background_mode(archetype)
+    if mode in ('photo', 'image') and photo_png:
+        img = _cover(Image.open(io.BytesIO(photo_png)), W, H)
+    else:
+        # solid / solid_photo / fallback sem foto
+        img = Image.new('RGB', (W, H), _hex_to_rgb(color_hex))
+    buf = io.BytesIO()
+    img.save(buf, 'PNG')
+    return buf.getvalue()
+
+
+def _expand_seals(elements, x_png_bytes):
+    """Substitui elementos role='seal' por sticker (data URI) circulo+X."""
+    datauri = compose_seal_datauri(x_png_bytes) if x_png_bytes else None
+    out = []
+    for el in elements:
+        if (el.get('role') or '') == 'seal':
+            if not datauri:
+                continue
+            out.append({
+                'role': 'image', 'url': datauri,
+                'x_pct': el['x_pct'], 'y_pct': el['y_pct'],
+                'width_pct': el['width_pct'], 'height_pct': el['width_pct'],
+                '_todxs_seal': True,
+            })
+        else:
+            out.append(el)
+    return out
+
+
+def render_todxs(*, archetype, content, color_hex, fmt, formato_px, kb,
+                 paleta=None, photo_png=None, x_png_bytes=None, logo_url=None):
+    """
+    Renderiza a arte final da TODXS via Pillow.
+    Retorna dict: {raw_png, final_png, elements, fonts_resolved}.
+    """
+    from apps.posts.services.gemini_image_generator import render_layout_document
+    from .wireframes import wireframe_elements
+
+    raw_png = build_background(archetype, fmt, color_hex, formato_px, photo_png=photo_png)
+    elements = wireframe_elements(archetype, content, color_hex, fmt)
+    elements = _expand_seals(elements, x_png_bytes)
+    fonts = resolve_todxs_fonts(kb)
+
+    final_png = render_layout_document(
+        raw_png, elements, paleta=paleta, fonts=fonts, logo_url=logo_url,
+    )
+    return {
+        'raw_png': raw_png,
+        'final_png': final_png,
+        'elements': elements,
+        'fonts_resolved': sorted(fonts.keys()),
+    }
