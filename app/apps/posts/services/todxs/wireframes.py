@@ -91,9 +91,10 @@ WIREFRAMES = {
         'formatos': ['feed', 'story'],
         'fundo': 'photo',              # Gemini gera a foto; Pillow desenha a faixa
         'usa': {'selo': True, 'wordmark': {'feed': False, 'story': True}, 'specimen': False},
-        'bg_prompt': ('full-bleed editorial COLOR photo of {PESSOA}; subject framed in the '
-                      'UPPER two-thirds, the lower area calmer; documentary, vibrant, natural '
-                      'light; NO text, NO logo, NO color band, NO graphic overlays.'),
+        'bg_prompt': ('full-bleed editorial COLOR photo of {PESSOA}, sharp focus throughout, '
+                      'subject in the upper-center of the frame; documentary, vibrant, natural '
+                      'light, evenly composed; NO blurred bands or strips, NO text, NO logo, '
+                      'NO color band, NO graphic overlays.'),
         'marca_desc': f'{SELO_DESC} over the photo.',
         'band': {'feed': {'y': 70}, 'story': {'y': 52}},   # faixa do y% ate 100%
         'zonas': {
@@ -102,12 +103,12 @@ WIREFRAMES = {
                  'x': 6, 'y': 5, 'w': 60, 'h': 6, 'fs': 2.4, 'font': 'caps_small',
                  'caps': True, 'align': 'left', 'color': '#F4F1D9'},
                 {'key': 'titulo', 'role': 'titulo', 'pos': 'inside the bottom color band',
-                 'x': 6, 'y': 74, 'w': 88, 'h': 22, 'fs': 7.0, 'font': 'medium',
+                 'x': 6, 'y': 71, 'w': 88, 'h': 26, 'fs': 9.0, 'font': 'medium',
                  'caps': True, 'align': 'left', 'color': None},
             ],
             'story': [
                 {'key': 'titulo', 'role': 'titulo', 'pos': 'inside the band (top)',
-                 'x': 7, 'y': 56, 'w': 86, 'h': 14, 'fs': 6.0, 'font': 'medium',
+                 'x': 7, 'y': 55, 'w': 86, 'h': 16, 'fs': 8.0, 'font': 'medium',
                  'caps': True, 'align': 'left', 'color': None},
                 {'key': 'apoio', 'role': 'subtitulo', 'pos': 'inside the band, below title',
                  'x': 7, 'y': 72, 'w': 86, 'h': 14, 'fs': 3.2, 'font': 'regular',
@@ -163,20 +164,18 @@ WIREFRAMES = {
         'name': 'Story tipografico - lista de blocos',
         'formatos': ['story'],
         'fundo': 'solid',
-        'usa': {'selo': True, 'wordmark': False, 'specimen': False},
+        'usa': {'selo': True, 'wordmark': True, 'specimen': False},
         'bg_prompt': '',
         'marca_desc': f'{SELO_DESC} at top-left.',
         'zonas': {
             'story': [
                 {'key': 'blocos', 'role': 'titulo', 'pos': 'stacked equal-weight blocks',
-                 'x': 7, 'y': 20, 'w': 86, 'h': 60, 'fs': 6.5, 'font': 'medium',
+                 'x': 7, 'y': 18, 'w': 86, 'h': 64, 'fs': 9.5, 'font': 'medium',
                  'caps': True, 'align': 'left', 'color': None, 'is_blocks': True},
-                {'key': 'assinatura', 'role': 'subtitulo', 'pos': 'bottom-left (tema)',
-                 'x': 7, 'y': 93, 'w': 60, 'h': 4, 'fs': 2.4, 'font': 'caps_small',
-                 'caps': True, 'align': 'left', 'color': None},
             ],
         },
         'seal': {'story': {'x': 7, 'y': 4, 'w': 15}},
+        'wordmark': {'story': {'x': 7, 'y': 91, 'w': 22}},  # logotipo (nao texto) no rodape
         'avoid': ['no photo', 'no frame/border', 'black text on the color field',
                   'all blocks same style, no numbering'],
     },
@@ -315,20 +314,52 @@ def build_singleshot_prompt(archetype: str, content: dict, color_hex: str,
 # Elementos para o Pillow (render_layout_document) — schema _layout_elements
 # ----------------------------------------------------------------------------
 
+def _contrast_on(hex_color: str) -> str:
+    """Preto ou off-white conforme a luminancia do fundo (campo/faixa)."""
+    h = (hex_color or '#000000').lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    try:
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    except Exception:
+        return '#000000'
+    lum = 0.299 * r + 0.587 * g + 0.114 * b
+    return '#000000' if lum > 150 else '#F4F1D9'
+
+
+def _text_el(z, content_text, color_hex, *, y=None, h=None):
+    """Monta um elemento de texto. Cor None -> contraste sobre o campo/faixa, e
+    nesse caso ativa a CENTRALIZACAO VERTICAL na caixa (background_color dispara
+    o has_bg do render_layout_document; para role != 'cta' nao desenha pill)."""
+    el = {
+        'role': z['role'], 'content': str(content_text).replace('\\n', '\n'),
+        'x_pct': z['x'], 'y_pct': z['y'] if y is None else y, 'width_pct': z['w'],
+        'height_pct': z['h'] if h is None else h, 'font_size_pct': z['fs'],
+        'weight': 'black' if z['role'] == 'titulo' else 'regular',
+        'case': 'upper' if z.get('caps') else 'none',
+        'align': z['align'], 'color': z['color'],
+    }
+    if z['color'] is None:
+        el['color'] = _contrast_on(color_hex)
+        el['background_color'] = color_hex  # so p/ centralizar vertical (sem pill)
+    return el
+
+
 def wireframe_elements(archetype: str, content: dict, color_hex: str, fmt: str) -> list:
     """
     Converte as zonas do wireframe em _layout_elements (o MESMO schema que o
-    editor avancado consome). Inclui: faixa de cor (grafismo), selo (marcado como
-    role='seal' p/ o pillow_render compor circulo+X), texto e wordmark.
+    editor avancado consome). Inclui: faixa de cor (grafismo), selo (role='seal'
+    -> pillow_render compoe circulo+X), texto (centralizado vertical) e wordmark.
     """
     w = WIREFRAMES[archetype]
     els = []
 
     # 1) Faixa de cor (B): grafismo retangulo do y% ate o fim, corte reto.
+    #    cor -> chave que o canvas JS le (e o Pillow tambem); color -> fallback.
     band = w.get('band', {}).get(fmt)
     if band:
         els.append({
-            'role': 'grafismo', 'forma': 'retangulo', 'color': color_hex,
+            'role': 'grafismo', 'forma': 'retangulo', 'cor': color_hex, 'color': color_hex,
             'x_pct': 0, 'y_pct': band['y'], 'width_pct': 100,
             'height_pct': 100 - band['y'], 'raio_pct': 0, 'opacidade': 100,
         })
@@ -344,24 +375,11 @@ def wireframe_elements(archetype: str, content: dict, color_hex: str, fmt: str) 
             top, span = z['y'], z['h']
             step = span / n
             for i, b in enumerate(blocos):
-                els.append({
-                    'role': 'titulo', 'content': b,
-                    'x_pct': z['x'], 'y_pct': top + i * step, 'width_pct': z['w'],
-                    'height_pct': max(4, step - 4), 'font_size_pct': z['fs'],
-                    'weight': 'black', 'case': 'upper', 'align': z['align'],
-                    'color': z['color'],
-                })
+                els.append(_text_el(z, b, color_hex, y=top + i * step, h=max(4, step)))
             continue
         if isinstance(val, list):
             val = ' '.join(str(v) for v in val if v)
-        els.append({
-            'role': z['role'], 'content': str(val).replace('\\n', '\n'),
-            'x_pct': z['x'], 'y_pct': z['y'], 'width_pct': z['w'],
-            'height_pct': z['h'], 'font_size_pct': z['fs'],
-            'weight': 'black' if z['role'] == 'titulo' else 'regular',
-            'case': 'upper' if z.get('caps') else 'none',
-            'align': z['align'], 'color': z['color'],
-        })
+        els.append(_text_el(z, val, color_hex))
 
     # 3) Selo (circulo preto + X) — pillow_render expande 'seal'
     need = assets_needed(archetype, fmt)

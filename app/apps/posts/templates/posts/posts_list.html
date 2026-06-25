@@ -632,6 +632,10 @@
             <strong style="font-size:13px;">Imagem final (com texto)</strong>
             <img id="simpleDebugFinal" style="width:100%;border:1px solid #ddd;border-radius:6px;margin-top:4px;" alt="final">
         </div>
+        <div style="flex:1;min-width:300px;">
+            <strong style="font-size:13px;">Gemini c/ texto (comparação — só TODXS)</strong>
+            <img id="simpleDebugGemini" style="width:100%;border:1px solid #ddd;border-radius:6px;margin-top:4px;" alt="gemini-texto">
+        </div>
     </div>
     <div style="margin-top:12px;">
         <strong style="font-size:13px;">Prompt do fundo</strong>
@@ -657,6 +661,7 @@
             var d = await r.json();
             document.getElementById('simpleDebugBg').src = d.bg_url || '';
             document.getElementById('simpleDebugFinal').src = d.final_url || '';
+            document.getElementById('simpleDebugGemini').src = d.gemini_url || '';
             document.getElementById('simpleDebugBgPrompt').textContent = d.bg_prompt || '(vazio — imagem ainda não gerada?)';
             document.getElementById('simpleDebugFinalPrompt').textContent = d.final_prompt || '(vazio)';
             document.getElementById('simpleDebugRules').textContent = JSON.stringify(d.rules || {}, null, 2);

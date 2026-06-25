@@ -98,10 +98,6 @@ def simple_debug(request, post_id):
     if not is_admin:
         return JsonResponse({'error': 'forbidden'}, status=403)
     post = get_object_or_404(Post, id=post_id, organization=request.organization)
-    if post.pipeline_used != 'simple':
-        return JsonResponse({'error': 'not_simple_pipeline'}, status=404)
-
-    dbg = (post.local_pipeline_context or {}).get('simple_image') or {}
 
     def _presign(key, fallback=''):
         if not key:
@@ -111,6 +107,40 @@ def simple_debug(request, post_id):
             return S3Service.generate_presigned_download_url(key, expires_in=3600)
         except Exception:
             return fallback
+
+    # Pipeline TODXS: estrutura propria (fundo + pillow publicado + gemini-texto
+    # de comparacao). Reusa o mesmo painel admin, mapeando os campos.
+    if post.pipeline_used == 'todxs':
+        tx = (post.local_pipeline_context or {}).get('todxs') or {}
+        di = tx.get('debug_images') or {}
+        trace = tx.get('trace') or []
+
+        def _step(name):
+            return next((t for t in trace if t.get('etapa') == name), {}) or {}
+
+        bg_t, gx_t, pil_t = _step('2_background'), _step('2b_gemini_text_debug'), _step('3_pillow_render')
+        return JsonResponse({
+            'pipeline': 'todxs', 'status': post.status,
+            'bg_url': di.get('fundo') or _presign(post.raw_image_s3_key),
+            'final_url': di.get('pillow') or _presign(post.image_s3_key),
+            'gemini_url': di.get('gemini_texto') or '',
+            'bg_prompt': bg_t.get('prompt') or '(fundo solido desenhado pelo Pillow — sem prompt)',
+            'final_prompt': gx_t.get('prompt') or post.image_prompt or '',
+            'rules': {
+                'archetype': tx.get('archetype'), 'color_hex': tx.get('color_hex'),
+                'background_mode': bg_t.get('mode'), 'fonts': pil_t.get('fonts'),
+                'elements': (post.designer_payload or {}).get('_layout_elements'),
+            },
+            'model_bg': bg_t.get('model', 'pillow'),
+            'model_final': 'todxs-pillow',
+            'created_at': tx.get('updated_at', ''),
+            'texts': {'title': post.title or '', 'subtitle': post.subtitle or '', 'cta': ''},
+        })
+
+    if post.pipeline_used != 'simple':
+        return JsonResponse({'error': 'not_simple_pipeline'}, status=404)
+
+    dbg = (post.local_pipeline_context or {}).get('simple_image') or {}
 
     return JsonResponse({
         'pipeline': 'simple',
