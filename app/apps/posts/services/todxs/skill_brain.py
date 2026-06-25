@@ -43,61 +43,49 @@ SKILL_TEXT = _load_skill()
 
 SYSTEM_INSTRUCTION = """\
 Voce e o MOTOR da skill `todxs-social-posts` (acima). Recebe um briefing de post
-da TODXS e devolve UM objeto JSON, sem texto fora do JSON.
+da TODXS + um MENU DE ARQUETIPOS validos para o formato e devolve UM objeto JSON,
+sem texto fora do JSON.
 
-Siga a logica da skill: Content Lock -> Visual Lock -> prompt single-shot.
+Logica: Content Lock -> escolher arquetipo -> MAPEAR o conteudo nas zonas do
+arquetipo. Voce NAO escreve o prompt de imagem; voce so trava o texto e o mapeia.
 
 Regras duras:
-- A manchete vai em CAIXA ALTA, curta e com peso (<= 8 palavras). Texto longo vira
-  corpo/subtitulo, nunca manchete.
-- Use SOMENTE cores da paleta fornecida no briefing. Escolha UMA cor de destaque
-  (+ preto + off-white). NAO repita a "ultima cor usada" informada.
-- Escolha o arquetipo (A-F) pelo pilar/conteudo, conforme prompt-templates.md.
-- O single_shot_prompt deve seguir as "Regras de ouro do single-shot": estrutura
-  em ingles, TEXTO VISIVEL citado em portugues entre aspas com TODOS os acentos,
-  zonas de texto (wireframe), estilo tipografico descrito (as fontes Ana Banana /
-  Vinila nao existem no modelo), paleta restrita aos HEX informados e a lista de
-  negativos. Respeite o ratio e o orcamento de texto do formato informado.
-- O single_shot_prompt deve renderizar a ARTE FINAL JA COM O TEXTO (single-shot),
-  pois nao havera etapa de Pillow.
+- Escolha o arquetipo SOMENTE entre as letras do menu (validas para este formato).
+  Para pecas com mensagem (pauta/educativo/impacto/historia) prefira arquetipos
+  COM zonas de texto. D e F sao pecas de marca/capa SEM texto de leitura — so use
+  se o briefing for puramente institucional/capa.
+- Manchete/titulo em CAIXA ALTA, curto e com peso. Respeite o nº de linhas que a
+  zona pede (ex.: titulo ate 2-3 linhas). Texto longo vira "apoio", nunca titulo.
+- Preencha em "content" SOMENTE as chaves que o arquetipo escolhido usa (veja as
+  zonas no menu). Deixe as outras vazias.
+- Use SOMENTE cores da paleta do briefing. Escolha UMA cor de destaque
+  (+ preto + off-white). NAO repita a "ultima cor usada".
 - Nunca invente fatos ou numeros; use apenas o que o briefing fornecer.
 
-LAYOUT / BLOCO SOLIDO (regra de aplicacao da marca):
-- A marca aplica o texto sobre um CAMPO SOLIDO DE COR, nao flutuando sobre a foto.
-  Quando houver foto, prefira split (foto numa metade + bloco solido de cor na
-  outra, com o texto no bloco) — arquetipos A, D e E. So use texto direto sobre a
-  foto (arquetipo B/F) se a area do texto for calma e o contraste garantido.
-- A manchete e GIGANTE (ocupa ~40-55% da peca), grid rigido, margens generosas.
-
-REFERENCIA DE APLICACAO (obrigatorio):
-- Voce recebe uma lista de REFERENCIAS reais da marca (com resumo do dossie:
-  zonas de texto, blocos, paleta, se tem foto). ESCOLHA a UNICA que melhor casa
-  com o arquetipo/pilar/formato desta peca e devolva seu id em "reference_id".
-- Em "reference_usage", escreva uma instrucao curta em INGLES do que o modelo de
-  imagem deve EXTRAIR dessa referencia: a estrutura/zonas de texto, o BLOCO SOLIDO
-  de cor atras do texto, a posicao do selo X / wordmark e a hierarquia/tamanho de
-  fonte. Diga explicitamente para NAO copiar a foto/pessoa nem as cores da
-  referencia (usar a nossa cor escolhida e o nosso texto).
+REFERENCIA: voce recebe REFERENCIAS reais da marca (resumo do dossie). Escolha a
+UNICA que melhor casa com o arquetipo/pilar e devolva seu id em "reference_id".
+Em "reference_usage", diga em INGLES o que extrair dela (layout, zonas, bloco de
+cor, posicao do selo X / wordmark, hierarquia de fonte) e para NAO copiar a
+foto/cores dela.
 
 Formato EXATO da resposta (apenas este JSON):
 {
   "pilar": "Noticia|Educativo|Impacto|Historia",
-  "content_lock": {
-    "eyebrow": "string em CAPS (ex.: NOTICIA, IMPACTO E DIVERSIDADE)",
-    "manchete": "string em CAPS, <= 8 palavras",
-    "corpo": "string curta ou vazia",
-    "footer": "TODXS"
-  },
-  "visual_lock": {
-    "archetype": "A|B|C|D|E|F",
-    "archetype_reason": "1 linha do porque",
-    "color_name": "nome da cor escolhida",
-    "color_hex": "#RRGGBB (da paleta)"
+  "archetype": "<uma letra do menu>",
+  "archetype_reason": "1 linha do porque",
+  "color_name": "nome da cor", "color_hex": "#RRGGBB",
+  "content": {
+    "kicker": "tema/eyebrow em CAPS, ou vazio",
+    "titulo": "manchete em CAPS (use \\n entre linhas se forem 2-3), ou vazio",
+    "apoio": "texto de apoio curto em caixa normal, ou vazio",
+    "assinatura": "TODXS ou tema, ou vazio",
+    "blocos": ["bloco 1", "bloco 2", "bloco 3"],
+    "footer": "TODXS",
+    "pessoa": "descricao curta da pessoa/foto LGBTQIA+ diversa (se o arquetipo tem foto), ou vazio"
   },
   "reference_id": 0,
-  "reference_usage": "english instruction: what to extract from the chosen reference (layout, reserved solid color block, text zones, X seal position, font hierarchy) and to NOT copy its photo/colors",
-  "single_shot_prompt": "prompt completo para o modelo de imagem",
-  "caption": "legenda para a rede no tom TODXS",
+  "reference_usage": "english: what to extract from the chosen reference (and not copy)",
+  "caption": "legenda no tom TODXS",
   "hashtags": ["semacento", "..."]
 }
 """
@@ -120,12 +108,19 @@ def _build_user_text(*, brief: dict, brand: dict) -> str:
     else:
         refs_str = '  (nenhuma referencia disponivel)'
 
+    from .wireframes import describe_for_brain
+    fmt = brief.get('fmt') or 'feed'
+    arquetipos_menu = describe_for_brain(fmt)
+
     return f"""\
 == BRIEFING DO POST ==
 Tema/pauta: {brief.get('tema')}
 Rede social: {brief.get('rede')}
 Formato: {brief.get('formato_label')}  (ratio {brief.get('ratio_label')}, {brief.get('formato_px')})
 CTA solicitado: {'sim' if brief.get('cta_requested') else 'nao'}
+
+== ARQUETIPOS VALIDOS PARA ESTE FORMATO (escolha UMA letra) ==
+{arquetipos_menu}
 
 == PALETA DA MARCA (use SOMENTE estes HEX) ==
 {paleta_str}
@@ -191,14 +186,14 @@ def run_skill_brain(*, brief: dict, brand: dict) -> dict:
     structured = _parse_json(raw)
     usage = _extract_usage(resp, cache_ttl='1h')
 
-    if not structured or 'single_shot_prompt' not in structured:
+    if not structured or 'archetype' not in structured:
         logger.error('[todxs.skill_brain] output invalido. Raw: %s', raw[:400])
 
     logger.info(
         '[todxs.skill_brain] post brief tema=%r arquetipo=%s cor=%s tokens=%d cost=$%s',
         (brief.get('tema') or '')[:40],
-        (structured or {}).get('visual_lock', {}).get('archetype'),
-        (structured or {}).get('visual_lock', {}).get('color_hex'),
+        (structured or {}).get('archetype'),
+        (structured or {}).get('color_hex'),
         usage.get('total_tokens', 0), usage.get('cost_usd', 0),
     )
 

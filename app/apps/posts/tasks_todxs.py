@@ -21,25 +21,19 @@ logger = logging.getLogger(__name__)
 
 
 def _formato_meta(post):
-    """Deriva (formato_label, ratio_label, formato_px) para feed 1:1 ou story 9:16."""
-    from apps.posts.tasks import _formato_px
-    px = _formato_px(post)
+    """Deriva (fmt, formato_label, ratio_label, formato_px).
+
+    Conforme o sistema de wireframes da TODXS: feed = 4:5 (1080x1350),
+    story = 9:16 (1080x1920). fmt e a chave usada pelo wireframe ('feed'/'story').
+    """
     formats = [f.lower() for f in (post.formats or [])]
     is_story = (
         'stories' in formats or 'story' in formats
         or (post.social_network or '').lower() in ('stories', 'story')
     )
-    try:
-        w, h = (int(x) for x in px.lower().split('x'))
-        if h > w:
-            is_story = True
-    except Exception:
-        pass
     if is_story:
-        if px == '1080x1080':
-            px = '1080x1920'
-        return 'Story 9:16', '9:16', px
-    return 'Feed 1:1', '1:1', px
+        return 'story', 'Story 9:16', '9:16', '1080x1920'
+    return 'feed', 'Feed 4:5', '4:5', '1080x1350'
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=30)
@@ -64,7 +58,7 @@ def generate_post_todxs_task(self, post_id: int):
     todxs_ctx = ctx.get('todxs') or {}
     trace = todxs_ctx.get('trace') or []
 
-    formato_label, ratio_label, formato_px = _formato_meta(post)
+    fmt, formato_label, ratio_label, formato_px = _formato_meta(post)
 
     # ---------------- Etapa 1: skill brain (Claude) ----------------
     try:
@@ -79,6 +73,7 @@ def generate_post_todxs_task(self, post_id: int):
         brief = {
             'tema': post.requested_theme,
             'rede': post.social_network,
+            'fmt': fmt,
             'formato_label': formato_label,
             'ratio_label': ratio_label,
             'formato_px': formato_px,
@@ -101,15 +96,17 @@ def generate_post_todxs_task(self, post_id: int):
         'at': dj_tz.now().isoformat(),
     })
     # Persiste o trace da etapa 1 ANTES de gerar imagem (inspecionavel mesmo se etapa 2 falhar)
-    content = structured.get('content_lock') or {}
-    visual = structured.get('visual_lock') or {}
+    content = structured.get('content') or {}
+    archetype = (structured.get('archetype') or '').strip().upper()[:1]
+    color_hex = structured.get('color_hex') or '#000000'
+    color_name = structured.get('color_name') or ''
     todxs_ctx.update({
         'pilar': structured.get('pilar'),
-        'archetype': visual.get('archetype'),
-        'archetype_reason': visual.get('archetype_reason'),
-        'color_name': visual.get('color_name'),
-        'color_hex': visual.get('color_hex'),
-        'content_lock': content,
+        'archetype': archetype,
+        'archetype_reason': structured.get('archetype_reason'),
+        'color_name': color_name,
+        'color_hex': color_hex,
+        'content': content,
         'reference_id': structured.get('reference_id'),
         'reference_usage': structured.get('reference_usage'),
         'formato_label': formato_label,
@@ -126,10 +123,19 @@ def generate_post_todxs_task(self, post_id: int):
     _record_ai_usage(post, step='text_generation', model=brain.get('model'),
                      usage_dict=brain.get('usage') or {}, purpose='todxs_skill_brain')
 
-    single_shot_prompt = structured.get('single_shot_prompt')
-    if not single_shot_prompt:
-        logger.error('[todxs] skill_brain sem single_shot_prompt post=%s', post_id)
-        raise self.retry(exc=RuntimeError('skill_brain output invalido (sem single_shot_prompt)'))
+    # Prompt single-shot DETERMINISTICO, montado a partir do wireframe do arquetipo
+    # (zonas/posicoes/tamanhos/cores do doc) + o conteudo travado pelo skill brain.
+    from apps.posts.services.todxs.wireframes import (
+        WIREFRAMES, build_singleshot_prompt, archetypes_for_format,
+    )
+    if archetype not in WIREFRAMES or archetype not in archetypes_for_format(fmt):
+        # fallback seguro: 1o arquetipo valido do formato
+        archetype = archetypes_for_format(fmt)[0]
+        todxs_ctx['archetype'] = archetype
+    single_shot_prompt = build_singleshot_prompt(
+        archetype=archetype, content=content, color_hex=color_hex,
+        color_name=color_name, fmt=fmt,
+    )
 
     # ---------------- Etapa 2: single-shot (Gemini) ----------------
     image_inputs = []
@@ -167,7 +173,8 @@ def generate_post_todxs_task(self, post_id: int):
         if b64:
             image_inputs.append({'b64': b64, 'mime': mime, 'role': 'LOGO', 'name': 'logo primario'})
 
-    specimen = todxs_assets.render_ana_banana_specimen(kb, content.get('manchete') or '')
+    _titulo = content.get('titulo') or (content.get('blocos') or [''])[0] or ''
+    specimen = todxs_assets.render_ana_banana_specimen(kb, (_titulo or '').replace('\n', ' '))
     if specimen:
         image_inputs.append({
             'b64': base64.b64encode(specimen).decode('ascii'),
@@ -238,8 +245,8 @@ def generate_post_todxs_task(self, post_id: int):
         order=(max_order if max_order is not None else -1) + 1,
     )
 
-    post.title = content.get('manchete') or post.title
-    post.subtitle = content.get('corpo') or content.get('eyebrow') or ''
+    post.title = (_titulo or '').replace('\n', ' ') or post.title
+    post.subtitle = content.get('apoio') or content.get('kicker') or ''
     post.caption = structured.get('caption') or ''
     post.hashtags = structured.get('hashtags') or []
     post.image_prompt = single_shot_prompt
@@ -261,6 +268,5 @@ def generate_post_todxs_task(self, post_id: int):
                      usage_dict=gem.get('usage') or {}, purpose='todxs_singleshot',
                      images_generated=1)
 
-    logger.info('[todxs] post=%s OK arquetipo=%s cor=%s', post_id,
-                visual.get('archetype'), visual.get('color_hex'))
-    return {'success': True, 'post_id': post_id, 'archetype': visual.get('archetype')}
+    logger.info('[todxs] post=%s OK arquetipo=%s cor=%s', post_id, archetype, color_hex)
+    return {'success': True, 'post_id': post_id, 'archetype': archetype}
