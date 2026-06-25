@@ -108,9 +108,16 @@ def _build_user_text(*, brief: dict, brand: dict) -> str:
     else:
         refs_str = '  (nenhuma referencia disponivel)'
 
-    from .wireframes import describe_for_brain
+    from .wireframes import describe_for_brain, WIREFRAMES, zones_for
     fmt = brief.get('fmt') or 'feed'
-    arquetipos_menu = describe_for_brain(fmt)
+    force = (brief.get('force_archetype') or '').strip().upper()
+    if force and force in WIREFRAMES:
+        w = WIREFRAMES[force]
+        keys = ', '.join(z['key'] for z in zones_for(force, fmt)) or '(sem texto de leitura)'
+        arquetipos_menu = (f"  {force} — {w['name']} | zonas: {keys}\n"
+                           f"  >>> USE OBRIGATORIAMENTE o arquetipo {force} (ignore os demais) <<<")
+    else:
+        arquetipos_menu = describe_for_brain(fmt)
 
     return f"""\
 == BRIEFING DO POST ==

@@ -74,6 +74,7 @@ def generate_post_todxs_task(self, post_id: int):
             'tema': post.requested_theme,
             'rede': post.social_network,
             'fmt': fmt,
+            'force_archetype': todxs_ctx.get('force_archetype'),  # so p/ validacao
             'formato_label': formato_label,
             'ratio_label': ratio_label,
             'formato_px': formato_px,

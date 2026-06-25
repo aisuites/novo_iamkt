@@ -67,24 +67,27 @@ WIREFRAMES = {
         'name': 'Capa tipografica - fundo solido',
         'formatos': ['feed'],
         'fundo': 'solid',              # Pillow desenha campo de cor
-        'usa': {'selo': True, 'wordmark': False, 'specimen': True},
+        # Peca 01: SEM simbolo e SEM logo. So kicker + titulo + apoio.
+        'usa': {'selo': False, 'wordmark': False, 'specimen': True},
         'bg_prompt': '',               # solid: sem Gemini
-        'marca_desc': f'a small {SELO_DESC} at top-right.',
+        'marca_desc': 'no symbol and no logo — the solid color and the big title ARE the piece.',
         'zonas': {
             'feed': [
                 {'key': 'kicker', 'role': 'subtitulo', 'pos': 'top-left',
                  'x': 6, 'y': 6, 'w': 60, 'h': 6, 'fs': 2.4, 'font': 'caps_small',
                  'caps': True, 'align': 'left', 'color': None},
-                {'key': 'titulo', 'role': 'titulo', 'pos': 'lower third, breathing space above',
-                 'x': 6, 'y': 55, 'w': 90, 'h': 28, 'fs': 12, 'font': 'display',
+                # Bloco titulo+apoio agrupado no MEIO-SUPERIOR (ref "NOSSOS PROJETOS"):
+                # vazio fica embaixo, nao em cima.
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'upper-middle, big display, 2 lines',
+                 'x': 6, 'y': 36, 'w': 90, 'h': 22, 'fs': 11, 'font': 'display',
                  'caps': True, 'align': 'left', 'color': None},
-                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'right column, bottom',
-                 'x': 52, 'y': 84, 'w': 42, 'h': 12, 'fs': 3.0, 'font': 'regular',
+                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'just below the title, left column ~50%',
+                 'x': 6, 'y': 60, 'w': 50, 'h': 14, 'fs': 3.0, 'font': 'regular',
                  'caps': False, 'align': 'left', 'color': None},
             ],
         },
-        'seal': {'feed': {'x': 82, 'y': 4, 'w': 12}},
-        'avoid': ['no photo', 'no color band', 'title in BLACK on the color field'],
+        'avoid': ['no photo', 'no color band', 'no symbol/seal', 'no logo/wordmark',
+                  'title and support text in BLACK on the color field'],
     },
     'B': {
         'name': 'Foto + faixa de cor inferior',
