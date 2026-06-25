@@ -153,8 +153,6 @@ def generate_post_todxs_task(self, post_id: int):
                 "reference's colors. " + usage + '\n\n'
             )
 
-    final_prompt = ref_block + single_shot_prompt
-
     # contagem de posts todxs ja gerados -> rotaciona o grafismo
     post_count = Post.objects.filter(organization=org, pipeline_used='todxs').count()
     graf = todxs_assets.pick_grafismo_x(kb, rotate_seed=post_count)
@@ -176,6 +174,34 @@ def generate_post_todxs_task(self, post_id: int):
             'mime': 'image/png', 'role': 'FONT_SPECIMEN_ANA_BANANA',
             'name': 'specimen Ana Banana Black',
         })
+
+    # Bloco de FIDELIDADE dos assets de marca anexados: o modelo deve reproduzi-los
+    # exatamente (logo e grafismo X), nao redesenhar.
+    roles = {i['role'] for i in image_inputs}
+    asset_lines = []
+    if 'LOGO' in roles:
+        asset_lines.append(
+            '- role=LOGO: the exact TODXS logo/wordmark provided. Reproduce it '
+            'FAITHFULLY — same letterforms, the four-petal "X" glyph and proportions. '
+            'Do NOT redraw, restyle or distort it. Recolor ONLY to off-white #F4F1D9 '
+            'or black for contrast.')
+    if 'GRAFISMO_X' in roles:
+        asset_lines.append(
+            '- role=GRAFISMO_X: the exact four-petal "X" graphic provided. Use THIS '
+            'exact shape for the X seal/blob; do NOT invent a different X. Recolor to '
+            'the chosen accent color or off-white/black as needed.')
+    if 'FONT_SPECIMEN_ANA_BANANA' in roles:
+        asset_lines.append(
+            '- role=FONT_SPECIMEN_ANA_BANANA: a specimen of the headline typeface. '
+            'Match its letterform style (deep ink-traps, rounded counters, heavy weight).')
+    assets_block = ''
+    if asset_lines:
+        assets_block = (
+            'BRAND ASSETS attached — reproduce them FAITHFULLY, do not redraw or '
+            'restyle:\n' + '\n'.join(asset_lines) + '\n\n'
+        )
+
+    final_prompt = ref_block + assets_block + single_shot_prompt
 
     try:
         gem = generate_singleshot(prompt_text=final_prompt, image_inputs=image_inputs)
