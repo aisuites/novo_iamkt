@@ -62,6 +62,23 @@ Regras duras:
   pois nao havera etapa de Pillow.
 - Nunca invente fatos ou numeros; use apenas o que o briefing fornecer.
 
+LAYOUT / BLOCO SOLIDO (regra de aplicacao da marca):
+- A marca aplica o texto sobre um CAMPO SOLIDO DE COR, nao flutuando sobre a foto.
+  Quando houver foto, prefira split (foto numa metade + bloco solido de cor na
+  outra, com o texto no bloco) — arquetipos A, D e E. So use texto direto sobre a
+  foto (arquetipo B/F) se a area do texto for calma e o contraste garantido.
+- A manchete e GIGANTE (ocupa ~40-55% da peca), grid rigido, margens generosas.
+
+REFERENCIA DE APLICACAO (obrigatorio):
+- Voce recebe uma lista de REFERENCIAS reais da marca (com resumo do dossie:
+  zonas de texto, blocos, paleta, se tem foto). ESCOLHA a UNICA que melhor casa
+  com o arquetipo/pilar/formato desta peca e devolva seu id em "reference_id".
+- Em "reference_usage", escreva uma instrucao curta em INGLES do que o modelo de
+  imagem deve EXTRAIR dessa referencia: a estrutura/zonas de texto, o BLOCO SOLIDO
+  de cor atras do texto, a posicao do selo X / wordmark e a hierarquia/tamanho de
+  fonte. Diga explicitamente para NAO copiar a foto/pessoa nem as cores da
+  referencia (usar a nossa cor escolhida e o nosso texto).
+
 Formato EXATO da resposta (apenas este JSON):
 {
   "pilar": "Noticia|Educativo|Impacto|Historia",
@@ -77,6 +94,8 @@ Formato EXATO da resposta (apenas este JSON):
     "color_name": "nome da cor escolhida",
     "color_hex": "#RRGGBB (da paleta)"
   },
+  "reference_id": 0,
+  "reference_usage": "english instruction: what to extract from the chosen reference (layout, reserved solid color block, text zones, X seal position, font hierarchy) and to NOT copy its photo/colors",
   "single_shot_prompt": "prompt completo para o modelo de imagem",
   "caption": "legenda para a rede no tom TODXS",
   "hashtags": ["semacento", "..."]
@@ -92,6 +111,14 @@ def _build_user_text(*, brief: dict, brand: dict) -> str:
     rec = ', '.join(brand.get('palavras_recomendadas') or []) or '(nenhuma)'
     evi = ', '.join(brand.get('palavras_evitar') or []) or '(nenhuma)'
     last_color = brief.get('last_color_hex') or '(nenhuma — primeira peca)'
+
+    refs = brand.get('references') or []
+    if refs:
+        refs_str = '\n'.join(
+            f'  [id={r.get("id")}] {r.get("title")}: {r.get("resumo")}' for r in refs
+        )
+    else:
+        refs_str = '  (nenhuma referencia disponivel)'
 
     return f"""\
 == BRIEFING DO POST ==
@@ -110,6 +137,9 @@ Ultima cor de destaque usada (EVITE repetir): {last_color}
 Tom de voz externo: {brand.get('tom_voz') or ''}
 Vocabulario recomendado: {rec}
 Vocabulario a evitar: {evi}
+
+== REFERENCIAS DE APLICACAO (escolha a melhor e devolva o id em reference_id) ==
+{refs_str}
 
 Produza o JSON conforme as instrucoes.
 """

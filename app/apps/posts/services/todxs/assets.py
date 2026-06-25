@@ -48,6 +48,73 @@ def pick_grafismo_x(kb, *, rotate_seed: int = 0):
     return {'name': gm.name, 's3_key': gm.s3_key, 'url': url}
 
 
+def _summarize_dossie(va: dict) -> str:
+    """Resumo compacto do dossie visual de uma ReferenceImage para o skill brain."""
+    if not va:
+        return '(sem dossie)'
+    parts = []
+    if va.get('descricao_geral'):
+        parts.append('Descricao: ' + str(va['descricao_geral'])[:280])
+    hum = va.get('is_humanizada')
+    parts.append('Tem foto/pessoa: ' + ('sim' if hum in (True, 'True', 'true') else 'nao'))
+    grid = va.get('grid') or {}
+    zonas = grid.get('zonas') if isinstance(grid, dict) else None
+    if zonas:
+        zs = '; '.join(
+            f"{z.get('nome')}({z.get('conteudo')}) x{z.get('x_pct')}/y{z.get('y_pct')} ~{z.get('largura_pct')}x{z.get('altura_pct')}%"
+            for z in zonas[:6] if isinstance(z, dict)
+        )
+        parts.append('Zonas de texto: ' + zs)
+    txt = va.get('texto_x_imagem') or {}
+    blocos = txt.get('blocos') if isinstance(txt, dict) else None
+    if blocos:
+        bs = '; '.join(
+            f"{b.get('papel')}:{b.get('peso')}/{b.get('caixa')}/{b.get('cor')}"
+            for b in blocos[:6] if isinstance(b, dict)
+        )
+        parts.append('Blocos de texto: ' + bs)
+    amb = va.get('ambiente') or {}
+    if isinstance(amb, dict) and amb.get('descricao'):
+        parts.append('Fundo: ' + str(amb['descricao'])[:140])
+    pal = va.get('paleta_observada') or []
+    if isinstance(pal, list) and pal:
+        ps = ', '.join(f"{c.get('hex')}({c.get('papel')})" for c in pal[:5] if isinstance(c, dict))
+        parts.append('Paleta observada: ' + ps)
+    return ' | '.join(p for p in parts if p)[:1200]
+
+
+def references_for_brain(kb) -> list:
+    """Lista as ReferenceImage analisadas com um resumo do dossie, para o skill
+    brain escolher a melhor como guia de layout/estilo/aplicacao."""
+    from apps.knowledge.models import ReferenceImage
+    out = []
+    qs = ReferenceImage.objects.filter(
+        knowledge_base=kb, analysis_status='completed'
+    ).order_by('id')
+    for r in qs:
+        out.append({'id': r.id, 'title': r.title or f'ref {r.id}',
+                    'resumo': _summarize_dossie(r.visual_analysis or {})})
+    return out
+
+
+def get_reference_image(kb, reference_id):
+    """Retorna {id, name, url presigned} da ReferenceImage escolhida, ou None."""
+    if not reference_id:
+        return None
+    from apps.knowledge.models import ReferenceImage
+    from apps.core.services.s3_service import S3Service
+    try:
+        r = ReferenceImage.objects.get(knowledge_base=kb, id=int(reference_id))
+    except (ReferenceImage.DoesNotExist, ValueError, TypeError):
+        return None
+    url = r.s3_url
+    try:
+        url = S3Service.generate_presigned_download_url(r.s3_key, expires_in=3600)
+    except Exception:
+        pass
+    return {'id': r.id, 'name': r.title or f'ref {r.id}', 'url': url}
+
+
 def render_ana_banana_specimen(kb, text: str):
     """
     Renderiza um PNG com a manchete na Ana Banana Black (fonte real do S3), para

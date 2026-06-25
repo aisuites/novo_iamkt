@@ -74,6 +74,7 @@ def generate_post_todxs_task(self, post_id: int):
             'palavras_evitar': getattr(kb, 'palavras_evitar', []) or [],
             'kb_summary': _build_kb_summary(org),
             'tom_voz': getattr(kb, 'tom_voz_externo', '') or '',
+            'references': todxs_assets.references_for_brain(kb),
         }
         brief = {
             'tema': post.requested_theme,
@@ -109,6 +110,8 @@ def generate_post_todxs_task(self, post_id: int):
         'color_name': visual.get('color_name'),
         'color_hex': visual.get('color_hex'),
         'content_lock': content,
+        'reference_id': structured.get('reference_id'),
+        'reference_usage': structured.get('reference_usage'),
         'formato_label': formato_label,
         'ratio_label': ratio_label,
         'formato_px': formato_px,
@@ -130,6 +133,27 @@ def generate_post_todxs_task(self, post_id: int):
 
     # ---------------- Etapa 2: single-shot (Gemini) ----------------
     image_inputs = []
+
+    # Referencia de aplicacao escolhida pelo skill brain: entra PRIMEIRO (guia de
+    # layout/estilo) e a explicacao do que extrair vai no topo do prompt.
+    ref_block = ''
+    ref = todxs_assets.get_reference_image(kb, structured.get('reference_id'))
+    if ref:
+        b64, mime = _download_to_base64(ref['url'])
+        if b64:
+            image_inputs.append({'b64': b64, 'mime': mime, 'role': 'REFERENCIA_LAYOUT', 'name': ref['name']})
+            usage = (structured.get('reference_usage') or '').strip()
+            ref_block = (
+                'REFERENCE LAYOUT IMAGE attached (role=REFERENCIA_LAYOUT). Use it '
+                'STRICTLY as a layout/style/application guide: replicate its structure '
+                '— reserved text zones, the SOLID COLOR BLOCK behind the text, the '
+                'position of the X seal/wordmark, and the font hierarchy/relative sizes. '
+                'Apply OUR locked text and OUR chosen accent color from the spec below. '
+                "Do NOT copy the reference's photo/subject and do NOT use the "
+                "reference's colors. " + usage + '\n\n'
+            )
+
+    final_prompt = ref_block + single_shot_prompt
 
     # contagem de posts todxs ja gerados -> rotaciona o grafismo
     post_count = Post.objects.filter(organization=org, pipeline_used='todxs').count()
@@ -154,7 +178,7 @@ def generate_post_todxs_task(self, post_id: int):
         })
 
     try:
-        gem = generate_singleshot(prompt_text=single_shot_prompt, image_inputs=image_inputs)
+        gem = generate_singleshot(prompt_text=final_prompt, image_inputs=image_inputs)
     except Exception as exc:
         logger.exception('[todxs] etapa 2 (gemini single-shot) falhou post=%s', post_id)
         trace.append({
