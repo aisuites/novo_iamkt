@@ -54,8 +54,12 @@ Regras duras:
   Para pecas com mensagem (pauta/educativo/impacto/historia) prefira arquetipos
   COM zonas de texto. D e F sao pecas de marca/capa SEM texto de leitura — so use
   se o briefing for puramente institucional/capa.
-- Manchete/titulo em CAIXA ALTA, curto e com peso. Respeite o nº de linhas que a
-  zona pede (ex.: titulo ate 2-3 linhas). Texto longo vira "apoio", nunca titulo.
+- DIMENSIONE o copy ao ARQUETIPO (cada zona traz seu orcamento no menu):
+  - zona DISPLAY (titulo grande) = CURTO E IMPACTANTE, poucas palavras, cabe no
+    nº de linhas indicado (ex.: arquetipo A = titulo de ~3 a 6 palavras, 2 linhas).
+    Pense numa MANCHETE/slogan, nao numa frase.
+  - zona de APOIO pode ser mais longa (ate o nº de linhas da zona).
+  - todo titulo em CAIXA ALTA. Texto longo vira "apoio", nunca titulo.
 - Preencha em "content" SOMENTE as chaves que o arquetipo escolhido usa (veja as
   zonas no menu). Deixe as outras vazias.
 - Use SOMENTE cores da paleta do briefing. Escolha UMA cor de destaque

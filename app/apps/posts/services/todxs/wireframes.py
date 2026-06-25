@@ -251,14 +251,25 @@ def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: 
             f"a Brazilian LGBTQIA+ NGO. No watermark, no caption, no UI.")
 
 
+def _zone_budget(z) -> str:
+    """Descreve o orcamento de texto de uma zona (p/ o brain dimensionar o copy)."""
+    n = z.get('max_linhas')
+    if z.get('is_blocks'):
+        return f"{z['key']} (2-3 blocos curtos, ~{n or 2} linhas cada)"
+    if z['font'] == 'display':
+        return f"{z['key']} (DISPLAY: CURTO e impactante, <= {n or 2} linhas / poucas palavras)"
+    cab = 'caixa alta' if z.get('caps') else 'caixa normal'
+    return f"{z['key']} ({cab}, ate {n or 3} linhas)"
+
+
 def describe_for_brain(fmt: str) -> str:
-    """Resumo dos arquetipos validos no formato, para o skill brain escolher."""
+    """Resumo dos arquetipos validos no formato + orcamento de texto por zona."""
     lines = []
     for k in archetypes_for_format(fmt):
         w = WIREFRAMES[k]
-        keys = [z['key'] for z in zones_for(k, fmt)]
-        zonas = ', '.join(keys) or '(sem texto de leitura)'
-        lines.append(f"  {k} — {w['name']} | fundo={w['fundo']} | zonas: {zonas}")
+        zs = [_zone_budget(z) for z in zones_for(k, fmt)]
+        zonas = ' | '.join(zs) or '(sem texto de leitura)'
+        lines.append(f"  {k} — {w['name']} | fundo={w['fundo']}\n      zonas: {zonas}")
     return '\n'.join(lines)
 
 

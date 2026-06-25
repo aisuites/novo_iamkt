@@ -64,6 +64,13 @@ def overlay_data(request, post_id):
         if font_paths.get(role):
             font_urls[role] = f'/posts/{post.id}/fonts/{role}/'
 
+    # TODXS: fontes por CHAVE de uso (display/regular/caps_small) p/ o editor
+    # desenhar com a mesma fonte do render Pillow (por elemento, nao por papel).
+    todxs_font_urls = {}
+    if post.pipeline_used == 'todxs':
+        for k in ('display', 'medium', 'regular', 'caps_small'):
+            todxs_font_urls[k] = f'/posts/{post.id}/todxs-font/{k}/'
+
     history = ((post.local_pipeline_context or {}).get('background_history') or [])
 
     return JsonResponse({
@@ -74,6 +81,7 @@ def overlay_data(request, post_id):
         'canvas_h': canvas_h,
         'font_names': font_names,
         'font_urls': font_urls,
+        'todxs_font_urls': todxs_font_urls,
         # Status + chave da imagem raw — usados pelo polling do "Solicitar nova
         # imagem de fundo" para saber quando a nova arte ficou pronta.
         'status': post.status,
@@ -229,6 +237,37 @@ _STICKER_MAX_BYTES = 8 * 1024 * 1024  # 8 MB hard cap
 _STICKER_ACCEPTED_MIME = {
     'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif',
 }
+
+
+_TODXS_FONT_KEYS = {'display', 'medium', 'regular', 'caps_small'}
+
+
+@login_required
+@require_GET
+def todxs_font_file(request, post_id, key):
+    """Serve a fonte real da TODXS por CHAVE de uso (display/medium/regular/
+    caps_small) — para o editor desenhar com a MESMA fonte do render Pillow."""
+    if key not in _TODXS_FONT_KEYS:
+        return JsonResponse({'error': 'key_invalida'}, status=400)
+    post = get_object_or_404(Post, id=post_id, organization=request.organization)
+    from apps.knowledge.models import KnowledgeBase
+    from apps.posts.services.todxs.pillow_render import resolve_todxs_weights
+    kb = KnowledgeBase.objects.filter(organization=post.organization).first()
+    fp = (resolve_todxs_weights(kb) or {}).get(key) if kb else None
+    if not fp:
+        return JsonResponse({'error': 'font_missing'}, status=404)
+    try:
+        resolved = Path(fp).resolve()
+        if _FONTS_CACHE_DIR not in resolved.parents or not resolved.is_file():
+            return JsonResponse({'error': 'path_forbidden'}, status=403)
+    except Exception:
+        return JsonResponse({'error': 'invalid_path'}, status=400)
+    mime, _ = mimetypes.guess_type(resolved.name)
+    resp = FileResponse(open(resolved, 'rb'),
+                        content_type=mime or ('font/otf' if resolved.suffix.lower() == '.otf' else 'font/ttf'))
+    resp['Cache-Control'] = 'private, max-age=3600'
+    resp['Access-Control-Allow-Origin'] = '*'
+    return resp
 
 
 @login_required

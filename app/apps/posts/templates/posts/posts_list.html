@@ -875,6 +875,7 @@ function toggleCarrossel() {
     let canvasW = 1080, canvasH = 1080, scale = 1;
     let titleFont = 'serif', logoUrl = null;
     let fontFamilyByRole = { titulo: 'serif', subtitulo: 'serif', cta: 'serif' };
+    let txFamilies = {};  // TODXS: familias por chave de uso (display/regular/caps_small)
     // History stack para undo/redo. Cada snapshot e um JSON.stringify(elements).
     let history = [];
     let historyIdx = -1;
@@ -949,6 +950,7 @@ function toggleCarrossel() {
             currentRawKey = data.raw_image_s3_key || '';
             _updateRestoreBtn(data.background_history_size || 0);
             fontFamilyByRole = _registerPostFonts(postId, data.font_urls || {}, data.font_names || {});
+            txFamilies = _registerTodxsFonts(postId, data.todxs_font_urls || {});
             // Aguarda imagem de fundo carregar — fitContainer depende de naturalWidth/Height
             await new Promise((resolve) => {
                 if (bgEl.complete && bgEl.naturalWidth > 0) return resolve();
@@ -1052,15 +1054,20 @@ function toggleCarrossel() {
             // feed/story), nao na altura — assim o editor bate com o publicado.
             const basis = Math.min(canvasW, canvasH);
             const fsPx = ((el.font_size_pct||5)/100*basis*scale).toFixed(1);
-            const fam = fontFamilyByRole[role] || fontFamilyByRole.titulo || 'serif';
+            // TODXS: fonte por CHAVE de uso (mesma do Pillow) + leading + quebras fixas.
+            const isTodxs = !!(el.font_key && txFamilies[el.font_key]);
+            const fam = isTodxs ? txFamilies[el.font_key]
+                                : (fontFamilyByRole[role] || fontFamilyByRole.titulo || 'serif');
             const alignH = (el.align==='center')?'center':((el.align==='right')?'flex-end':'flex-start');
             Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
                 width:el.width_pct+'%',
                 color:el.color||'#000', fontSize:fsPx+'px',
                 fontWeight:el.weight==='bold'?'bold':'normal', textAlign:el.align||'left',
-                fontFamily:fam, lineHeight:'1.2', cursor:'pointer', userSelect:'none',
-                boxSizing:'border-box', whiteSpace:'pre-line' });
-            if (el.height_pct) dom.style.height = el.height_pct + '%';
+                fontFamily:fam, lineHeight:String(isTodxs ? (el._leading||1.16) : 1.2),
+                cursor:'pointer', userSelect:'none',
+                boxSizing:'border-box', whiteSpace: isTodxs ? 'pre' : 'pre-line' });
+            // TODXS ja vem com tamanho/quebra calculados -> NAO re-encolher nem re-quebrar.
+            if (el.height_pct && !isTodxs) dom.style.height = el.height_pct + '%';
             // CTA unificado: background_color + radius_pct + padding (so o CTA pinta fundo)
             if (role==='cta' && el.background_color) {
                 dom.style.background = el.background_color;
@@ -1078,9 +1085,9 @@ function toggleCarrossel() {
                 dom.style.justifyContent='center';
                 dom.style.alignItems = (role==='cta') ? 'center' : alignH;
             }
-            // REGRA PILLOW: encolher-pra-caber — se houver caixa (height), o fit pass
-            // reduz a fonte ate o texto caber na altura (como o auto-fit do Pillow).
-            if (el.height_pct) { dom.dataset.fit = '1'; dom.style.overflow = 'hidden'; }
+            // REGRA PILLOW: encolher-pra-caber (fluxo simples). TODXS NAO: o tamanho
+            // ja vem calculado pelo compute_layout — re-encolher quebraria a paridade.
+            if (el.height_pct && !isTodxs) { dom.dataset.fit = '1'; dom.style.overflow = 'hidden'; }
             dom.textContent = el.content || '';
         } else return;
 
@@ -1547,6 +1554,20 @@ function toggleCarrossel() {
         });
         styleEl.textContent = css.join('\n');
         return families;
+    }
+    function _registerTodxsFonts(postId, urls) {
+        const fams = {};
+        const styleId = `todxsfonts-${postId}`;
+        let styleEl = document.getElementById(styleId);
+        if (!styleEl) { styleEl = document.createElement('style'); styleEl.id = styleId; document.head.appendChild(styleEl); }
+        const css = [];
+        Object.keys(urls || {}).forEach(key => {
+            const family = `TODXS_${postId}_${key}`;
+            css.push(`@font-face{font-family:'${family}';src:url('${urls[key]}') format('truetype');font-display:swap;}`);
+            fams[key] = `'${family}', sans-serif`;
+        });
+        styleEl.textContent = css.join('\n');
+        return fams;
     }
     function _toHex6(c) {
         if (/^#[0-9a-f]{6}$/i.test(c)) return c;

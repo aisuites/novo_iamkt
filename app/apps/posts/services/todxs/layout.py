@@ -128,6 +128,7 @@ def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
                 'weight': 'black' if z['role'] == 'titulo' else 'regular',
                 'case': 'none', 'align': z['align'], 'color': color,
                 '_font_path': font_path, '_leading': leading,
+                'font_key': z['font'],  # editor carrega a fonte real por chave
             })
             bottoms[z['key']] = draw_y + total_h_pct
 
