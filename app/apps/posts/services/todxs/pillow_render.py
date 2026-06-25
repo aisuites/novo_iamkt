@@ -82,8 +82,9 @@ def resolve_todxs_weights(kb) -> dict:
     return {
         'display': path('black', 'bold'),
         'medium': path('medium', 'semibold', 'bold'),
-        'regular': path('regular', 'medium'),
-        'caps_small': path('light', 'extralight', 'regular'),  # ~ Vinila Condensed Light
+        'regular': path('ana banana regular', 'regular', 'medium'),
+        # kicker/tema = Vinila -> stand-in CallingCode (cadastrada na KB)
+        'caps_small': path('calling', 'vinila') or path('light', 'extralight'),
     }
 
 
@@ -199,7 +200,7 @@ def _draw_text_el(draw, el, W, H):
     bw = float(el.get('width_pct', 60)) / 100.0 * W
     align = (el.get('align') or 'left').lower()
     color = _hex_to_rgb(el.get('color') or '#000000')
-    line_h = size * 1.16
+    line_h = size * float(el.get('_leading', 1.16))
     for line in str(el.get('content', '')).split('\n'):
         lw = draw.textlength(line, font=font)
         lx = x + (bw - lw) / 2 if align == 'center' else (x + bw - lw if align == 'right' else x)

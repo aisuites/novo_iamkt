@@ -73,18 +73,20 @@ WIREFRAMES = {
         'marca_desc': 'no symbol and no logo — the solid color and the big title ARE the piece.',
         'zonas': {
             'feed': [
-                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'top-left, small light highlight',
-                 'x': 6, 'y': 7, 'w': 60, 'h': 5, 'fs': 2.3, 'font': 'caps_small',
-                 'caps': True, 'align': 'left', 'color': None, 'max_linhas': 1},
-                # Bloco titulo+apoio agrupado no MEIO-SUPERIOR (ref "NOSSOS PROJETOS").
-                {'key': 'titulo', 'role': 'titulo', 'pos': 'upper-middle, huge display, dominates',
-                 'x': 6, 'y': 36, 'w': 92, 'h': 40, 'fs': 15, 'font': 'display',
-                 'caps': True, 'align': 'left', 'color': None, 'max_linhas': 3},
-                # apoio FLUI logo abaixo do titulo (y calculado, nao fixo).
-                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'flows right below the title, left col ~50%',
-                 'x': 6, 'y': 60, 'w': 50, 'h': 14, 'fs': 3.0, 'font': 'regular',
-                 'caps': False, 'align': 'left', 'color': None, 'max_linhas': 4,
-                 'flow_after': 'titulo', 'gap_pct': 2.5, 'y_max': 94},
+                # Coordenadas EXATAS medidas da referencia (arquetipo_A.json).
+                # Cor do texto = PRETO obrigatorio. kicker = Vinila (CallingCode).
+                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'top-left (margem)',
+                 'x': 6.18, 'y': 3.54, 'w': 30.74, 'h': 4.0, 'fs': 2.3, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1,
+                 'leading': 1.0},
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'ancora y=0.40 (nunca no topo)',
+                 'x': 6.66, 'y': 40.42, 'w': 86.69, 'h': 22.71, 'fs': 13.9, 'font': 'display',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 2,
+                 'leading': 0.92},
+                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'coluna direita, base inferior',
+                 'x': 47.39, 'y': 71.06, 'w': 44.85, 'h': 22.1, 'fs': 2.78, 'font': 'regular',
+                 'caps': False, 'align': 'left', 'color': '#000000', 'max_linhas': 6,
+                 'leading': 1.35},
             ],
         },
         'avoid': ['no photo', 'no color band', 'no symbol/seal', 'no logo/wordmark',

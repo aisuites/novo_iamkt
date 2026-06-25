@@ -46,7 +46,7 @@ def _greedy_wrap(text, font, max_w, draw):
 _LH = 1.16  # entrelinha (igual ao render_layout_document ~1.18, com folga)
 
 
-def _fit(text, font_path, max_w, max_h, max_lines, start_px, draw, min_px=14):
+def _fit(text, font_path, max_w, max_h, max_lines, start_px, draw, min_px=14, leading=_LH):
     """Maior tamanho que cabe o texto em <= max_lines dentro de (max_w,max_h)."""
     from PIL import ImageFont
     size = max(min_px, int(start_px))
@@ -55,15 +55,15 @@ def _fit(text, font_path, max_w, max_h, max_lines, start_px, draw, min_px=14):
         try:
             font = ImageFont.truetype(font_path, size)
         except Exception:
-            return None, [str(text)], size, int(size * _LH)
+            return None, [str(text)], size, int(size * leading)
         lines = _greedy_wrap(text, font, max_w, draw)
-        total_h = int(size * _LH * len(lines))
+        total_h = int(size * leading * len(lines))
         fits_w = all(draw.textlength(ln, font=font) <= max_w for ln in lines)
         if len(lines) <= max_lines and total_h <= max_h and fits_w:
             return font, lines, size, total_h
         best = (font, lines, size, total_h)
         size -= 2
-    return best if best else (None, [str(text)], min_px, int(min_px * _LH))
+    return best if best else (None, [str(text)], min_px, int(min_px * leading))
 
 
 def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
@@ -108,12 +108,13 @@ def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
             if z.get('caps'):
                 text = text.upper()
             font_path = weights.get(z['font'])
+            leading = float(z.get('leading', _LH))
             max_w_px = box_w / 100.0 * W
             max_h_px = box_h / 100.0 * H
             start_px = z['fs'] / 100.0 * basis
             max_lines = z.get('max_linhas', 4)
             font, lines, size_px, total_h_px = _fit(
-                text, font_path, max_w_px, max_h_px, max_lines, start_px, draw)
+                text, font_path, max_w_px, max_h_px, max_lines, start_px, draw, leading=leading)
             total_h_pct = total_h_px / H * 100.0
             # valign: center_v centraliza dentro da caixa; senao topo
             draw_y = box_y + (box_h - total_h_pct) / 2.0 if z.get('center_v') else box_y
@@ -126,7 +127,7 @@ def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
                 'font_size_pct': round(size_px / basis * 100.0, 3),
                 'weight': 'black' if z['role'] == 'titulo' else 'regular',
                 'case': 'none', 'align': z['align'], 'color': color,
-                '_font_path': font_path,
+                '_font_path': font_path, '_leading': leading,
             })
             bottoms[z['key']] = draw_y + total_h_pct
 
