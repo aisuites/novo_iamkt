@@ -1,53 +1,28 @@
 """
-Endpoint do PIPELINE SIMPLES (v2) — agente unico via OpenAI.
-Disparado pelo seletor "Simples (OpenAI)" do modal Gerar Post.
+Entrada do fluxo EXCLUSIVO da TODXS.
 
-Cria o Post com pipeline_used='simple' e dispara generate_post_simple_task.
-Mesmo payload/validacoes do endpoint /posts/gerar-local/ (reaproveita o
-mesmo modal), mudando apenas a pipeline e a task acionada.
-
-Disponivel apenas quando settings.ENABLE_LOCAL_PIPELINE=True (homol/dev).
+Chamada por delegacao a partir de gerar_post_simples quando a org e slug='todxs'.
+Espelha a criacao do Post do pipeline simples, mas com pipeline_used='todxs' e
+dispara generate_post_todxs_task. Nao tem URL propria (so e alcancada via
+delegacao), entao os decorators de auth/csrf ja correram na view delegante.
 """
-
 import json
 import logging
 
-from django.conf import settings
-from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
 
 from apps.posts.models import Post, PostFormat, PostReferenceImage
-from apps.posts.tasks import generate_post_simple_task
 
 logger = logging.getLogger(__name__)
 
-MAX_REF_IMAGES = 5
-_VALID_REDES = ['instagram', 'facebook', 'linkedin', 'whatsapp']
-_VALID_LOGO_POS = {
-    'top-left', 'top-center', 'top-right',
-    'middle-left', 'middle-center', 'middle-right',
-    'bottom-left', 'bottom-center', 'bottom-right',
-}
-_NON_EXCLUSIVE = {'produto', 'pessoa_modelo'}
+_VALID_REDES = {'instagram', 'facebook', 'linkedin', 'whatsapp'}
+_MAX_REF_IMAGES = 5
 
 
-@login_required
-@require_http_methods(['POST'])
-def gerar_post_simples(request):
-    """Cria Post com pipeline_used='simple' e dispara generate_post_simple_task."""
-    # Delegacao TODXS: a org slug='todxs' segue um fluxo exclusivo e isolado
-    # (skill todxs-social-posts). Nenhuma outra org muda de comportamento.
-    if getattr(request.user, 'organization', None) and request.user.organization.slug == 'todxs':
-        from .views_gerar_todxs import gerar_post_todxs
-        return gerar_post_todxs(request)
-
-    if not getattr(settings, 'ENABLE_SIMPLE_PIPELINE', True):
-        return JsonResponse(
-            {'success': False, 'error': 'Pipeline simples desabilitada neste ambiente'},
-            status=403,
-        )
+def gerar_post_todxs(request):
+    """Cria Post(pipeline_used='todxs') e dispara o pipeline da skill TODXS."""
+    from apps.posts.tasks_todxs import generate_post_todxs_task
 
     try:
         data = json.loads(request.body.decode('utf-8') or '{}')
@@ -60,48 +35,17 @@ def gerar_post_simples(request):
     is_carousel = bool(data.get('is_carousel', False))
     image_count = int(data.get('image_count') or 1)
     reference_images = data.get('reference_images') or []
-    if isinstance(reference_images, list) and len(reference_images) > MAX_REF_IMAGES:
-        reference_images = reference_images[:MAX_REF_IMAGES]
+    if isinstance(reference_images, list) and len(reference_images) > _MAX_REF_IMAGES:
+        reference_images = reference_images[:_MAX_REF_IMAGES]
 
     post_format_id = data.get('post_format_id')
     formato_legado = (data.get('formato') or '').strip()
-
-    # Selecoes da galeria (mesmo formato do pipeline local)
     selected_logo_ids = data.get('selected_logo_ids') or []
     if isinstance(selected_logo_ids, list) and len(selected_logo_ids) > 1:
         selected_logo_ids = selected_logo_ids[:1]
     selected_reference_ids = data.get('selected_reference_ids') or []
     references_usage_description = (data.get('references_usage_description') or '').strip()
-
-    reference_aspects = data.get('reference_aspects') or {}
-    if isinstance(reference_aspects, dict):
-        _seen, _clean = {}, {}
-        for _rid, _asps in reference_aspects.items():
-            if isinstance(_asps, str):
-                _asps = [_asps] if _asps.strip() else []
-            elif not isinstance(_asps, list):
-                _asps = []
-            _kept = []
-            for _a in _asps:
-                _a = (_a or '').strip()
-                if not _a:
-                    continue
-                if _a in _NON_EXCLUSIVE:
-                    _kept.append(_a)
-                    continue
-                if _a in _seen:
-                    continue
-                _seen[_a] = str(_rid)
-                _kept.append(_a)
-            if _kept:
-                _clean[str(_rid)] = _kept
-        reference_aspects = _clean
-    else:
-        reference_aspects = {}
-
     logo_position = (data.get('logo_position') or '').strip()
-    if logo_position and logo_position not in _VALID_LOGO_POS:
-        logo_position = ''
 
     # ---- Validacoes ----
     if rede_social not in _VALID_REDES:
@@ -111,11 +55,6 @@ def gerar_post_simples(request):
         )
     if not tema:
         return JsonResponse({'success': False, 'error': 'Tema obrigatorio'}, status=400)
-    if is_carousel and not (2 <= image_count <= 5):
-        return JsonResponse(
-            {'success': False, 'error': 'Quantidade de imagens deve ser entre 2 e 5'},
-            status=400,
-        )
 
     post_format = None
     formato = formato_legado
@@ -142,8 +81,7 @@ def gerar_post_simples(request):
         else ('story' if formato == 'stories' else 'post')
     )
 
-    # Quota: respeita o limite DIARIO/MENSAL de posts da organizacao
-    # (can_create_post valida dia + mes + suspensao/aprovacao).
+    # Quota: mesma regra do fluxo padrao (dia/mes/suspensao)
     can_create, _qcode, qmsg = request.user.organization.can_create_post()
     if not can_create:
         return JsonResponse({'success': False, 'error': qmsg}, status=403)
@@ -165,20 +103,18 @@ def gerar_post_simples(request):
                 status='generating',
                 caption='',
                 hashtags=[],
-                ia_provider='openai',
-                ia_model_text='gpt-4o-mini',
-                pipeline_used='simple',
+                ia_provider='anthropic',
+                ia_model_text='claude-sonnet-4-6',
+                pipeline_used='todxs',
                 copy_payload={},
                 designer_payload={},
                 local_pipeline_context={
                     'selected_logo_ids': list(selected_logo_ids or []),
                     'selected_reference_ids': list(selected_reference_ids or []),
                     'references_usage_description': references_usage_description,
-                    'reference_aspects': reference_aspects,
                     'logo_position': logo_position,
                 },
             )
-
             for idx, ref_img in enumerate(reference_images):
                 PostReferenceImage.objects.create(
                     post=post,
@@ -189,21 +125,18 @@ def gerar_post_simples(request):
                     usage_description=ref_img.get('usage_description', '') or '',
                     order=idx,
                 )
+            logger.info('[posts.todxs] Post %s criado pipeline=todxs', post.id)
 
-            logger.info('[posts.simple] Post %s criado pipeline=simple refs=%d',
-                        post.id, len(reference_images))
-
-        generate_post_simple_task.delay(post.id)
+        generate_post_todxs_task.delay(post.id)
 
         return JsonResponse({
             'success': True,
             'id': post.id,
             'post_id': post.id,
             'status': 'generating',
-            'pipeline': 'simple',
-            'message': 'Post criado. Texto sendo gerado via OpenAI gpt-4o-mini...',
+            'pipeline': 'todxs',
+            'message': 'Post TODXS criado. Gerando arte via skill (Claude + Gemini single-shot)...',
         })
-
     except Exception:
-        logger.exception('[posts.simple] Falha ao criar post simples')
+        logger.exception('[posts.todxs] Falha ao criar post todxs')
         return JsonResponse({'success': False, 'error': 'Erro interno ao criar post'}, status=500)

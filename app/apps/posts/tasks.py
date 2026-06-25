@@ -2415,3 +2415,7 @@ from apps.posts.tasks_simple import (  # noqa: E402,F401
     revise_scene_task,
     revise_image_task,
 )
+
+# Pipeline EXCLUSIVO da TODXS (org slug='todxs'): task isolada em tasks_todxs.py.
+# Reimportada aqui apenas para o autodiscovery do Celery registra-la.
+from apps.posts.tasks_todxs import generate_post_todxs_task  # noqa: E402,F401
