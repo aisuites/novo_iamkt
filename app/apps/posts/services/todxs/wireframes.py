@@ -108,8 +108,9 @@ WIREFRAMES = {
         'marca_desc': ('feed: the "TODXS" wordmark at top-left over the photo. '
                        f'story: {SELO_DESC} at top-left + the wordmark in the bottom signature.'),
         # split do JSON: foto 67.77% / faixa 32.23%
-        'band': {'feed': {'y': 67.77}, 'story': {'y': 52}},
+        'band': {'feed': {'y': 67.77}, 'story': {'y': 50.25}},
         'wordmark_color': '#000000',   # B: wordmark SEMPRE preto (decisao do dono)
+        'seal_color': 'ACCENT',        # selo (story): circulo preto + X na cor da faixa
         'zonas': {
             'feed': [
                 # coords do arquetipo_B.json; titulo PRETO, Ana Banana Medium,
@@ -120,20 +121,25 @@ WIREFRAMES = {
                  'caps': True, 'align': 'left', 'color': '#000000', 'center_v': True,
                  'leading': 1.05, 'max_linhas': 3},
             ],
+            # coords do arquetipo_B_story.json: faixa empilha titulo->apoio->assinatura.
             'story': [
-                {'key': 'titulo', 'role': 'titulo', 'pos': 'inside the band (top)',
-                 'x': 7, 'y': 55, 'w': 86, 'h': 16, 'fs': 8.0, 'font': 'medium',
-                 'caps': True, 'align': 'left', 'color': None},
-                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'inside the band, below title',
-                 'x': 7, 'y': 72, 'w': 86, 'h': 14, 'fs': 3.2, 'font': 'regular',
-                 'caps': False, 'align': 'left', 'color': None},
-                {'key': 'assinatura', 'role': 'subtitulo', 'pos': 'band bottom-left (tema)',
-                 'x': 7, 'y': 93, 'w': 50, 'h': 4, 'fs': 2.4, 'font': 'caps_small',
-                 'caps': True, 'align': 'left', 'color': None},
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'faixa, hero (3 linhas)',
+                 'x': 9.43, 'y': 57.26, 'w': 81.14, 'h': 17.92, 'fs': 8.9, 'font': 'medium',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'leading': 1.05,
+                 'max_linhas': 3},
+                {'key': 'apoio', 'role': 'subtitulo', 'pos': 'faixa, below title',
+                 'x': 9.25, 'y': 79.48, 'w': 80.43, 'h': 8.5, 'fs': 3.15, 'font': 'regular',
+                 'caps': False, 'align': 'left', 'color': '#000000', 'leading': 1.4,
+                 'max_linhas': 3},
+                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'assinatura base-left (tema)',
+                 'x': 9.61, 'y': 90.69, 'w': 34.52, 'h': 2.7, 'fs': 2.6, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1},
             ],
         },
-        'seal': {'story': {'x': 7, 'y': 3, 'w': 15}},
-        'wordmark': {'feed': {'x': 6.34, 'y': 3.42, 'w': 19.18}, 'story': {'x': 70, 'y': 92, 'w': 23}},
+        'seal': {'story': {'x': 4.98, 'y': 3.8, 'w': 11.92}},
+        'wordmark': {'feed': {'x': 6.34, 'y': 3.42, 'w': 19.18},
+                     'story': {'x': 69.75, 'y': 90.69, 'w': 20.46}},
+        'rounded_frame': {'story': 3.9},   # moldura arredondada (raio % da largura)
         'avoid': ['straight horizontal cut between photo and band',
                   'feed: wordmark top-left + title in the band ONLY (no kicker, no seal)'],
     },

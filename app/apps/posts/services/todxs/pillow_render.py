@@ -109,8 +109,8 @@ def _recolor_opaque(img, rgb):
     return solid
 
 
-def compose_seal_datauri(x_png_bytes, diameter=420):
-    """Compoe o SELO da marca: circulo preto + X (off-white) centrado.
+def compose_seal_datauri(x_png_bytes, diameter=420, x_color=_OFFWHITE):
+    """Compoe o SELO da marca: circulo PRETO + X (na cor x_color) centrado.
     Retorna data URI (image/png) para usar como sticker editavel."""
     from PIL import Image, ImageDraw
     D = diameter
@@ -120,8 +120,11 @@ def compose_seal_datauri(x_png_bytes, diameter=420):
     if x_png_bytes:
         try:
             x = Image.open(io.BytesIO(x_png_bytes)).convert('RGBA')
-            x = _recolor_opaque(x, _OFFWHITE)
-            target = int(D * 0.58)
+            x = _recolor_opaque(x, x_color)
+            bbox = x.split()[3].getbbox()
+            if bbox:
+                x = x.crop(bbox)
+            target = int(D * 0.56)
             iw, ih = x.size
             scale = min(target / iw, target / ih)
             x = x.resize((max(1, int(iw * scale)), max(1, int(ih * scale))), Image.LANCZOS)
@@ -196,7 +199,8 @@ def _expand_seals(elements, x_png_bytes):
                 uri = compose_simbolo_datauri(x_png_bytes,
                                               color=_hex_to_rgb(el.get('seal_color') or '#F4F1D9'))
             else:
-                uri = compose_seal_datauri(x_png_bytes)
+                uri = compose_seal_datauri(x_png_bytes,
+                                           x_color=_hex_to_rgb(el.get('seal_color') or '#F4F1D9'))
             if not uri:
                 continue
             out.append({
@@ -296,6 +300,20 @@ def draw_todxs(bg_png, elements, W, H, logo_url=None):
     return buf.getvalue()
 
 
+def _round_corners(png_bytes, radius, bg=(244, 241, 217)):
+    """Arredonda os 4 cantos da arte (moldura), preenchendo o fora com bg."""
+    from PIL import Image, ImageDraw
+    img = Image.open(io.BytesIO(png_bytes)).convert('RGB')
+    W, H = img.size
+    mask = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, W - 1, H - 1], radius=radius, fill=255)
+    out = Image.new('RGB', (W, H), bg)
+    out.paste(img, (0, 0), mask)
+    buf = io.BytesIO()
+    out.save(buf, 'PNG')
+    return buf.getvalue()
+
+
 def render_todxs(*, archetype, content, color_hex, fmt, formato_px, kb,
                  paleta=None, photo_png=None, x_png_bytes=None, logo_url=None):
     """
@@ -304,6 +322,7 @@ def render_todxs(*, archetype, content, color_hex, fmt, formato_px, kb,
     Retorna dict: {raw_png, final_png, elements, fonts_resolved}.
     """
     from .layout import compute_layout
+    from .wireframes import WIREFRAMES
 
     W, H = _parse_px(formato_px)
     raw_png = build_background(archetype, fmt, color_hex, formato_px, photo_png=photo_png)
@@ -311,6 +330,10 @@ def render_todxs(*, archetype, content, color_hex, fmt, formato_px, kb,
     elements = compute_layout(archetype, content, color_hex, fmt, W, H, weights)
     elements = _expand_seals(elements, x_png_bytes)  # seal -> image (data URI)
     final_png = draw_todxs(raw_png, elements, W, H, logo_url=logo_url)
+    # moldura arredondada (ex.: B story)
+    rf = (WIREFRAMES.get(archetype, {}).get('rounded_frame', {}) or {}).get(fmt)
+    if rf:
+        final_png = _round_corners(final_png, int(rf / 100.0 * W))
     return {
         'raw_png': raw_png,
         'final_png': final_png,

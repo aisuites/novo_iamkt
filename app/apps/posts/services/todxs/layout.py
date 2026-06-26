@@ -157,13 +157,22 @@ def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
     need = assets_needed(archetype, fmt)
     seal = w.get('seal', {}).get(fmt)
     if need['selo'] and seal:
+        sc = w.get('seal_color')
+        if sc == 'ACCENT':
+            sc = color_hex
         els.append({'role': 'seal', 'x_pct': seal['x'], 'y_pct': seal['y'],
                     'width_pct': seal['w'], 'style': w.get('seal_style', 'circle'),
-                    'seal_color': w.get('seal_color')})
+                    'seal_color': sc})
     wm = w.get('wordmark', {}).get(fmt)
     if need['wordmark'] and wm:
-        logo_color = (w.get('wordmark_color')
-                      or (_contrast_on(color_hex) if w.get('fundo') == 'solid' else '#F4F1D9'))
+        band = w.get('band', {}).get(fmt)
+        over_faixa = bool(band) and wm['y'] >= band['y']  # wordmark na faixa -> contraste
+        if w.get('wordmark_color'):
+            logo_color = w.get('wordmark_color')
+        elif over_faixa or w.get('fundo') == 'solid':
+            logo_color = _contrast_on(color_hex)
+        else:
+            logo_color = '#F4F1D9'   # sobre a foto
         els.append({'role': 'logo', 'x_pct': wm['x'], 'y_pct': wm['y'],
                     'width_pct': wm['w'], 'logo_color': logo_color})
 
