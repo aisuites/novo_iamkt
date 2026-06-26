@@ -227,8 +227,9 @@ WIREFRAMES = {
         'zonas': {
             'feed': [
                 # kicker com a MESMA altura de maiuscula do logotipo (medido por pixel)
+                # fs TRAVADO em 4.08% -> maiusculas = 30px = altura do logo (medido)
                 {'key': 'kicker', 'role': 'subtitulo', 'pos': 'header top-left',
-                 'x': 7.12, 'y': 3.0, 'w': 80, 'h': 7, 'fs': 5.28, 'font': 'caps_small',
+                 'x': 7.12, 'y': 3.28, 'w': 80, 'h': 7, 'fs': 4.08, 'font': 'caps_small',
                  'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1,
                  'fixed_fs': True},
                 # titulo DISPLAY/BLACK GIGANTE (heroi ~39%), leading apertado 0.95.
