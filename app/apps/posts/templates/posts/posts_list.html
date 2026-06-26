@@ -876,6 +876,7 @@ function toggleCarrossel() {
     let titleFont = 'serif', logoUrl = null;
     let fontFamilyByRole = { titulo: 'serif', subtitulo: 'serif', cta: 'serif' };
     let txFamilies = {};  // TODXS: familias por chave de uso (display/regular/caps_small)
+    let currentPipeline = '';
     // History stack para undo/redo. Cada snapshot e um JSON.stringify(elements).
     let history = [];
     let historyIdx = -1;
@@ -943,6 +944,7 @@ function toggleCarrossel() {
             if (!resp.ok) throw new Error('not_ready');
             const data = await resp.json();
             canvasW = data.canvas_w; canvasH = data.canvas_h;
+            currentPipeline = data.pipeline || '';
             logoUrl = data.logo_url;
             titleFont = (data.font_names && data.font_names.titulo) || 'serif';
             elements = JSON.parse(JSON.stringify(data.elements));
@@ -1357,6 +1359,26 @@ function toggleCarrossel() {
     });
 
     // ── Fechar ─────────────────────────────────────────────────────────────
+    function _showSaveOverlay() {
+        let ov = document.getElementById('todxsSaveOverlay');
+        if (!ov) {
+            if (!document.getElementById('todxsSpinKf')) {
+                const st = document.createElement('style'); st.id = 'todxsSpinKf';
+                st.textContent = '@keyframes todxsspin{to{transform:rotate(360deg)}}';
+                document.head.appendChild(st);
+            }
+            ov = document.createElement('div');
+            ov.id = 'todxsSaveOverlay';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(255,255,255,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;';
+            ov.innerHTML = '<div style="width:46px;height:46px;border:4px solid #e5e7eb;border-top-color:#6d28d9;border-radius:50%;animation:todxsspin .8s linear infinite;"></div><div style="font:600 14px system-ui,Arial;color:#444;">Atualizando a arte…</div>';
+            document.body.appendChild(ov);
+        }
+        ov.style.display = 'flex';
+    }
+    function _hideSaveOverlay() {
+        const ov = document.getElementById('todxsSaveOverlay');
+        if (ov) ov.style.display = 'none';
+    }
     async function _saveElements(postId, els) {
         if (!postId || !els || !els.length) return;
         try {
@@ -1366,26 +1388,40 @@ function toggleCarrossel() {
                 body: JSON.stringify({ elements: els }),
             });
             const d = await r.json().catch(() => ({}));
-            // Atualiza o preview da pagina com a arte re-renderizada (TODXS).
+            // Atualiza o preview da pagina com a arte re-renderizada (TODXS) e
+            // ESPERA a imagem nova carregar antes de retornar (spinner some so apos).
             if (d && d.image_url) {
                 const frame = document.getElementById('postImageFrame');
                 const img = frame && frame.querySelector('img');
-                if (img) { img.removeAttribute('data-lazy-load'); img.src = d.image_url; }
-                // avisa o posts.js (caso queira sincronizar o estado/galeria)
+                if (img) {
+                    await new Promise((res) => {
+                        img.onload = res; img.onerror = res;
+                        img.removeAttribute('data-lazy-load');
+                        img.src = d.image_url;
+                        setTimeout(res, 8000);  // seguranca
+                    });
+                }
                 window.dispatchEvent(new CustomEvent('todxs:image-updated',
                     { detail: { postId: postId, url: d.image_url } }));
             }
         } catch (e) { /* best-effort */ }
     }
-    function closeModal() {
+    async function closeModal() {
         const pid = currentPostId;
         const els = elements.slice();
+        const todxs = (currentPipeline === 'todxs') && pid && els && els.length;
         _stopBgPolling();
+        if (todxs) _showSaveOverlay();  // trava a tela ate a arte nova carregar
         modal.style.display='none'; document.body.style.overflow='';
-        currentPostId=null; selectedIdx=null;
+        currentPostId=null; selectedIdx=null; currentPipeline='';
         history = []; historyIdx = -1;
         if (bgRequestBox) bgRequestBox.style.display = 'none';
-        _saveElements(pid, els);
+        if (todxs) {
+            await _saveElements(pid, els);
+            _hideSaveOverlay();
+        } else {
+            _saveElements(pid, els);
+        }
     }
     document.getElementById('btnCloseArteFinal').addEventListener('click', closeModal);
     document.getElementById('btnCloseArteFinal2').addEventListener('click', closeModal);

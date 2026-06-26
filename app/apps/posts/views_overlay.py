@@ -82,6 +82,7 @@ def overlay_data(request, post_id):
         'font_names': font_names,
         'font_urls': font_urls,
         'todxs_font_urls': todxs_font_urls,
+        'pipeline': post.pipeline_used or '',
         # Status + chave da imagem raw — usados pelo polling do "Solicitar nova
         # imagem de fundo" para saber quando a nova arte ficou pronta.
         'status': post.status,
