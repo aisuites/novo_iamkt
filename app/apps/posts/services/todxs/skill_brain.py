@@ -85,7 +85,7 @@ Formato EXATO da resposta (apenas este JSON):
     "assinatura": "TODXS ou tema, ou vazio",
     "blocos": ["bloco 1", "bloco 2", "bloco 3"],
     "footer": "TODXS",
-    "pessoa": "descricao curta da pessoa/foto LGBTQIA+ diversa (se o arquetipo tem foto), ou vazio"
+    "pessoa": "CONCEITO DA FOTO ligado ao TEMA (se o arquetipo tem foto): QUEM (pessoa LGBTQIA+ diversa, com styling/atitude) + CONTEXTO/cena/acao que COMUNICA visualmente a mensagem do titulo. Ex.: tema rede de apoio -> duas pessoas se acolhendo; tema saude/cuidado -> pessoa em consulta ou momento de autocuidado. Curto e visual. Vazio se sem foto."
   },
   "reference_id": 0,
   "reference_usage": "english: what to extract from the chosen reference (and not copy)",

@@ -249,7 +249,7 @@ def zones_for(archetype: str, fmt: str) -> list:
 # retratos editoriais marcantes, makeup artístico colorido, luz dramática/colorida,
 # olhar firme, fundos com textura/caráter, cor saturada, energia Lampião.
 BRAND_PHOTO_STYLE = (
-    'TODXS editorial photography — BOLD and high-impact, magazine-cover quality. '
+    'TODXS editorial photography — BOLD and high-impact. '
     'Real, diverse LGBTQIA+ person (trans, travesti, non-binary; Black/brown skin; '
     'varied bodies and ages), CONFIDENT DIRECT GAZE into the camera. '
     'Expressive artistic styling: vivid colorful eyeshadow/makeup, characterful '
@@ -257,7 +257,7 @@ BRAND_PHOTO_STYLE = (
     'colored gel light, strong shadows, cinematic mood. Characterful background '
     '(worn textured wall, intimate interior with a window, OR clean studio backdrop). '
     'Rich saturated color, shallow depth of field, tack-sharp on the eyes. '
-    '1970s queer print-press energy (Lampião da Esquina) in a contemporary way. '
+    'Bold contemporary queer aesthetic energy. '
     'Authentic, dignified, powerful — NOT a generic stock photo.'
 )
 
@@ -275,12 +275,16 @@ def foto_region(archetype: str, fmt: str, W: int, H: int):
     return (0, 0, W, H)  # full-bleed
 
 
-def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: str) -> str:
+def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: str,
+                            brand_summary: str = '') -> str:
     """Prompt para o Gemini gerar o FUNDO (foto/cena), sem texto. '' = sem Gemini."""
     w = WIREFRAMES[archetype]
     tmpl = w.get('bg_prompt') or ''
     if not tmpl:
         return ''
+    brand_ctx = ''
+    if brand_summary:
+        brand_ctx = (f"BRAND CONTEXT (who this is for): {str(brand_summary).strip()[:700]}\n\n")
     pessoa = content.get('pessoa') or 'a diverse LGBTQIA+ person'
     f = FORMATOS[fmt]
     pw, ph = (int(x) for x in f['px'].split('x'))
@@ -292,14 +296,20 @@ def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: 
     else:
         shape = f'NEAR-SQUARE (about {fw}x{fh}px)'
     body = tmpl.replace('{PESSOA}', pessoa).replace('{COR}', color_hex)
+    titulo = ' '.join(str(content.get('titulo') or '').replace('\\n', ' ').split())
+    msg = (f"MESSAGE TO CONVEY: the photo must VISUALLY express the headline "
+           f'"{titulo}" — the subject, context, mood and action should connect to it, '
+           f"not be a generic portrait.\n\n") if titulo else ''
     return (
-        f"Editorial photo, {shape}. {body}\n\n"
+        f"Editorial photo, {shape}. {body}\n\n{brand_ctx}{msg}"
         f"FRAMING: TIGHT close-up / chest-up crop — the PERSON DOMINATES the frame, "
         f"filling ~75-85% of it; face and shoulders LARGE and prominent; eyes/head in the "
         f"upper-center; minimal empty background. Compose for THIS exact crop (nothing "
         f"important near the very bottom edge).\n\n"
         f"PHOTOGRAPHIC DIRECTION: {BRAND_PHOTO_STYLE}\n\n"
-        f"No watermark, no caption, no text, no UI, no logo, no color band.")
+        f"CRITICAL: this is a PHOTOGRAPH ONLY. ABSOLUTELY NO text of any kind anywhere "
+        f"in the image — no headlines, mastheads, captions, words, letters, numbers, "
+        f"watermark, logo, UI or color band. Just a clean, bold photo of the person.")
 
 
 def _zone_budget(z) -> str:

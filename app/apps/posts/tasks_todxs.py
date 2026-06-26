@@ -159,7 +159,8 @@ def generate_post_todxs_task(self, post_id: int):
     photo_png = None
     bg_info = {'mode': mode}
     if mode in ('photo', 'solid_photo', 'image'):
-        bg_prompt = build_background_prompt(archetype, content, color_hex, fmt)
+        bg_prompt = build_background_prompt(
+            archetype, content, color_hex, fmt, brand_summary=brand.get('kb_summary') or '')
         try:
             bg = generate_singleshot(prompt_text=bg_prompt, image_inputs=[])
             photo_png = bg['png_bytes']
