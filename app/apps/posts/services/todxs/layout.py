@@ -134,6 +134,8 @@ def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
             zc = z['color']
             if zc == 'ACCENT_LIGHT':
                 color = _lighten(color_hex, 0.72)
+            elif zc == 'ACCENT':
+                color = color_hex
             elif zc:
                 color = zc
             else:
@@ -156,7 +158,8 @@ def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
     seal = w.get('seal', {}).get(fmt)
     if need['selo'] and seal:
         els.append({'role': 'seal', 'x_pct': seal['x'], 'y_pct': seal['y'],
-                    'width_pct': seal['w'], 'style': w.get('seal_style', 'circle')})
+                    'width_pct': seal['w'], 'style': w.get('seal_style', 'circle'),
+                    'seal_color': w.get('seal_color')})
     wm = w.get('wordmark', {}).get(fmt)
     if need['wordmark'] and wm:
         logo_color = (w.get('wordmark_color')

@@ -193,7 +193,8 @@ def _expand_seals(elements, x_png_bytes):
             if not x_png_bytes:
                 continue
             if el.get('style') == 'bare':
-                uri = compose_simbolo_datauri(x_png_bytes)
+                uri = compose_simbolo_datauri(x_png_bytes,
+                                              color=_hex_to_rgb(el.get('seal_color') or '#F4F1D9'))
             else:
                 uri = compose_seal_datauri(x_png_bytes)
             if not uri:

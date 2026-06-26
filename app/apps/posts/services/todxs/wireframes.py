@@ -141,30 +141,31 @@ WIREFRAMES = {
         'name': 'Foto duotone (multiply) + faixa - variante mono',
         'formatos': ['feed'],
         'auto': False,          # so via force (selecao automatica fica p/ depois)
-        'fundo': 'photo',       # MESMA geracao do B (foto colorida) + multiply
-        'multiply': True,       # build_background aplica multiply da cor da faixa na foto
+        'fundo': 'photo',       # foto gerada no Gemini JA como duotone
+        'gemini_duotone': True, # bg_prompt pede DUOTONE na cor da faixa (sem multiply Pillow)
         'usa': {'selo': True, 'wordmark': False, 'specimen': False},
-        'seal_style': 'bare',   # simbolo = X puro (sem circulo), recolorido p/ contraste
-        'bg_prompt': ('full-bleed editorial COLOR photo of {PESSOA}, sharp focus throughout; '
+        'seal_style': 'bare',   # simbolo = X puro (sem circulo)
+        'seal_color': '#000000',  # asset PRETO
+        'bg_prompt': ('editorial portrait of {PESSOA}, sharp focus throughout; '
                       'frame the subject in the TOP ~68% of the image (the bottom will be '
                       'covered by a solid color band, so keep the subject high); '
-                      'vibrant, natural light, evenly composed; NO blurred bands or strips, '
-                      'NO text, NO logo, NO color band, NO graphic overlays.'),
-        'marca_desc': ('TEMA (kicker) top-left + four-petal X seal top-right over the photo; '
-                       'the photo is a MULTIPLY duotone in the band color.'),
+                      'evenly composed; NO blurred bands or strips, NO text, NO logo, '
+                      'NO color band, NO graphic overlays.'),
+        'marca_desc': ('TEMA (kicker) top-left + four-petal X (black) top-right over the photo; '
+                       'the photo is a monochromatic DUOTONE in the band color.'),
         # split do arquetipo_B_duotone.json: foto 70.26% / faixa 29.74%
         'band': {'feed': {'y': 70.26}},
         'zonas': {
             'feed': [
                 {'key': 'kicker', 'role': 'subtitulo', 'pos': 'tema top-left over photo',
                  'x': 6.18, 'y': 3.55, 'w': 29.95, 'h': 4.0, 'fs': 1.95, 'font': 'caps_small',
-                 'caps': True, 'align': 'left', 'color': 'ACCENT_LIGHT', 'max_linhas': 1,
+                 'caps': True, 'align': 'left', 'color': 'ACCENT', 'max_linhas': 1,
                  'leading': 1.0},
-                # titulo PRETO, ~largura total, centralizado vertical na faixa, leading 1.08.
+                # titulo PRETO, ~largura total, GRANDE, centralizado vertical na faixa.
                 {'key': 'titulo', 'role': 'titulo', 'pos': 'in band, almost full width',
-                 'x': 6.5, 'y': 70.26, 'w': 92.55, 'h': 29.74, 'fs': 5.8, 'font': 'medium',
+                 'x': 6.5, 'y': 70.26, 'w': 92.55, 'h': 29.74, 'fs': 7.4, 'font': 'medium',
                  'caps': True, 'align': 'left', 'color': '#000000', 'center_v': True,
-                 'leading': 1.08, 'max_linhas': 3},
+                 'leading': 1.06, 'max_linhas': 3},
             ],
         },
         'seal': {'feed': {'x': 86.69, 'y': 3.43, 'w': 6.97}},
@@ -334,13 +335,20 @@ def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: 
     msg = (f"MESSAGE TO CONVEY: the photo must VISUALLY express the headline "
            f'"{titulo}" — the subject, context, mood and action should connect to it, '
            f"not be a generic portrait.\n\n") if titulo else ''
+    duo = ''
+    if w.get('gemini_duotone'):
+        duo = (f"\n\nFINAL TREATMENT — DUOTONE: render the ENTIRE photo as a MONOCHROMATIC "
+               f"DUOTONE in the color {color_hex}. Every tone is a shade of {color_hex} "
+               f"(deep shadows ~black/dark {color_hex}, highlights ~light {color_hex}/white). "
+               f"NO other hues anywhere — a single-color {color_hex} duotone print look. "
+               f"Keep the bold styling and strong contrast, but unified in this one color.")
     return (
         f"Editorial photo, {shape}. {body}\n\n{brand_ctx}{msg}"
         f"FRAMING: TIGHT close-up / chest-up crop — the PERSON DOMINATES the frame, "
         f"filling ~75-85% of it; face and shoulders LARGE and prominent; eyes/head in the "
         f"upper-center; minimal empty background. Compose for THIS exact crop (nothing "
         f"important near the very bottom edge).\n\n"
-        f"PHOTOGRAPHIC DIRECTION: {BRAND_PHOTO_STYLE}\n\n"
+        f"PHOTOGRAPHIC DIRECTION: {BRAND_PHOTO_STYLE}{duo}\n\n"
         f"CRITICAL: this is a PHOTOGRAPH ONLY. ABSOLUTELY NO text of any kind anywhere "
         f"in the image — no headlines, mastheads, captions, words, letters, numbers, "
         f"watermark, logo, UI or color band. Just a clean, bold photo of the person.")
