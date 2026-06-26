@@ -227,7 +227,7 @@ WIREFRAMES = {
             'feed': [
                 # kicker com a MESMA altura de maiuscula do logotipo (medido por pixel)
                 {'key': 'kicker', 'role': 'subtitulo', 'pos': 'header top-left',
-                 'x': 7.12, 'y': 3.28, 'w': 70, 'h': 7, 'fs': 4.08, 'font': 'caps_small',
+                 'x': 7.12, 'y': 3.0, 'w': 70, 'h': 7, 'fs': 5.28, 'font': 'caps_small',
                  'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1},
                 # titulo DISPLAY/BLACK GIGANTE (heroi ~39%), leading apertado 0.95.
                 {'key': 'titulo', 'role': 'titulo', 'pos': 'display HERO (~39%)',
