@@ -148,8 +148,8 @@ def _cover(img, W, H):
 def build_background(archetype, fmt, color_hex, formato_px, photo_png=None):
     """Constroi o fundo (raw): 'solid' = campo de cor; 'photo'/'image' = foto/cena
     do Gemini (cover). Retorna PNG bytes."""
-    from PIL import Image
-    from .wireframes import background_mode, foto_region
+    from PIL import Image, ImageChops
+    from .wireframes import background_mode, foto_region, WIREFRAMES
     W, H = _parse_px(formato_px)
     mode = background_mode(archetype)
     img = Image.new('RGB', (W, H), _hex_to_rgb(color_hex))
@@ -158,22 +158,48 @@ def build_background(archetype, fmt, color_hex, formato_px, photo_png=None):
         # faixa, desenhada depois. Assim o Gemini compoe pro que realmente aparece.
         fx, fy, fw, fh = foto_region(archetype, fmt, W, H)
         photo = _cover(Image.open(io.BytesIO(photo_png)), fw, fh)
+        # Variante duotone: MULTIPLY da cor da faixa sobre a foto (mesma geracao do B).
+        if WIREFRAMES.get(archetype, {}).get('multiply'):
+            overlay = Image.new('RGB', photo.size, _hex_to_rgb(color_hex))
+            photo = ImageChops.multiply(photo.convert('RGB'), overlay)
         img.paste(photo, (fx, fy))
     buf = io.BytesIO()
     img.save(buf, 'PNG')
     return buf.getvalue()
 
 
+def compose_simbolo_datauri(x_png_bytes, color=_OFFWHITE):
+    """SIMBOLO 'bare' (sem circulo): o X recolorido p/ contraste, cortado no bbox."""
+    from PIL import Image
+    try:
+        x = Image.open(io.BytesIO(x_png_bytes)).convert('RGBA')
+        x = _recolor_opaque(x, color)
+        bbox = x.split()[3].getbbox()
+        if bbox:
+            x = x.crop(bbox)
+    except Exception:
+        return None
+    buf = io.BytesIO()
+    x.save(buf, 'PNG')
+    return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode('ascii')
+
+
 def _expand_seals(elements, x_png_bytes):
-    """Substitui elementos role='seal' por sticker (data URI) circulo+X."""
-    datauri = compose_seal_datauri(x_png_bytes) if x_png_bytes else None
+    """Substitui elementos role='seal' por sticker (data URI): 'circle' = circulo+X,
+    'bare' = X recolorido (off-white) sem circulo."""
     out = []
     for el in elements:
         if (el.get('role') or '') == 'seal':
-            if not datauri:
+            if not x_png_bytes:
+                continue
+            if el.get('style') == 'bare':
+                uri = compose_simbolo_datauri(x_png_bytes)
+            else:
+                uri = compose_seal_datauri(x_png_bytes)
+            if not uri:
                 continue
             out.append({
-                'role': 'image', 'url': datauri,
+                'role': 'image', 'url': uri,
                 'x_pct': el['x_pct'], 'y_pct': el['y_pct'],
                 'width_pct': el['width_pct'], 'height_pct': el['width_pct'],
                 '_todxs_seal': True,

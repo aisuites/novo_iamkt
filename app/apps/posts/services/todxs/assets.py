@@ -115,6 +115,22 @@ def get_reference_image(kb, reference_id):
     return {'id': r.id, 'name': r.title or f'ref {r.id}', 'url': url}
 
 
+def todxs_simbolo_url(kb):
+    """URL presigned do SIMBOLO oficial fixado (Grafismo X Preto 1).
+    Fallback: primeiro grafismo X ativo. Retorna URL ou None."""
+    from apps.knowledge.models import BrandgraficModule
+    from apps.core.services.s3_service import S3Service
+    g = (BrandgraficModule.objects.filter(knowledge_base=kb, name__icontains='Preto 1').first()
+         or BrandgraficModule.objects.filter(knowledge_base=kb, is_active=True).order_by('name').first()
+         or BrandgraficModule.objects.filter(knowledge_base=kb).first())
+    if not g:
+        return None
+    try:
+        return S3Service.generate_presigned_download_url(g.s3_key, expires_in=3600)
+    except Exception:
+        return g.s3_url
+
+
 def todxs_wordmark_url(kb):
     """URL presigned do WORDMARK oficial fixado (TODXS Logotipo Preto 7).
     Fallback: logo primario. Retorna URL ou None."""

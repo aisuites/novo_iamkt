@@ -98,7 +98,7 @@ def generate_post_todxs_task(self, post_id: int):
     })
     # Persiste o trace da etapa 1 ANTES de gerar imagem (inspecionavel mesmo se etapa 2 falhar)
     content = structured.get('content') or {}
-    archetype = (structured.get('archetype') or '').strip().upper()[:1]
+    archetype = (structured.get('archetype') or '').strip().upper()  # ex.: 'B', 'B_DUO'
     color_hex = structured.get('color_hex') or '#000000'
     color_name = structured.get('color_name') or ''
     todxs_ctx.update({
@@ -139,12 +139,11 @@ def generate_post_todxs_task(self, post_id: int):
     paleta = _kb_colors(kb)
     mode = background_mode(archetype)
 
-    # Assets de marca: X (p/ o selo, rotaciona) + logo (p/ wordmark)
-    post_count = Post.objects.filter(organization=org, pipeline_used='todxs').count()
-    graf = todxs_assets.pick_grafismo_x(kb, rotate_seed=post_count)
+    # Simbolo oficial fixado (Grafismo X Preto 1) p/ o selo/simbolo.
     x_png_bytes = None
-    if graf:
-        gb64, _ = _download_to_base64(graf['url'])
+    simbolo_url = todxs_assets.todxs_simbolo_url(kb)
+    if simbolo_url:
+        gb64, _ = _download_to_base64(simbolo_url)
         if gb64:
             x_png_bytes = base64.b64decode(gb64)
     # Wordmark oficial fixado (TODXS Logotipo Preto 7); fallback p/ logo primario.

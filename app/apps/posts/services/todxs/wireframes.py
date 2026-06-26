@@ -137,6 +137,40 @@ WIREFRAMES = {
         'avoid': ['straight horizontal cut between photo and band',
                   'feed: wordmark top-left + title in the band ONLY (no kicker, no seal)'],
     },
+    'B_DUO': {
+        'name': 'Foto duotone (multiply) + faixa - variante mono',
+        'formatos': ['feed'],
+        'auto': False,          # so via force (selecao automatica fica p/ depois)
+        'fundo': 'photo',       # MESMA geracao do B (foto colorida) + multiply
+        'multiply': True,       # build_background aplica multiply da cor da faixa na foto
+        'usa': {'selo': True, 'wordmark': False, 'specimen': False},
+        'seal_style': 'bare',   # simbolo = X puro (sem circulo), recolorido p/ contraste
+        'bg_prompt': ('full-bleed editorial COLOR photo of {PESSOA}, sharp focus throughout; '
+                      'frame the subject in the TOP ~68% of the image (the bottom will be '
+                      'covered by a solid color band, so keep the subject high); '
+                      'vibrant, natural light, evenly composed; NO blurred bands or strips, '
+                      'NO text, NO logo, NO color band, NO graphic overlays.'),
+        'marca_desc': ('TEMA (kicker) top-left + four-petal X seal top-right over the photo; '
+                       'the photo is a MULTIPLY duotone in the band color.'),
+        # split do arquetipo_B_duotone.json: foto 70.26% / faixa 29.74%
+        'band': {'feed': {'y': 70.26}},
+        'zonas': {
+            'feed': [
+                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'tema top-left over photo',
+                 'x': 6.18, 'y': 3.55, 'w': 29.95, 'h': 4.0, 'fs': 1.95, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': 'ACCENT_LIGHT', 'max_linhas': 1,
+                 'leading': 1.0},
+                # titulo PRETO, ~largura total, centralizado vertical na faixa, leading 1.08.
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'in band, almost full width',
+                 'x': 6.5, 'y': 70.26, 'w': 92.55, 'h': 29.74, 'fs': 5.8, 'font': 'medium',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'center_v': True,
+                 'leading': 1.08, 'max_linhas': 3},
+            ],
+        },
+        'seal': {'feed': {'x': 86.69, 'y': 3.43, 'w': 6.97}},
+        'avoid': ['no wordmark', 'photo in duotone/multiply of the band color',
+                  'tema top-left + X seal top-right'],
+    },
     'C': {
         'name': 'Manchete em cima - foto emoldurada',
         'formatos': ['feed'],
@@ -328,6 +362,8 @@ def describe_for_brain(fmt: str) -> str:
     lines = []
     for k in archetypes_for_format(fmt):
         w = WIREFRAMES[k]
+        if w.get('auto') is False:      # variantes (ex.: B_DUO) so via force
+            continue
         zs = [_zone_budget(z) for z in zones_for(k, fmt)]
         zonas = ' | '.join(zs) or '(sem texto de leitura)'
         lines.append(f"  {k} — {w['name']} | fundo={w['fundo']}\n      zonas: {zonas}")

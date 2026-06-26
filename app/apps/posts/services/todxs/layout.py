@@ -18,6 +18,19 @@ import io
 from .wireframes import WIREFRAMES, zones_for, assets_needed
 
 
+def _lighten(hex_color: str, amt: float = 0.72) -> str:
+    """Clareia a cor em direcao ao branco (amt 0..1). Para 'tom claro de destaque'."""
+    h = (hex_color or '#000000').lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    try:
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    except Exception:
+        return '#F4F1D9'
+    r = int(r + (255 - r) * amt); g = int(g + (255 - g) * amt); b = int(b + (255 - b) * amt)
+    return f'#{r:02X}{g:02X}{b:02X}'
+
+
 def _contrast_on(hex_color: str) -> str:
     h = (hex_color or '#000000').lstrip('#')
     if len(h) == 3:
@@ -118,7 +131,13 @@ def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
             total_h_pct = total_h_px / H * 100.0
             # valign: center_v centraliza dentro da caixa; senao topo
             draw_y = box_y + (box_h - total_h_pct) / 2.0 if z.get('center_v') else box_y
-            color = z['color'] or _contrast_on(color_hex)
+            zc = z['color']
+            if zc == 'ACCENT_LIGHT':
+                color = _lighten(color_hex, 0.72)
+            elif zc:
+                color = zc
+            else:
+                color = _contrast_on(color_hex)
             els.append({
                 'role': z['role'],
                 'content': '\n'.join(lines),
@@ -136,7 +155,8 @@ def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
     need = assets_needed(archetype, fmt)
     seal = w.get('seal', {}).get(fmt)
     if need['selo'] and seal:
-        els.append({'role': 'seal', 'x_pct': seal['x'], 'y_pct': seal['y'], 'width_pct': seal['w']})
+        els.append({'role': 'seal', 'x_pct': seal['x'], 'y_pct': seal['y'],
+                    'width_pct': seal['w'], 'style': w.get('seal_style', 'circle')})
     wm = w.get('wordmark', {}).get(fmt)
     if need['wordmark'] and wm:
         logo_color = (w.get('wordmark_color')
