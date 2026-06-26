@@ -126,8 +126,20 @@ def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
             max_h_px = box_h / 100.0 * H
             start_px = z['fs'] / 100.0 * basis
             max_lines = z.get('max_linhas', 4)
-            font, lines, size_px, total_h_px = _fit(
-                text, font_path, max_w_px, max_h_px, max_lines, start_px, draw, leading=leading)
+            if z.get('fixed_fs'):
+                # tamanho TRAVADO: usa o fs exato (nao encolhe) -> consistente
+                # entre posts, independente do texto. So quebra em linhas.
+                from PIL import ImageFont
+                try:
+                    font = ImageFont.truetype(font_path, max(8, int(start_px)))
+                except Exception:
+                    font = None
+                lines = _greedy_wrap(text, font, max_w_px, draw)[:max_lines] if font else [text]
+                size_px = int(start_px)
+                total_h_px = int(size_px * leading * len(lines))
+            else:
+                font, lines, size_px, total_h_px = _fit(
+                    text, font_path, max_w_px, max_h_px, max_lines, start_px, draw, leading=leading)
             total_h_pct = total_h_px / H * 100.0
             # valign: center_v centraliza dentro da caixa; senao topo
             draw_y = box_y + (box_h - total_h_pct) / 2.0 if z.get('center_v') else box_y

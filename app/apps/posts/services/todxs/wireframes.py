@@ -194,8 +194,9 @@ WIREFRAMES = {
         'zonas': {
             'feed': [
                 {'key': 'kicker', 'role': 'subtitulo', 'pos': 'header top-left (ex.: NOTICIA)',
-                 'x': 6.34, 'y': 3.06, 'w': 40, 'h': 4, 'fs': 2.2, 'font': 'caps_small',
-                 'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1},
+                 'x': 6.34, 'y': 3.06, 'w': 50, 'h': 4, 'fs': 2.2, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1,
+                 'fixed_fs': True},
                 # manchete grande (medium), ate 5 linhas, abaixo do cabecalho.
                 {'key': 'titulo', 'role': 'titulo', 'pos': 'headline below header (HERO, big)',
                  'x': 6.34, 'y': 8.19, 'w': 90.0, 'h': 30.0, 'fs': 13.0, 'font': 'medium',
@@ -227,8 +228,9 @@ WIREFRAMES = {
             'feed': [
                 # kicker com a MESMA altura de maiuscula do logotipo (medido por pixel)
                 {'key': 'kicker', 'role': 'subtitulo', 'pos': 'header top-left',
-                 'x': 7.12, 'y': 3.0, 'w': 70, 'h': 7, 'fs': 5.28, 'font': 'caps_small',
-                 'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1},
+                 'x': 7.12, 'y': 3.0, 'w': 80, 'h': 7, 'fs': 5.28, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1,
+                 'fixed_fs': True},
                 # titulo DISPLAY/BLACK GIGANTE (heroi ~39%), leading apertado 0.95.
                 {'key': 'titulo', 'role': 'titulo', 'pos': 'display HERO (~39%)',
                  'x': 6.8, 'y': 11.5, 'w': 86.71, 'h': 39.27, 'fs': 15.0, 'font': 'display',
