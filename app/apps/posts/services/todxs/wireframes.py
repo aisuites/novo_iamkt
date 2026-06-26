@@ -245,17 +245,34 @@ def zones_for(archetype: str, fmt: str) -> list:
     return WIREFRAMES[archetype].get('zonas', {}).get(fmt, [])
 
 
+# Direção fotográfica da TODXS (extraída dos dossiês das referências da KB):
+# retratos editoriais marcantes, makeup artístico colorido, luz dramática/colorida,
+# olhar firme, fundos com textura/caráter, cor saturada, energia Lampião.
+BRAND_PHOTO_STYLE = (
+    'TODXS editorial photography — BOLD and high-impact, magazine-cover quality. '
+    'Real, diverse LGBTQIA+ person (trans, travesti, non-binary; Black/brown skin; '
+    'varied bodies and ages), CONFIDENT DIRECT GAZE into the camera. '
+    'Expressive artistic styling: vivid colorful eyeshadow/makeup, characterful '
+    'wardrobe with saturated colors. DRAMATIC lighting — directional or a saturated '
+    'colored gel light, strong shadows, cinematic mood. Characterful background '
+    '(worn textured wall, intimate interior with a window, OR clean studio backdrop). '
+    'Rich saturated color, shallow depth of field, tack-sharp on the eyes. '
+    '1970s queer print-press energy (Lampião da Esquina) in a contemporary way. '
+    'Authentic, dignified, powerful — NOT a generic stock photo.'
+)
+
+
 def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: str) -> str:
     """Prompt para o Gemini gerar o FUNDO (foto/cena), sem texto. '' = sem Gemini."""
     w = WIREFRAMES[archetype]
     tmpl = w.get('bg_prompt') or ''
     if not tmpl:
         return ''
-    pessoa = content.get('pessoa') or 'a diverse LGBTQIA+ person, expressive, natural'
+    pessoa = content.get('pessoa') or 'a diverse LGBTQIA+ person'
     f = FORMATOS[fmt]
     body = tmpl.replace('{PESSOA}', pessoa).replace('{COR}', color_hex)
-    return (f"{f['ratio']} ({f['px']}) {body} Editorial documentary photography for TODXS, "
-            f"a Brazilian LGBTQIA+ NGO. No watermark, no caption, no UI.")
+    return (f"{f['ratio']} ({f['px']}) {body}\n\nPHOTOGRAPHIC DIRECTION: {BRAND_PHOTO_STYLE}\n\n"
+            f"No watermark, no caption, no text, no UI, no logo.")
 
 
 def _zone_budget(z) -> str:
