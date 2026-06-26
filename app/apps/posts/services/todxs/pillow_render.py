@@ -156,13 +156,14 @@ def build_background(archetype, fmt, color_hex, formato_px, photo_png=None):
     W, H = _parse_px(formato_px)
     mode = background_mode(archetype)
     img = Image.new('RGB', (W, H), _hex_to_rgb(color_hex))
-    if mode in ('photo', 'image') and photo_png:
-        # Cola a foto EXATAMENTE na regiao visivel (cover-crop) -> o resto e a
-        # faixa, desenhada depois. Assim o Gemini compoe pro que realmente aparece.
+    if mode in ('photo', 'solid_photo', 'image') and photo_png:
+        # Cola a foto na regiao visivel (faixa: topo; frame: miolo) cover-crop.
         fx, fy, fw, fh = foto_region(archetype, fmt, W, H)
         photo = _cover(Image.open(io.BytesIO(photo_png)), fw, fh)
-        # Variante duotone: MULTIPLY da cor da faixa sobre a foto (mesma geracao do B).
-        if WIREFRAMES.get(archetype, {}).get('multiply'):
+        aw = WIREFRAMES.get(archetype, {})
+        if aw.get('grayscale'):                 # foto P&B (arquetipo C)
+            photo = photo.convert('L').convert('RGB')
+        if aw.get('multiply'):                  # duotone (B_DUO): multiply da cor
             overlay = Image.new('RGB', photo.size, _hex_to_rgb(color_hex))
             photo = ImageChops.multiply(photo.convert('RGB'), overlay)
         img.paste(photo, (fx, fy))

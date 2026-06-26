@@ -179,29 +179,36 @@ WIREFRAMES = {
                   'tema top-left + X seal top-right'],
     },
     'C': {
-        'name': 'Manchete em cima - foto emoldurada',
+        'name': 'Manchete em cima + foto P&B emoldurada no miolo',
         'formatos': ['feed'],
-        'fundo': 'solid_photo',        # Pillow: campo de cor + foto colada (emoldurada)
-        'usa': {'selo': False, 'wordmark': True, 'specimen': True},
-        'bg_prompt': ('full-bleed editorial COLOR photo of {PESSOA}, american shot, vibrant; '
-                      'NO text, NO logo, NO border.'),
-        'marca_desc': 'the "TODXS" wordmark at top-right.',
-        'photo_frame': {'feed': {'x': 6, 'y': 40, 'w': 88, 'h': 40}},
+        'fundo': 'solid_photo',        # campo de cor solido + foto emoldurada (Gemini)
+        'grayscale': True,             # foto em P&B (grayscale)
+        'usa': {'selo': False, 'wordmark': True, 'specimen': False},
+        'wordmark_color': '#000000',   # wordmark PRETO no topo-direita sobre a cor
+        'bg_prompt': ('editorial portrait of {PESSOA}, sharp focus; '
+                      'NO text, NO logo, NO border, NO frame.'),
+        'marca_desc': ('KICKER (e.g. NOTICIA) top-left + "TODXS" wordmark top-right on the same '
+                       'baseline; a BLACK-AND-WHITE framed photo in the middle, on a solid color field.'),
+        # foto emoldurada no miolo (arquetipo_C.json): margens laterais ~6.3%.
+        'photo_frame': {'feed': {'x': 6.34, 'y': 38.75, 'w': 86.85, 'h': 41.2}},
         'zonas': {
             'feed': [
-                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'top-left header',
-                 'x': 6, 'y': 5, 'w': 50, 'h': 5, 'fs': 2.4, 'font': 'caps_small',
-                 'caps': True, 'align': 'left', 'color': None},
-                {'key': 'titulo', 'role': 'titulo', 'pos': 'below header, large',
-                 'x': 6, 'y': 12, 'w': 88, 'h': 24, 'fs': 9.0, 'font': 'display',
-                 'caps': True, 'align': 'left', 'color': None},
+                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'header top-left (ex.: NOTICIA)',
+                 'x': 6.34, 'y': 3.06, 'w': 40, 'h': 4, 'fs': 2.2, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1},
+                # manchete grande (medium), ate 5 linhas, abaixo do cabecalho.
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'headline below header (HERO, big)',
+                 'x': 6.34, 'y': 8.19, 'w': 90.0, 'h': 30.0, 'fs': 13.0, 'font': 'medium',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'leading': 1.02,
+                 'max_linhas': 5},
                 {'key': 'apoio', 'role': 'subtitulo', 'pos': 'below the photo',
-                 'x': 6, 'y': 84, 'w': 88, 'h': 10, 'fs': 2.8, 'font': 'regular',
-                 'caps': False, 'align': 'left', 'color': None},
+                 'x': 6.02, 'y': 83.86, 'w': 87.48, 'h': 10.88, 'fs': 2.6, 'font': 'regular',
+                 'caps': False, 'align': 'left', 'color': '#000000', 'leading': 1.4,
+                 'max_linhas': 3},
             ],
         },
-        'wordmark': {'feed': {'x': 66, 'y': 4, 'w': 28}},
-        'avoid': ['no band', 'black text on the color field'],
+        'wordmark': {'feed': {'x': 84.94, 'y': 3.55, 'w': 8.24}},
+        'avoid': ['no band', 'black text on the solid color field', 'photo is BLACK AND WHITE'],
     },
     'D': {
         'name': 'Retrato full-bleed + wordmark gigante (peca de marca, SEM texto)',
@@ -291,8 +298,10 @@ def zones_for(archetype: str, fmt: str) -> list:
 # olhar firme, fundos com textura/caráter, cor saturada, energia Lampião.
 BRAND_PHOTO_STYLE = (
     'TODXS editorial photography — BOLD and high-impact. '
-    'Real, diverse LGBTQIA+ person (trans, travesti, non-binary; Black/brown skin; '
-    'varied bodies and ages), CONFIDENT DIRECT GAZE into the camera. '
+    'Real LGBTQIA+ person whose QUEER identity reads clearly and connects to the topic '
+    '(gay man, lesbian woman, bi, trans, travesti or non-binary — choose to fit the theme); '
+    'VARIED ethnicity reflecting Brazilian diversity (Black, brown, white, Indigenous, Asian), '
+    'varied bodies and ages; CONFIDENT DIRECT GAZE into the camera. '
     'Expressive artistic styling: vivid colorful eyeshadow/makeup, characterful '
     'wardrobe with saturated colors. DRAMATIC lighting — directional or a saturated '
     'colored gel light, strong shadows, cinematic mood. Characterful background '
@@ -338,9 +347,16 @@ def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: 
         shape = f'NEAR-SQUARE (about {fw}x{fh}px)'
     body = tmpl.replace('{PESSOA}', pessoa).replace('{COR}', color_hex)
     titulo = ' '.join(str(content.get('titulo') or '').replace('\\n', ' ').split())
-    msg = (f"MESSAGE TO CONVEY: the photo must VISUALLY express the headline "
-           f'"{titulo}" — the subject, context, mood and action should connect to it, '
-           f"not be a generic portrait.\n\n") if titulo else ''
+    apoio = ' '.join(str(content.get('apoio') or '').replace('\\n', ' ').split())
+    if titulo:
+        ctx = f'headline "{titulo}"' + (f' — support text: "{apoio[:200]}"' if apoio else '')
+        msg = (f"MESSAGE TO CONVEY: the photo must VISUALLY express this post ({ctx}). "
+               f"The subject and scene should CONNECT to the topic AND clearly read as part "
+               f"of the LGBTQIA+ community relevant to it (a visibly queer person — e.g. a "
+               f"gay/lesbian/trans person, or pride/affection cues) — NOT a generic portrait, "
+               f"NOT a purely racial/ethnic read disconnected from the queer theme.\n\n")
+    else:
+        msg = ''
     duo = ''
     if w.get('gemini_duotone'):
         duo = (f"\n\nFINAL TREATMENT — DUOTONE: render the ENTIRE photo as a MONOCHROMATIC "
@@ -365,8 +381,14 @@ def _zone_budget(z) -> str:
     n = z.get('max_linhas')
     if z.get('is_blocks'):
         return f"{z['key']} (2-3 blocos curtos, ~{n or 2} linhas cada)"
-    if z['font'] == 'display':
-        return f"{z['key']} (DISPLAY: CURTO e impactante, <= {n or 2} linhas / poucas palavras)"
+    if z['key'] == 'titulo':
+        if z['font'] == 'display':
+            return f"titulo (DISPLAY: CURTO e impactante, <= {n or 2} linhas / poucas palavras)"
+        # titulo nao-display com varias linhas = MANCHETE jornalistica completa
+        if (n or 0) >= 4:
+            return (f"titulo (MANCHETE jornalistica COMPLETA: escreva a FRASE INTEIRA da "
+                    f"noticia, ~12 a 16 palavras, para encher ~{n} linhas)")
+        return f"titulo (CAIXA ALTA, curto, <= {n or 3} linhas)"
     cab = 'caixa alta' if z.get('caps') else 'caixa normal'
     return f"{z['key']} ({cab}, ate {n or 3} linhas)"
 
