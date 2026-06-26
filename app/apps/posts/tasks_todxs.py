@@ -147,8 +147,11 @@ def generate_post_todxs_task(self, post_id: int):
         gb64, _ = _download_to_base64(graf['url'])
         if gb64:
             x_png_bytes = base64.b64decode(gb64)
-    logos = list(_logos_from_org(org, post=post))
-    logo_url = logos[0] if logos else None
+    # Wordmark oficial fixado (TODXS Logotipo Preto 7); fallback p/ logo primario.
+    logo_url = todxs_assets.todxs_wordmark_url(kb)
+    if not logo_url:
+        logos = list(_logos_from_org(org, post=post))
+        logo_url = logos[0] if logos else None
 
     # ---------------- Etapa 2: FUNDO ----------------
     # solid -> Pillow desenha o campo de cor; photo/solid_photo/image -> Gemini gera

@@ -100,18 +100,25 @@ WIREFRAMES = {
         # story (peca 04): selo top-left + wordmark na assinatura (rodape direito).
         'usa': {'selo': {'feed': False, 'story': True},
                 'wordmark': {'feed': True, 'story': True}, 'specimen': False},
-        'bg_prompt': ('full-bleed editorial COLOR photo of {PESSOA}, sharp focus throughout, '
-                      'subject in the upper-center of the frame; documentary, vibrant, natural '
-                      'light, evenly composed; NO blurred bands or strips, NO text, NO logo, '
-                      'NO color band, NO graphic overlays.'),
+        'bg_prompt': ('full-bleed editorial COLOR photo of {PESSOA}, sharp focus throughout; '
+                      'frame the subject in the TOP ~65% of the image (the bottom third will be '
+                      'covered by a solid color band, so keep the subject high); documentary, '
+                      'vibrant, natural light, evenly composed; NO blurred bands or strips, '
+                      'NO text, NO logo, NO color band, NO graphic overlays.'),
         'marca_desc': ('feed: the "TODXS" wordmark at top-left over the photo. '
                        f'story: {SELO_DESC} at top-left + the wordmark in the bottom signature.'),
-        'band': {'feed': {'y': 69}, 'story': {'y': 52}},   # faixa do y% ate 100%
+        # split do JSON: foto 67.77% / faixa 32.23%
+        'band': {'feed': {'y': 67.77}, 'story': {'y': 52}},
+        'wordmark_color': '#000000',   # B: wordmark SEMPRE preto (decisao do dono)
         'zonas': {
             'feed': [
-                {'key': 'titulo', 'role': 'titulo', 'pos': 'inside the bottom color band',
-                 'x': 6, 'y': 72, 'w': 88, 'h': 24, 'fs': 9.0, 'font': 'medium',
-                 'caps': True, 'align': 'left', 'color': None, 'center_v': True},
+                # coords do arquetipo_B.json; titulo PRETO, Ana Banana Medium,
+                # centralizado vertical na faixa, leading 1.05.
+                # box = faixa inteira (67.77->100) + center_v -> respiro igual em cima/baixo.
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'centered in the bottom color band',
+                 'x': 7.61, 'y': 67.77, 'w': 70.52, 'h': 32.23, 'fs': 7.2, 'font': 'medium',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'center_v': True,
+                 'leading': 1.05, 'max_linhas': 3},
             ],
             'story': [
                 {'key': 'titulo', 'role': 'titulo', 'pos': 'inside the band (top)',
@@ -126,7 +133,7 @@ WIREFRAMES = {
             ],
         },
         'seal': {'story': {'x': 7, 'y': 3, 'w': 15}},
-        'wordmark': {'feed': {'x': 6, 'y': 5, 'w': 22}, 'story': {'x': 70, 'y': 92, 'w': 23}},
+        'wordmark': {'feed': {'x': 6.34, 'y': 3.42, 'w': 19.18}, 'story': {'x': 70, 'y': 92, 'w': 23}},
         'avoid': ['straight horizontal cut between photo and band',
                   'feed: wordmark top-left + title in the band ONLY (no kicker, no seal)'],
     },

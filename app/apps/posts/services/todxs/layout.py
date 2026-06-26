@@ -139,7 +139,8 @@ def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
         els.append({'role': 'seal', 'x_pct': seal['x'], 'y_pct': seal['y'], 'width_pct': seal['w']})
     wm = w.get('wordmark', {}).get(fmt)
     if need['wordmark'] and wm:
-        logo_color = _contrast_on(color_hex) if w.get('fundo') == 'solid' else '#F4F1D9'
+        logo_color = (w.get('wordmark_color')
+                      or (_contrast_on(color_hex) if w.get('fundo') == 'solid' else '#F4F1D9'))
         els.append({'role': 'logo', 'x_pct': wm['x'], 'y_pct': wm['y'],
                     'width_pct': wm['w'], 'logo_color': logo_color})
 

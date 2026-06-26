@@ -115,6 +115,22 @@ def get_reference_image(kb, reference_id):
     return {'id': r.id, 'name': r.title or f'ref {r.id}', 'url': url}
 
 
+def todxs_wordmark_url(kb):
+    """URL presigned do WORDMARK oficial fixado (TODXS Logotipo Preto 7).
+    Fallback: logo primario. Retorna URL ou None."""
+    from apps.knowledge.models import Logo
+    from apps.core.services.s3_service import S3Service
+    logo = (Logo.objects.filter(knowledge_base=kb, name__icontains='Preto 7').first()
+            or Logo.objects.filter(knowledge_base=kb, is_primary=True).first()
+            or Logo.objects.filter(knowledge_base=kb).first())
+    if not logo:
+        return None
+    try:
+        return S3Service.generate_presigned_download_url(logo.s3_key, expires_in=3600)
+    except Exception:
+        return logo.s3_url
+
+
 def render_ana_banana_specimen(kb, text: str):
     """
     Renderiza um PNG com a manchete na Ana Banana Black (fonte real do S3), para
