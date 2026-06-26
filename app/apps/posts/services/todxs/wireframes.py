@@ -225,9 +225,9 @@ WIREFRAMES = {
         'photo_frame': {'feed': {'x': 6.8, 'y': 54.27, 'w': 87.34, 'h': 41.1}},
         'zonas': {
             'feed': [
-                # kicker DOBRO do tamanho (fs ~4 vs 2)
+                # kicker com a MESMA altura de maiuscula do logotipo (fs medido = 5.28)
                 {'key': 'kicker', 'role': 'subtitulo', 'pos': 'header top-left',
-                 'x': 7.12, 'y': 3.0, 'w': 60, 'h': 6, 'fs': 4.0, 'font': 'caps_small',
+                 'x': 7.12, 'y': 3.0, 'w': 70, 'h': 7, 'fs': 5.28, 'font': 'caps_small',
                  'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1},
                 # titulo DISPLAY/BLACK GIGANTE (heroi ~39%), leading apertado 0.95.
                 {'key': 'titulo', 'role': 'titulo', 'pos': 'display HERO (~39%)',
