@@ -210,6 +210,35 @@ WIREFRAMES = {
         'wordmark': {'feed': {'x': 84.94, 'y': 3.55, 'w': 8.24}},
         'avoid': ['no band', 'black text on the solid color field', 'photo is BLACK AND WHITE'],
     },
+    'C_DISPLAY': {
+        'name': 'Manchete display + foto colorida na base (variante)',
+        'formatos': ['feed'],
+        'auto': False,                 # so via force
+        'fundo': 'solid_photo',        # campo de cor + foto COLORIDA emoldurada (sem grayscale)
+        'usa': {'selo': False, 'wordmark': True, 'specimen': True},
+        'wordmark_color': '#000000',
+        'bg_prompt': ('editorial portrait of {PESSOA}, sharp focus, vibrant; '
+                      'NO text, NO logo, NO border, NO frame.'),
+        'marca_desc': ('KICKER top-left + "TODXS" wordmark top-right; a BIG display headline is '
+                       'the hero; a COLOR framed photo anchored at the base. No support text.'),
+        # foto colorida ancorada na BASE (arquetipo_C_display.json).
+        'photo_frame': {'feed': {'x': 6.8, 'y': 54.27, 'w': 87.34, 'h': 41.1}},
+        'zonas': {
+            'feed': [
+                {'key': 'kicker', 'role': 'subtitulo', 'pos': 'header top-left',
+                 'x': 7.12, 'y': 3.17, 'w': 40, 'h': 4, 'fs': 2.0, 'font': 'caps_small',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'max_linhas': 1},
+                # titulo DISPLAY/BLACK gigante (heroi ~39%), leading apertado 0.95.
+                {'key': 'titulo', 'role': 'titulo', 'pos': 'display HERO (~39%)',
+                 'x': 6.8, 'y': 10.0, 'w': 86.71, 'h': 39.27, 'fs': 11.5, 'font': 'display',
+                 'caps': True, 'align': 'left', 'color': '#000000', 'leading': 0.95,
+                 'max_linhas': 4},
+            ],
+        },
+        'wordmark': {'feed': {'x': 85.6, 'y': 3.54, 'w': 7.91}},
+        'avoid': ['no support text (the title carries the piece)',
+                  'COLOR framed photo anchored at the base', 'black display headline on the color field'],
+    },
     'D': {
         'name': 'Retrato full-bleed + wordmark gigante (peca de marca, SEM texto)',
         'formatos': ['feed'],
