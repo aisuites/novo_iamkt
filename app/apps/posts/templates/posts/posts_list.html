@@ -1357,13 +1357,25 @@ function toggleCarrossel() {
     });
 
     // ── Fechar ─────────────────────────────────────────────────────────────
-    function _saveElements(postId, els) {
+    async function _saveElements(postId, els) {
         if (!postId || !els || !els.length) return;
-        fetch(`/posts/${postId}/save-elements/`, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ elements: els }),
-        }).catch(() => {});
+        try {
+            const r = await fetch(`/posts/${postId}/save-elements/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ elements: els }),
+            });
+            const d = await r.json().catch(() => ({}));
+            // Atualiza o preview da pagina com a arte re-renderizada (TODXS).
+            if (d && d.image_url) {
+                const frame = document.getElementById('postImageFrame');
+                const img = frame && frame.querySelector('img');
+                if (img) { img.removeAttribute('data-lazy-load'); img.src = d.image_url; }
+                // avisa o posts.js (caso queira sincronizar o estado/galeria)
+                window.dispatchEvent(new CustomEvent('todxs:image-updated',
+                    { detail: { postId: postId, url: d.image_url } }));
+            }
+        } catch (e) { /* best-effort */ }
     }
     function closeModal() {
         const pid = currentPostId;

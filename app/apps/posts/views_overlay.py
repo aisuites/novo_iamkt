@@ -452,7 +452,54 @@ def save_elements(request, post_id):
         return JsonResponse({'error': 'invalid_json'}, status=400)
 
     _save_elements(post.pk, elements)
-    return JsonResponse({'ok': True})
+
+    # TODXS: re-renderiza e ATUALIZA a imagem publicada, para o preview da pagina
+    # refletir as edicoes (senao o usuario so ve a mudanca abrindo o editor).
+    image_url = None
+    if post.pipeline_used == 'todxs':
+        try:
+            image_url = _todxs_rerender_published(post, elements)
+        except Exception:
+            logger.exception('[overlay] re-render todxs (save) falhou post=%s', post.id)
+    return JsonResponse({'ok': True, 'image_url': image_url})
+
+
+def _todxs_rerender_published(post, elements):
+    """Redesenha a arte do post todxs (draw_todxs) a partir do fundo + elementos
+    editados e atualiza post.image_s3_key/url + a PostImage ativa. Retorna a URL."""
+    import base64 as _b64
+    from apps.posts.models import PostImage
+    from apps.knowledge.models import KnowledgeBase
+    from apps.posts.services.todxs.pillow_render import draw_todxs
+    from apps.posts.services.todxs.assets import todxs_wordmark_url
+    from apps.posts.tasks import _upload_image_to_s3
+    from apps.core.services.s3_service import S3Service
+
+    raw_data = _download_as_data_uri(_get_raw_image_url(post))
+    if not raw_data:
+        return None
+    _, _, payload = raw_data.partition(',')
+    bg_bytes = _b64.b64decode(payload)
+    cw, ch = _get_canvas(post)
+    kb = KnowledgeBase.objects.filter(organization=post.organization).first()
+    logo_url = todxs_wordmark_url(kb) if kb else _get_logo_url(post)
+    els = _prepare_stickers_for_export(elements)
+    png = draw_todxs(bg_bytes, els, cw, ch, logo_url=logo_url)
+
+    old_key = post.image_s3_key
+    key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
+                                   png_bytes=png, mime_type='image/png')
+    if old_key:
+        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    post.image_s3_key, post.image_s3_url = key, url
+    gi = post.generated_images if isinstance(post.generated_images, list) else []
+    gi.append({'s3_key': key, 'url': url})
+    post.generated_images = gi
+    post.save(update_fields=['image_s3_key', 'image_s3_url', 'generated_images'])
+    try:
+        return S3Service.generate_presigned_download_url(key, expires_in=86400)
+    except Exception:
+        return url
 
 
 async def _playwright_screenshot(html: str, width: int, height: int) -> bytes:
