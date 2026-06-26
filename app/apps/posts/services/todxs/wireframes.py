@@ -262,6 +262,19 @@ BRAND_PHOTO_STYLE = (
 )
 
 
+def foto_region(archetype: str, fmt: str, W: int, H: int):
+    """(x,y,w,h) px da AREA VISIVEL da foto (acima da faixa, ou frame, ou full)."""
+    w = WIREFRAMES[archetype]
+    band = w.get('band', {}).get(fmt)
+    if band:
+        return (0, 0, W, int(round(band['y'] / 100.0 * H)))
+    frame = w.get('photo_frame', {}).get(fmt)
+    if frame:
+        return (int(frame['x'] / 100.0 * W), int(frame['y'] / 100.0 * H),
+                int(frame['w'] / 100.0 * W), int(frame['h'] / 100.0 * H))
+    return (0, 0, W, H)  # full-bleed
+
+
 def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: str) -> str:
     """Prompt para o Gemini gerar o FUNDO (foto/cena), sem texto. '' = sem Gemini."""
     w = WIREFRAMES[archetype]
@@ -270,9 +283,23 @@ def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: 
         return ''
     pessoa = content.get('pessoa') or 'a diverse LGBTQIA+ person'
     f = FORMATOS[fmt]
+    pw, ph = (int(x) for x in f['px'].split('x'))
+    _, _, fw, fh = foto_region(archetype, fmt, pw, ph)
+    if fw > fh * 1.07:
+        shape = f'SLIGHTLY LANDSCAPE (wider than tall, about {fw}x{fh}px)'
+    elif fh > fw * 1.07:
+        shape = f'PORTRAIT (taller than wide, about {fw}x{fh}px)'
+    else:
+        shape = f'NEAR-SQUARE (about {fw}x{fh}px)'
     body = tmpl.replace('{PESSOA}', pessoa).replace('{COR}', color_hex)
-    return (f"{f['ratio']} ({f['px']}) {body}\n\nPHOTOGRAPHIC DIRECTION: {BRAND_PHOTO_STYLE}\n\n"
-            f"No watermark, no caption, no text, no UI, no logo.")
+    return (
+        f"Editorial photo, {shape}. {body}\n\n"
+        f"FRAMING: TIGHT close-up / chest-up crop — the PERSON DOMINATES the frame, "
+        f"filling ~75-85% of it; face and shoulders LARGE and prominent; eyes/head in the "
+        f"upper-center; minimal empty background. Compose for THIS exact crop (nothing "
+        f"important near the very bottom edge).\n\n"
+        f"PHOTOGRAPHIC DIRECTION: {BRAND_PHOTO_STYLE}\n\n"
+        f"No watermark, no caption, no text, no UI, no logo, no color band.")
 
 
 def _zone_budget(z) -> str:

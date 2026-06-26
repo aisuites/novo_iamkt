@@ -149,14 +149,16 @@ def build_background(archetype, fmt, color_hex, formato_px, photo_png=None):
     """Constroi o fundo (raw): 'solid' = campo de cor; 'photo'/'image' = foto/cena
     do Gemini (cover). Retorna PNG bytes."""
     from PIL import Image
-    from .wireframes import background_mode
+    from .wireframes import background_mode, foto_region
     W, H = _parse_px(formato_px)
     mode = background_mode(archetype)
+    img = Image.new('RGB', (W, H), _hex_to_rgb(color_hex))
     if mode in ('photo', 'image') and photo_png:
-        img = _cover(Image.open(io.BytesIO(photo_png)), W, H)
-    else:
-        # solid / solid_photo / fallback sem foto
-        img = Image.new('RGB', (W, H), _hex_to_rgb(color_hex))
+        # Cola a foto EXATAMENTE na regiao visivel (cover-crop) -> o resto e a
+        # faixa, desenhada depois. Assim o Gemini compoe pro que realmente aparece.
+        fx, fy, fw, fh = foto_region(archetype, fmt, W, H)
+        photo = _cover(Image.open(io.BytesIO(photo_png)), fw, fh)
+        img.paste(photo, (fx, fy))
     buf = io.BytesIO()
     img.save(buf, 'PNG')
     return buf.getvalue()
