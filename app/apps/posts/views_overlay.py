@@ -215,13 +215,19 @@ def export_png(request, post_id):
         logger.error('[overlay] base do fundo invalida para export post=%s', post_id)
         return JsonResponse({'error': 'image_download_failed'}, status=500)
 
-    from apps.posts.services.gemini_image_generator import render_layout_document
     try:
-        png_bytes = render_layout_document(
-            bg_bytes, elements, paleta=None, fonts=font_paths, logo_url=logo_url,
-        )
+        if post.pipeline_used == 'todxs':
+            # TODXS: usa o desenhador DEDICADO (mesmo do publicado) -> respeita
+            # leading/quebras por elemento. render_layout_document ignoraria isso.
+            from apps.posts.services.todxs.pillow_render import draw_todxs
+            png_bytes = draw_todxs(bg_bytes, elements, canvas_w, canvas_h, logo_url=logo_url)
+        else:
+            from apps.posts.services.gemini_image_generator import render_layout_document
+            png_bytes = render_layout_document(
+                bg_bytes, elements, paleta=None, fonts=font_paths, logo_url=logo_url,
+            )
     except Exception:
-        logger.exception('[overlay] render Pillow (export) falhou post=%s', post_id)
+        logger.exception('[overlay] render (export) falhou post=%s', post_id)
         return JsonResponse({'error': 'render_failed'}, status=500)
 
     response = HttpResponse(png_bytes, content_type='image/png')
