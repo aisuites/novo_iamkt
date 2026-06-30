@@ -148,8 +148,43 @@ def get_org_assets(request):
         except Exception:
             logger.exception('Falha ao listar references')
 
+    # Modo "Usar template": arquetipos (catalogo) + paleta da marca. So quando a
+    # org tem o seletor habilitado (orgs normais nao pagam esse custo).
+    archetype_enabled = bool(getattr(org, 'archetype_selector_enabled', False))
+    archetypes_data = []
+    palette_data = []
+    if archetype_enabled and asset_type in ('archetypes', 'all'):
+        try:
+            from apps.posts.models import PostArchetype
+            rows = (PostArchetype.objects
+                    .filter(organization=org, is_active=True)
+                    .select_related('thumbnail')
+                    .order_by('order', 'key'))
+            for a in rows:
+                archetypes_data.append({
+                    'key': a.key,
+                    'name': a.name,
+                    'description': a.description or '',
+                    'format': a.format,          # feed | story | both
+                    'order': a.order,
+                    'thumbnail_url': _presign(a.thumbnail.s3_key) if a.thumbnail_id else '',
+                })
+        except Exception:
+            logger.exception('Falha ao listar arquetipos')
+        try:
+            from apps.posts.tasks import _kb_colors
+            for c in (_kb_colors(kb) or []):
+                hexv = c.get('hex')
+                if hexv:
+                    palette_data.append({'nome': c.get('nome') or '', 'hex': hexv})
+        except Exception:
+            logger.exception('Falha ao montar paleta')
+
     return JsonResponse({
         'success': True,
         'logos': logos_data,
         'references': refs_data,
+        'archetype_selector_enabled': archetype_enabled,
+        'archetypes': archetypes_data,
+        'palette': palette_data,
     })

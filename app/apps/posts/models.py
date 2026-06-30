@@ -718,3 +718,51 @@ class PostGenerationMetric(models.Model):
 
     def __str__(self):
         return f"Post #{self.post_id} - {self.method_used}"
+
+
+class PostArchetype(models.Model):
+    """
+    Catálogo de ARQUÉTIPOS (templates de layout) por organização.
+
+    `spec` (JSON) é a ficha de layout que o renderizador determinístico da TODXS
+    lê (data-driven): zonas, coordenadas, fontes, tratamento de foto, etc. — o
+    mesmo conteúdo que vivia em services/todxs/wireframes.py. Assim dá pra fazer
+    correções pontuais via admin (e, futuramente, um agente preenche a spec a
+    partir de wireframe+imagem).
+    """
+    FORMATS = [
+        ('feed', 'Feed 4:5'),
+        ('story', 'Story 9:16'),
+        ('both', 'Feed e Story'),
+    ]
+    organization = models.ForeignKey(
+        'core.Organization', on_delete=models.CASCADE,
+        related_name='archetypes', verbose_name='Organização')
+    key = models.CharField(
+        max_length=40, verbose_name='Chave',
+        help_text='Identificador do arquétipo (ex.: A, B, B_DUO, C, C_DISPLAY)')
+    name = models.CharField(max_length=120, verbose_name='Nome')
+    description = models.CharField(max_length=300, blank=True, default='', verbose_name='Descrição')
+    format = models.CharField(max_length=10, choices=FORMATS, default='feed', verbose_name='Formato')
+    spec = models.JSONField(
+        default=dict, verbose_name='Ficha (spec)',
+        help_text='Ficha de layout (zonas, coords, fontes, tratamento) que o renderizador usa')
+    thumbnail = models.ForeignKey(
+        'knowledge.ReferenceImage', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='+', verbose_name='Thumbnail (imagem de referência)')
+    order = models.PositiveIntegerField(default=0, verbose_name='Ordem')
+    is_active = models.BooleanField(default=True, verbose_name='Ativo')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
+
+    class Meta:
+        verbose_name = 'Arquétipo de Post'
+        verbose_name_plural = 'Arquétipos de Post'
+        ordering = ['organization', 'order', 'key']
+        unique_together = [('organization', 'key')]
+
+    def __str__(self):
+        return f"{self.key} — {self.name}"
+
+    def supports(self, fmt: str) -> bool:
+        return self.format in (fmt, 'both')

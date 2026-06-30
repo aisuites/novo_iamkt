@@ -837,6 +837,10 @@
       references_usage_description: payload.refsUsageDescription || '',
       reference_aspects: payload.referenceAspects || {},
       logo_position: payload.logoPosition || '',
+      // Modo "Usar template" (org com seletor de arquetipo). Vazio = geracao livre.
+      archetype: payload.archetype || '',
+      color_hex: payload.colorHex || '',
+      color_name: payload.colorName || '',
     };
 
     logger.debug('[POSTS] Enviando post para Django:', endpoint, jsonPayload);
@@ -943,6 +947,14 @@
           : {};
         const logoPosition = document.getElementById('logoPosition')?.value || '';
 
+        // Modo "Usar template": o usuario escolhe arquetipo + cor inspiracao.
+        const aState = etapa4.orgAssetsState || {};
+        const useTemplate = aState.genMode === 'template';
+        if (useTemplate && !aState.selectedArchetype) {
+          if (window.toaster) window.toaster.error('Escolha um template (arquetipo) antes de gerar.');
+          return;
+        }
+
         const payload = {
           rede,
           tema,
@@ -957,6 +969,9 @@
           refsUsageDescription,
           referenceAspects,
           logoPosition,
+          archetype: useTemplate ? (aState.selectedArchetype || '') : '',
+          colorHex: useTemplate ? (aState.selectedColorHex || '') : '',
+          colorName: useTemplate ? (aState.selectedColorName || '') : '',
         };
 
         const result = await requestPostFromAgent(payload, pipeline);
@@ -2336,6 +2351,14 @@
     selectedRefIds: new Set(),
     refAspects: {},   // { refId: ['layout_composicao', 'grafismos', ...] } (multi)
     loaded: false,
+    // Modo "Usar template" (seletor de arquetipo) — so orgs com flag habilitada
+    archetypeEnabled: false,
+    archetypes: [],        // [{key,name,format,thumbnail_url,order}]
+    palette: [],           // [{nome,hex}]
+    genMode: 'livre',      // 'livre' | 'template'
+    selectedArchetype: null,   // key
+    selectedColorHex: null,
+    selectedColorName: null,
   };
 
   // Aspecto a aproveitar de cada referencia (1 por imagem, exclusivo entre elas)
@@ -2379,9 +2402,13 @@
       const data = await resp.json();
       orgAssetsState.logos = data.logos || [];
       orgAssetsState.references = data.references || [];
+      orgAssetsState.archetypeEnabled = !!data.archetype_selector_enabled;
+      orgAssetsState.archetypes = data.archetypes || [];
+      orgAssetsState.palette = data.palette || [];
       orgAssetsState.loaded = true;
       renderLogosGallery();
       renderReferencesGallery();
+      setupArchetypeMode();
     } catch (err) {
       console.error('[ETAPA4] Falha ao carregar org-assets:', err);
       const containers = ['orgLogosGallery', 'orgRefsGallery'];
@@ -2390,6 +2417,101 @@
         if (el) el.innerHTML = '<div class="asset-gallery-loading">Erro ao carregar.</div>';
       });
     }
+  }
+
+  // ============================================================
+  // Modo "Usar template" (seletor de arquetipo) — orgs habilitadas
+  // ============================================================
+  function currentTemplateFmt() {
+    const opt = dom.formatoSelect?.selectedOptions?.[0];
+    const txt = ((opt?.textContent || '') + ' ' + (opt?.dataset?.aspect || '')).toLowerCase();
+    return (txt.includes('stor') || txt.includes('9:16')) ? 'story' : 'feed';
+  }
+
+  let _archetypeWired = false;
+  function setupArchetypeMode() {
+    const row = document.getElementById('genModeRow');
+    if (!row) return;
+    if (!orgAssetsState.archetypeEnabled) { row.style.display = 'none'; return; }
+    row.style.display = '';
+    renderArchetypePalette();
+    renderArchetypeSlider();
+    if (_archetypeWired) return;
+    _archetypeWired = true;
+    row.querySelectorAll('.gen-mode-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setGenMode(btn.dataset.mode));
+    });
+    // troca de formato -> refiltra o slider pelo formato (feed/story)
+    dom.formatoSelect?.addEventListener('change', () => {
+      if (orgAssetsState.genMode === 'template') renderArchetypeSlider();
+    });
+  }
+
+  function setGenMode(mode) {
+    orgAssetsState.genMode = mode;
+    document.getElementById('genModeRow')
+      ?.querySelectorAll('.gen-mode-btn')
+      .forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+    const free = document.getElementById('freeGenFields');
+    const panel = document.getElementById('archetypePanel');
+    if (mode === 'template') {
+      if (free) free.style.display = 'none';
+      if (panel) panel.style.display = '';
+      renderArchetypeSlider();
+    } else {
+      if (free) free.style.display = '';
+      if (panel) panel.style.display = 'none';
+    }
+  }
+
+  function renderArchetypeSlider() {
+    const slider = document.getElementById('archetypeSlider');
+    if (!slider) return;
+    const fmt = currentTemplateFmt();
+    const list = (orgAssetsState.archetypes || [])
+      .filter((a) => a.format === fmt || a.format === 'both');
+    slider.innerHTML = '';
+    if (!list.length) {
+      slider.innerHTML = '<div class="asset-gallery-loading">Nenhum template para este formato.</div>';
+      return;
+    }
+    // se o arquetipo selecionado nao vale neste formato, limpa
+    if (!list.some((a) => a.key === orgAssetsState.selectedArchetype)) {
+      orgAssetsState.selectedArchetype = null;
+    }
+    list.forEach((a) => {
+      const card = document.createElement('div');
+      card.className = 'archetype-card' + (a.key === orgAssetsState.selectedArchetype ? ' selected' : '');
+      const media = a.thumbnail_url
+        ? `<img class="thumb" src="${a.thumbnail_url}" alt="${a.name}">`
+        : `<div class="ph">${a.key}</div>`;
+      card.innerHTML = `${media}<div class="cap">${a.name}<small>${a.format}</small></div>`;
+      card.addEventListener('click', () => {
+        orgAssetsState.selectedArchetype = a.key;
+        slider.querySelectorAll('.archetype-card').forEach((c) => c.classList.remove('selected'));
+        card.classList.add('selected');
+      });
+      slider.appendChild(card);
+    });
+  }
+
+  function renderArchetypePalette() {
+    const pal = document.getElementById('archetypePalette');
+    if (!pal) return;
+    pal.innerHTML = '';
+    (orgAssetsState.palette || []).forEach((c) => {
+      const dot = document.createElement('div');
+      dot.className = 'color-dot' + (c.hex === orgAssetsState.selectedColorHex ? ' selected' : '');
+      dot.style.background = c.hex;
+      dot.title = `${c.nome} (${c.hex})`;
+      dot.addEventListener('click', () => {
+        orgAssetsState.selectedColorHex = c.hex;
+        orgAssetsState.selectedColorName = c.nome;
+        pal.querySelectorAll('.color-dot').forEach((d) => d.classList.remove('selected'));
+        dot.classList.add('selected');
+      });
+      pal.appendChild(dot);
+    });
   }
 
   function renderLogosGallery() {

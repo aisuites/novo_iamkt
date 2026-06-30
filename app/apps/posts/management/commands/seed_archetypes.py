@@ -1,0 +1,76 @@
+"""
+Semeia/atualiza o catalogo PostArchetype a partir do WIREFRAMES (codigo) para
+uma organizacao (default: todxs).
+
+Idempotente. Por padrao NAO sobrescreve a `spec` de arquetipos ja existentes
+(preserva correcoes feitas no admin); use --resync-spec para reimportar do codigo.
+
+  python manage.py seed_archetypes                 # cria os que faltam (org todxs)
+  python manage.py seed_archetypes --resync-spec   # reimporta a spec do codigo
+  python manage.py seed_archetypes --org outra
+"""
+from django.core.management.base import BaseCommand
+
+from apps.core.models import Organization
+from apps.posts.models import PostArchetype
+from apps.posts.services.todxs.wireframes import WIREFRAMES
+
+# Nomes amigaveis (fallback ao spec['name']); o admin pode renomear depois.
+FRIENDLY = {
+    'A': 'Capa tipografica',
+    'B': 'Foto + faixa',
+    'B_DUO': 'Foto duotone + faixa',
+    'C': 'Noticia (P&B)',
+    'C_DISPLAY': 'Display (manchete gigante)',
+    'D': 'Retrato + wordmark',
+    'E': 'Story — lista de blocos',
+    'F': 'Story duotone',
+}
+
+
+def _fmt(formatos) -> str:
+    s = set(formatos or ['feed'])
+    if {'feed', 'story'} <= s:
+        return 'both'
+    return 'story' if 'story' in s else 'feed'
+
+
+class Command(BaseCommand):
+    help = 'Semeia/atualiza PostArchetype a partir do WIREFRAMES (codigo).'
+
+    def add_arguments(self, parser):
+        parser.add_argument('--org', default='todxs', help='slug da organizacao')
+        parser.add_argument('--resync-spec', action='store_true',
+                            help='sobrescreve a spec de arquetipos existentes (perde edicoes do admin)')
+
+    def handle(self, *args, **opts):
+        slug = opts['org']
+        try:
+            org = Organization.objects.get(slug=slug)
+        except Organization.DoesNotExist:
+            self.stderr.write(self.style.ERROR(f'org slug={slug!r} nao encontrada'))
+            return
+
+        for order, (key, spec) in enumerate(WIREFRAMES.items(), start=1):
+            fmt = _fmt(spec.get('formatos'))
+            name = FRIENDLY.get(key) or spec.get('name') or key
+            obj, created = PostArchetype.objects.get_or_create(
+                organization=org, key=key,
+                defaults={'name': name, 'format': fmt, 'spec': spec,
+                          'order': order, 'is_active': True},
+            )
+            if created:
+                self.stdout.write(self.style.SUCCESS(f'  + {key:10s} ({fmt})'))
+            else:
+                obj.format = fmt
+                obj.order = order
+                if not obj.name:
+                    obj.name = name
+                if opts['resync_spec']:
+                    obj.spec = spec
+                obj.save()
+                tag = ' [spec resync]' if opts['resync_spec'] else ''
+                self.stdout.write(f'  ~ {key:10s} ({fmt}){tag}')
+
+        total = PostArchetype.objects.filter(organization=org).count()
+        self.stdout.write(self.style.SUCCESS(f'OK: {total} arquetipos para org={slug}'))

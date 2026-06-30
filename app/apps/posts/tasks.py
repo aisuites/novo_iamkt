@@ -1056,6 +1056,15 @@ def _refresh_editable_post_image(post):
         logger.info('[regen_bg] post sem _layout_elements, pula refresh')
         return
 
+    # TODXS: re-render com o renderizador DETERMINISTICO (draw_todxs), igual a
+    # geracao e ao editor — nao o HTML/Playwright generico (que nao reproduz a
+    # faixa/center_v/fixed_fs do todxs e quebra o layout no download).
+    if getattr(post, 'pipeline_used', '') == 'todxs':
+        from apps.posts.views_overlay import _todxs_rerender_published
+        _todxs_rerender_published(post, els)
+        logger.info('[regen_bg] PostImage todxs re-renderizada via draw_todxs post=%s', post.id)
+        return
+
     raw_url = _get_raw_image_url(post)
     logo_url = _get_logo_url(post)
     cw, ch = _get_canvas(post)

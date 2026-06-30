@@ -511,7 +511,13 @@ class Organization(TimeStampedModel):
         help_text="Empresa autorizada a usar módulo de email marketing",
         verbose_name='Email Marketing Habilitado'
     )
-    
+
+    archetype_selector_enabled = models.BooleanField(
+        default=False,  # Desabilitado por padrão
+        help_text="Mostra no modal de gerar post a opção 'Usar template' (escolher arquétipo + cor)",
+        verbose_name='Seletor de Arquétipo Habilitado'
+    )
+
     # Ciclo de Faturamento (Billing Cycle)
     billing_cycle_day = models.PositiveSmallIntegerField(
         default=1,

@@ -54,6 +54,11 @@ def generate_post_todxs_task(self, post_id: int):
     org = post.organization
     kb = KnowledgeBase.objects.filter(organization=org).first()
 
+    # DATA-DRIVEN: carrega as specs dos arquetipos da org (banco sobre o codigo)
+    # no contextvar que o renderizador (WF) le durante toda esta task.
+    from apps.posts.services.todxs.catalog import apply_org_wireframes
+    apply_org_wireframes(org)
+
     ctx = post.local_pipeline_context or {}
     todxs_ctx = ctx.get('todxs') or {}
     trace = todxs_ctx.get('trace') or []
@@ -101,6 +106,11 @@ def generate_post_todxs_task(self, post_id: int):
     archetype = (structured.get('archetype') or '').strip().upper()  # ex.: 'B', 'B_DUO'
     color_hex = structured.get('color_hex') or '#000000'
     color_name = structured.get('color_name') or ''
+    # Modo template: a cor inspiracao escolhida pelo usuario sobrepoe a da IA.
+    _force_color = todxs_ctx.get('force_color')
+    if _force_color:
+        color_hex = _force_color
+        color_name = todxs_ctx.get('force_color_name') or color_name
     todxs_ctx.update({
         'pilar': structured.get('pilar'),
         'archetype': archetype,
@@ -125,13 +135,13 @@ def generate_post_todxs_task(self, post_id: int):
                      usage_dict=brain.get('usage') or {}, purpose='todxs_skill_brain')
 
     from apps.posts.services.todxs.wireframes import (
-        WIREFRAMES, archetypes_for_format, background_mode,
+        WF, archetypes_for_format, background_mode,
         build_singleshot_prompt, build_background_prompt,
     )
     from apps.posts.services.todxs import pillow_render
     from django.db.models import Max
 
-    if archetype not in WIREFRAMES or archetype not in archetypes_for_format(fmt):
+    if archetype not in WF() or archetype not in archetypes_for_format(fmt):
         archetype = archetypes_for_format(fmt)[0]  # fallback seguro
         todxs_ctx['archetype'] = archetype
 

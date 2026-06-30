@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Post, PostImage, PostReferenceImage, PostChangeRequest, PostFormat
+from .models import (
+    Post, PostImage, PostReferenceImage, PostChangeRequest, PostFormat,
+    PostArchetype,
+)
 
 
 class PostImageInline(admin.TabularInline):
@@ -263,5 +266,37 @@ class PostFormatAdmin(admin.ModelAdmin):
         }),
         ('Dimensões', {
             'fields': ('width', 'height', 'aspect_ratio')
+        }),
+    )
+
+
+@admin.register(PostArchetype)
+class PostArchetypeAdmin(admin.ModelAdmin):
+    """Catálogo de arquétipos (templates) por organização. `spec` (JSON) é a
+    ficha de layout que o renderizador lê — editável aqui para correções pontuais."""
+    list_display = ['organization', 'key', 'name', 'format', 'is_active', 'order', 'thumbnail']
+    list_filter = ['organization', 'format', 'is_active']
+    list_editable = ['name', 'is_active', 'order']
+    search_fields = ['key', 'name', 'organization__name', 'organization__slug']
+    ordering = ['organization', 'order', 'key']
+    raw_id_fields = ['thumbnail']
+    readonly_fields = ['created_at', 'updated_at']
+
+    fieldsets = (
+        ('Identificação', {
+            'fields': ('organization', 'key', 'name', 'description', 'format', 'order', 'is_active')
+        }),
+        ('Thumbnail (slider do modal)', {
+            'fields': ('thumbnail',),
+            'description': 'Imagem de referência usada como miniatura no modal de gerar post.'
+        }),
+        ('Ficha de layout (spec)', {
+            'fields': ('spec',),
+            'description': 'JSON lido pelo renderizador determinístico (zonas, coords, '
+                           'fontes, tratamento). Correções aqui refletem na arte sem deploy.'
+        }),
+        ('Metadados', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
         }),
     )

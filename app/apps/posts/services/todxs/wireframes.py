@@ -293,11 +293,33 @@ WIREFRAMES = {
 
 
 # ----------------------------------------------------------------------------
+# DATA-DRIVEN: as fichas (specs) podem vir do banco (PostArchetype) por org.
+# WF() devolve o conjunto ativo (contextvar setado no inicio da geracao) ou,
+# por padrao, o WIREFRAMES do codigo. Assim correcoes via admin refletem na arte.
+# ----------------------------------------------------------------------------
+import contextvars as _ctxvars
+_WF_CTX = _ctxvars.ContextVar('todxs_wireframes', default=None)
+
+
+def WF() -> dict:
+    return _WF_CTX.get() or WIREFRAMES
+
+
+def set_wireframes(specs: dict):
+    """Seta o conjunto de specs da org atual (dict {key: spec})."""
+    _WF_CTX.set(specs or None)
+
+
+def reset_wireframes():
+    _WF_CTX.set(None)
+
+
+# ----------------------------------------------------------------------------
 # Helpers de leitura
 # ----------------------------------------------------------------------------
 
 def archetypes_for_format(fmt: str) -> list:
-    return [k for k, v in WIREFRAMES.items() if fmt in v['formatos']]
+    return [k for k, v in WF().items() if fmt in v.get('formatos', [])]
 
 
 def _uso(val, fmt):
@@ -309,7 +331,7 @@ def _uso(val, fmt):
 
 def assets_needed(archetype: str, fmt: str) -> dict:
     """Quais assets de marca o arquetipo/formato realmente usa (gating)."""
-    usa = WIREFRAMES[archetype]['usa']
+    usa = WF()[archetype]['usa']
     return {
         'selo': _uso(usa.get('selo'), fmt),
         'wordmark': _uso(usa.get('wordmark'), fmt),
@@ -320,11 +342,11 @@ def assets_needed(archetype: str, fmt: str) -> dict:
 def background_mode(archetype: str) -> str:
     """'solid' (Pillow desenha), 'photo' (Gemini foto + Pillow faixa),
     'solid_photo' (Pillow cor + foto colada), 'image' (Gemini peca inteira)."""
-    return WIREFRAMES[archetype].get('fundo', 'solid')
+    return WF()[archetype].get('fundo', 'solid')
 
 
 def zones_for(archetype: str, fmt: str) -> list:
-    return WIREFRAMES[archetype].get('zonas', {}).get(fmt, [])
+    return WF()[archetype].get('zonas', {}).get(fmt, [])
 
 
 # Direção fotográfica da TODXS (extraída dos dossiês das referências da KB):
@@ -348,7 +370,7 @@ BRAND_PHOTO_STYLE = (
 
 def foto_region(archetype: str, fmt: str, W: int, H: int):
     """(x,y,w,h) px da AREA VISIVEL da foto (acima da faixa, ou frame, ou full)."""
-    w = WIREFRAMES[archetype]
+    w = WF()[archetype]
     band = w.get('band', {}).get(fmt)
     if band:
         return (0, 0, W, int(round(band['y'] / 100.0 * H)))
@@ -362,7 +384,7 @@ def foto_region(archetype: str, fmt: str, W: int, H: int):
 def build_background_prompt(archetype: str, content: dict, color_hex: str, fmt: str,
                             brand_summary: str = '') -> str:
     """Prompt para o Gemini gerar o FUNDO (foto/cena), sem texto. '' = sem Gemini."""
-    w = WIREFRAMES[archetype]
+    w = WF()[archetype]
     tmpl = w.get('bg_prompt') or ''
     if not tmpl:
         return ''
@@ -431,7 +453,7 @@ def describe_for_brain(fmt: str) -> str:
     """Resumo dos arquetipos validos no formato + orcamento de texto por zona."""
     lines = []
     for k in archetypes_for_format(fmt):
-        w = WIREFRAMES[k]
+        w = WF()[k]
         if w.get('auto') is False:      # variantes (ex.: B_DUO) so via force
             continue
         zs = [_zone_budget(z) for z in zones_for(k, fmt)]
@@ -461,7 +483,7 @@ def _zone_instruction(z: dict, content: dict) -> str:
 
 def build_singleshot_prompt(archetype: str, content: dict, color_hex: str,
                             color_name: str, fmt: str) -> str:
-    w = WIREFRAMES[archetype]
+    w = WF()[archetype]
     f = FORMATOS[fmt]
     pessoa = content.get('pessoa') or 'a diverse LGBTQIA+ person, expressive'
     band = w.get('band', {}).get(fmt)
@@ -544,7 +566,7 @@ def wireframe_elements(archetype: str, content: dict, color_hex: str, fmt: str) 
     editor avancado consome). Inclui: faixa de cor (grafismo), selo (role='seal'
     -> pillow_render compoe circulo+X), texto (centralizado vertical) e wordmark.
     """
-    w = WIREFRAMES[archetype]
+    w = WF()[archetype]
     els = []
 
     # 1) Faixa de cor (B): grafismo retangulo do y% ate o fim, corte reto.

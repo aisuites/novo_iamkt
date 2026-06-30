@@ -152,7 +152,7 @@ def build_background(archetype, fmt, color_hex, formato_px, photo_png=None):
     """Constroi o fundo (raw): 'solid' = campo de cor; 'photo'/'image' = foto/cena
     do Gemini (cover). Retorna PNG bytes."""
     from PIL import Image, ImageChops
-    from .wireframes import background_mode, foto_region, WIREFRAMES
+    from .wireframes import background_mode, foto_region, WF
     W, H = _parse_px(formato_px)
     mode = background_mode(archetype)
     img = Image.new('RGB', (W, H), _hex_to_rgb(color_hex))
@@ -160,7 +160,7 @@ def build_background(archetype, fmt, color_hex, formato_px, photo_png=None):
         # Cola a foto na regiao visivel (faixa: topo; frame: miolo) cover-crop.
         fx, fy, fw, fh = foto_region(archetype, fmt, W, H)
         photo = _cover(Image.open(io.BytesIO(photo_png)), fw, fh)
-        aw = WIREFRAMES.get(archetype, {})
+        aw = WF().get(archetype, {})
         if aw.get('grayscale'):                 # foto P&B (arquetipo C)
             photo = photo.convert('L').convert('RGB')
         if aw.get('multiply'):                  # duotone (B_DUO): multiply da cor
@@ -256,9 +256,17 @@ def _paste_contain(base, sticker_rgba, el, W, H):
 
 
 def draw_todxs(bg_png, elements, W, H, logo_url=None):
-    """Desenha a arte final: faixa -> selo/logo -> texto. Pillow puro."""
+    """Desenha a arte final: faixa -> selo/logo -> texto. Pillow puro.
+
+    O fundo e SEMPRE normalizado para o canvas WxH (cover) — as zonas usam
+    coordenadas em % de WxH, entao um fundo de tamanho/aspecto diferente (ex.:
+    output do Gemini no regenerate-background) desalinharia tudo. No-op quando o
+    fundo ja e WxH (caso da geracao original)."""
     from PIL import Image, ImageDraw
-    img = Image.open(io.BytesIO(bg_png)).convert('RGBA')
+    img = Image.open(io.BytesIO(bg_png))
+    if img.size != (W, H):
+        img = _cover(img, W, H)
+    img = img.convert('RGBA')
     draw = ImageDraw.Draw(img)
 
     # 1) faixa (grafismo retangulo)
@@ -323,7 +331,7 @@ def render_todxs(*, archetype, content, color_hex, fmt, formato_px, kb,
     Retorna dict: {raw_png, final_png, elements, fonts_resolved}.
     """
     from .layout import compute_layout
-    from .wireframes import WIREFRAMES
+    from .wireframes import WF
 
     W, H = _parse_px(formato_px)
     raw_png = build_background(archetype, fmt, color_hex, formato_px, photo_png=photo_png)
@@ -332,7 +340,7 @@ def render_todxs(*, archetype, content, color_hex, fmt, formato_px, kb,
     elements = _expand_seals(elements, x_png_bytes)  # seal -> image (data URI)
     final_png = draw_todxs(raw_png, elements, W, H, logo_url=logo_url)
     # moldura arredondada (ex.: B story)
-    rf = (WIREFRAMES.get(archetype, {}).get('rounded_frame', {}) or {}).get(fmt)
+    rf = (WF().get(archetype, {}).get('rounded_frame', {}) or {}).get(fmt)
     if rf:
         final_png = _round_corners(final_png, int(rf / 100.0 * W))
     return {

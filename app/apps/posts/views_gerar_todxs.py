@@ -47,6 +47,12 @@ def gerar_post_todxs(request):
     references_usage_description = (data.get('references_usage_description') or '').strip()
     logo_position = (data.get('logo_position') or '').strip()
 
+    # Modo "Usar template" (seletor de arquetipo): o usuario escolhe o arquetipo
+    # e a cor inspiracao. Vazio = "geracao livre" (a IA decide, fluxo atual).
+    force_archetype = (data.get('archetype') or '').strip().upper()
+    force_color = (data.get('color_hex') or '').strip()
+    force_color_name = (data.get('color_name') or '').strip()
+
     # ---- Validacoes ----
     if rede_social not in _VALID_REDES:
         return JsonResponse(
@@ -113,6 +119,12 @@ def gerar_post_todxs(request):
                     'selected_reference_ids': list(selected_reference_ids or []),
                     'references_usage_description': references_usage_description,
                     'logo_position': logo_position,
+                    # Modo template: a task le force_archetype/force_color daqui.
+                    'todxs': {
+                        'force_archetype': force_archetype or None,
+                        'force_color': force_color or None,
+                        'force_color_name': force_color_name or None,
+                    },
                 },
             )
             for idx, ref_img in enumerate(reference_images):

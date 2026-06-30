@@ -15,7 +15,7 @@ gambiarra de background_color nem y falso.
 """
 import io
 
-from .wireframes import WIREFRAMES, zones_for, assets_needed
+from .wireframes import WF, zones_for, assets_needed
 
 
 def _lighten(hex_color: str, amt: float = 0.72) -> str:
@@ -82,7 +82,7 @@ def _fit(text, font_path, max_w, max_h, max_lines, start_px, draw, min_px=14, le
 def compute_layout(archetype, content, color_hex, fmt, W, H, weights):
     """Retorna a lista de _layout_elements JA RESOLVIDA (explicita)."""
     from PIL import Image, ImageDraw
-    w = WIREFRAMES[archetype]
+    w = WF()[archetype]
     draw = ImageDraw.Draw(Image.new('RGB', (8, 8)))
     basis = min(W, H)
     els = []

@@ -359,6 +359,42 @@
                           maxlength="3000" placeholder="Restrições, exemplos, referências..." required></textarea>
             </div>
             
+            <!-- Modo de geracao (so orgs com seletor de arquetipo habilitado) -->
+            <style>
+              .gen-mode-toggle{display:inline-flex;border:1px solid #d1d5db;border-radius:10px;overflow:hidden;background:#f9fafb;}
+              .gen-mode-btn{padding:8px 16px;border:none;background:transparent;font:600 13px system-ui,Arial;color:#6b7280;cursor:pointer;}
+              .gen-mode-btn.active{background:#6d28d9;color:#fff;}
+              .archetype-slider{display:flex;gap:10px;overflow-x:auto;padding:6px 2px 10px;}
+              .archetype-card{flex:0 0 auto;width:112px;border:2px solid #e5e7eb;border-radius:10px;overflow:hidden;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s;}
+              .archetype-card.selected{border-color:#6d28d9;box-shadow:0 0 0 2px rgba(109,40,217,.22);}
+              .archetype-card .thumb{width:100%;height:140px;object-fit:cover;display:block;background:#f3f4f6;}
+              .archetype-card .ph{width:100%;height:140px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font:700 12px system-ui;text-align:center;padding:6px;background:#f3f4f6;}
+              .archetype-card .cap{padding:6px 8px;font:600 11px system-ui,Arial;color:#374151;line-height:1.25;}
+              .archetype-card .cap small{display:block;color:#9ca3af;font-weight:500;text-transform:uppercase;font-size:9px;letter-spacing:.04em;}
+              .archetype-palette{display:flex;flex-wrap:wrap;gap:10px;padding:4px 0;}
+              .color-dot{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1px #d1d5db;transition:transform .1s,box-shadow .1s;}
+              .color-dot.selected{box-shadow:0 0 0 2px #6d28d9;transform:scale(1.12);}
+            </style>
+            <div id="genModeRow" class="field" style="display:none;">
+                <label>Como gerar a arte</label>
+                <div class="gen-mode-toggle" role="tablist">
+                    <button type="button" class="gen-mode-btn active" data-mode="livre">Geracao livre</button>
+                    <button type="button" class="gen-mode-btn" data-mode="template">Usar template</button>
+                </div>
+                <small class="asset-hint">Geracao livre: a IA escolhe o template e a cor. Usar template: voce escolhe o arquetipo e a cor inspiracao.</small>
+            </div>
+
+            <!-- Painel do modo "Usar template" -->
+            <div id="archetypePanel" class="field" style="display:none;">
+                <label>Escolha o template (arquetipo)</label>
+                <div id="archetypeSlider" class="archetype-slider">
+                    <div class="asset-gallery-loading">Carregando templates...</div>
+                </div>
+                <label style="margin-top:10px;">Cor inspiracao</label>
+                <div id="archetypePalette" class="archetype-palette"></div>
+            </div>
+
+            <div id="freeGenFields">
             <!-- LINHA 4: Logos da marca -->
             <div class="field">
                 <label>Logo a ser aplicado (escolha apenas 1)</label>
@@ -410,7 +446,8 @@
                 </div>
                 <small class="asset-hint">Para cada imagem, indique o tipo de uso e descreva como usar. Combinacoes mistas (ex: 2 produtos + 1 pessoa) sao suportadas.</small>
             </div>
-            
+            </div><!-- /#freeGenFields -->
+
             <div class="modal-footer">
                 {% if is_admin %}
                 <div class="pipeline-selector" style="margin-right:auto; display:flex; align-items:center; gap:8px;">

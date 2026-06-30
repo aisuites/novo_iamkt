@@ -160,7 +160,8 @@ class OrganizationAdmin(admin.ModelAdmin):
                 'posts_enabled',
                 'trends_enabled',
                 'videos_avatar_enabled',
-                'email_marketing_enabled'
+                'email_marketing_enabled',
+                'archetype_selector_enabled'
             ),
             'description': 'Habilite/desabilite ferramentas para esta empresa'
         }),
