@@ -61,3 +61,6 @@ db.sqlite3-journal
 /final94*.png
 /wf94*.png
 /wireframe*.png
+
+# Manuais de marca em PDF (muito grandes, ~200MB+) — nao versionar
+*Manual de Marca.pdf

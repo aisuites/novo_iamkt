@@ -46,6 +46,23 @@ def overlay_data(request, post_id):
     """Retorna JSON com elements, raw_image_url, logo_url e font_names para o frontend."""
     post = get_object_or_404(Post, id=post_id, organization=request.organization)
 
+    # VB: editor de texto generico (mesmo front), com fonte por elemento.
+    # raw = cena sem texto (bg + ilustracao); elements = zonas de texto editaveis.
+    if post.pipeline_used == 'vb':
+        from apps.posts.services.vb.specs import SPECS
+        vbx = (post.local_pipeline_context or {}).get('vb') or {}
+        sp = SPECS.get((vbx.get('archetype') or '').strip())
+        cw, ch = (sp['canvas'] if sp else _get_canvas(post))
+        vb_font_urls = {k: f'/posts/{post.id}/todxs-font/{k}/'
+                        for k in ('light', 'semibold', 'medium')}
+        return JsonResponse({
+            'elements': _get_elements(post),
+            'raw_image_url': _get_raw_image_url(post), 'logo_url': '',
+            'canvas_w': cw, 'canvas_h': ch, 'font_names': {}, 'font_urls': {},
+            'todxs_font_urls': vb_font_urls, 'pipeline': 'vb', 'status': post.status,
+            'raw_image_s3_key': post.raw_image_s3_key or '', 'background_history_size': 0,
+        })
+
     elements = _get_elements(post)
     raw_image_url = _get_raw_image_url(post)
     logo_url = _get_logo_url(post)
@@ -146,6 +163,23 @@ def simple_debug(request, post_id):
             'texts': {'title': post.title or '', 'subtitle': post.subtitle or '', 'cta': ''},
         })
 
+    # Pipeline VB: fundo (cena sem texto) + arte final, ambos Pillow.
+    if post.pipeline_used == 'vb':
+        vb = (post.local_pipeline_context or {}).get('vb') or {}
+        di = vb.get('debug_images') or {}
+        return JsonResponse({
+            'pipeline': 'vb', 'status': post.status,
+            'bg_url': di.get('fundo') or _presign(post.raw_image_s3_key),
+            'final_url': di.get('final') or _presign(post.image_s3_key),
+            'gemini_url': '',
+            'bg_prompt': '(VB: fundo + ilustracao desenhados pelo Pillow — sem prompt de imagem)',
+            'final_prompt': post.image_prompt or '',
+            'rules': {'archetype': vb.get('archetype'),
+                      'objeto_ilustracao': vb.get('objeto_ilustracao')},
+            'model_bg': 'vb-pillow', 'model_final': 'vb-pillow',
+            'created_at': vb.get('updated_at', ''),
+        })
+
     if post.pipeline_used != 'simple':
         return JsonResponse({'error': 'not_simple_pipeline'}, status=404)
 
@@ -222,6 +256,19 @@ def export_png(request, post_id):
             # leading/quebras por elemento. render_layout_document ignoraria isso.
             from apps.posts.services.todxs.pillow_render import draw_todxs
             png_bytes = draw_todxs(bg_bytes, elements, canvas_w, canvas_h, logo_url=logo_url)
+        elif post.pipeline_used == 'vb':
+            from apps.posts.services.vb.render import draw_vb_compose
+            from apps.posts.services.vb.specs import SPECS
+            from PIL import Image
+            import io as _io2
+            vbx = (post.local_pipeline_context or {}).get('vb') or {}
+            sp = SPECS.get((vbx.get('archetype') or '').strip())
+            cw, ch = (sp['canvas'] if sp else (canvas_w, canvas_h))
+            base = Image.open(_io2.BytesIO(bg_bytes)).convert('RGBA')
+            if base.size != (cw, ch):
+                base = base.resize((cw, ch), Image.LANCZOS)
+            draw_vb_compose(base, elements, cw, ch)
+            _o = _io2.BytesIO(); base.convert('RGB').save(_o, 'PNG'); png_bytes = _o.getvalue()
         else:
             from apps.posts.services.gemini_image_generator import render_layout_document
             png_bytes = render_layout_document(
@@ -254,9 +301,23 @@ _TODXS_FONT_KEYS = {'display', 'medium', 'regular', 'caps_small'}
 def todxs_font_file(request, post_id, key):
     """Serve a fonte real da TODXS por CHAVE de uso (display/medium/regular/
     caps_small) — para o editor desenhar com a MESMA fonte do render Pillow."""
+    post = get_object_or_404(Post, id=post_id, organization=request.organization)
+    # VB: serve a fonte Barlow Condensed (stand-in da Acumin) por chave. Aditivo.
+    if post.pipeline_used == 'vb':
+        import os
+        from apps.posts.services.vb.render import _font_path, _FONT_FILES
+        if key not in _FONT_FILES:
+            return JsonResponse({'error': 'key_invalida'}, status=400)
+        fp = _font_path(key)
+        if not os.path.isfile(fp):
+            return JsonResponse({'error': 'font_missing'}, status=404)
+        mime, _m = mimetypes.guess_type(fp)
+        resp = FileResponse(open(fp, 'rb'), content_type=mime or 'font/ttf')
+        resp['Cache-Control'] = 'private, max-age=3600'
+        resp['Access-Control-Allow-Origin'] = '*'
+        return resp
     if key not in _TODXS_FONT_KEYS:
         return JsonResponse({'error': 'key_invalida'}, status=400)
-    post = get_object_or_404(Post, id=post_id, organization=request.organization)
     from apps.knowledge.models import KnowledgeBase
     from apps.posts.services.todxs.pillow_render import resolve_todxs_weights
     kb = KnowledgeBase.objects.filter(organization=post.organization).first()
@@ -462,7 +523,52 @@ def save_elements(request, post_id):
             image_url = _todxs_rerender_published(post, elements)
         except Exception:
             logger.exception('[overlay] re-render todxs (save) falhou post=%s', post.id)
+    elif post.pipeline_used == 'vb':
+        try:
+            image_url = _vb_rerender_published(post, elements)
+        except Exception:
+            logger.exception('[overlay] re-render vb (save) falhou post=%s', post.id)
     return JsonResponse({'ok': True, 'image_url': image_url})
+
+
+def _vb_rerender_published(post, elements):
+    """Redesenha a arte VB (raw cena + texto editado) e atualiza a imagem publicada."""
+    import base64 as _b64
+    from apps.posts.models import PostImage
+    from apps.posts.services.vb.render import draw_vb_compose
+    from apps.posts.services.vb.specs import SPECS
+    from apps.posts.tasks import _upload_image_to_s3
+    from apps.core.services.s3_service import S3Service
+    from PIL import Image
+    import io as _io
+
+    raw_data = _download_as_data_uri(_get_raw_image_url(post))
+    if not raw_data:
+        return None
+    _, _, payload = raw_data.partition(',')
+    base = Image.open(_io.BytesIO(_b64.b64decode(payload))).convert('RGBA')
+    vbx = (post.local_pipeline_context or {}).get('vb') or {}
+    sp = SPECS.get((vbx.get('archetype') or '').strip())
+    cw, ch = (sp['canvas'] if sp else _get_canvas(post))
+    if base.size != (cw, ch):
+        base = base.resize((cw, ch), Image.LANCZOS)
+    draw_vb_compose(base, elements, cw, ch)  # imagem (stickers) + texto
+    out = _io.BytesIO(); base.convert('RGB').save(out, 'PNG')
+
+    old_key = post.image_s3_key
+    key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
+                                   png_bytes=out.getvalue(), mime_type='image/png')
+    if old_key:
+        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    post.image_s3_key, post.image_s3_url = key, url
+    gi = post.generated_images if isinstance(post.generated_images, list) else []
+    gi.append({'s3_key': key, 'url': url})
+    post.generated_images = gi
+    post.save(update_fields=['image_s3_key', 'image_s3_url', 'generated_images'])
+    try:
+        return S3Service.generate_presigned_download_url(key, expires_in=86400)
+    except Exception:
+        return url
 
 
 def _todxs_rerender_published(post, elements):

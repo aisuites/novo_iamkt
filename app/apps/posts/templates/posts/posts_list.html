@@ -1128,6 +1128,20 @@ function toggleCarrossel() {
             // ja vem calculado pelo compute_layout — re-encolher quebraria a paridade.
             if (el.height_pct && !isTodxs) { dom.dataset.fit = '1'; dom.style.overflow = 'hidden'; }
             dom.textContent = el.content || '';
+            // Texto VERTICAL (rotacionado): edita como texto, mas exibe girado.
+            // bbox (width_pct/height_pct) = caixa JA rotacionada na tela.
+            if (el.rotation === -90 || el.rotation === 90) {
+                const bboxW = (el.width_pct||0)/100*canvasW*scale;
+                const bboxH = (el.height_pct||0)/100*canvasH*scale;
+                dom.style.width  = bboxH + 'px';   // pre-rotacao: largura = comprimento do texto
+                dom.style.height = bboxW + 'px';   // pre-rotacao: altura = pilha de linhas
+                dom.style.whiteSpace = 'pre';
+                dom.style.lineHeight = String(el._leading || 1.1);
+                dom.style.transformOrigin = 'top left';
+                dom.style.transform = (el.rotation === -90)
+                    ? `translateY(${bboxH}px) rotate(-90deg)`
+                    : `translateX(${bboxW}px) rotate(90deg)`;
+            }
         } else return;
 
         if (idx === selectedIdx) {
@@ -1446,14 +1460,16 @@ function toggleCarrossel() {
     async function closeModal() {
         const pid = currentPostId;
         const els = elements.slice();
-        const todxs = (currentPipeline === 'todxs') && pid && els && els.length;
+        // Pipelines que RE-RENDERIZAM o publicado no save (todxs, vb): trava a tela
+        // com overlay ate a arte nova carregar no preview.
+        const rerenders = (currentPipeline === 'todxs' || currentPipeline === 'vb') && pid && els && els.length;
         _stopBgPolling();
-        if (todxs) _showSaveOverlay();  // trava a tela ate a arte nova carregar
+        if (rerenders) _showSaveOverlay();
         modal.style.display='none'; document.body.style.overflow='';
         currentPostId=null; selectedIdx=null; currentPipeline='';
         history = []; historyIdx = -1;
         if (bgRequestBox) bgRequestBox.style.display = 'none';
-        if (todxs) {
+        if (rerenders) {
             await _saveElements(pid, els);
             _hideSaveOverlay();
         } else {

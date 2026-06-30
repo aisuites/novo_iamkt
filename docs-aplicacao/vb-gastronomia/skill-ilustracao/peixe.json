@@ -1,0 +1,11 @@
+{
+ "canvas":[1080,760], "bg":"oliva", "output":"/tmp/peixe_v4.png",
+ "pecas":[
+  {"tipo":"triangulo","cor":"terracota","cx":215,"cy":400,"base":118,"altura":290,"rot":200},
+  {"tipo":"triangulo","cor":"amarelo","cx":295,"cy":545,"base":66,"altura":225,"rot":237},
+  {"tipo":"triangulo","cor":"amarelo","cx":248,"cy":585,"base":52,"altura":175,"rot":252},
+  {"tipo":"asset","nome":"faca","cor":"terracota","cx":690,"cy":300,"escala":1.15,"rot":118},
+  {"tipo":"triangulo","cor":"creme","cx":645,"cy":352,"base":104,"altura":180,"rot":183},
+  {"tipo":"circulo","cor":"branco","cx":858,"cy":206,"r":24}
+ ]
+}

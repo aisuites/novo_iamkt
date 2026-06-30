@@ -1,0 +1,4 @@
+{"canvas":[600,600],"bg":"transparent","output":"assets/exemplos/ovo.png","pecas":[
+ {"tipo":"oval","cor":"branco","cx":300,"cy":320,"rx":175,"ry":150,"rot":-12},
+ {"tipo":"circulo","cor":"amarelo","cx":275,"cy":300,"r":74}
+]}

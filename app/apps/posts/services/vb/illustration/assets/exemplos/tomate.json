@@ -1,0 +1,7 @@
+{"canvas":[600,600],"bg":"transparent","output":"assets/exemplos/tomate.png","pecas":[
+ {"tipo":"circulo","cor":"terracota","cx":305,"cy":355,"r":165},
+ {"tipo":"triangulo","cor":"oliva","cx":305,"cy":195,"base":70,"altura":120,"rot":90},
+ {"tipo":"triangulo","cor":"oliva","cx":250,"cy":205,"base":56,"altura":105,"rot":115},
+ {"tipo":"triangulo","cor":"oliva","cx":362,"cy":205,"base":56,"altura":105,"rot":65},
+ {"tipo":"circulo","cor":"laranja","cx":250,"cy":300,"r":30}
+]}
