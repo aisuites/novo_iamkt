@@ -48,6 +48,11 @@ def gerar_post_simples(request):
         from .views_gerar_vb import gerar_post_vb
         return gerar_post_vb(request)
 
+    # Delegacao Samsung Healthcare: fluxo exclusivo (arquetipos Relentless/Medison).
+    if getattr(request.user, 'organization', None) and request.user.organization.slug == 'samsung-healthcare':
+        from .views_gerar_samsung import gerar_post_samsung
+        return gerar_post_samsung(request)
+
     if not getattr(settings, 'ENABLE_SIMPLE_PIPELINE', True):
         return JsonResponse(
             {'success': False, 'error': 'Pipeline simples desabilitada neste ambiente'},

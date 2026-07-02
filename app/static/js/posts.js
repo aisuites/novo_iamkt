@@ -2454,14 +2454,17 @@
       .forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
     const free = document.getElementById('freeGenFields');
     const panel = document.getElementById('archetypePanel');
-    if (mode === 'template') {
-      if (free) free.style.display = 'none';
-      if (panel) panel.style.display = '';
-      renderArchetypeSlider();
-    } else {
-      if (free) free.style.display = '';
-      if (panel) panel.style.display = 'none';
-    }
+    // No modo "template" escondemos apenas logos e upload de novas imagens; a
+    // galeria de referencias (dentro de freeGenFields) fica VISIVEL para o
+    // usuario escolher a imagem de produto (ex.: arquetipo Samsung B).
+    const logoField = document.getElementById('logoField');
+    const uploadField = document.getElementById('uploadRefField');
+    const tpl = mode === 'template';
+    if (free) free.style.display = '';            // sempre visivel (contem as refs)
+    if (panel) panel.style.display = tpl ? '' : 'none';
+    if (logoField) logoField.style.display = tpl ? 'none' : '';
+    if (uploadField) uploadField.style.display = tpl ? 'none' : '';
+    if (tpl) renderArchetypeSlider();
   }
 
   function renderArchetypeSlider() {

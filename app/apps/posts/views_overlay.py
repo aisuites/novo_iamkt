@@ -63,6 +63,19 @@ def overlay_data(request, post_id):
             'raw_image_s3_key': post.raw_image_s3_key or '', 'background_history_size': 0,
         })
 
+    # Samsung Healthcare: editor generico (mesmo front), fonte por font_key
+    # (Samsung SS Head/Body servidas via /posts/<id>/samsung-font/<key>/).
+    if post.pipeline_used == 'samsung':
+        from apps.posts.services.samsung.wireframes import FONT_FILES
+        s_font_urls = {k: f'/posts/{post.id}/samsung-font/{k}/' for k in FONT_FILES}
+        return JsonResponse({
+            'elements': _get_elements(post),
+            'raw_image_url': _get_raw_image_url(post), 'logo_url': '',
+            'canvas_w': 1080, 'canvas_h': 1350, 'font_names': {}, 'font_urls': {},
+            'todxs_font_urls': s_font_urls, 'pipeline': 'samsung', 'status': post.status,
+            'raw_image_s3_key': post.raw_image_s3_key or '', 'background_history_size': 0,
+        })
+
     elements = _get_elements(post)
     raw_image_url = _get_raw_image_url(post)
     logo_url = _get_logo_url(post)
@@ -333,6 +346,27 @@ def todxs_font_file(request, post_id, key):
     mime, _ = mimetypes.guess_type(resolved.name)
     resp = FileResponse(open(resolved, 'rb'),
                         content_type=mime or ('font/otf' if resolved.suffix.lower() == '.otf' else 'font/ttf'))
+    resp['Cache-Control'] = 'private, max-age=3600'
+    resp['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+
+@login_required
+@require_GET
+def samsung_font_file(request, post_id, key):
+    """Serve a fonte Samsung SS (Head/Body) por font_key, bundled em
+    services/samsung/fonts/ — para o editor desenhar igual ao render Pillow."""
+    post = get_object_or_404(Post, id=post_id, organization=request.organization)
+    from apps.posts.services import samsung as _samsung_pkg
+    from apps.posts.services.samsung.wireframes import FONT_FILES
+    fname = FONT_FILES.get(key)
+    if not fname:
+        return JsonResponse({'error': 'key_invalida'}, status=400)
+    fp = os.path.join(os.path.dirname(_samsung_pkg.__file__), 'fonts', fname)
+    if not os.path.isfile(fp):
+        return JsonResponse({'error': 'font_missing'}, status=404)
+    mime, _m = mimetypes.guess_type(fp)
+    resp = FileResponse(open(fp, 'rb'), content_type=mime or 'font/otf')
     resp['Cache-Control'] = 'private, max-age=3600'
     resp['Access-Control-Allow-Origin'] = '*'
     return resp

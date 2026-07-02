@@ -2431,3 +2431,6 @@ from apps.posts.tasks_todxs import generate_post_todxs_task  # noqa: E402,F401
 
 # Pipeline EXCLUSIVO da VB Gastronomia (org slug='vb-gastronomia'): idem.
 from apps.posts.tasks_vb import generate_post_vb_task  # noqa: E402,F401
+
+# Pipeline EXCLUSIVO da Samsung Healthcare (org slug='samsung-healthcare'): idem.
+from apps.posts.tasks_samsung import generate_post_samsung_task  # noqa: E402,F401

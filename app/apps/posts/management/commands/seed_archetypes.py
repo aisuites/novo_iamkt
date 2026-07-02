@@ -13,19 +13,29 @@ from django.core.management.base import BaseCommand
 
 from apps.core.models import Organization
 from apps.posts.models import PostArchetype
-from apps.posts.services.todxs.wireframes import WIREFRAMES
 
-# Nomes amigaveis (fallback ao spec['name']); o admin pode renomear depois.
-FRIENDLY = {
-    'A': 'Capa tipografica',
-    'B': 'Foto + faixa',
-    'B_DUO': 'Foto duotone + faixa',
-    'C': 'Noticia (P&B)',
-    'C_DISPLAY': 'Display (manchete gigante)',
-    'D': 'Retrato + wordmark',
-    'E': 'Story — lista de blocos',
-    'F': 'Story duotone',
+# Nomes amigaveis por org (fallback ao spec['name']); admin pode renomear depois.
+FRIENDLY_BY_ORG = {
+    'todxs': {
+        'A': 'Capa tipografica',
+        'B': 'Foto + faixa',
+        'B_DUO': 'Foto duotone + faixa',
+        'C': 'Noticia (P&B)',
+        'C_DISPLAY': 'Display (manchete gigante)',
+        'D': 'Retrato + wordmark',
+        'E': 'Story — lista de blocos',
+        'F': 'Story duotone',
+    },
 }
+
+
+def _wireframes_for(slug: str) -> dict:
+    """Fonte de specs por org (cada pipeline tem seu proprio WIREFRAMES)."""
+    if slug == 'samsung-healthcare':
+        from apps.posts.services.samsung.wireframes import WIREFRAMES
+        return WIREFRAMES
+    from apps.posts.services.todxs.wireframes import WIREFRAMES
+    return WIREFRAMES
 
 
 def _fmt(formatos) -> str:
@@ -51,9 +61,11 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f'org slug={slug!r} nao encontrada'))
             return
 
-        for order, (key, spec) in enumerate(WIREFRAMES.items(), start=1):
+        wireframes = _wireframes_for(slug)
+        friendly = FRIENDLY_BY_ORG.get(slug, {})
+        for order, (key, spec) in enumerate(wireframes.items(), start=1):
             fmt = _fmt(spec.get('formatos'))
-            name = FRIENDLY.get(key) or spec.get('name') or key
+            name = friendly.get(key) or spec.get('name') or key
             obj, created = PostArchetype.objects.get_or_create(
                 organization=org, key=key,
                 defaults={'name': name, 'format': fmt, 'spec': spec,
