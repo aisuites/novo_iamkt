@@ -31,6 +31,12 @@ logger = logging.getLogger(__name__)
 MODEL = 'claude-sonnet-4-6'
 MAX_TOKENS = 8000
 
+# Teto de base64 por imagem que o Claude aceita: 10.485.760 bytes. Base64 infla
+# ~33% sobre o raw, entao qualquer foto raw > ~7,5 MB estoura o limite e a API
+# rejeita a requisicao inteira com 400 permanente. Mantemos uma margem de
+# seguranca (9 MB) e recomprimimos localmente o que passar disso.
+_CLAUDE_B64_LIMIT = 9_000_000
+
 # Carrega o conhecimento do orquestrador-designer: base compartilhada
 # (shared_skill/) + designer_skill (SKILL + 3 references). Bloco cacheado
 # por 1h via cache_control no system message.
@@ -684,7 +690,66 @@ def _download_to_base64(url: str):
         ct = 'image/gif'
     elif ct not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
         ct = 'image/png'
+    data, ct = _shrink_for_claude(data, ct)
     return base64.b64encode(data).decode('ascii'), ct
+
+
+def _b64_len(raw_len: int) -> int:
+    """Tamanho do base64 (com padding) para um payload de raw_len bytes."""
+    return ((raw_len + 2) // 3) * 4
+
+
+def _shrink_for_claude(data: bytes, ct: str):
+    """Se o base64 estourar o teto do Claude, recomprime/redimensiona a imagem
+    ate caber. Fotos (sem alpha) viram JPEG com qualidade decrescente; imagens
+    com transparencia continuam PNG. Best-effort: sem Pillow ou imagem invalida,
+    devolve o original (a API decide) — nao deixamos o fluxo quebrar aqui."""
+    if _b64_len(len(data)) <= _CLAUDE_B64_LIMIT:
+        return data, ct
+    try:
+        import io
+        from PIL import Image
+        img = Image.open(io.BytesIO(data))
+        img.load()
+    except Exception as exc:
+        logger.warning('[orchestrator] recompressao indisponivel (%s); '
+                       'enviando imagem original de %d bytes', exc, len(data))
+        return data, ct
+
+    has_alpha = img.mode in ('RGBA', 'LA') or (
+        img.mode == 'P' and 'transparency' in img.info
+    )
+    max_dim = max(img.size)
+    quality = 85
+    out, out_ct = data, ct
+    for _ in range(12):
+        work = img
+        if max_dim < max(img.size):
+            ratio = max_dim / max(img.size)
+            work = img.resize(
+                (max(1, int(img.width * ratio)), max(1, int(img.height * ratio))),
+                Image.LANCZOS,
+            )
+        buf = io.BytesIO()
+        if has_alpha:
+            work.save(buf, format='PNG', optimize=True)
+            out_ct = 'image/png'
+        else:
+            work.convert('RGB').save(buf, format='JPEG', quality=quality, optimize=True)
+            out_ct = 'image/jpeg'
+        out = buf.getvalue()
+        if _b64_len(len(out)) <= _CLAUDE_B64_LIMIT:
+            logger.info('[orchestrator] imagem recomprimida: %d -> %d bytes (%s)',
+                        len(data), len(out), out_ct)
+            return out, out_ct
+        # Ainda grande: baixa qualidade primeiro (fotos), depois a dimensao.
+        if not has_alpha and quality > 45:
+            quality -= 15
+        else:
+            max_dim = int(max_dim * 0.8)
+    logger.warning('[orchestrator] imagem ainda grande apos recompressao: '
+                   '%d bytes (base64 ~%d)', len(out), _b64_len(len(out)))
+    return out, out_ct
 
 
 def _parse_json(text: str) -> Optional[Dict[str, Any]]:
