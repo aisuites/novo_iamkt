@@ -30,15 +30,9 @@ FRIENDLY_BY_ORG = {
 
 
 def _wireframes_for(slug: str) -> dict:
-    """Fonte de specs por org (cada pipeline tem seu proprio WIREFRAMES)."""
-    if slug == 'samsung-healthcare':
-        from apps.posts.services.samsung.wireframes import WIREFRAMES
-        return WIREFRAMES
-    if slug == 'vb-gastronomia':
-        from apps.posts.services.vb.specs import SPECS
-        return SPECS
-    from apps.posts.services.todxs.wireframes import WIREFRAMES
-    return WIREFRAMES
+    """Fonte de specs por org — resolvida pelo REGISTRY do artkit."""
+    from apps.posts.services.artkit.registry import wireframes_for
+    return wireframes_for(slug)
 
 
 def _fmt(spec) -> str:
@@ -67,6 +61,11 @@ class Command(BaseCommand):
             return
 
         wireframes = _wireframes_for(slug)
+        if wireframes is None:
+            self.stderr.write(self.style.ERROR(
+                f'org {slug!r} nao tem pipeline de arquetipos no registry '
+                f'(services/artkit/registry.py)'))
+            return
         friendly = FRIENDLY_BY_ORG.get(slug, {})
         for order, (key, spec) in enumerate(wireframes.items(), start=1):
             fmt = _fmt(spec)
