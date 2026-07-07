@@ -64,3 +64,11 @@ db.sqlite3-journal
 
 # Manuais de marca em PDF (muito grandes, ~200MB+) — nao versionar
 *Manual de Marca.pdf
+
+# Material de referencia de clientes (PDFs, screenshots, fontes soltas) —
+# fica no servidor, NAO vai pro repo (playbook: coleta Drive -> S3/KB).
+docs-aplicacao/vb-gastronomia/
+docs-aplicacao/todxs/
+docs-aplicacao/samsung-healthcare/
+docs-aplicacao/*.pdf
+docs-aplicacao/*.skill
