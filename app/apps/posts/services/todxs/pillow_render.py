@@ -19,13 +19,8 @@ _OFFWHITE = (244, 241, 217)
 
 
 def _hex_to_rgb(h):
-    h = (h or '#000000').lstrip('#')
-    if len(h) == 3:
-        h = ''.join(c * 2 for c in h)
-    try:
-        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
-    except Exception:
-        return (0, 0, 0)
+    from apps.posts.services.artkit.image import hex_to_rgb
+    return hex_to_rgb(h)
 
 
 def _parse_px(formato_px, default=(1080, 1350)):
@@ -138,14 +133,8 @@ def compose_seal_datauri(x_png_bytes, diameter=420, x_color=_OFFWHITE):
 
 def _cover(img, W, H):
     """Redimensiona (cover) e corta no centro para WxH."""
-    from PIL import Image
-    img = img.convert('RGB')
-    iw, ih = img.size
-    scale = max(W / iw, H / ih)
-    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
-    img = img.resize((nw, nh), Image.LANCZOS)
-    left, top = (nw - W) // 2, (nh - H) // 2
-    return img.crop((left, top, left + W, top + H))
+    from apps.posts.services.artkit.image import cover
+    return cover(img.convert('RGB'), W, H)  # todxs: converte RGB antes (historico)
 
 
 def build_background(archetype, fmt, color_hex, formato_px, photo_png=None):

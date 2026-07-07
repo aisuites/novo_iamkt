@@ -42,9 +42,8 @@ def _load_illustrate():
 # ---------------------------------------------------------------- helpers
 
 def _rgb(token_or_hex):
-    h = PALETTE.get(token_or_hex, token_or_hex) or '#000000'
-    h = h.lstrip('#')
-    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    from apps.posts.services.artkit.image import hex_to_rgb
+    return hex_to_rgb(PALETTE.get(token_or_hex, token_or_hex))
 
 
 def _font(font_key, fs):
@@ -77,16 +76,8 @@ def _ensure_contrast(color_token_or_hex, bg_hex):
 
 
 def _wrap(draw, text, font, max_w):
-    out, cur = [], ''
-    for w in str(text).split():
-        t = (cur + ' ' + w).strip()
-        if not cur or draw.textlength(t, font=font) <= max_w:
-            cur = t
-        else:
-            out.append(cur); cur = w
-    if cur:
-        out.append(cur)
-    return out or ['']
+    from apps.posts.services.artkit.text import wrap_greedy
+    return wrap_greedy(text, font, max_w, draw)
 
 
 def _draw_zone(img, draw, text, z):
@@ -162,11 +153,8 @@ def _paste_fit(img, a, x, y, w, h=None, fit='width'):
 
 
 def _cover(im, W, H):
-    iw, ih = im.size
-    s = max(W / iw, H / ih)
-    im = im.resize((max(1, int(iw * s)), max(1, int(ih * s))), Image.LANCZOS)
-    l, t = (im.width - W) // 2, (im.height - H) // 2
-    return im.crop((l, t, l + W, t + H))
+    from apps.posts.services.artkit.image import cover
+    return cover(im, W, H)  # int() historico (todxs/vb)
 
 
 _GRAF_DIR = os.path.join(_HERE, 'illustration', 'assets', 'grafismos', 'oficiais')

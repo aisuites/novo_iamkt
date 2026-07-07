@@ -47,7 +47,7 @@ def generate_post_todxs_task(self, post_id: int):
     )
     from apps.posts.services.gemini_image_generator import _download_to_base64
     from apps.posts.services.todxs.skill_brain import run_skill_brain
-    from apps.posts.services.todxs.gemini_singleshot import generate_singleshot
+    from apps.posts.services.artkit.gemini import generate_singleshot
     from apps.posts.services.todxs import assets as todxs_assets
 
     post = Post.objects.get(id=post_id)

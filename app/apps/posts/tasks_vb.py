@@ -148,7 +148,7 @@ def generate_post_vb_task(self, post_id: int):
     _sp = SP().get(archetype) or {}
     _needs_photo = (_sp.get('bg', {}).get('type') == 'photo') or bool(_sp.get('foto_frame'))
     if _needs_photo:
-        from apps.posts.services.todxs.gemini_singleshot import generate_singleshot
+        from apps.posts.services.artkit.gemini import generate_singleshot
         conceito = structured.get('foto') or f'prato de comida fresca sobre {post.requested_theme}'
         prompt = (build_vb_framed_photo_prompt(conceito) if _sp.get('foto_frame')
                   else build_vb_photo_prompt(conceito, _sp))

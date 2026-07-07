@@ -113,7 +113,7 @@ def generate_post_samsung_task(self, post_id: int):
             return False
 
     def _gemini(prompt, style):
-        from apps.posts.services.todxs.gemini_singleshot import generate_singleshot
+        from apps.posts.services.artkit.gemini import generate_singleshot
         g = generate_singleshot(prompt_text=prompt + style, image_inputs=[])
         _record_ai_usage(post, step='image_generation', model=g.get('model'),
                          usage_dict=g.get('usage') or {}, purpose='samsung_background',

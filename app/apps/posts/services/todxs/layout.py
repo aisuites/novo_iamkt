@@ -32,28 +32,13 @@ def _lighten(hex_color: str, amt: float = 0.72) -> str:
 
 
 def _contrast_on(hex_color: str) -> str:
-    h = (hex_color or '#000000').lstrip('#')
-    if len(h) == 3:
-        h = ''.join(c * 2 for c in h)
-    try:
-        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
-    except Exception:
-        return '#000000'
-    return '#000000' if (0.299 * r + 0.587 * g + 0.114 * b) > 150 else '#F4F1D9'
+    from apps.posts.services.artkit.text import contrast_on
+    return contrast_on(hex_color)
 
 
 def _greedy_wrap(text, font, max_w, draw):
-    out, cur = [], ''
-    for w in str(text).split():
-        trial = (cur + ' ' + w).strip()
-        if not cur or draw.textlength(trial, font=font) <= max_w:
-            cur = trial
-        else:
-            out.append(cur)
-            cur = w
-    if cur:
-        out.append(cur)
-    return out or ['']
+    from apps.posts.services.artkit.text import wrap_greedy
+    return wrap_greedy(text, font, max_w, draw)
 
 
 _LH = 1.16  # entrelinha (igual ao render_layout_document ~1.18, com folga)
