@@ -216,6 +216,20 @@
     restoredFromStorage: false
   };
 
+  // Editor avançado re-renderizou a arte publicada (todxs/vb/samsung): sincroniza
+  // o s3_key da imagem ATIVA no estado — sem isso, o botão de download da página
+  // presigna a chave antiga e baixa a arte SEM as edições.
+  window.addEventListener('todxs:image-updated', (e) => {
+    const { postId, s3_key } = (e && e.detail) || {};
+    if (!postId || !s3_key) return;
+    const post = postsState.items.find(p => p && String(p.id) === String(postId));
+    if (!post || !Array.isArray(post.imagens) || !post.imagens.length) return;
+    const idx = Math.max(0, Math.min(post.imagens.length - 1, post.activeImageIndex || 0));
+    const item = post.imagens[idx];
+    if (item && typeof item === 'object') item.s3_key = s3_key;
+    else post.imagens[idx] = s3_key;
+  });
+
   // Normalizar dados dos posts
   postsState.items.forEach(item => {
     if (!item) return;

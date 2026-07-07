@@ -576,7 +576,10 @@ def save_elements(request, post_id):
             image_url = _samsung_rerender_published(post, elements)
         except Exception:
             logger.exception('[overlay] re-render samsung (save) falhou post=%s', post.id)
-    return JsonResponse({'ok': True, 'image_url': image_url})
+    # image_s3_key: o front sincroniza o s3_key da imagem ativa (botao de download
+    # da pagina presigna por chave — sem isso, baixaria a arte ANTIGA).
+    return JsonResponse({'ok': True, 'image_url': image_url,
+                         'image_s3_key': (post.image_s3_key if image_url else None)})
 
 
 def _vb_rerender_published(post, elements):

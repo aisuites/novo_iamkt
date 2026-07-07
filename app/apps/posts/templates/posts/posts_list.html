@@ -1453,7 +1453,8 @@ function toggleCarrossel() {
                     });
                 }
                 window.dispatchEvent(new CustomEvent('todxs:image-updated',
-                    { detail: { postId: postId, url: d.image_url } }));
+                    { detail: { postId: postId, url: d.image_url,
+                                s3_key: d.image_s3_key || null } }));
             }
         } catch (e) { /* best-effort */ }
     }
