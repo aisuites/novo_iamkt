@@ -14,9 +14,8 @@ import logging
 import os
 from pathlib import Path
 
-import anthropic
-
-from ..post_orchestrator import _parse_json, _extract_usage
+from ..artkit.brain import call_brain, cached_system_blocks
+from ..artkit.brain import parse_json as _parse_json, extract_usage as _extract_usage
 
 logger = logging.getLogger(__name__)
 MODEL = 'claude-sonnet-4-6'
@@ -128,18 +127,9 @@ Evitar: {', '.join(brand.get('palavras_evitar') or [])}
 Produza o JSON (texto + receita de ilustracao relacionada ao tema).
 """
 
-    system_blocks = [
-        {'type': 'text', 'text': _SKILL_TEXT,
-         'cache_control': {'type': 'ephemeral', 'ttl': '1h'}},
-        {'type': 'text', 'text': SYSTEM,
-         'cache_control': {'type': 'ephemeral', 'ttl': '1h'}},
-    ]
-    client = anthropic.Anthropic(api_key=api_key, max_retries=6)
-    resp = client.messages.create(
-        model=MODEL, max_tokens=MAX_TOKENS, system=system_blocks,
-        messages=[{'role': 'user', 'content': user_text}],
-    )
-    raw = ''.join(b.text for b in resp.content if getattr(b, 'type', None) == 'text')
+    system_blocks = cached_system_blocks(_SKILL_TEXT, SYSTEM, ttl='1h')
+    resp, raw = call_brain(model=MODEL, max_tokens=MAX_TOKENS,
+                           system=system_blocks, user_text=user_text)
     structured = _parse_json(raw)
     usage = _extract_usage(resp, cache_ttl='1h')
     if not structured or 'content' not in structured:

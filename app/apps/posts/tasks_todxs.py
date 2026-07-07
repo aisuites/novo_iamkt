@@ -193,23 +193,20 @@ def generate_post_todxs_task(self, post_id: int):
         logger.exception('[todxs] pillow render falhou post=%s', post_id)
         raise self.retry(exc=exc)
 
-    raw_key, raw_url = _upload_image_to_s3(
-        org_id=org.id, post_id=post.id, png_bytes=pr['raw_png'], mime_type='image/png')
-    s3_key, s3_url = _upload_image_to_s3(
-        org_id=org.id, post_id=post.id, png_bytes=pr['final_png'], mime_type='image/png')
-
-    # ---------------- Persistencia ----------------
-    max_order = post.images.aggregate(Max('order'))['order__max']
-    PostImage.objects.create(
-        post=post, s3_key=s3_key, s3_url=s3_url,
-        order=(max_order if max_order is not None else -1) + 1,
+    # ---------------- Persistencia (nucleo comum: artkit.persist) ----------------
+    from apps.posts.services.artkit.persist import persist_rendered_art
+    up = persist_rendered_art(
+        post,
+        raw_png=pr['raw_png'], final_png=pr['final_png'], elements=pr['elements'],
+        title=(_titulo or '').replace('\n', ' ') or post.title,
+        subtitle=content.get('apoio') or content.get('kicker') or '',
+        caption=structured.get('caption') or '',
+        hashtags=structured.get('hashtags') or [],
+        image_prompt=f"TODXS arquetipo {archetype} ({fmt}) — render Pillow deterministico",
+        ia_model_image='todxs-pillow',
     )
-
-    # designer_payload -> a edicao avancada (canvas modal) consome estes elementos
-    dp = post.designer_payload if isinstance(post.designer_payload, dict) else {}
-    dp['_layout_elements'] = pr['elements']
-    post.designer_payload = dp
-    post.raw_image_s3_key = raw_key
+    raw_key, raw_url = up['raw_key'], up['raw_url']
+    s3_key, s3_url = up['s3_key'], up['s3_url']
 
     trace.append({'etapa': '2_background', **bg_info,
                   'raw_s3_key': raw_key, 'raw_url': raw_url, 'at': dj_tz.now().isoformat()})
@@ -219,19 +216,6 @@ def generate_post_todxs_task(self, post_id: int):
 
     # imagens p/ inspecao no debug (sem Gemini-texto: o render e 100% Pillow)
     todxs_ctx['debug_images'] = {'fundo': raw_url, 'gemini_texto': None, 'pillow': s3_url}
-
-    post.title = (_titulo or '').replace('\n', ' ') or post.title
-    post.subtitle = content.get('apoio') or content.get('kicker') or ''
-    post.caption = structured.get('caption') or ''
-    post.hashtags = structured.get('hashtags') or []
-    post.image_prompt = f"TODXS arquetipo {archetype} ({fmt}) — render Pillow deterministico"
-    post.image_s3_key = s3_key
-    post.image_s3_url = s3_url
-    post.has_image = True
-    post.ia_model_image = 'todxs-pillow'
-    existing = post.generated_images if isinstance(post.generated_images, list) else []
-    existing.append({'s3_key': s3_key, 'url': s3_url})
-    post.generated_images = existing
 
     todxs_ctx['trace'] = trace
     ctx['todxs'] = todxs_ctx

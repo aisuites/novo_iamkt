@@ -8,16 +8,12 @@ Samsung. Também produz caption + hashtags.
 Retorna dict: {structured, model, usage, debug{request,response_raw}}.
 """
 import json
-import os
 import logging
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
 MODEL = 'claude-sonnet-4-5'
 MAX_TOKENS = 1500
-COST_INPUT_PER_M = Decimal('3.0')
-COST_OUTPUT_PER_M = Decimal('15.0')
 
 _TONE = """Você é diretor de conteúdo da Samsung Healthcare (assinatura Relentless
 Innovation / Samsung Medison) para posts de rede social.
@@ -62,39 +58,14 @@ FORMATO (JSON puro): {"archetype":"B","content":{"title":"","body":""},"caption"
 }
 
 
-def _parse_json(text):
-    if not text:
-        return None
-    s = text.strip()
-    if s.startswith('```'):
-        s = s.split('```', 2)[1] if '```' in s[3:] else s
-        s = s.replace('json', '', 1).strip('` \n')
-    try:
-        return json.loads(s)
-    except Exception:
-        import re
-        m = re.search(r'\{[\s\S]+\}', s)
-        if m:
-            try:
-                return json.loads(m.group(0))
-            except Exception:
-                return None
-    return None
-
-
 def run_skill_brain(*, brief: dict, brand: dict) -> dict:
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
-    if not api_key:
-        raise RuntimeError('ANTHROPIC_API_KEY ausente')
+    from apps.posts.services.artkit.brain import call_brain, parse_json, extract_usage
 
     archetype = (brief.get('archetype') or 'A').strip().upper()
     zones = _ZONES.get(archetype, _ZONES['A'])
     system_prompt = _TONE + "\n\n" + zones + "\n\nAlém disso produza: caption " \
         "(legenda 2-4 frases, tom Samsung) e hashtags (3-6 palavras, sem #). " \
         "Retorne APENAS o JSON."
-
-    import anthropic
-    client = anthropic.Anthropic(api_key=api_key)
 
     user_payload = {
         'tema': brief.get('tema'),
@@ -111,22 +82,14 @@ def run_skill_brain(*, brief: dict, brand: dict) -> dict:
     user_text = ('Gere o JSON para este briefing (responda só o JSON):\n'
                  + json.dumps(user_payload, ensure_ascii=False))
 
-    resp = client.messages.create(
-        model=MODEL, max_tokens=MAX_TOKENS, system=system_prompt,
-        messages=[{'role': 'user', 'content': user_text}],
-    )
-    raw = ''.join(getattr(b, 'text', '') for b in resp.content)
-    structured = _parse_json(raw) or {}
-
-    usage = getattr(resp, 'usage', None)
-    in_tok = getattr(usage, 'input_tokens', 0) or 0
-    out_tok = getattr(usage, 'output_tokens', 0) or 0
-    cost = (COST_INPUT_PER_M * Decimal(in_tok) + COST_OUTPUT_PER_M * Decimal(out_tok)) / Decimal(1_000_000)
+    resp, raw = call_brain(model=MODEL, max_tokens=MAX_TOKENS,
+                           system=system_prompt, user_text=user_text)
+    structured = parse_json(raw) or {}
+    usage = extract_usage(resp)  # sem cache blocks -> custo identico ao calculo antigo
 
     return {
         'structured': structured,
         'model': MODEL,
-        'usage': {'input_tokens': in_tok, 'output_tokens': out_tok,
-                  'total_tokens': in_tok + out_tok, 'cost_usd': float(cost)},
+        'usage': usage,
         'debug': {'request': user_payload, 'response_raw': raw},
     }

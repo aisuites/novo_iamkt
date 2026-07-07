@@ -15,9 +15,8 @@ import logging
 import os
 from pathlib import Path
 
-import anthropic
-
-from ..post_orchestrator import _parse_json, _extract_usage
+from ..artkit.brain import call_brain, cached_system_blocks
+from ..artkit.brain import parse_json as _parse_json, extract_usage as _extract_usage
 
 logger = logging.getLogger(__name__)
 
@@ -166,12 +165,7 @@ def run_skill_brain(*, brief: dict, brand: dict) -> dict:
 
     user_text = _build_user_text(brief=brief, brand=brand)
 
-    system_blocks = [
-        {'type': 'text', 'text': SKILL_TEXT,
-         'cache_control': {'type': 'ephemeral', 'ttl': '1h'}},
-        {'type': 'text', 'text': SYSTEM_INSTRUCTION,
-         'cache_control': {'type': 'ephemeral', 'ttl': '1h'}},
-    ]
+    system_blocks = cached_system_blocks(SKILL_TEXT, SYSTEM_INSTRUCTION, ttl='1h')
 
     debug_request = {
         'model': MODEL,
@@ -183,17 +177,8 @@ def run_skill_brain(*, brief: dict, brand: dict) -> dict:
         'user': user_text,
     }
 
-    client = anthropic.Anthropic(api_key=api_key, max_retries=6)
-    resp = client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=system_blocks,
-        messages=[{'role': 'user', 'content': user_text}],
-    )
-
-    raw = ''.join(
-        blk.text for blk in resp.content if getattr(blk, 'type', None) == 'text'
-    )
+    resp, raw = call_brain(model=MODEL, max_tokens=MAX_TOKENS,
+                           system=system_blocks, user_text=user_text)
     structured = _parse_json(raw)
     usage = _extract_usage(resp, cache_ttl='1h')
 

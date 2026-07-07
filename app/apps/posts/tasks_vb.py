@@ -171,41 +171,29 @@ def generate_post_vb_task(self, post_id: int):
         logger.exception('[vb] render falhou post=%s', post_id)
         raise self.retry(exc=exc)
 
-    raw_key, raw_url = _upload_image_to_s3(
-        org_id=org.id, post_id=post.id, png_bytes=pr['raw_png'], mime_type='image/png')
-    s3_key, s3_url = _upload_image_to_s3(
-        org_id=org.id, post_id=post.id, png_bytes=pr['final_png'], mime_type='image/png')
+    # ---------------- Persistencia (nucleo comum: artkit.persist) ----------------
+    from apps.posts.services.artkit.persist import persist_rendered_art
+    up = persist_rendered_art(
+        post,
+        raw_png=pr['raw_png'], final_png=pr['final_png'],
+        elements=pr.get('elements') or [],
+        title=(content.get('titulo') or '').replace('\n', ' ') or post.title,
+        subtitle=content.get('apoio') or '',
+        caption=structured.get('caption') or '',
+        hashtags=structured.get('hashtags') or [],
+        image_prompt=f'VB arquetipo {archetype} ({fmt}) — render Pillow deterministico',
+        ia_provider='anthropic', ia_model_text=brain.get('model'),
+        ia_model_image='vb-pillow',
+        set_raw_url=True,  # vb historicamente persiste tambem a URL do raw
+    )
+    raw_url, s3_url = up['raw_url'], up['s3_url']
 
-    max_order = post.images.aggregate(Max('order'))['order__max']
-    PostImage.objects.create(post=post, s3_key=s3_key, s3_url=s3_url,
-                             order=(max_order if max_order is not None else -1) + 1)
-
-    post.raw_image_s3_key = raw_key
-    post.raw_image_s3_url = raw_url
-    # designer_payload -> a edicao avancada consome estes elementos de texto
-    dp = post.designer_payload if isinstance(post.designer_payload, dict) else {}
-    dp['_layout_elements'] = pr.get('elements') or []
-    post.designer_payload = dp
     vb_ctx.update({'archetype': archetype, 'content': content,
                    'objeto_ilustracao': structured.get('objeto_ilustracao'),
                    'debug_images': {'fundo': raw_url, 'final': s3_url},
                    'updated_at': dj_tz.now().isoformat()})
     ctx['vb'] = vb_ctx
     post.local_pipeline_context = ctx
-    post.title = (content.get('titulo') or '').replace('\n', ' ') or post.title
-    post.subtitle = content.get('apoio') or ''
-    post.caption = structured.get('caption') or ''
-    post.hashtags = structured.get('hashtags') or []
-    post.image_prompt = f'VB arquetipo {archetype} ({fmt}) — render Pillow deterministico'
-    post.image_s3_key = s3_key
-    post.image_s3_url = s3_url
-    post.has_image = True
-    post.ia_provider = 'anthropic'
-    post.ia_model_text = brain.get('model')
-    post.ia_model_image = 'vb-pillow'
-    existing = post.generated_images if isinstance(post.generated_images, list) else []
-    existing.append({'s3_key': s3_key, 'url': s3_url})
-    post.generated_images = existing
     post.status = 'image_ready'
     post.save()
 
