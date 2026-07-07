@@ -37,11 +37,15 @@ def generate_post_samsung_task(self, post_id: int):
     from apps.posts.services.samsung.skill_brain import run_skill_brain
     from apps.posts.services.samsung.render import render_samsung
     from apps.posts.services.samsung.wireframes import WF, archetypes_for_format
+    from apps.posts.services.samsung.catalog import apply_org_wireframes
     from django.db.models import Max
 
     post = Post.objects.get(id=post_id)
     org = post.organization
     kb = KnowledgeBase.objects.filter(organization=org).first()
+
+    # Data-driven: specs do banco (PostArchetype) sobrepoem o codigo (como todxs).
+    apply_org_wireframes(org)
 
     ctx = post.local_pipeline_context or {}
     s_ctx = ctx.get('samsung') or {}

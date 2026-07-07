@@ -131,5 +131,21 @@ SPECS = {
 }
 
 
+# ---- Data-driven: contextvar (banco sobre código, como em todxs/samsung) ----
+import contextvars
+
+_active = contextvars.ContextVar('vb_specs', default=None)
+
+
+def set_specs(specs: dict):
+    """Define as specs ativas para esta execução (usado pelo catálogo/DB)."""
+    _active.set(dict(specs or {}))
+
+
+def SP() -> dict:
+    """Specs ativas (override do banco) ou o SPECS do código."""
+    return _active.get() or SPECS
+
+
 def archetypes_for_format(fmt):
-    return [k for k, v in SPECS.items() if v['formato'] == fmt]
+    return [k for k, v in SP().items() if v.get('formato') == fmt]

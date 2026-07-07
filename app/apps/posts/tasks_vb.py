@@ -99,21 +99,26 @@ def generate_post_vb_task(self, post_id: int):
     from apps.posts.tasks import _upload_image_to_s3, _record_ai_usage
     from apps.posts.services.vb.skill_brain import run_vb_brain
     from apps.posts.services.vb.render import render_vb
-    from apps.posts.services.vb.specs import SPECS
+    from apps.posts.services.vb.specs import SP
+    from apps.posts.services.vb.catalog import apply_org_specs
     from django.db.models import Max
 
     post = Post.objects.get(id=post_id)
     org = post.organization
     kb = KnowledgeBase.objects.filter(organization=org).first()
+
+    # Data-driven: specs do banco (PostArchetype) sobrepoem o codigo (como todxs).
+    apply_org_specs(org)
+
     ctx = post.local_pipeline_context or {}
     vb_ctx = ctx.get('vb') or {}
     fmt, _px = _fmt_meta(post)
 
     archetype = (vb_ctx.get('force_archetype') or '').strip()
-    if archetype not in SPECS:
+    if archetype not in SP():
         # fallback: primeiro arquetipo do formato
         from apps.posts.services.vb.specs import archetypes_for_format
-        opts = archetypes_for_format(fmt) or list(SPECS.keys())
+        opts = archetypes_for_format(fmt) or list(SP().keys())
         archetype = opts[0]
 
     brand = {
@@ -140,7 +145,7 @@ def generate_post_vb_task(self, post_id: int):
     # Upload de imagem (futuro) entra aqui como drop-in: se houver imagem enviada,
     # usa ela em vez do Gemini (e aplica efeito/ajuste).
     photo_png = None
-    _sp = SPECS.get(archetype) or {}
+    _sp = SP().get(archetype) or {}
     _needs_photo = (_sp.get('bg', {}).get('type') == 'photo') or bool(_sp.get('foto_frame'))
     if _needs_photo:
         from apps.posts.services.todxs.gemini_singleshot import generate_singleshot

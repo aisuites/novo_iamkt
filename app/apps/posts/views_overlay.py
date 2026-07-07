@@ -282,6 +282,15 @@ def export_png(request, post_id):
                 base = base.resize((cw, ch), Image.LANCZOS)
             draw_vb_compose(base, elements, cw, ch)
             _o = _io2.BytesIO(); base.convert('RGB').save(_o, 'PNG'); png_bytes = _o.getvalue()
+        elif post.pipeline_used == 'samsung':
+            from apps.posts.services.samsung.render import draw_samsung_compose
+            from PIL import Image
+            import io as _io3
+            base = Image.open(_io3.BytesIO(bg_bytes)).convert('RGBA')
+            if base.size != (canvas_w, canvas_h):
+                base = base.resize((canvas_w, canvas_h), Image.LANCZOS)
+            base = draw_samsung_compose(base, elements, canvas_w, canvas_h)
+            _o = _io3.BytesIO(); base.convert('RGB').save(_o, 'PNG'); png_bytes = _o.getvalue()
         else:
             from apps.posts.services.gemini_image_generator import render_layout_document
             png_bytes = render_layout_document(
@@ -562,6 +571,11 @@ def save_elements(request, post_id):
             image_url = _vb_rerender_published(post, elements)
         except Exception:
             logger.exception('[overlay] re-render vb (save) falhou post=%s', post.id)
+    elif post.pipeline_used == 'samsung':
+        try:
+            image_url = _samsung_rerender_published(post, elements)
+        except Exception:
+            logger.exception('[overlay] re-render samsung (save) falhou post=%s', post.id)
     return JsonResponse({'ok': True, 'image_url': image_url})
 
 
@@ -587,6 +601,45 @@ def _vb_rerender_published(post, elements):
     if base.size != (cw, ch):
         base = base.resize((cw, ch), Image.LANCZOS)
     draw_vb_compose(base, elements, cw, ch)  # imagem (stickers) + texto
+    out = _io.BytesIO(); base.convert('RGB').save(out, 'PNG')
+
+    old_key = post.image_s3_key
+    key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
+                                   png_bytes=out.getvalue(), mime_type='image/png')
+    if old_key:
+        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    post.image_s3_key, post.image_s3_url = key, url
+    gi = post.generated_images if isinstance(post.generated_images, list) else []
+    gi.append({'s3_key': key, 'url': url})
+    post.generated_images = gi
+    post.save(update_fields=['image_s3_key', 'image_s3_url', 'generated_images'])
+    try:
+        return S3Service.generate_presigned_download_url(key, expires_in=86400)
+    except Exception:
+        return url
+
+
+def _samsung_rerender_published(post, elements):
+    """Redesenha a arte Samsung (raw fundo + elementos editados) e atualiza a
+    imagem publicada (espelha _vb_rerender_published)."""
+    import base64 as _b64
+    from apps.posts.models import PostImage
+    from apps.posts.services.samsung.render import draw_samsung_compose
+    from apps.posts.tasks import _upload_image_to_s3
+    from apps.core.services.s3_service import S3Service
+    from PIL import Image
+    import io as _io
+
+    raw_data = _download_as_data_uri(_get_raw_image_url(post))
+    if not raw_data:
+        return None
+    _, _, payload = raw_data.partition(',')
+    base = Image.open(_io.BytesIO(_b64.b64decode(payload))).convert('RGBA')
+    cw, ch = _get_canvas(post)
+    if base.size != (cw, ch):
+        base = base.resize((cw, ch), Image.LANCZOS)
+    els = _prepare_stickers_for_export(elements)
+    base = draw_samsung_compose(base, els, cw, ch)
     out = _io.BytesIO(); base.convert('RGB').save(out, 'PNG')
 
     old_key = post.image_s3_key

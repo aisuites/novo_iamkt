@@ -100,17 +100,20 @@ class Post(models.Model):
     ia_model_text = models.CharField(max_length=50, verbose_name='Modelo IA Texto')
     ia_model_image = models.CharField(max_length=50, blank=True, verbose_name='Modelo IA Imagem')
 
-    # Pipeline usada (N8N externo ou Celery local). Permite A/B em homol.
+    # Pipeline usada (N8N externo, Celery local ou pipeline de arte por org).
     pipeline_used = models.CharField(
         max_length=10,
         choices=[
             ('n8n', 'N8N (workflow externo)'),
             ('local', 'Local (Celery interno)'),
             ('simple', 'Simples (Celery + OpenAI, 1 agente)'),
+            ('todxs', 'TODXS (arquetipos, render deterministico)'),
+            ('vb', 'VB Gastronomia (arquetipos, render deterministico)'),
+            ('samsung', 'Samsung Healthcare (arquetipos, render deterministico)'),
         ],
         default='n8n',
         verbose_name='Pipeline usada',
-        help_text='Qual pipeline foi acionado: N8N externo (producao) ou Celery local (homol)'
+        help_text='Qual pipeline foi acionado: N8N externo, Celery local ou pipeline de arte da org'
     )
     
     # Conteúdo gerado

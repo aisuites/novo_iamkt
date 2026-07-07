@@ -1460,9 +1460,9 @@ function toggleCarrossel() {
     async function closeModal() {
         const pid = currentPostId;
         const els = elements.slice();
-        // Pipelines que RE-RENDERIZAM o publicado no save (todxs, vb): trava a tela
-        // com overlay ate a arte nova carregar no preview.
-        const rerenders = (currentPipeline === 'todxs' || currentPipeline === 'vb') && pid && els && els.length;
+        // Pipelines que RE-RENDERIZAM o publicado no save (todxs, vb, samsung):
+        // trava a tela com overlay ate a arte nova carregar no preview.
+        const rerenders = (currentPipeline === 'todxs' || currentPipeline === 'vb' || currentPipeline === 'samsung') && pid && els && els.length;
         _stopBgPolling();
         if (rerenders) _showSaveOverlay();
         modal.style.display='none'; document.body.style.overflow='';

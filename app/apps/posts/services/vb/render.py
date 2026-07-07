@@ -13,7 +13,7 @@ import importlib.util
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .specs import SPECS, PALETTE
+from .specs import PALETTE
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _FONTS = os.path.join(_HERE, 'fonts')
@@ -235,6 +235,29 @@ def _grafismo_grid(grid_spec, W_box, H_box, seed=0):
     return canvas
 
 
+def _fix_recipe_contrast(recipe, bg_value):
+    """Guardrail: peça da ilustração na COR DO FUNDO fica invisível — remapeia
+    para a primeira cor de contraste da paleta. Determinístico (independe do brain)."""
+    try:
+        bgc = _rgb(bg_value)
+    except Exception:
+        return recipe
+    prefer = ['terracota', 'laranja', 'vinho', 'creme', 'amarelo', 'preto']
+    repl = next((c for c in prefer if _rgb(c) != bgc), 'creme')
+    changed = 0
+    for p in (recipe or {}).get('pecas') or []:
+        try:
+            if _rgb(p.get('cor')) == bgc:
+                p['cor'] = repl
+                changed += 1
+        except Exception:
+            continue
+    if changed:
+        logger.warning('[vb] ilustracao: %s peca(s) na cor do fundo remapeada(s) p/ %s',
+                       changed, repl)
+    return recipe
+
+
 def _illustration(recipe, W, H):
     """Renderiza a ilustração (skill) a partir da receita -> Image RGBA WxH-canvas."""
     illu = _load_illustrate()
@@ -412,7 +435,8 @@ def _rotated_text_img(text, font_key, fs, color, box_w, box_h, rot, leading=1.1,
 
 
 def render_vb(archetype, content, color_hex=None, fmt='feed', kb=None, photo_png=None):
-    spec = SPECS[archetype]
+    from .specs import SP
+    spec = SP()[archetype]
     W, H = spec['canvas']
 
     # 1) Fundo — o RAW é SÓ o fundo; todo o resto vira elemento editável.
@@ -440,7 +464,10 @@ def render_vb(archetype, content, color_hex=None, fmt='feed', kb=None, photo_png
     izone = spec.get('ilustracao')
     if izone and content.get('ilustracao'):
         try:
-            im = _illustration(content['ilustracao'], izone['w'], izone['h'])
+            _bg_val = color_hex or (bg.get('color') if bg.get('type') == 'solid' else None)
+            recipe = (_fix_recipe_contrast(content['ilustracao'], _bg_val)
+                      if _bg_val else content['ilustracao'])
+            im = _illustration(recipe, izone['w'], izone['h'])
             elements.append(_img_el('ilustracao', im, izone['x'], izone['y'],
                                     izone['w'], izone['h'], W, H, izone.get('fit', 'contain')))
         except Exception:

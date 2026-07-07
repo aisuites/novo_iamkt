@@ -102,18 +102,23 @@ def run_vb_brain(*, tema: str, archetype: str, brand: dict) -> dict:
     if not api_key:
         raise RuntimeError('ANTHROPIC_API_KEY ausente no ambiente')
 
-    from .specs import SPECS
-    sp = SPECS.get(archetype) or {}
+    from .specs import SP
+    sp = SP().get(archetype) or {}
     _has_photo = sp.get('bg', {}).get('type') == 'photo' or sp.get('foto_frame')
     _has_illu = bool(sp.get('ilustracao'))
     modo = 'foto' if _has_photo else ('ilustracao' if _has_illu else 'texto')
     zonas = ARCH_ZONES.get(archetype, 'titulo, apoio')
+    # Cor de fundo da arte: a ilustracao NAO pode usa-la (peca invisivel).
+    _bg_cor = (sp.get('bg') or {}).get('color') or ''
+    _bg_regra = (f'\nCOR DE FUNDO da arte: {_bg_cor} — NUNCA use {_bg_cor} nas pecas '
+                 f'da ilustracao (ficariam invisiveis); prefira cores de CONTRASTE '
+                 f'da paleta.' if (_has_illu and _bg_cor) else '')
     user_text = f"""\
 == TEMA DO POST ==
 {tema}
 
 == ARQUETIPO ==
-{archetype} — MODO={modo} — zonas: {zonas}
+{archetype} — MODO={modo} — zonas: {zonas}{_bg_regra}
 
 == MARCA (VB Gastronomia) ==
 Tom de voz: {brand.get('tom_voz') or ''}

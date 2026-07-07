@@ -337,3 +337,52 @@ def render_samsung(*, archetype, content, kb=None, assets=None):
 
     return {'raw_png': _png(raw), 'final_png': _png(base),
             'elements': elements, 'fonts_resolved': fonts_resolved}
+
+
+def draw_samsung_compose(base, elements, W, H):
+    """Compõe a arte a partir dos ELEMENTOS do editor (mesma convenção do canvas):
+    pinta elementos de imagem (data URI) e desenha o texto. Usado pelo save/export
+    do editor avançado (espelha draw_vb_compose)."""
+    if base.mode != 'RGBA':
+        base = base.convert('RGBA')
+    draw = ImageDraw.Draw(base)
+    basis = min(W, H)
+    for el in elements:
+        if el.get('visible') is False:
+            continue
+        role = (el.get('role') or '').lower()
+        if role == 'image':
+            url = el.get('url') or ''
+            if not url.startswith('data:'):
+                continue
+            try:
+                img = Image.open(io.BytesIO(base64.b64decode(url.split(',', 1)[1]))).convert('RGBA')
+                x = float(el.get('x_pct', 0)) / 100.0 * W
+                y = float(el.get('y_pct', 0)) / 100.0 * H
+                w = float(el.get('width_pct', 10)) / 100.0 * W
+                h = float(el.get('height_pct', 10)) / 100.0 * H
+                img = _contain(img, max(1, int(w)), max(1, int(h)))
+                base.paste(img, (int(x + (w - img.width) / 2), int(y + (h - img.height) / 2)), img)
+            except Exception:
+                logger.exception('[samsung] compose: elemento de imagem falhou')
+            continue
+        text = str(el.get('content') or '')
+        if not text.strip():
+            continue
+        size = max(8, int(float(el.get('font_size_pct', 4)) / 100.0 * basis))
+        font = _font(el.get('font_key') or 'head_regular', size)
+        x = float(el.get('x_pct', 0)) / 100.0 * W
+        y = float(el.get('y_pct', 0)) / 100.0 * H
+        bw = float(el.get('width_pct', 60)) / 100.0 * W
+        align = (el.get('align') or 'left').lower()
+        fill = el.get('color') or '#FFFFFF'
+        leading = float(el.get('_leading', 1.1))
+        tracking = float(el.get('tracking') or 0.0)
+        for line in text.split('\n'):
+            lw = draw.textlength(line, font=font)
+            if tracking:
+                lw += tracking * size * max(0, len(line) - 1)
+            lx = x + (bw - lw) / 2 if align == 'center' else (x + bw - lw if align == 'right' else x)
+            _draw_line(draw, (lx, y), line, font, fill, tracking)
+            y += size * leading
+    return base

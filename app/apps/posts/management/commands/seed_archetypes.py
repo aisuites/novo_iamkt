@@ -34,11 +34,16 @@ def _wireframes_for(slug: str) -> dict:
     if slug == 'samsung-healthcare':
         from apps.posts.services.samsung.wireframes import WIREFRAMES
         return WIREFRAMES
+    if slug == 'vb-gastronomia':
+        from apps.posts.services.vb.specs import SPECS
+        return SPECS
     from apps.posts.services.todxs.wireframes import WIREFRAMES
     return WIREFRAMES
 
 
-def _fmt(formatos) -> str:
+def _fmt(spec) -> str:
+    # todxs/samsung: spec['formatos'] = lista; vb: spec['formato'] = string.
+    formatos = spec.get('formatos') or ([spec['formato']] if spec.get('formato') else None)
     s = set(formatos or ['feed'])
     if {'feed', 'story'} <= s:
         return 'both'
@@ -64,7 +69,7 @@ class Command(BaseCommand):
         wireframes = _wireframes_for(slug)
         friendly = FRIENDLY_BY_ORG.get(slug, {})
         for order, (key, spec) in enumerate(wireframes.items(), start=1):
-            fmt = _fmt(spec.get('formatos'))
+            fmt = _fmt(spec)
             name = friendly.get(key) or spec.get('name') or key
             obj, created = PostArchetype.objects.get_or_create(
                 organization=org, key=key,
