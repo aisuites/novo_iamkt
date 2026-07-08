@@ -2171,6 +2171,12 @@ def _record_ai_usage(post, *, step: str, model: str, usage_dict: dict,
         'total_cost_usd',
     ])
 
+    # Evento na fonte única org-level (C0.3) — nunca levanta exceção.
+    from apps.core.services.ai_usage import record_ai_event
+    record_ai_event(getattr(post, 'organization', None), step=step, model=model,
+                    usage_dict=usage_dict, purpose=purpose, post=post,
+                    source='posts', images_generated=images_generated)
+
     logger.info(
         '[ai_cost] post=%s step=%s model=%s tokens_in=%d tokens_out=%d images=%d cost=$%s (R$%s)',
         post.id, step, model,
