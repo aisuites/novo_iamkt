@@ -85,12 +85,17 @@ def transcribe_published_art(post):
         if not api_key:
             logger.warning('[transcribe] ANTHROPIC_API_KEY ausente — skip')
             return None, {}
-        if not post.image_s3_key or not post.raw_image_s3_key:
+        # SEMPRE mede o ORIGINAL do Gemini (gemini_final_s3_key) — o publicado
+        # (image_s3_key) pode ja ser um re-render Pillow de elements antigos,
+        # e medir um re-render envenena a transcricao (licao do post 255).
+        si = (post.local_pipeline_context or {}).get('simple_image') or {}
+        final_key = si.get('gemini_final_s3_key') or post.image_s3_key
+        if not final_key or not post.raw_image_s3_key:
             logger.info('[transcribe] post=%s sem raw/final — skip', post.id)
             return None, {}
 
         raw_b64, raw_mime = _fetch_b64(_presign(post.raw_image_s3_key))
-        fin_b64, fin_mime = _fetch_b64(_presign(post.image_s3_key))
+        fin_b64, fin_mime = _fetch_b64(_presign(final_key))
 
         known = {
             'titulo': (post.title or '').strip(),
