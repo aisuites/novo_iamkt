@@ -203,6 +203,9 @@ def simple_debug(request, post_id):
         'status': post.status,
         'bg_url': _presign(post.raw_image_s3_key, post.raw_image_s3_url or ''),
         'final_url': _presign(post.image_s3_key, post.image_s3_url or ''),
+        # Original do Gemini com texto (pode diferir do final se o usuario
+        # editou — o publicado vira re-render Pillow). Base da comparacao Q1.
+        'gemini_url': _presign(dbg.get('gemini_final_s3_key') or ''),
         'bg_prompt': dbg.get('bg_prompt', ''),
         'final_prompt': dbg.get('final_prompt', ''),
         'rules': dbg.get('rules', {}),
@@ -623,7 +626,18 @@ def _simple_rerender_published(post, elements):
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
     post.generated_images = gi
-    post.save(update_fields=['image_s3_key', 'image_s3_url', 'generated_images'])
+    # Preserva o PNG original do Gemini p/ comparacao no debug (posts antigos
+    # sem a chave: o old_key da PRIMEIRA edicao e o original do Gemini).
+    ctx = post.local_pipeline_context or {}
+    si = ctx.get('simple_image') or {}
+    if old_key and not si.get('gemini_final_s3_key'):
+        si['gemini_final_s3_key'] = old_key
+        ctx['simple_image'] = si
+        post.local_pipeline_context = ctx
+        post.save(update_fields=['image_s3_key', 'image_s3_url',
+                                 'generated_images', 'local_pipeline_context'])
+    else:
+        post.save(update_fields=['image_s3_key', 'image_s3_url', 'generated_images'])
     try:
         return S3Service.generate_presigned_download_url(key, expires_in=86400)
     except Exception:

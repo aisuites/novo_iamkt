@@ -544,6 +544,10 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
         'scene_prompt_final': scene_prompt,
         'model_bg': bg_result.get('model', ''),
         'model_final': apply_result['model'],
+        # Original do Gemini preservado p/ comparacao no debug (Q1): se o
+        # usuario editar, o publicado vira re-render Pillow e substitui
+        # image_s3_key — esta chave guarda o PNG original com texto.
+        'gemini_final_s3_key': s3_key,
         'created_at': _tz.now().isoformat(),
     }
     post.local_pipeline_context = _ctx
