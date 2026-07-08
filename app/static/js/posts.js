@@ -832,8 +832,11 @@
     const endpoints = { local: '/posts/gerar-local/', simple: '/posts/gerar-simples/' };
     const endpoint = endpoints[pipeline] || '/posts/gerar/';
     
-    // Obter post_format_id do select (NOVO)
-    const postFormatId = dom.formatoSelect?.value || null;
+    // Obter post_format_id do select (NOVO). No modo template o payload manda
+    // null explicito (o select fica oculto; o formato legado vem do arquetipo).
+    const postFormatId = (payload.postFormatId !== undefined)
+      ? payload.postFormatId
+      : (dom.formatoSelect?.value || null);
     
     // Preparar payload JSON para Django
     const jsonPayload = {
@@ -969,14 +972,26 @@
           return;
         }
 
+        // Modo template: rede/formato, CTA e carrossel ficam OCULTOS no modal
+        // — o formato vem do ARQUETIPO escolhido e CTA/carrossel nao se
+        // aplicam ao render deterministico.
+        let tplFormats = null;
+        if (useTemplate) {
+          const arch = (aState.archetypes || [])
+            .find((a) => a.key === aState.selectedArchetype);
+          const f = (arch?.format || 'feed').toLowerCase();
+          tplFormats = [(f === 'story' || f === 'stories') ? 'stories' : 'feed'];
+        }
+
         const payload = {
           rede,
           tema,
           usuario: CURRENT_USER,
-          formatos,
-          carrossel,
-          qtdImagens,
-          ctaRequested,
+          formatos: useTemplate ? tplFormats : formatos,
+          carrossel: useTemplate ? false : carrossel,
+          qtdImagens: useTemplate ? 1 : qtdImagens,
+          ctaRequested: useTemplate ? false : ctaRequested,
+          postFormatId: useTemplate ? null : undefined,
           referenceImages,
           selectedLogoIds,
           selectedReferenceIds,
@@ -2440,12 +2455,6 @@
   // ============================================================
   // Modo "Usar template" (seletor de arquetipo) — orgs habilitadas
   // ============================================================
-  function currentTemplateFmt() {
-    const opt = dom.formatoSelect?.selectedOptions?.[0];
-    const txt = ((opt?.textContent || '') + ' ' + (opt?.dataset?.aspect || '')).toLowerCase();
-    return (txt.includes('stor') || txt.includes('9:16')) ? 'story' : 'feed';
-  }
-
   let _archetypeWired = false;
   function setupArchetypeMode() {
     const row = document.getElementById('genModeRow');
@@ -2459,10 +2468,6 @@
     row.querySelectorAll('.gen-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => setGenMode(btn.dataset.mode));
     });
-    // troca de formato -> refiltra o slider pelo formato (feed/story)
-    dom.formatoSelect?.addEventListener('change', () => {
-      if (orgAssetsState.genMode === 'template') renderArchetypeSlider();
-    });
   }
 
   function setGenMode(mode) {
@@ -2472,28 +2477,38 @@
       .forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
     const free = document.getElementById('freeGenFields');
     const panel = document.getElementById('archetypePanel');
-    // No modo "template" escondemos apenas logos e upload de novas imagens; a
-    // galeria de referencias (dentro de freeGenFields) fica VISIVEL para o
-    // usuario escolher a imagem de produto (ex.: arquetipo Samsung B).
+    // No modo "template" escondemos logos e upload de novas imagens; a galeria
+    // de referencias (dentro de freeGenFields) fica VISIVEL para o usuario
+    // escolher a imagem de produto (ex.: arquetipo Samsung B).
     const logoField = document.getElementById('logoField');
     const uploadField = document.getElementById('uploadRefField');
+    // Rede/formato, CTA e carrossel NAO se aplicam ao modo template: o formato
+    // vem do arquetipo escolhido e o render e deterministico (sem CTA/carrossel).
+    const linhaRedeFormato = document.getElementById('linhaRedeFormato');
+    const linhaCtaCarrossel = document.getElementById('linhaCtaCarrossel');
     const tpl = mode === 'template';
     if (free) free.style.display = '';            // sempre visivel (contem as refs)
     if (panel) panel.style.display = tpl ? '' : 'none';
     if (logoField) logoField.style.display = tpl ? 'none' : '';
     if (uploadField) uploadField.style.display = tpl ? 'none' : '';
+    if (linhaRedeFormato) linhaRedeFormato.style.display = tpl ? 'none' : '';
+    if (linhaCtaCarrossel) linhaCtaCarrossel.style.display = tpl ? 'none' : '';
+    // campos required escondidos bloqueiam o submit do form: solta o required
+    // no modo template e devolve no modo livre.
+    if (dom.redePost) dom.redePost.required = !tpl;
+    if (dom.formatoSelect) dom.formatoSelect.required = !tpl;
     if (tpl) renderArchetypeSlider();
   }
 
   function renderArchetypeSlider() {
     const slider = document.getElementById('archetypeSlider');
     if (!slider) return;
-    const fmt = currentTemplateFmt();
-    const list = (orgAssetsState.archetypes || [])
-      .filter((a) => a.format === fmt || a.format === 'both');
+    // Rede/formato ficam OCULTOS no modo template: mostramos TODOS os
+    // arquetipos e o formato (feed/story) vem do arquetipo escolhido.
+    const list = orgAssetsState.archetypes || [];
     slider.innerHTML = '';
     if (!list.length) {
-      slider.innerHTML = '<div class="asset-gallery-loading">Nenhum template para este formato.</div>';
+      slider.innerHTML = '<div class="asset-gallery-loading">Nenhum template cadastrado.</div>';
       return;
     }
     // se o arquetipo selecionado nao vale neste formato, limpa
