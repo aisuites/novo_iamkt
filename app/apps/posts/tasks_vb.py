@@ -168,8 +168,10 @@ def generate_post_vb_task(self, post_id: int):
         post.subtitle = content.get('apoio') or ''
         post.caption = structured.get('caption') or ''
         post.hashtags = structured.get('hashtags') or []
-        # Descricao editavel no portao = prompt REAL da foto (quando ha foto)
-        if _needs_photo:
+        # Descricao editavel no portao = prompt REAL da foto (quando ha foto
+        # E ela sera gerada por IA — foto do usuario nao tem o que descrever).
+        from apps.posts.services.artkit.photo_source import has_user_photo
+        if _needs_photo and not has_user_photo(post):
             post.image_prompt = (build_vb_framed_photo_prompt(conceito)
                                  if _sp.get('foto_frame')
                                  else build_vb_photo_prompt(conceito, _sp))

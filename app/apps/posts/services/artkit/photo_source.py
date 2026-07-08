@@ -33,6 +33,19 @@ def _download(url):
         return None
 
 
+def has_user_photo(post) -> bool:
+    """True se o usuario ESCOLHEU a foto no modal (upload ou ref selecionada).
+    Usado pelo portao: com foto do usuario nao ha descricao de imagem a
+    validar/revisar (a imagem nao sera gerada por IA)."""
+    try:
+        if post.reference_image_files.exists():
+            return True
+    except Exception:
+        pass
+    ctx = post.local_pipeline_context or {}
+    return bool(ctx.get('selected_reference_ids'))
+
+
 def resolve_user_photo(post, kb):
     """(png_bytes, origin) da foto escolhida pelo usuario, ou (None, None).
 

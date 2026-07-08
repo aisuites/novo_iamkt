@@ -2460,3 +2460,6 @@ from apps.posts.tasks_vb import generate_post_vb_task  # noqa: E402,F401
 
 # Pipeline EXCLUSIVO da Samsung Healthcare (org slug='samsung-healthcare'): idem.
 from apps.posts.tasks_samsung import generate_post_samsung_task  # noqa: E402,F401
+
+# Revisao por IA no portao dos TEMPLATES (C1.4): task generica das 3 orgs.
+from apps.posts.tasks_archetype import revise_template_gate_task  # noqa: E402,F401

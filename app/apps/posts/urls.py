@@ -36,6 +36,7 @@ urlpatterns = [
     path('<int:post_id>/approve/', views_actions.approve_post, name='approve'),
     path('<int:post_id>/generate-image/', views_actions.generate_image, name='generate_image'),
     path('<int:post_id>/request-text-change/', views_actions.request_text_change, name='request_text_change'),
+    path('<int:post_id>/template-revision/', views_actions.template_revision, name='template_revision'),
     path('<int:post_id>/request-image-change/', views_actions.request_image_change, name='request_image_change'),
     path('<int:post_id>/edit/', views_actions.edit_post, name='edit'),
     path('<int:post_id>/images/<int:image_id>/delete/', views_actions.delete_post_image, name='delete_image'),

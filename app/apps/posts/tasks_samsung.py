@@ -111,7 +111,10 @@ def generate_post_samsung_task(self, post_id: int):
         post.subtitle = content.get('body') or content.get('kicker') or ''
         post.caption = structured.get('caption') or ''
         post.hashtags = structured.get('hashtags') or []
-        post.image_prompt = (structured.get('image_prompt') or '').strip()
+        # Foto do usuario (upload/ref) -> sem descricao (imagem nao sera IA)
+        from apps.posts.services.artkit.photo_source import has_user_photo
+        post.image_prompt = ('' if has_user_photo(post)
+                             else (structured.get('image_prompt') or '').strip())
         s_ctx['gate_map'] = {'title': 'title' if content.get('title') else None,
                              'subtitle': ('body' if content.get('body')
                                           else ('kicker' if content.get('kicker') else None))}

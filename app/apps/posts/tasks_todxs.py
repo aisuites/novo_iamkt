@@ -151,7 +151,11 @@ def generate_post_todxs_task(self, post_id: int):
         post.caption = structured.get('caption') or ''
         post.hashtags = structured.get('hashtags') or []
         # Descricao da imagem editavel no portao = o prompt REAL do fundo.
-        if _bgm(archetype) in ('photo', 'solid_photo', 'image'):
+        # Com foto ESCOLHIDA pelo usuario (upload/ref) nao ha descricao: a
+        # imagem nao sera gerada por IA (campo vazio -> portao esconde).
+        from apps.posts.services.artkit.photo_source import has_user_photo
+        if (_bgm(archetype) in ('photo', 'solid_photo', 'image')
+                and not has_user_photo(post)):
             post.image_prompt = _bgp(archetype, content, color_hex, fmt,
                                      brand_summary=brand.get('kb_summary') or '')
         else:

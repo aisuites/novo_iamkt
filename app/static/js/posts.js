@@ -1540,23 +1540,66 @@
       btnReject.textContent = 'Gerar Novamente';
       btnReject.addEventListener('click', () => regeneratePost(post));
 
-      // Botão Alterar Cena - IA (revisa a cena via IA, limitado a 1)
-      const btnRequest = document.createElement('button');
-      btnRequest.type = 'button';
-      btnRequest.className = 'btn btn-outline-secondary';
-      btnRequest.textContent = 'Alterar Cena - IA';
-      const cenaRestantes = (typeof post.revisoesTextoRestantes === 'number') ? post.revisoesTextoRestantes : 1;
-      if (cenaRestantes <= 0) {
-        btnRequest.disabled = true;
-        btnRequest.title = 'Limite de alterações de cena atingido';
-      }
-      btnRequest.addEventListener('click', () => {
-        if (btnRequest.disabled) return;
+      // Botão de revisão por IA:
+      //  - simple: "Alterar Cena - IA" (revisa a cena via orquestrador, 1x)
+      //  - template (arquétipos, C1.4): "Ajustar textos com IA" + (quando a
+      //    imagem será GERADA por IA) "Ajustar imagem com IA" — limites
+      //    INDEPENDENTES de 1 cada. Correções pontuais => botão Editar.
+      let btnRequest;
+      let btnRequestImg = null;
+      const openRevisionInput = (kind) => {
+        post.templateRevisionKind = kind || null;
         post.textRequestOpen = true;
         post.pendingTextRequest = '';
         updatePostDetails(post);
         requestAnimationFrame(() => dom.textRequestInput?.focus());
-      });
+      };
+      if (post.isTemplate) {
+        const tplRev = post.tplRev || {};
+        btnRequest = document.createElement('button');
+        btnRequest.type = 'button';
+        btnRequest.className = 'btn btn-outline-secondary';
+        btnRequest.textContent = 'Ajustar textos com IA';
+        btnRequest.title = 'Reescreve os textos a partir do seu pedido. ' +
+          'Correções pontuais? Use Editar — é instantâneo.';
+        if ((tplRev.text ?? 1) <= 0) {
+          btnRequest.disabled = true;
+          btnRequest.title = 'Limite de ajustes de texto por IA atingido — use Editar';
+        }
+        btnRequest.addEventListener('click', () => {
+          if (btnRequest.disabled) return;
+          openRevisionInput('text');
+        });
+        if (post.aiImage) {
+          btnRequestImg = document.createElement('button');
+          btnRequestImg.type = 'button';
+          btnRequestImg.className = 'btn btn-outline-secondary';
+          btnRequestImg.textContent = 'Ajustar imagem com IA';
+          btnRequestImg.title = 'Reescreve a descrição da imagem que será gerada.';
+          if ((tplRev.image ?? 1) <= 0) {
+            btnRequestImg.disabled = true;
+            btnRequestImg.title = 'Limite de ajustes de imagem por IA atingido — edite a descrição em Editar';
+          }
+          btnRequestImg.addEventListener('click', () => {
+            if (btnRequestImg.disabled) return;
+            openRevisionInput('image');
+          });
+        }
+      } else {
+        btnRequest = document.createElement('button');
+        btnRequest.type = 'button';
+        btnRequest.className = 'btn btn-outline-secondary';
+        btnRequest.textContent = 'Alterar Cena - IA';
+        const cenaRestantes = (typeof post.revisoesTextoRestantes === 'number') ? post.revisoesTextoRestantes : 1;
+        if (cenaRestantes <= 0) {
+          btnRequest.disabled = true;
+          btnRequest.title = 'Limite de alterações de cena atingido';
+        }
+        btnRequest.addEventListener('click', () => {
+          if (btnRequest.disabled) return;
+          openRevisionInput(null);
+        });
+      }
       
       // Botão Editar
       const btnEdit = document.createElement('button');
@@ -1574,8 +1617,10 @@
         btnGenerate.textContent = 'Gerar Imagem';
         btnGenerate.addEventListener('click', () => startImageGeneration(post));
         
-        actionsContainer.append(btnReject, btnRequest, btnEdit, btnGenerate);
-        console.log('[DEBUG] 4 botões adicionados ao container');
+        actionsContainer.append(btnReject, btnRequest);
+        if (btnRequestImg) actionsContainer.append(btnRequestImg);
+        actionsContainer.append(btnEdit, btnGenerate);
+        console.log('[DEBUG] botões adicionados ao container');
       } else {
         // Botão Aprovar (se tem imagem)
         const btnApprove = document.createElement('button');
@@ -1584,7 +1629,9 @@
         btnApprove.textContent = 'Aprovar';
         btnApprove.addEventListener('click', () => approvePost(post));
         
-        actionsContainer.append(btnReject, btnRequest, btnEdit, btnApprove);
+        actionsContainer.append(btnReject, btnRequest);
+        if (btnRequestImg) actionsContainer.append(btnRequestImg);
+        actionsContainer.append(btnEdit, btnApprove);
       }
     }
   }
@@ -1947,15 +1994,27 @@
     post.statusLabel = statusInfo.generating?.label || 'Agente Gerando Conteúdo';
     renderPosts();
 
+    // Posts de TEMPLATE usam a revisão própria (C1.4): kind text|image,
+    // limites independentes. Simple continua no request-text-change.
+    const tplKind = post.isTemplate
+      ? (post.templateRevisionKind || 'text')
+      : null;
+    const endpoint = tplKind
+      ? `/posts/${serverId}/template-revision/`
+      : `/posts/${serverId}/request-text-change/`;
+    const body = tplKind
+      ? { kind: tplKind, mensagem: text }
+      : { mensagem: text };
+
     try {
-      const response = await fetch(`/posts/${serverId}/request-text-change/`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRFToken': CSRF_TOKEN,
           'Accept': 'application/json',
         },
-        body: JSON.stringify({ mensagem: text }),
+        body: JSON.stringify(body),
       });
       
       if (!response.ok) {
@@ -1968,7 +2027,14 @@
       post.status = data.status || 'agent';
       post.statusLabel = data.statusLabel || (statusInfo[post.status]?.label ?? 'Agente Alterando');
       
-      if (typeof data.revisoesRestantes === 'number') {
+      if (tplKind) {
+        // decrementa o contador local do kind revisado
+        post.tplRev = post.tplRev || {};
+        if (typeof data.revisoesRestantes === 'number') {
+          post.tplRev[tplKind] = data.revisoesRestantes;
+        }
+        post.templateRevisionKind = null;
+      } else if (typeof data.revisoesRestantes === 'number') {
         post.remaining_revisions = data.revisoesRestantes;
       }
       if (typeof data.revisoesTextoRestantes === 'number') {
@@ -1982,7 +2048,10 @@
       if (dom.textRequestInput) dom.textRequestInput.value = '';
 
       renderPosts();
-      window.toaster?.success('Alterando a cena com IA...');
+      window.toaster?.success(
+        tplKind === 'text' ? 'Ajustando os textos com IA...'
+          : tplKind === 'image' ? 'Ajustando a descrição da imagem com IA...'
+          : 'Alterando a cena com IA...');
       
     } catch (error) {
       console.error(error);

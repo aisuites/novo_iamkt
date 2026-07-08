@@ -92,7 +92,21 @@ def posts_list(request):
             # Pipeline SIMPLES (novo): image_prompt e a CENA PT-BR aprovada pelo user.
             # Pipelines antigos (local/n8n): image_prompt pode ser prompt EN do Gemini
             # — nao deve ir pro user; mantemos visual_brief (PT-BR) como antes.
-            if post.pipeline_used == 'simple':
+            # Posts de TEMPLATE (arquetipos): portao com revisao por IA propria
+            # (C1.4) — limites independentes por kind, contados no ctx.
+            is_template = post.pipeline_used in ('todxs', 'vb', 'samsung')
+            tpl_rev = {}
+            if is_template:
+                from apps.posts.tasks_archetype import TEMPLATE_REVISION_LIMIT
+                _rev = (post.local_pipeline_context or {}).get('template_revisions') or {}
+                tpl_rev = {
+                    'text': max(0, TEMPLATE_REVISION_LIMIT - int(_rev.get('text') or 0)),
+                    'image': max(0, TEMPLATE_REVISION_LIMIT - int(_rev.get('image') or 0)),
+                }
+
+            if post.pipeline_used == 'simple' or is_template:
+                # template: image_prompt e a descricao REAL do fundo (vazio =
+                # foto do usuario ou arquetipo solido -> sem IA de imagem)
                 image_description_ptbr = (post.image_prompt or '').strip()
             else:
                 image_description_ptbr = (post.visual_brief or '').strip()
@@ -126,6 +140,10 @@ def posts_list(request):
                 'maxImageRevisions': max_image_revisions,
                 'revisoesRestantes': 3,
                 'revisoesTextoRestantes': revisoes_texto_restantes,
+                # Portao de TEMPLATE (C1.4)
+                'isTemplate': is_template,
+                'aiImage': bool((post.image_prompt or '').strip()) if is_template else False,
+                'tplRev': tpl_rev,
             })
         except Exception:
             continue

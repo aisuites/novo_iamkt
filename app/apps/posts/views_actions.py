@@ -458,6 +458,77 @@ def generate_image(request, post_id):
 
 @login_required
 @require_http_methods(["POST"])
+def template_revision(request, post_id):
+    """
+    Revisao por IA no PORTAO de posts de TEMPLATE (arquetipos, C1.4).
+
+    POST /posts/<id>/template-revision/
+    Body: { "kind": "text"|"image", "mensagem": "..." }
+
+    Limites INDEPENDENTES (1 por kind, contados no local_pipeline_context).
+    'image' so quando a foto sera gerada por IA (post.image_prompt nao-vazio;
+    com upload/ref do usuario o portao nem oferece a opcao).
+    """
+    try:
+        post = Post.objects.get(id=post_id, organization=request.organization)
+        if post.pipeline_used not in ('todxs', 'vb', 'samsung'):
+            return JsonResponse({'success': False,
+                                 'error': 'Apenas posts de template'}, status=400)
+        if post.status != 'pending':
+            return JsonResponse({'success': False,
+                                 'error': 'Post não está no portão de aprovação'},
+                                status=400)
+
+        data = json.loads(request.body)
+        kind = (data.get('kind') or '').strip()
+        mensagem = (data.get('mensagem') or '').strip()
+        if kind not in ('text', 'image'):
+            return JsonResponse({'success': False,
+                                 'error': "kind deve ser 'text' ou 'image'"},
+                                status=400)
+        if not mensagem:
+            return JsonResponse({'success': False,
+                                 'error': 'Mensagem é obrigatória'}, status=400)
+        if kind == 'image' and not (post.image_prompt or '').strip():
+            return JsonResponse({'success': False,
+                                 'error': 'Este post usa a imagem enviada por '
+                                          'você — não há descrição de IA a alterar'},
+                                status=400)
+
+        from apps.posts.tasks_archetype import (
+            TEMPLATE_REVISION_LIMIT, revise_template_gate_task,
+        )
+        rev = (post.local_pipeline_context or {}).get('template_revisions') or {}
+        usadas = int(rev.get(kind) or 0)
+        if usadas >= TEMPLATE_REVISION_LIMIT:
+            return JsonResponse({'success': False,
+                                 'error': 'Limite de alterações por IA atingido '
+                                          f'para {"textos" if kind == "text" else "imagem"}'},
+                                status=400)
+
+        post.status = 'generating'
+        post.save(update_fields=['status'])
+        revise_template_gate_task.delay(post.id, kind, mensagem)
+
+        return JsonResponse({
+            'success': True,
+            'status': post.status,
+            'statusLabel': post.get_status_display(),
+            'kind': kind,
+            # otimista: a task incrementa no sucesso; o reload corrige
+            'revisoesRestantes': max(0, TEMPLATE_REVISION_LIMIT - usadas - 1),
+        })
+
+    except Post.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Post não encontrado'},
+                            status=404)
+    except Exception as e:
+        logger.error(f'Erro na revisão de template: {e}', exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
 def request_text_change(request, post_id):
     """
     ALTERAR CENA - IA: revisa a CENA (image_prompt) LOCALMENTE via orquestrador
