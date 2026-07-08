@@ -1443,7 +1443,7 @@ function toggleCarrossel() {
                 body: JSON.stringify({ elements: els }),
             });
             const d = await r.json().catch(() => ({}));
-            // Atualiza o preview da pagina com a arte re-renderizada (TODXS) e
+            // Atualiza o preview da pagina com a arte re-renderizada e
             // ESPERA a imagem nova carregar antes de retornar (spinner some so apos).
             if (d && d.image_url) {
                 const frame = document.getElementById('postImageFrame');
@@ -1467,7 +1467,7 @@ function toggleCarrossel() {
         const els = elements.slice();
         // Pipelines que RE-RENDERIZAM o publicado no save (todxs, vb, samsung):
         // trava a tela com overlay ate a arte nova carregar no preview.
-        const rerenders = (currentPipeline === 'todxs' || currentPipeline === 'vb' || currentPipeline === 'samsung') && pid && els && els.length;
+        const rerenders = (currentPipeline === 'todxs' || currentPipeline === 'vb' || currentPipeline === 'samsung' || currentPipeline === 'simple') && pid && els && els.length;
         _stopBgPolling();
         if (rerenders) _showSaveOverlay();
         modal.style.display='none'; document.body.style.overflow='';
