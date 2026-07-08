@@ -576,10 +576,58 @@ def save_elements(request, post_id):
             image_url = _samsung_rerender_published(post, elements)
         except Exception:
             logger.exception('[overlay] re-render samsung (save) falhou post=%s', post.id)
+    elif post.pipeline_used == 'simple':
+        try:
+            image_url = _simple_rerender_published(post, elements)
+        except Exception:
+            logger.exception('[overlay] re-render simple (save) falhou post=%s', post.id)
     # image_s3_key: o front sincroniza o s3_key da imagem ativa (botao de download
     # da pagina presigna por chave — sem isso, baixaria a arte ANTIGA).
     return JsonResponse({'ok': True, 'image_url': image_url,
                          'image_s3_key': (post.image_s3_key if image_url else None)})
+
+
+def _simple_rerender_published(post, elements):
+    """SIMPLE (transcritor/C3): raw (fundo sem texto do Gemini) + elements
+    editados -> re-render Pillow (render_layout_document, o MESMO motor do
+    export) vira o PUBLICADO. Q1 conservador: isso so acontece quando o
+    usuario EDITA e salva — ele ve o resultado na hora e pode re-editar."""
+    import base64 as _b64
+    import io as _io
+    from apps.posts.models import PostImage
+    from apps.posts.tasks import _upload_image_to_s3
+    from apps.core.services.s3_service import S3Service
+    from apps.posts.services.gemini_image_generator import render_layout_document
+
+    raw_data = _download_as_data_uri(_get_raw_image_url(post))
+    if not raw_data:
+        return None
+    _, _, payload = raw_data.partition(',')
+    raw_bytes = _b64.b64decode(payload)
+
+    els = _prepare_stickers_for_export(elements)
+    png_bytes = render_layout_document(
+        raw_bytes, els,
+        fonts=_get_font_paths(post) or {},
+        logo_url=_get_logo_url(post),
+    )
+    if not png_bytes:
+        return None
+
+    old_key = post.image_s3_key
+    key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
+                                   png_bytes=png_bytes, mime_type='image/png')
+    if old_key:
+        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    post.image_s3_key, post.image_s3_url = key, url
+    gi = post.generated_images if isinstance(post.generated_images, list) else []
+    gi.append({'s3_key': key, 'url': url})
+    post.generated_images = gi
+    post.save(update_fields=['image_s3_key', 'image_s3_url', 'generated_images'])
+    try:
+        return S3Service.generate_presigned_download_url(key, expires_in=86400)
+    except Exception:
+        return url
 
 
 def _vb_rerender_published(post, elements):

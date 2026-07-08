@@ -54,12 +54,18 @@ def posts_list(request):
             # (s3_key == post.image_s3_key). So nessa o botao "Edicao Avancada"
             # aparece no front — abre o modal que sempre carrega a versao atual.
             current_main_key = (post.image_s3_key or '').strip()
+            # Sem _layout_elements o editor NAO ABRE (overlay_not_ready) — o
+            # botao so aparece quando ha elementos (posts simple ganham via
+            # transcritor; arquetipos/local ja nascem com eles).
+            has_elements = bool((post.designer_payload or {}).get('_layout_elements'))
             post_images = post.images.all().order_by('order')
             imagens_data = [
                 {
                     'id': img.id,
                     's3_key': img.s3_key,
-                    'is_editable': bool(current_main_key) and img.s3_key == current_main_key,
+                    'is_editable': (bool(current_main_key)
+                                    and img.s3_key == current_main_key
+                                    and has_elements),
                 }
                 for img in post_images if img.s3_key
             ]

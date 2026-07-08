@@ -550,6 +550,28 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
     post.status = 'image_ready'
     post.save()
 
+    # ---- TRANSCRITOR (C3): publicado -> ELEMENTS canonicos -> Edicao Avancada.
+    # So p/ orgs com advanced_editor_enabled (quem quer o editor paga a
+    # transcricao, ~$0.02-0.05). NUNCA quebra o post (falha = nao-editavel).
+    # Q1 conservador: o publicado CONTINUA o PNG do Gemini; vira re-render
+    # Pillow apenas quando o usuario EDITAR e salvar.
+    if getattr(post.organization, 'advanced_editor_enabled', False):
+        try:
+            from apps.posts.services.artkit.transcribe import transcribe_published_art
+            _els, _t_usage = transcribe_published_art(post)
+            if _t_usage:
+                _record_ai_usage(post, step='text_generation', model='claude-sonnet-4-6',
+                                 usage_dict=_t_usage, purpose='vision_transcribe')
+            if _els:
+                _dp = post.designer_payload or {}
+                _dp['_layout_elements'] = _els
+                post.designer_payload = _dp
+                post.save(update_fields=['designer_payload'])
+                logger.info('[posts.simple] transcritor: post=%s EDITAVEL (%d elements)',
+                            post_id, len(_els))
+        except Exception:
+            logger.exception('[posts.simple] transcritor falhou post=%s (nao-fatal)', post_id)
+
     logger.info('[posts.simple] generate_post_simple_image_task OK post_id=%s', post_id)
     return {'success': True, 'post_id': post_id, 'final_model': apply_result['model']}
 
