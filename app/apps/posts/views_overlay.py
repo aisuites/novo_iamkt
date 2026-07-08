@@ -620,8 +620,17 @@ def _simple_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=png_bytes, mime_type='image/png')
+    updated = 0
     if old_key:
-        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+        updated = PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    if not updated:
+        # old_key dessincronizado (saves concorrentes): atualiza a PostImage
+        # mais recente — senao o botao Edicao Avancada SOME (is_editable
+        # compara o s3_key da PostImage com o publicado).
+        _im = post.images.order_by('-order').first()
+        if _im:
+            _im.s3_key, _im.s3_url = key, url
+            _im.save(update_fields=['s3_key', 's3_url'])
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
@@ -671,8 +680,17 @@ def _vb_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=out.getvalue(), mime_type='image/png')
+    updated = 0
     if old_key:
-        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+        updated = PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    if not updated:
+        # old_key dessincronizado (saves concorrentes): atualiza a PostImage
+        # mais recente — senao o botao Edicao Avancada SOME (is_editable
+        # compara o s3_key da PostImage com o publicado).
+        _im = post.images.order_by('-order').first()
+        if _im:
+            _im.s3_key, _im.s3_url = key, url
+            _im.save(update_fields=['s3_key', 's3_url'])
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
@@ -710,8 +728,17 @@ def _samsung_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=out.getvalue(), mime_type='image/png')
+    updated = 0
     if old_key:
-        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+        updated = PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    if not updated:
+        # old_key dessincronizado (saves concorrentes): atualiza a PostImage
+        # mais recente — senao o botao Edicao Avancada SOME (is_editable
+        # compara o s3_key da PostImage com o publicado).
+        _im = post.images.order_by('-order').first()
+        if _im:
+            _im.s3_key, _im.s3_url = key, url
+            _im.save(update_fields=['s3_key', 's3_url'])
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
@@ -748,8 +775,17 @@ def _todxs_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=png, mime_type='image/png')
+    updated = 0
     if old_key:
-        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+        updated = PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    if not updated:
+        # old_key dessincronizado (saves concorrentes): atualiza a PostImage
+        # mais recente — senao o botao Edicao Avancada SOME (is_editable
+        # compara o s3_key da PostImage com o publicado).
+        _im = post.images.order_by('-order').first()
+        if _im:
+            _im.s3_key, _im.s3_url = key, url
+            _im.save(update_fields=['s3_key', 's3_url'])
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
@@ -919,10 +955,40 @@ def _get_font_paths(post: Post) -> dict:
         from apps.posts.tasks import _get_kb, _prepare_pillow_overlay, _formato_px
         kb = _get_kb(post)
         fonts_data = _prepare_pillow_overlay(post, kb, _formato_px(post))
-        return {
+        out = {
             'titulo':    fonts_data.get('pillow_title_font_path') or '',
             'subtitulo': fonts_data.get('pillow_subtitle_font_path') or '',
             'cta':       fonts_data.get('pillow_title_font_path') or '',
         }
+        # Variante BOLD real p/ reproduzir o PESO detectado pelo transcritor.
+        # O navegador SINTETIZA bold no modal; o Pillow nao — sem a variante o
+        # download sai regular. resolve_typography respeita o peso DECLARADO
+        # na Typography (ex.: Montserrat 400), entao aqui forcamos a MESMA
+        # familia no peso bold (Google 700 com fallback de vizinhos) ou uma
+        # CustomFont bold da KB.
+        try:
+            from apps.posts.services import font_resolver as _fr
+            bold_path = ''
+            for t in (list(kb.typography_settings.all().order_by('order'))
+                      if kb else []):
+                if t.font_source == 'google' and t.google_font_name:
+                    bold_path = _fr._load_google_font(t.google_font_name, 'bold') or ''
+                elif t.font_source == 'upload' and t.custom_font:
+                    nm = (t.custom_font.name or '').lower()
+                    if any(k in nm for k in ('bold', 'black', 'heavy')):
+                        bold_path = _fr._load_custom_font(t.custom_font) or ''
+                if bold_path:
+                    break
+            if not bold_path and kb:
+                bcf = next((c for c in kb.custom_fonts.all()
+                            if any(k in (c.name or '').lower()
+                                   for k in ('bold', 'black', 'heavy'))), None)
+                bold_path = (_fr._load_custom_font(bcf) or '') if bcf else ''
+            if bold_path:
+                for role in ('titulo', 'subtitulo', 'cta'):
+                    out[role + '_bold'] = bold_path
+        except Exception:
+            pass
+        return out
     except Exception:
         return {}

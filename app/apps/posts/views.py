@@ -56,8 +56,12 @@ def posts_list(request):
             current_main_key = (post.image_s3_key or '').strip()
             # Sem _layout_elements o editor NAO ABRE (overlay_not_ready) — o
             # botao so aparece quando ha elementos (posts simple ganham via
-            # transcritor; arquetipos/local ja nascem com eles).
-            has_elements = bool((post.designer_payload or {}).get('_layout_elements'))
+            # transcritor; arquetipos/local ja nascem com eles). Espelha o
+            # _get_elements do overlay: designer_payload OU copy_payload.
+            has_elements = bool(
+                (post.designer_payload or {}).get('_layout_elements')
+                or (post.copy_payload or {}).get('_layout_elements')
+            )
             post_images = post.images.all().order_by('order')
             imagens_data = [
                 {

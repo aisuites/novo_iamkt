@@ -1462,7 +1462,12 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
             'padding_pct': float(el.get('padding_pct', 0) or 0),
             'font_size_pct': float(el.get('font_size_pct', 6) or 6),
             'is_bold': is_bold,
-            'fpath': el.get('_font_path') or fonts.get(role) or fonts.get('titulo') or (_DEJAVU_BOLD if is_bold else _DEJAVU_REG),
+            # bold: prefere a variante bold da KB (fonts['<role>_bold']) quando
+            # o elemento pede peso bold (transcritor detecta o peso na arte).
+            'fpath': (el.get('_font_path')
+                      or (fonts.get(role + '_bold') if is_bold else None)
+                      or fonts.get(role) or fonts.get('titulo')
+                      or (_DEJAVU_BOLD if is_bold else _DEJAVU_REG)),
             'fb': _DEJAVU_BOLD if is_bold else _DEJAVU_REG,
             'align_raw': el.get('align') or 'left',
             'color_hex': el.get('color'),
