@@ -994,10 +994,10 @@
 
         // Usar toaster ao invés de alert
         if (window.toaster) {
-          const msg = pipeline === 'local'
-            ? 'Post criado no fluxo interno. Texto sendo gerado via Claude...'
-            : pipeline === 'simple'
-            ? 'Post criado no fluxo simples. Texto sendo gerado via OpenAI...'
+          // Nomes de modelos/provedores de IA NAO aparecem para o usuario final
+          // (informacao de dev fica no admin/debug). Ver plano de fluxos.
+          const msg = (pipeline === 'local' || pipeline === 'simple')
+            ? 'Post criado! Gerando o texto do seu post...'
             : 'Post enviado ao agente! Aguarde o processamento.';
           window.toaster.success(msg);
         }
@@ -2378,7 +2378,7 @@
   // Aspecto a aproveitar de cada referencia (1 por imagem, exclusivo entre elas)
   const REFERENCE_ASPECTS = [
     { value: '', label: 'O que aproveitar...' },
-    { value: 'produto', label: 'Produto (enviar fiel ao Gemini)' },
+    { value: 'produto', label: 'Produto (reproduzir fielmente)' },
     { value: 'pessoa_modelo', label: 'Pessoa como modelo (fidelidade)' },
     { value: 'layout_composicao', label: 'Layout / composicao' },
     { value: 'iluminacao', label: 'Iluminacao' },
