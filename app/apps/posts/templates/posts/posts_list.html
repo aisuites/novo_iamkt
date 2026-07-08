@@ -734,13 +734,14 @@ try {
 
 window.CURRENT_USER = "{{ request.user.email|default:''|escapejs }}";
 window.IS_ADMIN = {{ is_admin|yesno:"true,false" }};
+window.ADVANCED_EDITOR = {{ advanced_editor|yesno:"true,false" }};
 window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 </script>
 
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260625-retry"></script>
+<script src="{% static 'js/posts.js' %}?v=20260708-advedit"></script>
 
 <script>
 // Inicializar lazyload para imagens dos posts com endpoint correto

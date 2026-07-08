@@ -1397,7 +1397,11 @@
         const isEditable = (activeImg && typeof activeImg === 'object')
             ? !!activeImg.is_editable
             : false;
-        if (isEditable && window.IS_ADMIN) {
+        // Liberado POR ORG (window.ADVANCED_EDITOR = flag da org OU equipe
+        // interna); fallback IS_ADMIN p/ cache de template antigo.
+        const canAdvancedEdit = (typeof window.ADVANCED_EDITOR !== 'undefined')
+            ? window.ADVANCED_EDITOR : window.IS_ADMIN;
+        if (isEditable && canAdvancedEdit) {
             const btnArteFinal = document.createElement('button');
             btnArteFinal.type = 'button';
             btnArteFinal.className = 'btn';

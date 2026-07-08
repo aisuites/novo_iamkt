@@ -147,6 +147,13 @@ def posts_list(request):
             request.user.is_superuser
             or request.user.is_staff
         ),
+        # "Edição Avançada" é liberada POR ORG (flag no admin); a equipe
+        # interna sempre vê. Não confundir com is_admin (pipeline/debug).
+        'advanced_editor': bool(
+            request.user.is_superuser
+            or request.user.is_staff
+            or getattr(request.organization, 'advanced_editor_enabled', False)
+        ),
     }
 
     return render(request, 'posts/posts_list.html', context)

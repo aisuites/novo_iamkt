@@ -526,6 +526,14 @@ class Organization(TimeStampedModel):
         verbose_name='Engine V3 de Arquétipos'
     )
 
+    advanced_editor_enabled = models.BooleanField(
+        default=False,
+        help_text='Mostra o botão "Edição Avançada" (editor de arte) para os '
+                  'usuários desta empresa. A equipe interna (staff/superuser) '
+                  'sempre vê, independente desta flag.',
+        verbose_name='Edição Avançada Habilitada'
+    )
+
     # Ciclo de Faturamento (Billing Cycle)
     billing_cycle_day = models.PositiveSmallIntegerField(
         default=1,
