@@ -399,6 +399,13 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             )
             if _prompt_result:
                 orchestrator_image_prompt = _prompt_result.get('prompt', '')
+                if _prompt_result.get('usage'):
+                    _record_ai_usage(
+                        post, step='text_generation',
+                        model=_prompt_result.get('model', ''),
+                        usage_dict=_prompt_result['usage'],
+                        purpose='prompt_designer',
+                    )
 
             # 2. Elementos de layout via layout_engine
             _pillow_kw = _prepare_pillow_overlay(post, kb, formato_px)
@@ -565,6 +572,13 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
                     from apps.posts.services.post_orchestrator import adapt_layout_spec
                     adapted = adapt_layout_spec(dossier_spec, float(src_ar), tgt_ar, formato_px)
                     if adapted:
+                        _adapt_usage = adapted.pop('_usage', None)
+                        _adapt_model = adapted.pop('_model', '')
+                        if _adapt_usage:
+                            _record_ai_usage(post, step='text_generation',
+                                             model=_adapt_model,
+                                             usage_dict=_adapt_usage,
+                                             purpose='layout_adapt')
                         dossier_spec = adapted
                         logger.info('[posts.local] layout adaptado AR %s -> %s', src_ar, tgt_ar)
                 except Exception:
@@ -857,6 +871,7 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
         result['model'],
         result.get('cost_usd', 0),
         usage_metadata=result.get('usage') or {},
+        purpose='gemini_main',
     )
 
     logger.info(
@@ -1015,7 +1030,8 @@ def regenerate_background_task(self, post_id: int, message: str):
         cost_in = int(usage.get('promptTokenCount', 0) or 0) * 0.10 / 1_000_000
         cost_out = 0.04  # flat por imagem
         cost = round(cost_in + cost_out, 6)
-        _log_usage_gemini(post, model_used, cost, usage_metadata=usage)
+        _log_usage_gemini(post, model_used, cost, usage_metadata=usage,
+                          purpose='gemini_regenerate_background')
     except Exception:
         logger.exception('[regen_bg] falha logar custo')
 
@@ -2038,10 +2054,13 @@ def _upload_image_to_s3(*, org_id: int, post_id: int, png_bytes: bytes, mime_typ
     return s3_key, s3_url
 
 
-def _log_usage_gemini(post, model: str, cost_usd: float, usage_metadata: dict = None):
+def _log_usage_gemini(post, model: str, cost_usd: float, usage_metadata: dict = None,
+                      purpose: str = ''):
     """
     Loga custo Gemini no Post.ai_usage_log.
     usage_metadata: dict do response.usageMetadata do Gemini (tokens reais)
+    purpose: granular (C0.2) — ex.: gemini_main, gemini_background,
+             gemini_text_apply, gemini_edit_image, gemini_regenerate_background
     """
     meta = usage_metadata or {}
     usage_dict = {
@@ -2055,6 +2074,7 @@ def _log_usage_gemini(post, model: str, cost_usd: float, usage_metadata: dict = 
         step='image_generation',
         model=model,
         usage_dict=usage_dict,
+        purpose=purpose,
         images_generated=1,
     )
 

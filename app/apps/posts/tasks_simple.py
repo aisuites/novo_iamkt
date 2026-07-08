@@ -440,7 +440,7 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
         bg_bytes = bg_result.get('raw_png_bytes') or bg_result.get('png_bytes')
         bg_prompt = bg_result.get('prompt_text', '')
         _log_usage_gemini(post, bg_result.get('model', ''), bg_result.get('cost_usd', 0),
-                          bg_result.get('usage'))
+                          bg_result.get('usage'), purpose='gemini_background')
 
         raw_key, raw_url = _upload_image_to_s3(
             org_id=post.organization.id, post_id=post.id,
@@ -508,7 +508,8 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
         )
         final_prompt = apply_result['prompt_text']
         _log_usage_gemini(post, apply_result['model'], apply_result['usage'].get('cost_usd', 0),
-                          {'promptTokenCount': apply_result['usage'].get('input_tokens', 0)})
+                          {'promptTokenCount': apply_result['usage'].get('input_tokens', 0)},
+                          purpose='gemini_text_apply')
 
     except Exception as exc:
         logger.exception('[posts.simple] Falha na geracao de imagem post_id=%s', post_id)
@@ -666,7 +667,8 @@ def revise_image_task(self, post_id: int, message: str = '', source_s3_key: str 
         # Etapa B: Gemini edita a imagem final
         b = edit_image_with_gemini(img_bytes, edit_prompt)
         _log_usage_gemini(post, b['model'], b['usage'].get('cost_usd', 0),
-                          {'promptTokenCount': b['usage'].get('input_tokens', 0)})
+                          {'promptTokenCount': b['usage'].get('input_tokens', 0)},
+                          purpose='gemini_edit_image')
     except Exception:
         logger.exception('[posts.simple] revise_image falhou post=%s', post_id)
         # Reverte o status (mantem a imagem atual) — falha nao trava o post.
