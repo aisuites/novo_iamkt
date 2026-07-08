@@ -268,6 +268,12 @@ def _todxs_render_stage(task, post_id: int, from_gate: bool = False):
         photo_png, _photo_origin = resolve_user_photo(post, kb)
         if photo_png:
             bg_info['origin'] = _photo_origin
+            # Tratamento que o GEMINI faria via prompt vira Pillow quando a
+            # foto e do usuario: duotone monocromatico na cor (ex.: B_DUO).
+            if (WF().get(archetype) or {}).get('gemini_duotone'):
+                from apps.posts.services.artkit.image import duotone_bytes
+                photo_png = duotone_bytes(photo_png, color_hex)
+                bg_info['treatment'] = 'duotone_pillow'
             logger.info('[todxs] post=%s foto do usuario (%s) — Gemini pulado',
                         post_id, _photo_origin)
     if photo_png is None and mode in ('photo', 'solid_photo', 'image'):

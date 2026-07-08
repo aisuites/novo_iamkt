@@ -86,6 +86,21 @@ def shrink_for_ai(data, mime='', max_bytes=4_500_000, max_dim=2200):
     return out, 'image/jpeg'
 
 
+def duotone_bytes(png_bytes, hex_color):
+    """Duotone monocromatico: P&B -> multiply na cor. Usado quando a foto e
+    do USUARIO e o arquetipo pedia duotone via prompt do Gemini (gemini_duotone
+    — ex.: todxs B_DUO): o tratamento que o Gemini faria vira Pillow."""
+    import io
+    from PIL import ImageChops
+    img = Image.open(io.BytesIO(png_bytes)).convert('RGB')
+    gray = img.convert('L').convert('RGB')
+    overlay = Image.new('RGB', gray.size, hex_to_rgb(hex_color))
+    out = ImageChops.multiply(gray, overlay)
+    buf = io.BytesIO()
+    out.save(buf, 'PNG')
+    return buf.getvalue()
+
+
 def recolor_opaque(img, rgb):
     """Recolore todos os pixels opacos para `rgb`, preservando o canal alpha.
     (Comportamento exato do todxs._recolor_opaque == vb._recolor.)"""
