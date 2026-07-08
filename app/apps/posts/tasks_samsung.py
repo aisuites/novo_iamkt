@@ -162,10 +162,24 @@ def generate_post_samsung_task(self, post_id: int):
     assets['brand_lockup'] = lockup_url
 
     # ---------------- Etapa 3: render Pillow ----------------
+    # ENGINE V3 (flag por org): converte a spec ativa (banco-sobre-código, v2)
+    # on-the-fly e renderiza pelo motor único. Paridade pixel provada (A e B).
+    # Desligar a flag = volta instantâneo ao render dedicado.
+    engine_used = 'legacy'
     try:
-        pr = render_samsung(archetype=archetype, content=content, kb=kb, assets=assets)
+        if getattr(org, 'archetype_engine_v3', False):
+            from apps.posts.services.artkit.convert import samsung_to_v3
+            from apps.posts.services.artkit import spec3
+            from apps.posts.services.artkit.engine import render_v3
+            from apps.posts.services.samsung.render import _font
+            norm = spec3.normalize(samsung_to_v3(archetype, src=WF().get(archetype)))
+            pr = render_v3(norm, content=content,
+                           ctx={'font': _font, 'assets': assets, 'tokens': {}})
+            engine_used = 'v3'
+        else:
+            pr = render_samsung(archetype=archetype, content=content, kb=kb, assets=assets)
     except Exception as exc:
-        logger.exception('[samsung] render falhou post=%s', post_id)
+        logger.exception('[samsung] render falhou post=%s (engine=%s)', post_id, engine_used)
         raise self.retry(exc=exc)
 
     # ---------------- Persistência (nucleo comum: artkit.persist) ----------------
@@ -183,7 +197,8 @@ def generate_post_samsung_task(self, post_id: int):
     )
     raw_url, s3_key, s3_url = up['raw_url'], up['s3_key'], up['s3_url']
 
-    trace.append({'etapa': '3_render', 'archetype': archetype, 'elements': pr['elements'],
+    trace.append({'etapa': '3_render', 'archetype': archetype, 'engine': engine_used,
+                  'elements': pr['elements'],
                   'fonts': pr['fonts_resolved'], 'photo_origin': photo_origin,
                   'photo_ref_id': ref.id if ref else None,
                   'final_s3_key': s3_key, 'at': dj_tz.now().isoformat()})

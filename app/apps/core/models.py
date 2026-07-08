@@ -518,6 +518,14 @@ class Organization(TimeStampedModel):
         verbose_name='Seletor de Arquétipo Habilitado'
     )
 
+    archetype_engine_v3 = models.BooleanField(
+        default=False,
+        help_text='Renderiza os arquétipos desta org pelo ENGINE V3 (motor único, '
+                  'spec convertida on-the-fly). Desligar = volta instantâneo ao '
+                  'pipeline dedicado. Rollout org a org.',
+        verbose_name='Engine V3 de Arquétipos'
+    )
+
     # Ciclo de Faturamento (Billing Cycle)
     billing_cycle_day = models.PositiveSmallIntegerField(
         default=1,

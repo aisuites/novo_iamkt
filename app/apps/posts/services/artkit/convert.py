@@ -5,10 +5,16 @@ VALIDADOS entram intactos (samsung/vb em px; todxs em pct).
 """
 
 
-def samsung_to_v3(key: str) -> dict:
-    """Converte WIREFRAMES[key] do samsung para spec v3 (units=px)."""
+def samsung_to_v3(key: str, src: dict = None) -> dict:
+    """Converte uma spec samsung v2 para v3 (units=px).
+
+    `src` opcional: a spec v2 ATIVA (ex.: WF()[key], banco-sobre-código) para
+    conversão ON-THE-FLY no runtime — o banco continua v2/editável e o engine
+    recebe v3; rollback = desligar a flag. Default: WIREFRAMES do código."""
     from apps.posts.services.samsung.wireframes import WIREFRAMES, TOKENS, FONT_FILES
-    src = WIREFRAMES[key]
+    src = src or WIREFRAMES[key]
+    if src.get('spec_version') == 3:   # já é v3 (futuro: banco nativo v3)
+        return src
 
     spec = {
         'spec_version': 3,
