@@ -534,6 +534,16 @@ class Organization(TimeStampedModel):
         verbose_name='Edição Avançada Habilitada'
     )
 
+    archetype_two_step = models.BooleanField(
+        default=False,
+        help_text='Pipelines de arquétipo em DUAS ETAPAS: o brain gera os '
+                  'textos + descrição da imagem e o post para em "pending" '
+                  '(portão de aprovação, como no fluxo simples); só depois da '
+                  'aprovação roda Gemini + render. Desligar = etapa única '
+                  '(comportamento atual). Rollout org a org.',
+        verbose_name='Arquétipos em Duas Etapas'
+    )
+
     # Ciclo de Faturamento (Billing Cycle)
     billing_cycle_day = models.PositiveSmallIntegerField(
         default=1,

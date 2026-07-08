@@ -12,7 +12,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-MODEL = 'claude-sonnet-4-5'
+MODEL = 'claude-sonnet-4-6'  # alinhado com todxs/vb (C1.5 do redesenho)
 MAX_TOKENS = 1500
 
 _TONE = """Você é diretor de conteúdo da Samsung Healthcare (assinatura Relentless

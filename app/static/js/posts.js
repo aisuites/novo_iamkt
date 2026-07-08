@@ -2477,9 +2477,10 @@
       .forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
     const free = document.getElementById('freeGenFields');
     const panel = document.getElementById('archetypePanel');
-    // No modo "template" escondemos logos e upload de novas imagens; a galeria
-    // de referencias (dentro de freeGenFields) fica VISIVEL para o usuario
-    // escolher a imagem de produto (ex.: arquetipo Samsung B).
+    // No modo "template" escondemos so os logos (o logo vem do proprio
+    // arquetipo/KB). Referencias E upload ficam VISIVEIS: o usuario pode
+    // escolher uma ref da KB OU subir uma imagem nova para ser ADAPTADA como
+    // foto de fundo do template (C1.6); sem escolha, a IA gera (fallback).
     const logoField = document.getElementById('logoField');
     const uploadField = document.getElementById('uploadRefField');
     // Rede/formato, CTA e carrossel NAO se aplicam ao modo template: o formato
@@ -2490,7 +2491,7 @@
     if (free) free.style.display = '';            // sempre visivel (contem as refs)
     if (panel) panel.style.display = tpl ? '' : 'none';
     if (logoField) logoField.style.display = tpl ? 'none' : '';
-    if (uploadField) uploadField.style.display = tpl ? 'none' : '';
+    if (uploadField) uploadField.style.display = '';
     if (linhaRedeFormato) linhaRedeFormato.style.display = tpl ? 'none' : '';
     if (linhaCtaCarrossel) linhaCtaCarrossel.style.display = tpl ? 'none' : '';
     // campos required escondidos bloqueiam o submit do form: solta o required

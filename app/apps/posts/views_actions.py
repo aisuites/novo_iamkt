@@ -217,6 +217,34 @@ def generate_image(request, post_id):
                 'pipeline': 'local',
             })
 
+        # Pipelines de ARQUETIPO (todxs/vb/samsung) — Etapa B do portao (C1):
+        # renderiza com as edicoes do usuario feitas no pending. Com `message`
+        # (alteracao apos image_ready), re-renderiza: a foto e re-resolvida
+        # (upload > ref > Gemini) e os textos atuais do Post valem.
+        _ARCHETYPE_RENDER_TASKS = {
+            'todxs': ('apps.posts.tasks_todxs', 'render_post_todxs_task'),
+            'vb': ('apps.posts.tasks_vb', 'render_post_vb_task'),
+            'samsung': ('apps.posts.tasks_samsung', 'render_post_samsung_task'),
+        }
+        if post.pipeline_used in _ARCHETYPE_RENDER_TASKS:
+            import importlib
+            mod_name, task_name = _ARCHETYPE_RENDER_TASKS[post.pipeline_used]
+            render_task = getattr(importlib.import_module(mod_name), task_name)
+            render_task.delay(post.id)
+            logger.info('[posts.%s] %s disparado post_id=%s (portao C1)',
+                        post.pipeline_used, task_name, post.id)
+            return JsonResponse({
+                'success': True,
+                'id': post.id,
+                'serverId': post.id,
+                'status': post.status,
+                'statusLabel': post.get_status_display(),
+                'imageStatus': 'generating',
+                'imageChanges': image_change_count,
+                'imageRequestedAt': change_request.created_at.isoformat(),
+                'pipeline': post.pipeline_used,
+            })
+
         # Enviar para N8N (webhook de geração de imagem)
         if hasattr(settings, 'N8N_WEBHOOK_GERAR_IMAGEM') and settings.N8N_WEBHOOK_GERAR_IMAGEM:
             try:
@@ -454,6 +482,16 @@ def request_text_change(request, post_id):
 
         from apps.posts.models import PostChangeRequest
         from apps.posts.tasks_simple import MAX_TEXT_REVISIONS, revise_scene_task
+
+        # Pipelines de arquetipo: a revisao por IA (re-rodar o brain com o
+        # feedback) chega na proxima iteracao da C1; o revise_scene do simple
+        # nao se aplica (nao ha conversa de orquestrador nesses posts).
+        if post.pipeline_used in ('todxs', 'vb', 'samsung'):
+            return JsonResponse({
+                'success': False,
+                'error': 'Para posts de template, edite os textos pelo botão '
+                         '"Editar" — a alteração por IA chega em breve.',
+            }, status=400)
 
         # Limite: espelha a alteracao de imagem (conta pedidos de texto nao-iniciais)
         usadas = PostChangeRequest.objects.filter(

@@ -141,35 +141,132 @@ def generate_post_vb_task(self, post_id: int):
     _record_ai_usage(post, step='text_generation', model=brain.get('model'),
                      usage_dict=brain.get('usage') or {}, purpose='vb_skill_brain')
 
-    # ---- Etapa 1b: FOTO (Gemini) para arquetipos com fundo de foto ----
-    # Upload de imagem (futuro) entra aqui como drop-in: se houver imagem enviada,
-    # usa ela em vez do Gemini (e aplica efeito/ajuste).
+    # Persiste o output da etapa 1 no ctx (fonte da etapa de render nas DUAS
+    # rotas: etapa unica e portao).
+    conceito = structured.get('foto') or f'prato de comida fresca sobre {post.requested_theme}'
+    vb_ctx.update({
+        'archetype': archetype,
+        'content': content,
+        'caption': structured.get('caption') or '',
+        'hashtags': structured.get('hashtags') or [],
+        'objeto_ilustracao': structured.get('objeto_ilustracao'),
+        'foto_conceito': conceito,
+        'brain_model': brain.get('model'),
+        'updated_at': dj_tz.now().isoformat(),
+    })
+    ctx['vb'] = vb_ctx
+    post.local_pipeline_context = ctx
+    post.ia_provider = 'anthropic'
+    post.ia_model_text = brain.get('model')
+    post.save(update_fields=['local_pipeline_context', 'ia_provider', 'ia_model_text'])
+
+    # ---------------- PORTAO (duas etapas — flag por org, C1) ----------------
+    if getattr(org, 'archetype_two_step', False):
+        _sp = SP().get(archetype) or {}
+        _needs_photo = (_sp.get('bg', {}).get('type') == 'photo') or bool(_sp.get('foto_frame'))
+        post.title = (content.get('titulo') or '').replace('\n', ' ') or post.title
+        post.subtitle = content.get('apoio') or ''
+        post.caption = structured.get('caption') or ''
+        post.hashtags = structured.get('hashtags') or []
+        # Descricao editavel no portao = prompt REAL da foto (quando ha foto)
+        if _needs_photo:
+            post.image_prompt = (build_vb_framed_photo_prompt(conceito)
+                                 if _sp.get('foto_frame')
+                                 else build_vb_photo_prompt(conceito, _sp))
+        else:
+            post.image_prompt = ''
+        vb_ctx['gate_map'] = {'title': 'titulo' if content.get('titulo') else None,
+                              'subtitle': 'apoio' if content.get('apoio') else None}
+        vb_ctx['gate'] = {'stage': 'awaiting_approval', 'at': dj_tz.now().isoformat()}
+        ctx['vb'] = vb_ctx
+        post.local_pipeline_context = ctx
+        post.status = 'pending'
+        post.save()
+        logger.info('[vb] post=%s PORTAO: textos prontos (arquetipo=%s) — '
+                    'aguardando aprovacao do usuario', post_id, archetype)
+        return {'success': True, 'post_id': post_id, 'gate': True,
+                'archetype': archetype}
+
+    return _vb_render_stage(self, post_id)
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=30)
+def render_post_vb_task(self, post_id: int):
+    """Etapa B do portao (C1): renderiza apos a aprovacao do usuario, com as
+    EDICOES feitas no pending (title/subtitle/caption/hashtags/image_prompt)."""
+    return _vb_render_stage(self, post_id, from_gate=True)
+
+
+def _vb_render_stage(task, post_id: int, from_gate: bool = False):
+    """Foto + render Pillow + persistencia — comum a etapa unica e ao portao."""
+    from apps.posts.models import Post
+    from apps.knowledge.models import KnowledgeBase
+    from apps.posts.tasks import _record_ai_usage
+    from apps.posts.services.vb.render import render_vb
+    from apps.posts.services.vb.specs import SP
+    from apps.posts.services.vb.catalog import apply_org_specs
+
+    post = Post.objects.get(id=post_id)
+    org = post.organization
+    kb = KnowledgeBase.objects.filter(organization=org).first()
+    apply_org_specs(org)
+
+    ctx = post.local_pipeline_context or {}
+    vb_ctx = ctx.get('vb') or {}
+    fmt, _px = _fmt_meta(post)
+
+    archetype = (vb_ctx.get('archetype') or '').strip()
+    content = dict(vb_ctx.get('content') or {})
+    caption = vb_ctx.get('caption') or ''
+    hashtags = vb_ctx.get('hashtags') or []
+
+    if from_gate:
+        gm = vb_ctx.get('gate_map') or {}
+        if gm.get('title') and (post.title or '').strip():
+            content[gm['title']] = post.title.strip()
+        if gm.get('subtitle') and (post.subtitle or '').strip():
+            content[gm['subtitle']] = post.subtitle.strip()
+        caption = post.caption or caption
+        hashtags = post.hashtags or hashtags
+        vb_ctx['content'] = content
+        vb_ctx['gate'] = {'stage': 'approved', 'at': dj_tz.now().isoformat()}
+
+    # ---- FOTO — prioridade C1.6 (escolha do MODAL): upload > ref > Gemini ----
     photo_png = None
     _sp = SP().get(archetype) or {}
     _needs_photo = (_sp.get('bg', {}).get('type') == 'photo') or bool(_sp.get('foto_frame'))
     if _needs_photo:
+        from apps.posts.services.artkit.photo_source import resolve_user_photo
+        photo_png, _photo_origin = resolve_user_photo(post, kb)
+        if photo_png:
+            vb_ctx['foto_origin'] = _photo_origin
+            logger.info('[vb] post=%s foto do usuario (%s) — Gemini pulado',
+                        post_id, _photo_origin)
+    if _needs_photo and photo_png is None:
         from apps.posts.services.artkit.gemini import generate_singleshot
-        conceito = structured.get('foto') or f'prato de comida fresca sobre {post.requested_theme}'
-        prompt = (build_vb_framed_photo_prompt(conceito) if _sp.get('foto_frame')
-                  else build_vb_photo_prompt(conceito, _sp))
+        conceito = vb_ctx.get('foto_conceito') or f'prato de comida fresca sobre {post.requested_theme}'
+        # Descricao editada no portao prevalece sobre o prompt construido.
+        prompt = (post.image_prompt or '').strip() if from_gate else ''
+        if not prompt:
+            prompt = (build_vb_framed_photo_prompt(conceito) if _sp.get('foto_frame')
+                      else build_vb_photo_prompt(conceito, _sp))
         try:
             bg = generate_singleshot(prompt_text=prompt, image_inputs=[])
             photo_png = bg['png_bytes']
             _record_ai_usage(post, step='image_generation', model=bg.get('model'),
                              usage_dict=bg.get('usage') or {}, purpose='vb_photo',
                              images_generated=1)
-            vb_ctx['foto_conceito'] = conceito
         except Exception as exc:
             logger.exception('[vb] foto (Gemini) falhou post=%s', post_id)
-            raise self.retry(exc=exc)
+            raise task.retry(exc=exc)
 
-    # ---- Etapa 2: render (Pillow) ----
+    # ---- Render (Pillow) ----
     try:
         pr = render_vb(archetype, content, color_hex=vb_ctx.get('force_color'),
                        fmt=fmt, kb=kb, photo_png=photo_png)
     except Exception as exc:
         logger.exception('[vb] render falhou post=%s', post_id)
-        raise self.retry(exc=exc)
+        raise task.retry(exc=exc)
 
     # ---------------- Persistencia (nucleo comum: artkit.persist) ----------------
     from apps.posts.services.artkit.persist import persist_rendered_art
@@ -179,18 +276,16 @@ def generate_post_vb_task(self, post_id: int):
         elements=pr.get('elements') or [],
         title=(content.get('titulo') or '').replace('\n', ' ') or post.title,
         subtitle=content.get('apoio') or '',
-        caption=structured.get('caption') or '',
-        hashtags=structured.get('hashtags') or [],
+        caption=caption,
+        hashtags=hashtags,
         image_prompt=f'VB arquetipo {archetype} ({fmt}) — render Pillow deterministico',
-        ia_provider='anthropic', ia_model_text=brain.get('model'),
+        ia_provider='anthropic', ia_model_text=vb_ctx.get('brain_model') or post.ia_model_text,
         ia_model_image='vb-pillow',
         set_raw_url=True,  # vb historicamente persiste tambem a URL do raw
     )
     raw_url, s3_url = up['raw_url'], up['s3_url']
 
-    vb_ctx.update({'archetype': archetype, 'content': content,
-                   'objeto_ilustracao': structured.get('objeto_ilustracao'),
-                   'debug_images': {'fundo': raw_url, 'final': s3_url},
+    vb_ctx.update({'debug_images': {'fundo': raw_url, 'final': s3_url},
                    'updated_at': dj_tz.now().isoformat()})
     ctx['vb'] = vb_ctx
     post.local_pipeline_context = ctx
@@ -198,5 +293,5 @@ def generate_post_vb_task(self, post_id: int):
     post.save()
 
     logger.info('[vb] post=%s OK arquetipo=%s objeto=%s', post_id, archetype,
-                structured.get('objeto_ilustracao'))
+                vb_ctx.get('objeto_ilustracao'))
     return {'success': True, 'post_id': post_id, 'archetype': archetype}
