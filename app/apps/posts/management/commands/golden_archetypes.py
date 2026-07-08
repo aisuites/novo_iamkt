@@ -45,6 +45,9 @@ class Command(BaseCommand):
         parser.add_argument('--record', action='store_true', help='grava referencias + manifest')
         parser.add_argument('--check', action='store_true', help='compara render atual vs manifest')
         parser.add_argument('--only', default=None, help='filtra por slug de org')
+        parser.add_argument('--engine', default='legacy', choices=['legacy', 'v3'],
+                            help="v3 = renderiza pelo ENGINE V3 e compara com o "
+                                 "manifest LEGADO (prova de paridade pixel)")
 
     def handle(self, *args, **o):
         from apps.knowledge.models import KnowledgeBase
@@ -52,6 +55,11 @@ class Command(BaseCommand):
 
         if not (o['record'] or o['check']):
             self.stderr.write(self.style.ERROR('use --record ou --check'))
+            return
+        if o['record'] and o['engine'] != 'legacy':
+            self.stderr.write(self.style.ERROR(
+                'goldens sao SEMPRE do render legado (referencia); '
+                '--engine v3 so com --check'))
             return
         os.makedirs(GOLDEN_DIR, exist_ok=True)
 
@@ -74,7 +82,7 @@ class Command(BaseCommand):
                 case = f'{slug}__{arch}__{fmt}'
                 total += 1
                 try:
-                    png = render_preview(org, kb, arch, fmt=fmt)
+                    png = render_preview(org, kb, arch, fmt=fmt, engine=o['engine'])
                 except Exception as e:
                     diffs.append((case, f'RENDER FALHOU: {e}'))
                     self.stdout.write(self.style.ERROR(f'  ✗ {case}: render falhou: {e}'))

@@ -65,6 +65,30 @@ def _fit_shrink(text, font_loader, font_key, box_w, box_h, max_lines,
     return font, min_px, wrap_greedy(text, font, box_w, draw), False
 
 
+def _fit_block(text, font_path, max_w, max_h, max_lines, start_px, draw,
+               min_px=14, leading=1.16, step=2):
+    """Maior corpo cujo BLOCO (linhas empilhadas com leading) cabe na caixa
+    (semantica todxs, fit_measure='block': mede altura TOTAL int() e checa a
+    largura real de cada linha). Fallback = ultimo tamanho tentado (>= min_px):
+    NUNCA descarta texto."""
+    from PIL import ImageFont
+    size = max(min_px, int(start_px))
+    best = None
+    while size >= min_px:
+        try:
+            font = ImageFont.truetype(font_path, size)
+        except Exception:
+            return None, [str(text)], size, int(size * leading)
+        lines = wrap_greedy(text, font, max_w, draw)
+        total_h = int(size * leading * len(lines))
+        fits_w = all(draw.textlength(ln, font=font) <= max_w for ln in lines)
+        if len(lines) <= max_lines and total_h <= max_h and fits_w:
+            return font, lines, size, total_h
+        best = (font, lines, size, total_h)
+        size -= step
+    return best if best else (None, [str(text)], min_px, int(min_px * leading))
+
+
 def _rounded(img, radius, corners):
     if not radius or not corners:
         return img
@@ -111,9 +135,12 @@ def _gradient_bg(W, H, bg, color):
 
 
 def _fetch(src):
+    import base64
     import urllib.request
     if isinstance(src, (bytes, bytearray)):
         data = bytes(src)
+    elif isinstance(src, str) and src.startswith('data:'):
+        data = base64.b64decode(src.partition(',')[2])
     else:
         req = urllib.request.Request(src, headers={'User-Agent': 'Mozilla/5.0 IAMKT'})
         with urllib.request.urlopen(req, timeout=30) as r:
@@ -126,6 +153,194 @@ def _datauri(img):
     buf = io.BytesIO()
     img.convert('RGBA').save(buf, 'PNG')
     return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode('ascii')
+
+
+# ---------------------------------------------------------------------------
+# Camada de ELEMENTS (zonas layer='elements') — dialeto todxs/vb: o pos-raw
+# vira _layout_elements EXPLICITOS (quantizados em %) e o desenho le OS
+# ELEMENTOS, nao as zonas -> editor == publicado por construcao.
+# Semanticas historicas preservadas: int() nas conversoes %->px, rects
+# inclusivos, alpha_composite ancorado no topo-esquerda, acumulacao float do y
+# de linha, corpo re-quantizado a partir do font_size_pct round(3).
+# ---------------------------------------------------------------------------
+
+def _zone_pct(z):
+    """[x,y,w,h] em % — floats AUTORADOS (pct_box) ou box normalizado *100."""
+    if z.get('pct_box'):
+        return list(z['pct_box'])
+    fx, fy, fw, fh = z['box']
+    return [fx * 100.0, fy * 100.0, fw * 100.0, fh * 100.0]
+
+
+def layout_element_zones(zones, content, ctx, W, H):
+    """Resolve as zonas layer='elements' em elementos explicitos (sem desenhar)."""
+    from PIL import Image as _Img, ImageDraw as _IDraw, ImageFont
+    draw0 = _IDraw.Draw(_Img.new('RGB', (8, 8)))
+    basis = min(W, H)
+    font_paths = ctx.get('font_paths') or {}
+    assets = ctx.get('assets') or {}
+    color = ctx['color']
+    els, bottoms = [], {}
+
+    for z in zones:
+        pct = _zone_pct(z)
+        role = z.get('role')
+
+        if role == 'grafismo':
+            hexcol = color(z.get('color'))
+            els.append({'role': 'grafismo', 'forma': 'retangulo',
+                        'cor': hexcol, 'color': hexcol,
+                        'x_pct': pct[0], 'y_pct': pct[1], 'width_pct': pct[2],
+                        'height_pct': pct[3], 'raio_pct': 0, 'opacidade': 100})
+            continue
+
+        if role == 'image':
+            if z.get('recolor'):
+                els.append({'role': 'logo', 'zone': z['key'],
+                            'x_pct': pct[0], 'y_pct': pct[1], 'width_pct': pct[2],
+                            'logo_color': color(z['recolor'])})
+            else:
+                uri = assets.get(z.get('asset') or z['key'])
+                if uri:
+                    els.append({'role': 'image', 'zone': z['key'], 'url': uri,
+                                'x_pct': pct[0], 'y_pct': pct[1],
+                                'width_pct': pct[2], 'height_pct': pct[3]})
+            continue
+
+        # ---- texto ----
+        val = (content or {}).get(z['key'])
+        if not val:
+            continue
+        blocks = z.get('blocks')
+        items = ([v for v in val if v] if (blocks and isinstance(val, list))
+                 else [' '.join(val) if isinstance(val, list) else val])
+        n = len(items) or 1
+        bx, by, bw, bh = pct
+        span = bh / n
+        leading = float(z.get('leading', 1.16))
+        fpath = font_paths.get(z.get('font'))
+        max_lines = z.get('max_lines', 4)
+        for i, raw_text in enumerate(items):
+            box_y = (by + i * span) if blocks else by
+            box_h = span if blocks else bh
+            if z.get('flow_after') and z['flow_after'] in bottoms:
+                box_y = bottoms[z['flow_after']] + z.get('flow_gap', 1.5)
+                box_h = max(6.0, (z.get('y_max', 96) - box_y))
+            text = str(raw_text).replace('\\n', ' ')
+            if z.get('text_normalize') == 'collapse':
+                text = ' '.join(text.split())
+            if z.get('case') == 'upper':
+                text = text.upper()
+            max_w_px = bw / 100.0 * W
+            max_h_px = box_h / 100.0 * H
+            start_px = (z.get('fs') or 0.037) * basis   # fs ja normalizado
+            if z.get('fit') == 'fixed':
+                try:
+                    font = ImageFont.truetype(fpath, max(8, int(start_px)))
+                except Exception:
+                    font = None
+                lines = (wrap_greedy(text, font, max_w_px, draw0)[:max_lines]
+                         if font else [text])
+                size_px = int(start_px)
+                total_h_px = int(size_px * leading * len(lines))
+            else:
+                min_px = int(round((z.get('min_fs') or (14.0 / basis)) * basis))
+                font, lines, size_px, total_h_px = _fit_block(
+                    text, fpath, max_w_px, max_h_px, max_lines, start_px, draw0,
+                    min_px=min_px, leading=leading, step=int(z.get('fit_step', 2)))
+            total_h_pct = total_h_px / H * 100.0
+            draw_y = (box_y + (box_h - total_h_pct) / 2.0
+                      if z.get('valign') == 'center' else box_y)
+            els.append({
+                'role': z.get('role') or 'subtitulo', 'zone': z['key'],
+                'content': '\n'.join(lines),
+                'x_pct': bx, 'y_pct': round(draw_y, 2), 'width_pct': bw,
+                'height_pct': round(total_h_pct + 0.5, 2),
+                'font_size_pct': round(size_px / basis * 100.0, 3),
+                'weight': 'black' if z.get('role') == 'titulo' else 'regular',
+                'case': 'none', 'align': z.get('align', 'left'),
+                'color': color(z.get('color')),
+                '_font_path': fpath, '_leading': leading, 'font_key': z.get('font'),
+            })
+            bottoms[z['key']] = draw_y + total_h_pct
+    return els
+
+
+def _paste_contain_el(base, sticker, el, W, H):
+    """Cola contain no box do elemento, ancorado no topo-esquerda (todxs).
+    height ausente => height_pct = width_pct (semantica historica do selo)."""
+    x = int(float(el.get('x_pct', 0)) / 100.0 * W)
+    y = int(float(el.get('y_pct', 0)) / 100.0 * H)
+    bw = max(8, int(float(el.get('width_pct', 10)) / 100.0 * W))
+    bh = max(8, int(float(el.get('height_pct', el.get('width_pct', 10))) / 100.0 * H))
+    iw, ih = sticker.size
+    s = min(bw / iw, bh / ih)
+    sticker = sticker.resize((max(1, int(iw * s)), max(1, int(ih * s))), Image.LANCZOS)
+    base.alpha_composite(sticker, (x, y))
+
+
+def _draw_element_text(draw, el, W, H):
+    from PIL import ImageFont
+    from .image import hex_to_rgb
+    basis = min(W, H)
+    size = max(8, int(float(el.get('font_size_pct', 5)) / 100.0 * basis))
+    try:
+        font = ImageFont.truetype(el.get('_font_path'), size)
+    except Exception:
+        font = ImageFont.load_default()
+    x = float(el.get('x_pct', 0)) / 100.0 * W
+    y = float(el.get('y_pct', 0)) / 100.0 * H
+    bw = float(el.get('width_pct', 60)) / 100.0 * W
+    align = (el.get('align') or 'left').lower()
+    fill = hex_to_rgb(el.get('color') or '#000000')
+    line_h = size * float(el.get('_leading', 1.16))
+    for line in str(el.get('content', '')).split('\n'):
+        lw = draw.textlength(line, font=font)
+        lx = x + (bw - lw) / 2 if align == 'center' else (x + bw - lw if align == 'right' else x)
+        draw.text((lx, y), line, font=font, fill=fill)
+        y += line_h
+
+
+def draw_layout_elements(base, elements, ctx, W, H):
+    """Desenha os elementos resolvidos: grafismos -> imagens/logos -> texto
+    (mesma ordem de camadas do desenhador todxs). `base` deve ser RGBA."""
+    import base64
+    from .image import hex_to_rgb, recolor_opaque
+    draw = ImageDraw.Draw(base)
+    assets = ctx.get('assets') or {}
+
+    for el in elements:
+        if (el.get('role') or '') == 'grafismo':
+            x = int(float(el.get('x_pct', 0)) / 100 * W)
+            y = int(float(el.get('y_pct', 0)) / 100 * H)
+            w = int(float(el.get('width_pct', 0)) / 100 * W)
+            h = int(float(el.get('height_pct', 0)) / 100 * H)
+            draw.rectangle([x, y, x + w, y + h],
+                           fill=hex_to_rgb(el.get('cor') or el.get('color') or '#000000'))
+
+    for el in elements:
+        role = (el.get('role') or '')
+        if role == 'image' and (el.get('url') or '').startswith('data:'):
+            try:
+                _, _, payload = el['url'].partition(',')
+                st = Image.open(io.BytesIO(base64.b64decode(payload))).convert('RGBA')
+                _paste_contain_el(base, st, el, W, H)
+            except Exception:
+                logger.exception('[engine.v3] elemento imagem falhou (%s)', el.get('zone'))
+        elif role == 'logo':
+            src = assets.get(el.get('zone') or 'wordmark') or assets.get('wordmark')
+            if not src:
+                continue
+            try:
+                lg = _fetch(src).convert('RGBA')
+                lg = recolor_opaque(lg, hex_to_rgb(el.get('logo_color') or '#F4F1D9'))
+                _paste_contain_el(base, lg, el, W, H)
+            except Exception:
+                logger.exception('[engine.v3] elemento logo falhou (%s)', el.get('zone'))
+
+    for el in elements:
+        if (el.get('role') or '') in ('titulo', 'subtitulo', 'cta') and el.get('content'):
+            _draw_element_text(draw, el, W, H)
 
 
 def render_v3(spec, *, content, ctx):
@@ -181,8 +396,10 @@ def render_v3(spec, *, content, ctx):
     # ---- 2. effects bg (ex.: scrim sobre a foto) ----
     base, draw = run_effects('bg', base, draw)
 
-    # ---- 3. zonas de imagem ----
+    # ---- 3. zonas de imagem (layer 'raw'; as de layer 'elements' vem depois) ----
     for z in spec['zones']:
+        if z.get('layer') == 'elements':
+            continue
         if (z.get('role') or z.get('category')) not in ('image', 'imagem', 'produto'):
             continue
         x, y, w, h = px_box(z['box'])
@@ -198,9 +415,21 @@ def render_v3(spec, *, content, ctx):
                           else y + (h - img.height) // 2 if va == 'center' else y)
                     base.paste(img, (ox, oy), img if img.mode == 'RGBA' else None)
                 else:
+                    src_img = _fetch(src)
+                    if z.get('fetch') == 'rgb':   # historico todxs/vb
+                        src_img = src_img.convert('RGB')
+                    rounding = int if z.get('cover_rounding') == 'int' else round
+                    img = _cover(src_img, w, h, rounding=rounding)
+                    if z.get('grayscale'):
+                        img = img.convert('L').convert('RGB')
+                    if z.get('multiply'):
+                        from PIL import ImageChops
+                        from .image import hex_to_rgb
+                        overlay = Image.new('RGB', img.size,
+                                            hex_to_rgb(color(z['multiply'])))
+                        img = ImageChops.multiply(img.convert('RGB'), overlay)
                     radius = int(round((z.get('radius') or 0) * basis))
-                    img = _rounded(_cover(_fetch(src), w, h, rounding=round),
-                                   radius, z.get('round_corners'))
+                    img = _rounded(img, radius, z.get('round_corners'))
                     base.paste(img, (x, y), img if img.mode == 'RGBA' else None)
             except Exception:
                 logger.exception('[engine.v3] falha imagem zona=%s', z['key'])
@@ -224,10 +453,26 @@ def render_v3(spec, *, content, ctx):
     font_loader = ctx['font']
     font_files = spec.get('fonts') or {}
 
-    # ---- 6. zonas de texto + logos ----
+    # ---- 5b. camada de ELEMENTS (todxs/vb): layout explicito + desenho ----
+    layout_zones = [z for z in spec['zones'] if z.get('layer') == 'elements']
+    if layout_zones:
+        base = base.convert('RGBA')
+        lctx = {'color': color, 'assets': assets,
+                'font_paths': ctx.get('font_paths') or {}}
+        lay_els = layout_element_zones(layout_zones, content, lctx, W, H)
+        draw_layout_elements(base, lay_els, lctx, W, H)
+        draw = ImageDraw.Draw(base)
+        elements.extend(lay_els)
+        for z in layout_zones:
+            if z.get('font') in font_files:
+                fonts_resolved[z['font']] = font_files[z['font']]
+
+    # ---- 6. zonas de texto + logos (inline; layer 'elements' ja resolvida) ----
     for z in spec['zones']:
+        if z.get('layer') == 'elements':
+            continue
         role = z.get('role') or z.get('category')
-        if role in ('image', 'imagem', 'produto'):
+        if role in ('image', 'imagem', 'produto', 'grafismo'):
             continue
         if role == 'partner_logo' or z.get('category') == 'partner_logo':
             src = assets.get('partner_logo')
@@ -315,5 +560,7 @@ def render_v3(spec, *, content, ctx):
         im.save(b, format='PNG')
         return b.getvalue()
 
-    return {'raw_png': _png(raw), 'final_png': _png(base),
+    # final SEMPRE RGB (semantica historica dos 3 pipelines; no-op se ja RGB)
+    final = base if base.mode == 'RGB' else base.convert('RGB')
+    return {'raw_png': _png(raw), 'final_png': _png(final),
             'elements': elements, 'fonts_resolved': fonts_resolved}

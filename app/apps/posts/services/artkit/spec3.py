@@ -48,6 +48,19 @@ ZONE_OFFICIAL = {
     'leading', 'max_lines', 'case', 'tracking', 'fit', 'fit_step', 'min_fs',
     'overflow', 'radius', 'round_corners', 'border', 'asset', 'optional',
     'anchor', 'halign', 'category', 'note',
+    # dialeto de ELEMENTS (todxs/vb): zonas pos-raw que viram _layout_elements
+    'layer',            # 'raw' (default) | 'elements' (pos-raw, editavel)
+    'pct_box',          # floats AUTORADOS intactos (evita ruido de quantizacao)
+    'blocks',           # lista de conteudo dividida em blocos de altura igual
+    'flow_after',       # key da zona-ref: y comeca abaixo do fim do TEXTO real
+    'flow_gap', 'y_max',
+    'fit_measure',      # 'lines' (samsung) | 'block' (todxs: altura total)
+    'text_normalize',   # 'collapse' = colapsa whitespace (todxs)
+    'fetch',            # 'rgb' = converte RGB antes do cover (todxs historico)
+    'cover_rounding',   # 'int' = trunca no resize do cover (todxs/vb historico)
+    'grayscale',        # foto P&B apos o cover (todxs C)
+    'multiply',         # duotone: multiply da cor (hex) apos o cover
+    'recolor',          # recolore pixels opacos do asset (hex) — logo/wordmark
 }
 
 

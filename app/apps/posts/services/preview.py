@@ -63,10 +63,20 @@ def list_cases(org):
             for f in sorted((s.get('zonas') or {}).keys())]
 
 
-def render_preview(org, kb, archetype, fmt=None, color=None, content_override=None):
-    """PNG (bytes) do arquetipo com conteudo de exemplo. Raises ValueError."""
+def render_preview(org, kb, archetype, fmt=None, color=None, content_override=None,
+                   engine='legacy'):
+    """PNG (bytes) do arquetipo com conteudo de exemplo. Raises ValueError.
+
+    engine='v3' renderiza pelo ENGINE V3 (conversao on-the-fly, mesmos inputs)
+    — usado pelo golden_archetypes --engine v3 p/ provar paridade pixel."""
     slug = org.slug
     override = content_override or {}
+    if engine == 'v3':
+        if slug == 'vb-gastronomia':
+            raise ValueError('vb-gastronomia ainda nao tem conversor v3')
+        if slug == 'samsung-healthcare':
+            return _samsung_v3(org, kb, archetype, fmt, color, override)
+        return _todxs_v3(org, kb, archetype, fmt, color, override)
     if slug == 'vb-gastronomia':
         return _vb(org, kb, archetype, fmt, color, override)
     if slug == 'samsung-healthcare':
@@ -157,4 +167,92 @@ def _samsung(org, kb, archetype, fmt, color, override):
     content.update(override)
 
     pr = render_samsung(archetype=archetype, content=content, kb=kb, assets={})
+    return pr['final_png']
+
+
+# ---- adaptadores ENGINE V3 (mesmos inputs do legado; paridade pixel) --------
+
+def _samsung_v3(org, kb, archetype, fmt, color, override):
+    from apps.posts.services.samsung.catalog import apply_org_wireframes
+    from apps.posts.services.samsung.wireframes import WF
+    from apps.posts.services.samsung.render import _font
+    from apps.posts.services.artkit.convert import samsung_to_v3
+    from apps.posts.services.artkit import spec3
+    from apps.posts.services.artkit.engine import render_v3
+
+    apply_org_wireframes(org)
+    spec = WF().get(archetype)
+    if not spec:
+        raise ValueError(f'arquetipo {archetype!r} nao existe (tem: {sorted(WF().keys())})')
+    keys = [z['key'] for z in spec.get('zones', [])
+            if z.get('category') not in ('image', 'partner_logo')]
+    content = sample_content(keys)
+    content.update(override)
+
+    norm = spec3.normalize(samsung_to_v3(archetype, src=spec))
+    pr = render_v3(norm, content=content,
+                   ctx={'font': _font, 'assets': {}, 'tokens': {}})
+    return pr['final_png']
+
+
+def _todxs_v3(org, kb, archetype, fmt, color, override):
+    from apps.posts.services.todxs.catalog import apply_org_wireframes
+    from apps.posts.services.todxs.wireframes import WF
+    from apps.posts.services.todxs import pillow_render
+    from apps.posts.services.artkit.convert import todxs_to_v3
+    from apps.posts.services.artkit import spec3
+    from apps.posts.services.artkit.engine import render_v3
+    from apps.posts.services.artkit.image import hex_to_rgb
+
+    apply_org_wireframes(org)
+    spec = WF().get(archetype)
+    if not spec:
+        raise ValueError(f'arquetipo {archetype!r} nao existe (tem: {sorted(WF().keys())})')
+    fmt = fmt or (spec.get('formatos') or ['feed'])[0]
+    zonas = (spec.get('zonas') or {}).get(fmt)
+    if zonas is None:
+        raise ValueError(f'arquetipo {archetype!r} nao tem formato {fmt!r} '
+                         f'(tem: {sorted((spec.get("zonas") or {}).keys())})')
+    content = sample_content([z['key'] for z in zonas])
+    content.update(override)
+    color_hex = color or TODXS_DEFAULT_COLOR
+
+    assets = {}
+    if spec.get('fundo') == 'photo':   # mesmo gating do preview legado
+        w, h = (1080, 1920) if fmt == 'story' else (1080, 1350)
+        assets['photo'] = placeholder_photo_png(w, h)
+
+    # selo/wordmark: MESMOS bytes/urls da KB que o legado usa
+    x_png, logo_url = None, None
+    try:
+        from apps.posts.services.todxs.assets import todxs_simbolo_url, todxs_wordmark_url
+        logo_url = todxs_wordmark_url(kb) if kb else None
+        simbolo_url = todxs_simbolo_url(kb) if kb else None
+        if simbolo_url:
+            import requests
+            x_png = requests.get(simbolo_url, timeout=20).content
+    except Exception:
+        pass  # preview segue sem selo/wordmark (igual ao legado)
+    if x_png:
+        sc = spec.get('seal_color')
+        if sc == 'ACCENT':
+            sc = color_hex
+        xc = hex_to_rgb(sc or '#F4F1D9')
+        if spec.get('seal_style') == 'bare':
+            assets['seal'] = pillow_render.compose_simbolo_datauri(x_png, color=xc)
+        else:
+            assets['seal'] = pillow_render.compose_seal_datauri(x_png, x_color=xc)
+    if logo_url:
+        assets['wordmark'] = logo_url
+
+    weights = pillow_render.resolve_todxs_weights(kb) if kb else {}
+
+    def _loader(key, size):
+        from PIL import ImageFont
+        return ImageFont.truetype(weights.get(key), int(size))
+
+    norm = spec3.normalize(todxs_to_v3(archetype, fmt, color_hex, src=spec))
+    pr = render_v3(norm, content=content,
+                   ctx={'font': _loader, 'font_paths': weights,
+                        'assets': assets, 'tokens': {}})
     return pr['final_png']

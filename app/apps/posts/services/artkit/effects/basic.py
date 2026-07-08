@@ -48,3 +48,22 @@ def guide_line(img, draw, params, ctx):
         draw.line([(x, y0), (x, y1)], fill=col, width=w)
         draw.line([(x, y1), (x_end, y1)], fill=col, width=w)
     return None
+
+
+@register('rounded_border')
+def rounded_border(img, draw, params, ctx):
+    """Moldura de cantos arredondados na arte inteira (origem: todxs B story).
+    params: radius (% da LARGURA — quantizacao int() historica do todxs),
+    bg_color (token|hex do preenchimento fora dos cantos, default off-white).
+    layer tipico: 'final'."""
+    from PIL import ImageDraw as _ImageDraw
+    from apps.posts.services.artkit.image import hex_to_rgb
+    W, H = ctx['canvas']
+    radius = int(float(params.get('radius', 0)) / 100.0 * W)  # int() historico
+    bg = hex_to_rgb(ctx['color'](params.get('bg_color', '#F4F1D9')))
+    src = img.convert('RGB')
+    mask = Image.new('L', (W, H), 0)
+    _ImageDraw.Draw(mask).rounded_rectangle([0, 0, W - 1, H - 1], radius=radius, fill=255)
+    out = Image.new('RGB', (W, H), bg)
+    out.paste(src, (0, 0), mask)
+    return out

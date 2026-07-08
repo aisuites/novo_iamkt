@@ -35,3 +35,13 @@ def contain(img, w, h):
     iw, ih = img.size
     scale = min(w / iw, h / ih)
     return img.resize((max(1, round(iw * scale)), max(1, round(ih * scale))), Image.LANCZOS)
+
+
+def recolor_opaque(img, rgb):
+    """Recolore todos os pixels opacos para `rgb`, preservando o canal alpha.
+    (Comportamento exato do todxs._recolor_opaque == vb._recolor.)"""
+    img = img.convert('RGBA')
+    alpha = img.split()[3]
+    solid = Image.new('RGBA', img.size, tuple(rgb) + (255,))
+    solid.putalpha(alpha)
+    return solid
