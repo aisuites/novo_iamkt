@@ -183,14 +183,27 @@ def generate_post_todxs_task(self, post_id: int):
             raise self.retry(exc=exc)
 
     # ---------------- Etapa 3: PILLOW (render publicado) ----------------
+    # ENGINE V3 (flag por org): converte a spec ativa on-the-fly e renderiza
+    # pelo motor único. Paridade pixel provada (goldens 9/9). Desligar a flag
+    # = volta instantâneo ao render dedicado.
+    engine_used = 'legacy'
     try:
-        pr = pillow_render.render_todxs(
-            archetype=archetype, content=content, color_hex=color_hex, fmt=fmt,
-            formato_px=formato_px, kb=kb, paleta=paleta,
-            photo_png=photo_png, x_png_bytes=x_png_bytes, logo_url=logo_url,
-        )
+        if getattr(org, 'archetype_engine_v3', False):
+            pr = pillow_render.render_todxs_v3(
+                archetype=archetype, content=content, color_hex=color_hex,
+                fmt=fmt, kb=kb, photo_png=photo_png,
+                x_png_bytes=x_png_bytes, logo_url=logo_url,
+            )
+            engine_used = 'v3'
+        else:
+            pr = pillow_render.render_todxs(
+                archetype=archetype, content=content, color_hex=color_hex, fmt=fmt,
+                formato_px=formato_px, kb=kb, paleta=paleta,
+                photo_png=photo_png, x_png_bytes=x_png_bytes, logo_url=logo_url,
+            )
     except Exception as exc:
-        logger.exception('[todxs] pillow render falhou post=%s', post_id)
+        logger.exception('[todxs] pillow render falhou post=%s (engine=%s)',
+                         post_id, engine_used)
         raise self.retry(exc=exc)
 
     # ---------------- Persistencia (nucleo comum: artkit.persist) ----------------
@@ -210,7 +223,8 @@ def generate_post_todxs_task(self, post_id: int):
 
     trace.append({'etapa': '2_background', **bg_info,
                   'raw_s3_key': raw_key, 'raw_url': raw_url, 'at': dj_tz.now().isoformat()})
-    trace.append({'etapa': '3_pillow_render', 'elements': pr['elements'],
+    trace.append({'etapa': '3_pillow_render', 'engine': engine_used,
+                  'elements': pr['elements'],
                   'fonts': pr['fonts_resolved'], 'final_s3_key': s3_key,
                   'final_url': s3_url, 'at': dj_tz.now().isoformat()})
 

@@ -199,10 +199,6 @@ def _todxs_v3(org, kb, archetype, fmt, color, override):
     from apps.posts.services.todxs.catalog import apply_org_wireframes
     from apps.posts.services.todxs.wireframes import WF
     from apps.posts.services.todxs import pillow_render
-    from apps.posts.services.artkit.convert import todxs_to_v3
-    from apps.posts.services.artkit import spec3
-    from apps.posts.services.artkit.engine import render_v3
-    from apps.posts.services.artkit.image import hex_to_rgb
 
     apply_org_wireframes(org)
     spec = WF().get(archetype)
@@ -217,10 +213,10 @@ def _todxs_v3(org, kb, archetype, fmt, color, override):
     content.update(override)
     color_hex = color or TODXS_DEFAULT_COLOR
 
-    assets = {}
+    photo_png = None
     if spec.get('fundo') == 'photo':   # mesmo gating do preview legado
         w, h = (1080, 1920) if fmt == 'story' else (1080, 1350)
-        assets['photo'] = placeholder_photo_png(w, h)
+        photo_png = placeholder_photo_png(w, h)
 
     # selo/wordmark: MESMOS bytes/urls da KB que o legado usa
     x_png, logo_url = None, None
@@ -233,26 +229,8 @@ def _todxs_v3(org, kb, archetype, fmt, color, override):
             x_png = requests.get(simbolo_url, timeout=20).content
     except Exception:
         pass  # preview segue sem selo/wordmark (igual ao legado)
-    if x_png:
-        sc = spec.get('seal_color')
-        if sc == 'ACCENT':
-            sc = color_hex
-        xc = hex_to_rgb(sc or '#F4F1D9')
-        if spec.get('seal_style') == 'bare':
-            assets['seal'] = pillow_render.compose_simbolo_datauri(x_png, color=xc)
-        else:
-            assets['seal'] = pillow_render.compose_seal_datauri(x_png, x_color=xc)
-    if logo_url:
-        assets['wordmark'] = logo_url
 
-    weights = pillow_render.resolve_todxs_weights(kb) if kb else {}
-
-    def _loader(key, size):
-        from PIL import ImageFont
-        return ImageFont.truetype(weights.get(key), int(size))
-
-    norm = spec3.normalize(todxs_to_v3(archetype, fmt, color_hex, src=spec))
-    pr = render_v3(norm, content=content,
-                   ctx={'font': _loader, 'font_paths': weights,
-                        'assets': assets, 'tokens': {}})
+    pr = pillow_render.render_todxs_v3(
+        archetype=archetype, content=content, color_hex=color_hex, fmt=fmt,
+        kb=kb, photo_png=photo_png, x_png_bytes=x_png, logo_url=logo_url)
     return pr['final_png']
