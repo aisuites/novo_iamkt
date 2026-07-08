@@ -33,9 +33,15 @@ Sua tarefa: para cada papel presente na arte final, medir com PRECISÃO:
   TODAS as linhas do texto daquele papel.
 - font_px: altura APROXIMADA do corpo da fonte em PIXELS (altura de uma
   linha de texto ≈ 1.2x o corpo; meça a altura das maiúsculas e estime).
+- n_lines: em QUANTAS linhas visuais o texto está quebrado na arte.
 - color: cor do texto em hex (#RRGGBB), a cor DOMINANTE dos glifos.
 - align: left | center | right (alinhamento das linhas dentro do bloco).
 - weight: regular | bold (peso visual do traço).
+
+Para o CTA, meça TAMBÉM (se ele tiver um fundo tipo botão/pill):
+- background_color: hex do fundo do botão (null se o texto está solto, sem fundo)
+- radius_px: raio dos cantos arredondados do botão, em pixels
+- (o bbox_pct do CTA deve cobrir o BOTÃO inteiro, não só o texto)
 
 Se houver LOGO na arte final que NÃO está no fundo, meça também:
 - logo: {bbox_pct: {x, y, w, h}}
@@ -45,9 +51,9 @@ REGRAS:
 - Papel ausente na arte → null.
 - Não invente texto; você só mede geometria/cor/alinhamento/peso.
 - Responda SÓ com JSON:
-{"titulo": {"bbox_pct": {...}, "font_px": N, "color": "#..", "align": "..", "weight": ".."} | null,
+{"titulo": {"bbox_pct": {...}, "font_px": N, "n_lines": N, "color": "#..", "align": "..", "weight": ".."} | null,
  "subtitulo": {...} | null,
- "cta": {...} | null,
+ "cta": {..., "background_color": "#.."|null, "radius_px": N} | null,
  "logo": {"bbox_pct": {...}} | null}"""
 
 
@@ -71,6 +77,35 @@ def _presign(s3_key, fallback=''):
         return S3Service.generate_presigned_download_url(s3_key, expires_in=600)
     except Exception:
         return fallback
+
+
+def _solve_font_px(text, font_path, box_w_px, n_lines, estimate_px):
+    """Resolve GEOMETRICAMENTE o corpo da fonte: maior tamanho cujo texto,
+    quebrado por palavra na LARGURA MEDIDA do bloco, cabe em <= n_lines
+    (com a TTF REAL da KB — mata o erro de estimativa visual do modelo).
+    Fallback: estimativa do modelo."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        from apps.posts.services.artkit.text import wrap_greedy
+        if not font_path or not text or box_w_px <= 0:
+            return estimate_px
+        draw = ImageDraw.Draw(Image.new('RGB', (8, 8)))
+        n_lines = max(1, int(n_lines or 1))
+        lo, hi, best = 8, 300, None
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            font = ImageFont.truetype(font_path, mid)
+            lines = wrap_greedy(text, font, box_w_px, draw)
+            fits = (len(lines) <= n_lines
+                    and all(draw.textlength(ln, font=font) <= box_w_px for ln in lines))
+            if fits:
+                best = mid
+                lo = mid + 1
+            else:
+                hi = mid - 1
+        return float(best) if best else estimate_px
+    except Exception:
+        return estimate_px
 
 
 def transcribe_published_art(post):
@@ -155,6 +190,14 @@ def transcribe_published_art(post):
                 pass
             return bb
 
+        # Fontes REAIS da KB (por role) — usadas p/ resolver o corpo
+        # geometricamente e garantir a tipografia definida no KB.
+        try:
+            from apps.posts.views_overlay import _get_font_paths
+            font_paths = _get_font_paths(post) or {}
+        except Exception:
+            font_paths = {}
+
         elements = []
         for role in ('titulo', 'subtitulo', 'cta'):
             d = parsed.get(role)
@@ -162,13 +205,20 @@ def transcribe_published_art(post):
             if not d or not isinstance(d, dict) or not txt:
                 continue
             bb = _norm_bbox(d.get('bbox_pct'))
+            w_pct = _clamp(bb.get('w'), 2, 100, 60)
             font_px = _clamp(d.get('font_px'), 8, basis * 0.3, basis * 0.05)
-            elements.append({
+            # Corpo GEOMETRICO: maior tamanho que preenche a largura medida
+            # com a fonte real da KB em n_lines linhas (a estimativa visual
+            # do modelo tende a subestimar).
+            font_px = _solve_font_px(txt, font_paths.get(role),
+                                     w_pct / 100.0 * W,
+                                     d.get('n_lines'), font_px)
+            el = {
                 'role': role,
                 'content': txt,   # SEMPRE o texto real do Post, nunca do modelo
                 'x_pct': round(_clamp(bb.get('x'), 0, 98, 5), 2),
                 'y_pct': round(_clamp(bb.get('y'), 0, 98, 5), 2),
-                'width_pct': round(_clamp(bb.get('w'), 2, 100, 60), 2),
+                'width_pct': round(w_pct, 2),
                 'height_pct': round(_clamp(bb.get('h'), 0, 100, 0), 2),
                 'font_size_pct': round(font_px / basis * 100.0, 3),
                 'color': (d.get('color') or '#FFFFFF'),
@@ -178,7 +228,20 @@ def transcribe_published_art(post):
                                                                  'heavy', 'semibold')
                            else 'regular'),
                 '_source': 'vision_transcribe',
-            })
+            }
+            # CTA tipo botao: fundo/radius sao PROPRIEDADES do proprio elemento
+            # (decisao do dono 2026-07-08) — o motor ja desenha o pill
+            # (_draw_cta_background) e o texto centraliza no box.
+            if role == 'cta' and (d.get('background_color') or '').strip():
+                el['background_color'] = d['background_color'].strip()
+                el['radius_pct'] = round(
+                    _clamp(d.get('radius_px'), 0, W * 0.1, 8) / W * 100.0, 3)
+                el['align'] = 'center'
+                # dentro do pill, o corpo geometrico "preencher a largura"
+                # nao vale (o botao tem padding) — mantem a estimativa visual.
+                fp = _clamp(d.get('font_px'), 8, basis * 0.3, basis * 0.05)
+                el['font_size_pct'] = round(fp / basis * 100.0, 3)
+            elements.append(el)
         lg = parsed.get('logo')
         if lg and isinstance(lg, dict):
             bb = _norm_bbox(lg.get('bbox_pct'))
