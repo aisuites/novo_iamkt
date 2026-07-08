@@ -47,12 +47,12 @@ async function uploadPerfilLogo(file) {
         return;
     }
     
-    // Validar tamanho (5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    // Validar tamanho (15MB)
+    if (file.size > 15 * 1024 * 1024) {
         if (window.toaster) {
-            toaster.error('Arquivo muito grande. Máximo 5MB');
+            toaster.error('Arquivo muito grande. Máximo 15MB');
         } else {
-            alert('Arquivo muito grande. Máximo 5MB');
+            alert('Arquivo muito grande. Máximo 15MB');
         }
         return;
     }

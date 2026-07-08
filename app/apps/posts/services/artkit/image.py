@@ -37,6 +37,55 @@ def contain(img, w, h):
     return img.resize((max(1, round(iw * scale)), max(1, round(ih * scale))), Image.LANCZOS)
 
 
+def shrink_for_ai(data, mime='', max_bytes=4_500_000, max_dim=2200):
+    """Compacta uma imagem para ENVIO A IAs (Claude/Gemini) sem tocar o
+    original no S3.
+
+    Regra (dono, 2026-07-08): o upload aceita ate 15MB; a compactacao acontece
+    SO na hora de mandar para a IA (o render Pillow usa o original integro).
+    - <= max_bytes: retorna intacto (bytes, mime).
+    - com alpha: re-encode PNG (preserva transparencia — logos/produtos),
+      reduzindo dimensao se preciso.
+    - sem alpha: JPEG com qualidade decrescente ate caber.
+    max_bytes default 4.5MB (limite de 5MB/imagem do Claude; seguro p/ Gemini).
+    """
+    if not data or len(data) <= max_bytes:
+        return data, mime
+    import io
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.load()
+    except Exception:
+        return data, mime
+    if max(img.size) > max_dim:
+        s = max_dim / max(img.size)
+        img = img.resize((max(1, int(img.width * s)), max(1, int(img.height * s))),
+                         Image.LANCZOS)
+    has_alpha = (img.mode in ('RGBA', 'LA')
+                 or (img.mode == 'P' and 'transparency' in img.info))
+    if has_alpha:
+        img = img.convert('RGBA')
+        buf = io.BytesIO()
+        img.save(buf, 'PNG', optimize=True)
+        out = buf.getvalue()
+        while len(out) > max_bytes and max(img.size) > 800:
+            img = img.resize((max(1, int(img.width * 0.8)),
+                              max(1, int(img.height * 0.8))), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, 'PNG', optimize=True)
+            out = buf.getvalue()
+        return out, 'image/png'
+    img = img.convert('RGB')
+    out = data
+    for q in (85, 75, 65, 55, 45):
+        buf = io.BytesIO()
+        img.save(buf, 'JPEG', quality=q, optimize=True)
+        out = buf.getvalue()
+        if len(out) <= max_bytes:
+            break
+    return out, 'image/jpeg'
+
+
 def recolor_opaque(img, rgb):
     """Recolore todos os pixels opacos para `rgb`, preservando o canal alpha.
     (Comportamento exato do todxs._recolor_opaque == vb._recolor.)"""

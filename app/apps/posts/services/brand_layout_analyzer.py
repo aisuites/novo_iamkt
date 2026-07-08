@@ -215,6 +215,10 @@ def _download_to_base64(url: str):
         ct = 'image/gif'
     elif ct not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
         ct = 'image/png'
+    # Uploads de ate 15MB: compacta SO para o envio a IA (limite 5MB/imagem
+    # do Claude; original fica intacto no S3).
+    from apps.posts.services.artkit.image import shrink_for_ai
+    data, ct = shrink_for_ai(data, ct)
     return base64.b64encode(data).decode('ascii'), ct
 
 

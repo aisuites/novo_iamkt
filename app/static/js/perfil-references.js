@@ -74,12 +74,12 @@ async function uploadPerfilReference(file, clearInput = true) {
         return false;
     }
     
-    // Validar tamanho (10MB)
-    if (file.size > 10 * 1024 * 1024) {
+    // Validar tamanho (15MB)
+    if (file.size > 15 * 1024 * 1024) {
         if (window.toaster) {
-            toaster.error('Arquivo muito grande. Máximo 10MB');
+            toaster.error('Arquivo muito grande. Máximo 15MB');
         } else {
-            alert('Arquivo muito grande. Máximo 10MB');
+            alert('Arquivo muito grande. Máximo 15MB');
         }
         return false;
     }

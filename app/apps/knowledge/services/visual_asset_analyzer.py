@@ -321,6 +321,9 @@ def analyze_brand_asset(
 
     if mime not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
         mime = 'image/png'
+    # Uploads de ate 15MB: compacta SO para o envio a IA.
+    from apps.posts.services.artkit.image import shrink_for_ai
+    raw_bytes, mime = shrink_for_ai(raw_bytes, mime)
     b64 = base64.b64encode(raw_bytes).decode('ascii')
 
     import anthropic
@@ -432,7 +435,11 @@ def _download_to_base64(url: str) -> Tuple[Optional[str], str]:
             ct = resp.headers.get('Content-Type', 'image/png').split(';')[0].strip()
     except Exception:
         return None, 'image/png'
-    return base64.b64encode(data).decode('ascii'), _sniff_mime(data, ct)
+    # Uploads de ate 15MB: compacta SO para o envio a IA (limite 5MB/imagem
+    # do Claude; original fica intacto no S3).
+    from apps.posts.services.artkit.image import shrink_for_ai
+    data, ct = shrink_for_ai(data, _sniff_mime(data, ct))
+    return base64.b64encode(data).decode('ascii'), ct
 
 
 def _parse_json(text: str) -> Optional[Dict[str, Any]]:

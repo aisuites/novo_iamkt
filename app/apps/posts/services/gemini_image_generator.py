@@ -291,6 +291,9 @@ def _download_to_base64(url: str) -> Tuple[Optional[str], str]:
 
     if content_type not in ('image/png', 'image/jpeg', 'image/webp'):
         content_type = 'image/png'
+    # Uploads de ate 15MB: compacta SO para o envio a IA (original fica no S3).
+    from apps.posts.services.artkit.image import shrink_for_ai
+    data, content_type = shrink_for_ai(data, content_type)
     return base64.b64encode(data).decode('ascii'), content_type
 
 

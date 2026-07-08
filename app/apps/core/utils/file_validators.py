@@ -52,16 +52,19 @@ class FileValidator:
         },
     }
 
-    # Tamanhos máximos por categoria (em MB)
+    # Tamanhos máximos por categoria (em MB).
+    # Imagens: 15MB (dono, 2026-07-08) — o original fica íntegro no S3 (o
+    # render Pillow usa em qualidade máxima); a compactação acontece SÓ na
+    # hora de enviar para IAs (artkit.image.shrink_for_ai).
     MAX_FILE_SIZES = {
-        'logos': 5,
-        'references': 10,
+        'logos': 15,
+        'references': 15,
         'fonts': 2,
         'documents': 20,
-        'posts': 10,
+        'posts': 15,
         'brandguides': 50,
-        'templates': 10,
-        'assets': 5,
+        'templates': 15,
+        'assets': 15,
     }
     
     @classmethod
