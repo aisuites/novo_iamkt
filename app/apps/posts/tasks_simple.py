@@ -727,8 +727,55 @@ def revise_image_task(self, post_id: int, message: str = '', source_s3_key: str 
         'model_img': b['model'],
         'pedido_usuario': message,
     }
+
+    # ---- Mantem o RAW (fundo sem texto) EM SINCRONIA com a edicao ----
+    # Sem isso a Edicao Avancada abre o fundo ANTIGO e o save re-renderiza
+    # por cima da correcao (bug do post 258: 'retire os grafismos verdes'
+    # corrigiu o publicado, o modal recarregou o fundo velho e SALVOU a
+    # versao sem correcao). Aplica o MESMO prompt de edicao ao raw.
+    if post.raw_image_s3_key:
+        try:
+            raw_url = S3Service.generate_presigned_download_url(
+                post.raw_image_s3_key, expires_in=600)
+            raw_b64, _rm = _download_to_base64(raw_url)
+            if raw_b64:
+                rb = edit_image_with_gemini(_b64.b64decode(raw_b64), edit_prompt)
+                _log_usage_gemini(post, rb['model'], rb['usage'].get('cost_usd', 0),
+                                  {'promptTokenCount': rb['usage'].get('input_tokens', 0)},
+                                  purpose='gemini_edit_raw_sync')
+                rk, ru = _upload_image_to_s3(
+                    org_id=post.organization.id, post_id=post.id,
+                    png_bytes=rb['png_bytes'], mime_type='image/png',
+                )
+                post.raw_image_s3_key, post.raw_image_s3_url = rk, ru
+                logger.info('[posts.simple] raw sincronizado com a edicao post=%s', post_id)
+        except Exception:
+            logger.exception('[posts.simple] sync do raw falhou post=%s '
+                             '(publicado editado fica valendo)', post_id)
+
+    # Novo final = nova base do transcritor/comparacao Q1
+    _si = _ctx.get('simple_image') or {}
+    _si['gemini_final_s3_key'] = s3_key
+    _ctx['simple_image'] = _si
     post.local_pipeline_context = _ctx
     post.status = 'image_ready'
     post.save()
+
+    # Re-transcreve p/ os elements refletirem a arte EDITADA (orgs com editor)
+    if getattr(post.organization, 'advanced_editor_enabled', False):
+        try:
+            from apps.posts.services.artkit.transcribe import transcribe_published_art
+            _els, _t_usage = transcribe_published_art(post)
+            if _t_usage:
+                _record_ai_usage(post, step='text_generation', model='claude-sonnet-4-6',
+                                 usage_dict=_t_usage, purpose='vision_transcribe')
+            if _els:
+                _dp = post.designer_payload or {}
+                _dp['_layout_elements'] = _els
+                post.designer_payload = _dp
+                post.save(update_fields=['designer_payload'])
+        except Exception:
+            logger.exception('[posts.simple] re-transcricao pos-edicao falhou post=%s', post_id)
+
     logger.info('[posts.simple] revise_image_task OK post=%s', post_id)
     return {'success': True, 'post_id': post_id}
