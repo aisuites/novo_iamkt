@@ -1652,7 +1652,13 @@ function toggleCarrossel() {
             const url = fontUrls && fontUrls[role];
             if (url) {
                 const family = `IAMKT_${postId}_${role}`;
-                css.push(`@font-face{font-family:'${family}';src:url('${url}') format('truetype');font-display:swap;}`);
+                css.push(`@font-face{font-family:'${family}';src:url('${url}') format('truetype');font-weight:400;font-display:swap;}`);
+                // Variante BOLD real (quando a KB/Google tem o peso): o browser
+                // usa o arquivo 700 em vez de SINTETIZAR — igual ao Pillow.
+                const boldUrl = fontUrls && fontUrls[role + '_bold'];
+                if (boldUrl) {
+                    css.push(`@font-face{font-family:'${family}';src:url('${boldUrl}') format('truetype');font-weight:700;font-display:swap;}`);
+                }
                 families[role] = `'${family}', '${(fontNames && fontNames[role]) || 'serif'}', serif`;
             } else {
                 families[role] = `'${(fontNames && fontNames[role]) || 'serif'}', serif`;

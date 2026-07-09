@@ -207,10 +207,16 @@ def transcribe_published_art(post):
             bb = _norm_bbox(d.get('bbox_pct'))
             w_pct = _clamp(bb.get('w'), 2, 100, 60)
             font_px = _clamp(d.get('font_px'), 8, basis * 0.3, basis * 0.05)
+            is_bold = (d.get('weight') or '') in ('bold', 'black', 'heavy',
+                                                  'semibold')
             # Corpo GEOMETRICO: maior tamanho que preenche a largura medida
             # com a fonte real da KB em n_lines linhas (a estimativa visual
-            # do modelo tende a subestimar).
-            font_px = _solve_font_px(txt, font_paths.get(role),
+            # do modelo tende a subestimar). CRITICO: resolver com a MESMA
+            # variante que o render vai usar — bold e mais LARGA; resolver
+            # com a regular faz o fitter do render encolher o texto depois.
+            solve_font = ((font_paths.get(role + '_bold') if is_bold else None)
+                          or font_paths.get(role))
+            font_px = _solve_font_px(txt, solve_font,
                                      w_pct / 100.0 * W,
                                      d.get('n_lines'), font_px)
             el = {
@@ -224,9 +230,7 @@ def transcribe_published_art(post):
                 'color': (d.get('color') or '#FFFFFF'),
                 'align': (d.get('align') if d.get('align') in ('left', 'center', 'right')
                           else 'left'),
-                'weight': ('bold' if (d.get('weight') or '') in ('bold', 'black',
-                                                                 'heavy', 'semibold')
-                           else 'regular'),
+                'weight': ('bold' if is_bold else 'regular'),
                 '_source': 'vision_transcribe',
             }
             # CTA tipo botao: fundo/radius sao PROPRIEDADES do proprio elemento
@@ -257,6 +261,19 @@ def transcribe_published_art(post):
         if not elements:
             logger.info('[transcribe] post=%s modelo nao localizou elementos', post.id)
             return None, usage
+
+        # Persiste as DIMENSOES REAIS da arte no ctx: o canvas do modal deve
+        # ser o da imagem (post_format pode divergir — ex.: 1200x630 vs
+        # 1424x752 do Gemini), senao o editor desenha em proporcao diferente.
+        try:
+            ctx = post.local_pipeline_context or {}
+            si = ctx.get('simple_image') or {}
+            si['canvas'] = [W, H]
+            ctx['simple_image'] = si
+            post.local_pipeline_context = ctx
+            post.save(update_fields=['local_pipeline_context'])
+        except Exception:
+            logger.exception('[transcribe] falha ao persistir canvas post=%s', post.id)
         logger.info('[transcribe] post=%s -> %d elements (%s)', post.id,
                     len(elements), [e['role'] for e in elements])
         return elements, usage

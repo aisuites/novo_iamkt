@@ -93,6 +93,11 @@ def overlay_data(request, post_id):
     for role in _VALID_FONT_ROLES:
         if font_paths.get(role):
             font_urls[role] = f'/posts/{post.id}/fonts/{role}/'
+        # Variante BOLD real (ex.: Montserrat 700): o modal registra um
+        # @font-face com font-weight:700 e o navegador usa o arquivo em vez
+        # de SINTETIZAR o negrito (que diverge do Pillow no publicado).
+        if font_paths.get(role + '_bold'):
+            font_urls[role + '_bold'] = f'/posts/{post.id}/fonts/{role}_bold/'
 
     # TODXS: fontes por CHAVE de uso (display/regular/caps_small) p/ o editor
     # desenhar com a mesma fonte do render Pillow (por elemento, nao por papel).
@@ -391,7 +396,8 @@ def font_file(request, post_id, role):
     Permite que o modal Arte Final injete @font-face apontando para a fonte
     real da KB (ou Google Fonts cacheado) — independente do Google Fonts CSS.
     """
-    if role not in _VALID_FONT_ROLES:
+    _base = role[:-5] if role.endswith('_bold') else role
+    if _base not in _VALID_FONT_ROLES:
         return JsonResponse({'error': 'role_invalido'}, status=400)
     post = get_object_or_404(Post, id=post_id, organization=request.organization)
     paths = _get_font_paths(post)
@@ -895,6 +901,13 @@ def _get_logo_url(post: Post) -> str:
 
 
 def _get_canvas(post: Post):
+    # SIMPLE transcrito: canvas = dimensoes REAIS da arte do Gemini (medidas
+    # na transcricao) — post_format pode divergir (ex.: 1200x630 vs 1424x752)
+    # e o modal desenharia em proporcao diferente do publicado.
+    _si = (post.local_pipeline_context or {}).get('simple_image') or {}
+    _cv = _si.get('canvas')
+    if isinstance(_cv, (list, tuple)) and len(_cv) == 2 and all(_cv):
+        return int(_cv[0]), int(_cv[1])
     if post.post_format:
         return post.post_format.width or 1080, post.post_format.height or 1080
     # TODXS: sem post_format -> deriva do formato salvo no contexto (feed 4:5 /
