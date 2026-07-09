@@ -717,6 +717,20 @@ def _build_prompt_text(
     # O titulo/subtitulo (desenhados via Pillow) podem manter a marca; a CENA nao.
     if brand_keywords:
         image_prompt_text = _sanitize_brand_terms(image_prompt_text, brand_keywords)
+
+    # MODO PILLOW (fundo SEM texto): a cena do orquestrador pode DESCREVER o
+    # bloco de texto/logo (p/ compor o espaco) — e a instrucao ESPECIFICA
+    # vence a regra generica de no-text: o Gemini desenha o texto no fundo
+    # (bug thermomix post 257). Reinterpretacao explicita: mencoes de texto/
+    # logo viram ESPACO VAZIO reservado.
+    if text_render_mode == 'pillow' and image_prompt_text:
+        image_prompt_text = (
+            '(NOTE: the scene below may mention text blocks, titles, CTAs or '
+            'logos — treat ALL of those ONLY as RESERVED EMPTY SPACE (clean '
+            'negative space in the described position/size). Do NOT render '
+            'any text, letters, numbers, typography or logos — they are '
+            'added later in post-production.)\n\n' + image_prompt_text
+        )
     inline_anchored = _scene_has_inline_anchoring(image_prompt_text)
 
     if use_hybrid_en:
