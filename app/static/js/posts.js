@@ -220,7 +220,7 @@
   // o s3_key da imagem ATIVA no estado — sem isso, o botão de download da página
   // presigna a chave antiga e baixa a arte SEM as edições.
   window.addEventListener('todxs:image-updated', (e) => {
-    const { postId, s3_key } = (e && e.detail) || {};
+    const { postId, s3_key, url } = (e && e.detail) || {};
     if (!postId || !s3_key) return;
     const post = postsState.items.find(p => p && String(p.id) === String(postId));
     if (!post || !Array.isArray(post.imagens) || !post.imagens.length) return;
@@ -228,6 +228,17 @@
     const item = post.imagens[idx];
     if (item && typeof item === 'object') item.s3_key = s3_key;
     else post.imagens[idx] = s3_key;
+    // Atualiza tambem o THUMB ja renderizado da galeria (a imagem grande e
+    // trocada pelo _saveElements; o thumb ficava com o src antigo ate reload).
+    if (dom.postGallery) {
+      const btn = dom.postGallery.querySelector(`.gallery-thumb[data-image-index="${idx}"]`);
+      const img = btn && btn.querySelector('img');
+      if (img) {
+        img.setAttribute('data-lazy-load', s3_key);
+        if (url) img.src = url;
+      }
+      if (btn) btn.dataset.s3Key = s3_key;
+    }
   });
 
   // Normalizar dados dos posts

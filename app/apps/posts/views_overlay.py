@@ -442,6 +442,22 @@ def regenerate_background(request, post_id):
     if not post.raw_image_s3_key:
         return JsonResponse({'error': 'no_raw_image'}, status=400)
 
+    # LIMITE POR ORG: mesma contagem do fluxo da pagina (generate_image) —
+    # sem isso o modal permitia alteracoes ILIMITADAS mesmo com a quota
+    # esgotada (reportado pelo dono em 2026-07-09).
+    from apps.posts.models import PostChangeRequest
+    max_rev = post.organization.max_image_revisions
+    usadas = PostChangeRequest.objects.filter(
+        post=post, change_type='image', is_initial=False).count()
+    if usadas >= max_rev:
+        return JsonResponse({
+            'error': f'Limite de alterações de imagem atingido ({usadas}/{max_rev})',
+        }, status=400)
+    PostChangeRequest.objects.create(
+        post=post, message=message, change_type='image', is_initial=False,
+        requester_email=getattr(request.user, 'email', '') or '',
+    )
+
     from apps.posts.tasks import regenerate_background_task
     regenerate_background_task.delay(post.id, message)
     return JsonResponse({

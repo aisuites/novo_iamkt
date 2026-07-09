@@ -744,7 +744,7 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260708-c14-revisao"></script>
+<script src="{% static 'js/posts.js' %}?v=20260709-thumb-limite"></script>
 
 <script>
 // Inicializar lazyload para imagens dos posts com endpoint correto
@@ -1529,7 +1529,10 @@ function toggleCarrossel() {
             _startBgPolling();
         } catch (e) {
             console.error('[bg-request]', e);
-            statusEl.textContent = 'Erro ao solicitar nova imagem.';
+            // Mostra a mensagem REAL do backend (ex.: limite de alteracoes
+            // atingido) em vez do erro generico.
+            statusEl.textContent = (e && e.message && e.message !== 'falha_solicitar')
+                ? e.message : 'Erro ao solicitar nova imagem.';
         } finally {
             btnBgRequestSubmit.disabled = false;
             btnBgRequestSubmit.textContent = 'Gerar nova imagem';
