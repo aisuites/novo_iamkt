@@ -824,8 +824,18 @@ def _build_prompt_text(
             '',
             '[BRAND GUIDELINES]',
             f'- Brand palette: {json.dumps(paleta, ensure_ascii=False)}',
-            f'- Typography: {json.dumps(tipografia, ensure_ascii=False)}',
-            '- Apply palette and typography ONLY to post text — not to referenced items.',
+            # MODO PILLOW (fundo SEM texto): tipografia NAO entra no prompt —
+            # (a) os NOMES das fontes podem conter a marca (ex.: Vorwerk-Bold)
+            # e vazar priors que degradam a fidelidade do produto; (b) falar de
+            # "post text" num render sem texto convida o Gemini a DESENHAR
+            # texto no fundo. O texto e aplicado depois (Pillow, fonte real).
+            *([]
+              if text_render_mode == 'pillow' else
+              [f'- Typography: {json.dumps(tipografia, ensure_ascii=False)}',
+               '- Apply palette and typography ONLY to post text — not to referenced items.']),
+            *(['- ABSOLUTELY NO text, letters, numbers, logos or typography in '
+               'this image — it is a clean background; text is added later.']
+              if text_render_mode == 'pillow' else []),
             '- Do not copy text visible inside reference images.',
             '- If no people in references, do not add people.',
             '',
