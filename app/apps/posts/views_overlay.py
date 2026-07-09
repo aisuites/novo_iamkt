@@ -642,17 +642,19 @@ def _simple_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=png_bytes, mime_type='image/png')
-    updated = 0
-    if old_key:
-        updated = PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
-    if not updated:
-        # old_key dessincronizado (saves concorrentes): atualiza a PostImage
-        # mais recente — senao o botao Edicao Avancada SOME (is_editable
-        # compara o s3_key da PostImage com o publicado).
-        _im = post.images.order_by('-order').first()
-        if _im:
-            _im.s3_key, _im.s3_url = key, url
-            _im.save(update_fields=['s3_key', 's3_url'])
+    # Atualiza SOMENTE a PostImage do publicado (a versao "editavel") — UMA
+    # linha, nunca as outras versoes da galeria (regra do dono: cada imagem
+    # permanece como foi gerada/corrigida). Sem linha casando, CRIA uma nova
+    # (mesmo padrao do _refresh_editable_post_image do regenerate).
+    _im = (post.images.filter(s3_key=old_key).order_by('-order').first()
+           if old_key else None)
+    if _im:
+        _im.s3_key, _im.s3_url = key, url
+        _im.save(update_fields=['s3_key', 's3_url'])
+    else:
+        from django.db.models import Max as _Max
+        _next = (post.images.aggregate(_Max('order'))['order__max'] or 0) + 1
+        PostImage.objects.create(post=post, s3_key=key, s3_url=url, order=_next)
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
@@ -702,17 +704,19 @@ def _vb_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=out.getvalue(), mime_type='image/png')
-    updated = 0
-    if old_key:
-        updated = PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
-    if not updated:
-        # old_key dessincronizado (saves concorrentes): atualiza a PostImage
-        # mais recente — senao o botao Edicao Avancada SOME (is_editable
-        # compara o s3_key da PostImage com o publicado).
-        _im = post.images.order_by('-order').first()
-        if _im:
-            _im.s3_key, _im.s3_url = key, url
-            _im.save(update_fields=['s3_key', 's3_url'])
+    # Atualiza SOMENTE a PostImage do publicado (a versao "editavel") — UMA
+    # linha, nunca as outras versoes da galeria (regra do dono: cada imagem
+    # permanece como foi gerada/corrigida). Sem linha casando, CRIA uma nova
+    # (mesmo padrao do _refresh_editable_post_image do regenerate).
+    _im = (post.images.filter(s3_key=old_key).order_by('-order').first()
+           if old_key else None)
+    if _im:
+        _im.s3_key, _im.s3_url = key, url
+        _im.save(update_fields=['s3_key', 's3_url'])
+    else:
+        from django.db.models import Max as _Max
+        _next = (post.images.aggregate(_Max('order'))['order__max'] or 0) + 1
+        PostImage.objects.create(post=post, s3_key=key, s3_url=url, order=_next)
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
@@ -750,17 +754,19 @@ def _samsung_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=out.getvalue(), mime_type='image/png')
-    updated = 0
-    if old_key:
-        updated = PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
-    if not updated:
-        # old_key dessincronizado (saves concorrentes): atualiza a PostImage
-        # mais recente — senao o botao Edicao Avancada SOME (is_editable
-        # compara o s3_key da PostImage com o publicado).
-        _im = post.images.order_by('-order').first()
-        if _im:
-            _im.s3_key, _im.s3_url = key, url
-            _im.save(update_fields=['s3_key', 's3_url'])
+    # Atualiza SOMENTE a PostImage do publicado (a versao "editavel") — UMA
+    # linha, nunca as outras versoes da galeria (regra do dono: cada imagem
+    # permanece como foi gerada/corrigida). Sem linha casando, CRIA uma nova
+    # (mesmo padrao do _refresh_editable_post_image do regenerate).
+    _im = (post.images.filter(s3_key=old_key).order_by('-order').first()
+           if old_key else None)
+    if _im:
+        _im.s3_key, _im.s3_url = key, url
+        _im.save(update_fields=['s3_key', 's3_url'])
+    else:
+        from django.db.models import Max as _Max
+        _next = (post.images.aggregate(_Max('order'))['order__max'] or 0) + 1
+        PostImage.objects.create(post=post, s3_key=key, s3_url=url, order=_next)
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
@@ -797,17 +803,19 @@ def _todxs_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=png, mime_type='image/png')
-    updated = 0
-    if old_key:
-        updated = PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
-    if not updated:
-        # old_key dessincronizado (saves concorrentes): atualiza a PostImage
-        # mais recente — senao o botao Edicao Avancada SOME (is_editable
-        # compara o s3_key da PostImage com o publicado).
-        _im = post.images.order_by('-order').first()
-        if _im:
-            _im.s3_key, _im.s3_url = key, url
-            _im.save(update_fields=['s3_key', 's3_url'])
+    # Atualiza SOMENTE a PostImage do publicado (a versao "editavel") — UMA
+    # linha, nunca as outras versoes da galeria (regra do dono: cada imagem
+    # permanece como foi gerada/corrigida). Sem linha casando, CRIA uma nova
+    # (mesmo padrao do _refresh_editable_post_image do regenerate).
+    _im = (post.images.filter(s3_key=old_key).order_by('-order').first()
+           if old_key else None)
+    if _im:
+        _im.s3_key, _im.s3_url = key, url
+        _im.save(update_fields=['s3_key', 's3_url'])
+    else:
+        from django.db.models import Max as _Max
+        _next = (post.images.aggregate(_Max('order'))['order__max'] or 0) + 1
+        PostImage.objects.create(post=post, s3_key=key, s3_url=url, order=_next)
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
