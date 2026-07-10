@@ -60,6 +60,7 @@ def overlay_data(request, post_id):
             'raw_image_url': _get_raw_image_url(post), 'logo_url': '',
             'canvas_w': cw, 'canvas_h': ch, 'font_names': {}, 'font_urls': {},
             'todxs_font_urls': vb_font_urls, 'pipeline': 'vb', 'status': post.status,
+            'palette': _editor_extras(post)[0], 'font_choices': _editor_extras(post)[1],
             'raw_image_s3_key': post.raw_image_s3_key or '', 'background_history_size': 0,
         })
 
@@ -73,6 +74,7 @@ def overlay_data(request, post_id):
             'raw_image_url': _get_raw_image_url(post), 'logo_url': '',
             'canvas_w': 1080, 'canvas_h': 1350, 'font_names': {}, 'font_urls': {},
             'todxs_font_urls': s_font_urls, 'pipeline': 'samsung', 'status': post.status,
+            'palette': _editor_extras(post)[0], 'font_choices': _editor_extras(post)[1],
             'raw_image_s3_key': post.raw_image_s3_key or '', 'background_history_size': 0,
         })
 
@@ -125,6 +127,9 @@ def overlay_data(request, post_id):
         # Tamanho do histórico de imagens de fundo — frontend usa pra
         # mostrar/esconder botão "Voltar imagem anterior".
         'background_history_size': len(history),
+        # Editor: paleta da KB (swatches) + fontes disponiveis (+ Texto)
+        'palette': _editor_extras(post)[0],
+        'font_choices': _editor_extras(post)[1],
     })
 
 
@@ -873,10 +878,72 @@ def _prepare_stickers_for_export(elements: list) -> list:
     return out
 
 
+def _editor_extras(post):
+    """Paleta da KB (swatches no editor) + opcoes de fonte do pipeline
+    (seletor do '+ Texto' / troca de fonte)."""
+    palette = []
+    try:
+        from apps.knowledge.models import KnowledgeBase
+        from apps.posts.tasks import _kb_colors
+        kb = KnowledgeBase.objects.filter(organization=post.organization).first()
+        for c in (_kb_colors(kb) or []):
+            hexv = (c.get('hex') or c.get('cor') or '').strip()
+            if hexv:
+                palette.append({'nome': c.get('nome') or c.get('name') or '', 'hex': hexv})
+    except Exception:
+        logger.exception('[overlay] paleta falhou post=%s', post.pk)
+    pipe = (post.pipeline_used or '')
+    if pipe == 'todxs':
+        fonts = [{'key': 'display', 'label': 'Display (Black)'},
+                 {'key': 'medium', 'label': 'Medium'},
+                 {'key': 'regular', 'label': 'Regular'},
+                 {'key': 'caps_small', 'label': 'Caps (Vinila)'}]
+    elif pipe == 'vb':
+        fonts = [{'key': 'light', 'label': 'Light'},
+                 {'key': 'medium', 'label': 'Medium'},
+                 {'key': 'semibold', 'label': 'SemiBold'}]
+    elif pipe == 'samsung':
+        try:
+            from apps.posts.services.samsung.wireframes import FONT_FILES
+            fonts = [{'key': k, 'label': k.replace('_', ' ').title()} for k in FONT_FILES]
+        except Exception:
+            fonts = []
+    else:
+        fonts = [{'key': 'titulo', 'label': 'Fonte do Título'},
+                 {'key': 'subtitulo', 'label': 'Fonte do Subtítulo'},
+                 {'key': 'cta', 'label': 'Fonte do CTA'}]
+    return palette, fonts
+
+
+
+def _enrich_font_paths(post, elements):
+    """Elementos de texto NOVOS/alterados no editor trazem so `font_key` (o
+    front nao conhece caminhos) — resolve o arquivo p/ o Pillow. Necessario
+    no TODXS (draw le _font_path); vb/samsung resolvem por font_key no draw e
+    o simple resolve via fonts[font_key] no render_layout_document."""
+    if (getattr(post, 'pipeline_used', '') or '') != 'todxs':
+        return elements
+    try:
+        from apps.knowledge.models import KnowledgeBase
+        from apps.posts.services.todxs.pillow_render import resolve_todxs_weights
+        kb = KnowledgeBase.objects.filter(organization=post.organization).first()
+        weights = resolve_todxs_weights(kb) if kb else {}
+        for el in elements or []:
+            if ((el.get('role') or '') in ('titulo', 'subtitulo', 'cta')
+                    and el.get('font_key') and not el.get('_font_path')):
+                p = weights.get(el['font_key'])
+                if p:
+                    el['_font_path'] = p
+    except Exception:
+        logger.exception('[overlay] enrich font paths falhou post=%s', post.pk)
+    return elements
+
+
 def _save_elements(post_pk: int, elements: list) -> None:
     """Grava elementos no banco usando update() direto — evita conflitos de instância."""
     try:
         post = Post.objects.get(pk=post_pk)
+        elements = _enrich_font_paths(post, elements)
         dp = dict(post.designer_payload or {})
         dp['_layout_elements'] = elements
         Post.objects.filter(pk=post_pk).update(designer_payload=dp)

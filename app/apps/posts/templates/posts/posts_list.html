@@ -542,6 +542,7 @@
                     <button type="button" id="btnUndo" title="Desfazer (Ctrl+Z)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">↶ Desfazer</button>
                     <button type="button" id="btnRedo" title="Refazer (Ctrl+Shift+Z)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">↷ Refazer</button>
                     <button type="button" id="btnAddImage" title="Adicionar imagem (sticker)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Imagem</button>
+                    <button type="button" id="btnAddText" title="Adicionar caixa de texto" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Texto</button>
                     <input type="file" id="stickerFileInput" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" style="display:none;">
                 </div>
                 <div id="panelEmpty" style="padding:24px 16px;color:#888;font-size:13px;text-align:center;">
@@ -567,6 +568,12 @@
                         <textarea id="ctrlText" rows="3" style="width:100%;font-size:13px;border:1px solid #ddd;border-radius:4px;padding:6px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
                     </div>
 
+                    <!-- Fonte (familias do pipeline/KB) -->
+                    <div id="ctrlFontWrap" style="margin-bottom:12px;display:none;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Fonte</label>
+                        <select id="ctrlFont" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:6px;font-size:12px;background:#fff;"></select>
+                    </div>
+
                     <!-- Tamanho da fonte -->
                     <div id="ctrlSizeWrap" style="margin-bottom:12px;">
                         <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Tamanho <span id="ctrlSizeVal">55</span>px</label>
@@ -577,6 +584,7 @@
                     <div id="ctrlColorWrap" style="margin-bottom:12px;">
                         <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Cor do texto</label>
                         <input type="color" id="ctrlColor" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                        <div id="paletteSwatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
                     </div>
 
                     <!-- Cor de fundo (CTA com background, grafismo) -->
@@ -586,6 +594,7 @@
                             <button type="button" id="btnRemoveBg" title="Remover fundo" style="border:none;background:none;cursor:pointer;font-size:11px;color:#999;padding:0;">remover</button>
                         </label>
                         <input type="color" id="ctrlBgColor" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                        <div id="paletteBgSwatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
                     </div>
 
                     <!-- Raio (CTA / grafismo) -->
@@ -744,7 +753,7 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260709-active-editavel"></script>
+<script src="{% static 'js/posts.js' %}?v=20260710-texto-paleta"></script>
 
 <script>
 // Inicializar lazyload para imagens dos posts com endpoint correto
@@ -917,6 +926,8 @@ function toggleCarrossel() {
     let titleFont = 'serif', logoUrl = null;
     let fontFamilyByRole = { titulo: 'serif', subtitulo: 'serif', cta: 'serif' };
     let txFamilies = {};  // TODXS: familias por chave de uso (display/regular/caps_small)
+    let editorPalette = [];   // paleta da KB [{nome, hex}] — swatches
+    let fontChoices = [];     // fontes do pipeline [{key, label}] — + Texto
     let currentPipeline = '';
     // History stack para undo/redo. Cada snapshot e um JSON.stringify(elements).
     let history = [];
@@ -994,6 +1005,10 @@ function toggleCarrossel() {
             _updateRestoreBtn(data.background_history_size || 0);
             fontFamilyByRole = _registerPostFonts(postId, data.font_urls || {}, data.font_names || {});
             txFamilies = _registerTodxsFonts(postId, data.todxs_font_urls || {});
+            editorPalette = data.palette || [];
+            fontChoices = data.font_choices || [];
+            _buildPaletteSwatches();
+            _buildFontSelect();
             // Aguarda imagem de fundo carregar — fitContainer depende de naturalWidth/Height
             await new Promise((resolve) => {
                 if (bgEl.complete && bgEl.naturalWidth > 0) return resolve();
@@ -1100,7 +1115,8 @@ function toggleCarrossel() {
             // TODXS: fonte por CHAVE de uso (mesma do Pillow) + leading + quebras fixas.
             const isTodxs = !!(el.font_key && txFamilies[el.font_key]);
             const fam = isTodxs ? txFamilies[el.font_key]
-                                : (fontFamilyByRole[role] || fontFamilyByRole.titulo || 'serif');
+                                : ((el.font_key && fontFamilyByRole[el.font_key])
+                                   || fontFamilyByRole[role] || fontFamilyByRole.titulo || 'serif');
             const alignH = (el.align==='center')?'center':((el.align==='right')?'flex-end':'flex-start');
             Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
                 width:el.width_pct+'%',
@@ -1180,6 +1196,11 @@ function toggleCarrossel() {
         const isImg  = role === 'image';
 
         ctrlTextWrap.style.display    = isText ? 'block' : 'none';
+        ctrlFontWrap.style.display    = (isText && fontChoices.length) ? 'block' : 'none';
+        if (isText && fontChoices.length) {
+            const cur = el.font_key || role;
+            ctrlFont.value = fontChoices.some(f => f.key === cur) ? cur : fontChoices[0].key;
+        }
         ctrlSizeWrap.style.display    = isText ? 'block' : 'none';
         ctrlColorWrap.style.display   = isText ? 'block' : 'none';
         ctrlStyleWrap.style.display   = isText ? 'flex'  : 'none';
@@ -1256,6 +1277,74 @@ function toggleCarrossel() {
         else if (role === 'grafismo') el.cor = ctrlBgColor.value;
         _renderAll();
         _bumpHistoryDebounced();
+    });
+
+    // ── Fonte por elemento (+ Texto / troca) ───────────────────────────────
+    const ctrlFontWrap = document.getElementById('ctrlFontWrap');
+    const ctrlFont = document.getElementById('ctrlFont');
+    function _buildFontSelect() {
+        ctrlFont.innerHTML = '';
+        fontChoices.forEach(f => {
+            const o = document.createElement('option');
+            o.value = f.key; o.textContent = f.label;
+            ctrlFont.appendChild(o);
+        });
+    }
+    ctrlFont.addEventListener('change', () => {
+        if (selectedIdx === null) return;
+        const el = elements[selectedIdx];
+        el.font_key = ctrlFont.value;
+        // caminho antigo nao vale mais — o backend re-resolve pelo font_key
+        delete el._font_path;
+        _renderAll(); _snapshotElements();
+    });
+
+    // ── Swatches da paleta da KB (cor do texto e cor do fundo) ─────────────
+    function _buildPaletteSwatches() {
+        [['paletteSwatches', (hex) => {
+            if (selectedIdx === null) return;
+            elements[selectedIdx].color = hex;
+            ctrlColor.value = _toHex6(hex);
+        }], ['paletteBgSwatches', (hex) => {
+            if (selectedIdx === null) return;
+            const el = elements[selectedIdx];
+            const role = (el.role||'').toLowerCase();
+            if (role === 'cta') el.background_color = hex;
+            else if (role === 'grafismo') el.cor = hex;
+            ctrlBgColor.value = _toHex6(hex);
+        }]].forEach(([id, apply]) => {
+            const box = document.getElementById(id);
+            if (!box) return;
+            box.innerHTML = '';
+            editorPalette.forEach(c => {
+                const d = document.createElement('span');
+                d.title = (c.nome ? c.nome + ' ' : '') + c.hex;
+                d.style.cssText = 'width:22px;height:22px;border-radius:50%;cursor:pointer;'
+                    + 'border:2px solid #fff;box-shadow:0 0 0 1px #ccc;display:inline-block;'
+                    + 'background:' + c.hex + ';';
+                d.addEventListener('click', () => { apply(c.hex); _renderAll(); _snapshotElements(); });
+                box.appendChild(d);
+            });
+        });
+    }
+
+    // ── + Texto: nova caixa de texto ───────────────────────────────────────
+    const btnAddText = document.getElementById('btnAddText');
+    btnAddText.addEventListener('click', () => {
+        if (!currentPostId) return;
+        const defFont = fontChoices.length ? fontChoices[0].key : null;
+        const defColor = (editorPalette[0] && editorPalette[0].hex) || '#FFFFFF';
+        const newEl = {
+            role: 'subtitulo', content: 'Novo texto',
+            x_pct: 8, y_pct: 8, width_pct: 45, height_pct: 10,
+            font_size_pct: 4.5, color: defColor, align: 'left',
+            weight: 'regular', visible: true,
+        };
+        if (defFont) newEl.font_key = defFont;
+        elements.push(newEl);
+        selectedIdx = elements.length - 1;
+        _renderAll(); _updatePanel(); _snapshotElements();
+        statusEl.textContent = 'Caixa de texto adicionada — edite o conteúdo no painel.';
     });
     btnRemoveBg.addEventListener('click', () => {
         if(selectedIdx===null)return;
