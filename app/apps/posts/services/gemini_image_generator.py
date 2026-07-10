@@ -773,10 +773,18 @@ def _build_prompt_text(
                         f'its exact shape, curvature, color and position.'
                     )
                 lines_rf.extend([
-                    'STEP 2: Reproduce those graphic elements in the final artwork with HIGH '
-                    'FIDELITY, exactly as they appear in the attached image. Do NOT invent, '
-                    'approximate, relocate, restyle, or add ANY graphic element that is not '
-                    'present in the reference image.',
+                    'STEP 2: Reproduce ONLY the NON-TEXT graphic elements in the final '
+                    'artwork with HIGH FIDELITY, exactly as they appear in the attached '
+                    'image. Do NOT invent, approximate, relocate, restyle, or add ANY '
+                    'graphic element that is not present in the reference image.',
+                    # TEXTO NAO E GRAFISMO: sem esta exclusao explicita, o comando de
+                    # alta fidelidade acima VENCE a regra generica de no-text e o Gemini
+                    # copia os textos/lockups da arte de referencia para dentro do
+                    # fundo (bug konimagem prod, post 275).
+                    'CRITICAL: TEXT, words, letters, numbers, typography, wordmarks and '
+                    'logos visible in the reference are NOT graphic elements — treat '
+                    'every text/logo area of the reference as EMPTY SPACE and NEVER '
+                    'reproduce any of them.',
                     'ALL graphic elements come strictly from the ATTACHED IMAGE — never from '
                     'imagination or from a text description.',
                 ])
