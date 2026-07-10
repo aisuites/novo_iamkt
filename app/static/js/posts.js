@@ -1281,6 +1281,14 @@
     
     // Imagem pronta
     if (post.imageStatus === 'ready' && post.imagens && post.imagens.length) {
+      // Imagem ativa INICIAL = a PUBLICADA/editavel (is_editable), nao a
+      // primeira da galeria: e ela que representa o post (e que tem o botao
+      // Edicao Avancada). As outras sao versoes/historico.
+      if (post.activeImageIndex === undefined || post.activeImageIndex === null) {
+        const edIdx = post.imagens.findIndex(
+          (it) => it && typeof it === 'object' && it.is_editable);
+        post.activeImageIndex = edIdx >= 0 ? edIdx : 0;
+      }
       const index = Math.max(0, Math.min(post.imagens.length - 1, post.activeImageIndex || 0));
       post.activeImageIndex = index;
 
