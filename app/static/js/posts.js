@@ -1240,6 +1240,47 @@
    * Atualiza área visual do post (imagens, galeria, banners)
    * EXATAMENTE IDÊNTICO ao resumo.html
    */
+  // Vigia do botao "Edicao Avancada": no pipeline simples o transcritor grava
+  // os _layout_elements DEPOIS do image_ready (~15-40s), entao logo apos a
+  // geracao o is_editable ainda e false. Consulta /posts/<id>/json/ a cada 5s
+  // (max 90s) e re-renderiza quando a versao editavel aparecer.
+  const _editableWatchers = {};
+  function _watchEditableFlag(post) {
+    const pid = post.serverId || post.id;
+    if (!pid || _editableWatchers[pid]) return;
+    let tries = 0;
+    _editableWatchers[pid] = setInterval(async () => {
+      tries += 1;
+      if (tries > 18) {
+        clearInterval(_editableWatchers[pid]);
+        delete _editableWatchers[pid];
+        return;
+      }
+      try {
+        const resp = await fetch(`/posts/${pid}/json/`);
+        if (!resp.ok) return;
+        const json = await resp.json();
+        const fresh = json && json.post;
+        const ready = fresh && Array.isArray(fresh.imagens)
+          && fresh.imagens.some((it) => it && typeof it === 'object' && it.is_editable);
+        if (!ready) return;
+        clearInterval(_editableWatchers[pid]);
+        delete _editableWatchers[pid];
+        post.imagens = fresh.imagens;
+        post.status = fresh.status;
+        post.imageStatus = fresh.imageStatus;
+        post.has_image = fresh.has_image;
+        post.activeImageIndex = undefined; // re-seleciona a versao editavel
+        // So re-renderiza se este post continua sendo o exibido no detalhe.
+        const idx = Math.min(postsState.filtered.length - 1, Math.max(0, postsState.page - 1));
+        const current = postsState.filtered[idx];
+        if (current && (current.serverId || current.id) === pid) {
+          updatePostVisual(post);
+        }
+      } catch (e) { /* rede instavel: tenta de novo no proximo tick */ }
+    }, 5000);
+  }
+
   function updatePostVisual(post) {
     if (!post || !dom.postImageFrame || !dom.postGallery) {
       return;
@@ -1444,6 +1485,13 @@
                 if (typeof openArteFinal === 'function') openArteFinal(post.serverId || post.id);
             });
             dom.postImageActions.appendChild(btnArteFinal);
+        } else if (canAdvancedEdit && post.status === 'image_ready'
+                   && !post.imagens.some((it) => it && typeof it === 'object' && it.is_editable)) {
+            // Imagem pronta mas SEM versao editavel ainda: o transcritor grava
+            // os _layout_elements DEPOIS do image_ready (~15-40s). Observa o
+            // backend ate o is_editable virar e re-renderiza — sem isso o
+            // botao so aparecia com um refresh manual.
+            _watchEditableFlag(post);
         }
       }
       return;
