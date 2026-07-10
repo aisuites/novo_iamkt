@@ -753,7 +753,7 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260710-wrap-vivo"></script>
+<script src="{% static 'js/posts.js' %}?v=20260710-logo-centro"></script>
 
 <script>
 // Inicializar lazyload para imagens dos posts com endpoint correto
@@ -1107,7 +1107,7 @@ function toggleCarrossel() {
             dom.src = logoUrl; dom.alt = 'Logo';
             Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
                 width:el.width_pct+'%', height:el.height_pct+'%',
-                objectFit:'contain', objectPosition:'left center', cursor:'pointer' });
+                objectFit:'contain', objectPosition:'center center', cursor:'pointer' });
 
         } else if (role === 'image' && el.url) {
             // Sticker — implementado em fase seguinte
