@@ -1337,8 +1337,14 @@ def _doc_color(img, hex_str, x, y, w, h, paleta):
     return _auto_contrast_color(img, x, y, w, h)
 
 
-def _draw_logo_at(overlay, logo_url, x, y, target_w):
-    """Cola o logo numa posicao (x,y) explicita com largura target_w."""
+def _draw_logo_at(overlay, logo_url, x, y, target_w, target_h=None):
+    """Cola o logo em (x,y) com CONTAIN no box (target_w x target_h).
+
+    target_h e ESSENCIAL quando o bbox veio do transcritor: ele mede o lockup
+    APLICADO na arte (ex.: horizontal), mas o arquivo da KB pode ter OUTRA
+    proporcao (ex.: lockup vertical) — escalar so pela largura explode o logo
+    (bug konimagem prod, post 274). Sem target_h, comportamento historico
+    (escala pela largura)."""
     from io import BytesIO
     from PIL import Image
     try:
@@ -1348,11 +1354,16 @@ def _draw_logo_at(overlay, logo_url, x, y, target_w):
         logo = Image.open(BytesIO(data)).convert('RGBA')
     except Exception:
         return None
-    ratio = target_w / logo.size[0]
-    target_h = max(16, int(logo.size[1] * ratio))
-    logo = logo.resize((max(16, target_w), target_h), Image.LANCZOS)
+    lw, lh = logo.size
+    if target_h and target_h > 0:
+        scale = min(target_w / lw, target_h / lh)   # contain (igual ao modal)
+    else:
+        scale = target_w / lw
+    nw = max(16, int(lw * scale))
+    nh = max(16, int(lh * scale))
+    logo = logo.resize((nw, nh), Image.LANCZOS)
     overlay.alpha_composite(logo, (x, y))
-    return (x, y, target_w, target_h)
+    return (x, y, nw, nh)
 
 
 def _draw_image_at(overlay, img_url, x, y, target_w, target_h):
@@ -1444,6 +1455,7 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
                     overlay, logo_url,
                     _px(el.get('x_pct', 80), W), _px(el.get('y_pct', 4), H),
                     max(48, _px(el.get('width_pct', 14), W)),
+                    target_h=_px(el.get('height_pct', 0), H) or None,
                 )
             except Exception:
                 logger.exception('[layout_doc] falha logo')

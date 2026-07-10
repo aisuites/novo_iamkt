@@ -753,7 +753,7 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260710-texto-paleta"></script>
+<script src="{% static 'js/posts.js' %}?v=20260710-hotfix-modal"></script>
 
 <script>
 // Inicializar lazyload para imagens dos posts com endpoint correto
@@ -926,6 +926,7 @@ function toggleCarrossel() {
     let titleFont = 'serif', logoUrl = null;
     let fontFamilyByRole = { titulo: 'serif', subtitulo: 'serif', cta: 'serif' };
     let txFamilies = {};  // TODXS: familias por chave de uso (display/regular/caps_small)
+    let initialElementsJson = '';  // snapshot da carga — fechar SEM editar nao salva
     let editorPalette = [];   // paleta da KB [{nome, hex}] — swatches
     let fontChoices = [];     // fontes do pipeline [{key, label}] — + Texto
     let currentPipeline = '';
@@ -1000,6 +1001,7 @@ function toggleCarrossel() {
             logoUrl = data.logo_url;
             titleFont = (data.font_names && data.font_names.titulo) || 'serif';
             elements = JSON.parse(JSON.stringify(data.elements));
+            initialElementsJson = JSON.stringify(elements);
             bgEl.src = data.raw_image_url;
             currentRawKey = data.raw_image_s3_key || '';
             _updateRestoreBtn(data.background_history_size || 0);
@@ -1554,15 +1556,22 @@ function toggleCarrossel() {
     async function closeModal() {
         const pid = currentPostId;
         const els = elements.slice();
-        // Pipelines que RE-RENDERIZAM o publicado no save (todxs, vb, samsung):
-        // trava a tela com overlay ate a arte nova carregar no preview.
-        const rerenders = (currentPipeline === 'todxs' || currentPipeline === 'vb' || currentPipeline === 'samsung' || currentPipeline === 'simple') && pid && els && els.length;
+        // DIRTY-CHECK: fechar SEM nenhuma edicao NAO salva nem re-renderiza —
+        // o publicado (ex.: arte do Gemini) so e substituido por acao REAL do
+        // usuario (bug konimagem prod: transcricao imperfeita sobrescrevia a
+        // arte correta ao simplesmente abrir e fechar o modal).
+        const dirty = JSON.stringify(els) !== initialElementsJson;
+        // Pipelines que RE-RENDERIZAM o publicado no save (todxs, vb, samsung,
+        // simple): trava a tela com overlay ate a arte nova carregar no preview.
+        const rerenders = dirty && (currentPipeline === 'todxs' || currentPipeline === 'vb' || currentPipeline === 'samsung' || currentPipeline === 'simple') && pid && els && els.length;
         _stopBgPolling();
         if (rerenders) _showSaveOverlay();
         modal.style.display='none'; document.body.style.overflow='';
         currentPostId=null; selectedIdx=null; currentPipeline='';
         history = []; historyIdx = -1;
+        initialElementsJson = '';
         if (bgRequestBox) bgRequestBox.style.display = 'none';
+        if (!dirty) return;   // nada mudou — nada a persistir
         if (rerenders) {
             await _saveElements(pid, els);
             _hideSaveOverlay();

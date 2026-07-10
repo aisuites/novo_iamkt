@@ -48,6 +48,10 @@ Se houver LOGO na arte final que NÃO está no fundo, meça também:
 
 REGRAS:
 - Compare as duas imagens: transcreva APENAS o que foi ADICIONADO na final.
+- PRECISÃO VERTICAL: y é a distância do TOPO do canvas ao TOPO do bloco.
+  Valide cada y contra os terços da imagem (bloco no terço superior → y < 33;
+  médio → 33-66; inferior → > 66) e confira que os blocos NÃO se sobrepõem:
+  y(subtítulo) ≥ y(título)+h(título); y(cta) ≥ y(subtítulo)+h(subtítulo).
 - Papel ausente na arte → null.
 - Não invente texto; você só mede geometria/cor/alinhamento/peso.
 - Responda SÓ com JSON:
