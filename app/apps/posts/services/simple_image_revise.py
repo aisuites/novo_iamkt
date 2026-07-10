@@ -149,3 +149,54 @@ def edit_image_with_gemini(image_bytes: bytes, edit_prompt: str,
         'usage': {'input_tokens': in_tok, 'output_tokens': 0,
                   'total_tokens': in_tok, 'cost_usd': cost},
     }
+
+_TEXT_GUARD_SYSTEM = (
+    'You inspect an image and answer with ONE word. Question: does the image '
+    'contain ANY readable text, words, letters, numbers, wordmarks or logos '
+    '(anywhere, any size)? Product screens/displays with tiny UI do NOT '
+    'count. Answer strictly YES or NO.'
+)
+
+_BG_CLEANUP_PROMPT = (
+    'Remove ALL text, words, letters, numbers, typography, wordmarks and '
+    'logos from this image. Keep every graphic shape, color band, swoosh, '
+    'curve and ALL photographic content EXACTLY as they are — only erase '
+    'the text/logo pixels, filling those areas with the underlying '
+    'background/graphics. Output an image only, same aspect ratio.'
+)
+
+
+def detect_visible_text(image_bytes: bytes) -> dict:
+    """Guarda de fundo limpo: gpt-4o-mini (visao) responde se ha texto/logo
+    legivel na imagem. Retorna {has_text: bool, usage, model}."""
+    api_key = getattr(settings, 'OPENAI_API_KEY', '') or ''
+    if not api_key:
+        raise RuntimeError('OPENAI_API_KEY ausente')
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
+    b64 = base64.b64encode(image_bytes).decode('ascii')
+    resp = client.chat.completions.create(
+        model=_PROMPT_MODEL,
+        messages=[
+            {'role': 'system', 'content': _TEXT_GUARD_SYSTEM},
+            {'role': 'user', 'content': [
+                {'type': 'image_url',
+                 'image_url': {'url': f'data:image/png;base64,{b64}'}},
+            ]},
+        ],
+        max_tokens=3,
+    )
+    ans = (resp.choices[0].message.content or '').strip().upper()
+    u = getattr(resp, 'usage', None)
+    in_tok = int(getattr(u, 'prompt_tokens', 0) or 0)
+    out_tok = int(getattr(u, 'completion_tokens', 0) or 0)
+    cost = (
+        (Decimal(in_tok) / Decimal(1_000_000)) * _COST_IN_PER_1M
+        + (Decimal(out_tok) / Decimal(1_000_000)) * _COST_OUT_PER_1M
+    )
+    return {
+        'has_text': ans.startswith('YES'),
+        'model': _PROMPT_MODEL,
+        'usage': {'input_tokens': in_tok, 'output_tokens': out_tok,
+                  'total_tokens': in_tok + out_tok, 'cost_usd': float(cost)},
+    }
