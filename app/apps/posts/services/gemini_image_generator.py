@@ -1411,7 +1411,7 @@ def _draw_image_at(overlay, img_url, x, y, target_w, target_h):
 
 
 def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
-                           logo_url=None):
+                           logo_url=None, fit_text=True):
     """
     Renderiza o layout_document (lista de 'divs' do orquestrador) sobre a
     imagem do Gemini. Cada elemento ja traz posicao/tamanho RELATIVOS (%),
@@ -1544,10 +1544,23 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
         # min_size: honra o tamanho calculado pelo layout_engine (start_size é o alvo).
         # Piso absoluto = 60% do start_size ou 12px, o que for maior.
         min_size = max(12, int(start_size * 0.6))
-        font, lines, fit_ok = _fit_text_to_box(
-            rb['content'], rb['fpath'], rb['fb'],
-            max(40, bw - 2 * pad), max_h, start_size, draw, min_size=min_size,
-        )
+        if fit_text:
+            font, lines, fit_ok = _fit_text_to_box(
+                rb['content'], rb['fpath'], rb['fb'],
+                max(40, bw - 2 * pad), max_h, start_size, draw, min_size=min_size,
+            )
+        else:
+            # MODO EDITOR (fit_text=False): o usuario e a autoridade — a fonte
+            # NUNCA muda; caixa mais estreita = MAIS LINHAS (re-wrap). O
+            # flow_y anti-overlap abaixo empurra os blocos seguintes se o
+            # texto crescer alem da caixa (regra do dono, 2026-07-10).
+            from PIL import ImageFont as _IF
+            try:
+                font = _IF.truetype(rb['fpath'] or rb['fb'], start_size)
+            except Exception:
+                font = _IF.truetype(rb['fb'], start_size)
+            lines = _wrap_text(rb['content'], font, max(40, bw - 2 * pad), draw)
+            fit_ok = True
         if not fit_ok:
             logger.warning(
                 '[layout_doc] texto nao coube na caixa (role=%s len=%d max_h_px=%d) '
