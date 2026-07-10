@@ -73,6 +73,10 @@ def _build_prompt(*, textos, briefing, formato_px, has_logo, logo_position,
         'FIDELIDADE DO TEXTO (CRITICO): escreva os textos com EXATIDAO ABSOLUTA, '
         'caractere por caractere, incluindo acentos. NAO traduza, NAO reescreva, NAO '
         'abrevie, NAO corrija.',
+        'DELIMITADORES: os sinais « e » abaixo servem APENAS para delimitar o texto '
+        'exato — NAO fazem parte do texto e NUNCA devem ser desenhados na imagem. '
+        'NAO adicione aspas, parenteses ou qualquer pontuacao que nao esteja DENTRO '
+        'dos delimitadores.',
         '',
         'FONTE (CRITICO): replique EXATAMENTE o desenho de letra mostrado na(s) '
         'imagem(ns)-amostra de fonte anexada(s) ao desenhar os textos. ' + font_labels,

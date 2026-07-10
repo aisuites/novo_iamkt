@@ -48,6 +48,12 @@ Se houver LOGO na arte final que NÃO está no fundo, meça também:
 
 REGRAS:
 - Compare as duas imagens: transcreva APENAS o que foi ADICIONADO na final.
+- USE A GRADE magenta da IMAGEM 2 para LER as coordenadas (linhas a cada
+  10%): localize entre quais linhas cada borda do bloco está e interpole.
+- Meça o y de CADA bloco INDEPENDENTEMENTE na grade — NUNCA derive a posição
+  de um bloco a partir do bbox de outro.
+- O bbox deve ser JUSTO: do topo da PRIMEIRA linha de texto à base da
+  ÚLTIMA linha — sem folga acima/abaixo (bbox inflado desloca os vizinhos).
 - PRECISÃO VERTICAL: y é a distância do TOPO do canvas ao TOPO do bloco.
   Valide cada y contra os terços da imagem (bloco no terço superior → y < 33;
   médio → 33-66; inferior → > 66) e confira que os blocos NÃO se sobrepõem:
@@ -59,6 +65,29 @@ REGRAS:
  "subtitulo": {...} | null,
  "cta": {..., "background_color": "#.."|null, "radius_px": N} | null,
  "logo": {"bbox_pct": {...}} | null}"""
+
+
+def _overlay_measure_grid(png_b64):
+    """Sobrepoe uma GRADE DE MEDICAO (linhas magenta a cada 10% com rotulos)
+    na copia da imagem enviada ao modelo — modelos de visao medem coordenadas
+    com muito mais precisao lendo uma grade visivel do que estimando a olho
+    (bbox do titulo vinha 'gordo' e empurrava o subtitulo — post 260)."""
+    import io
+    from PIL import Image, ImageDraw
+    img = Image.open(io.BytesIO(base64.b64decode(png_b64))).convert('RGB')
+    W, H = img.size
+    d = ImageDraw.Draw(img)
+    mag = (255, 0, 200)
+    for i in range(1, 10):
+        x = int(W * i / 10)
+        y = int(H * i / 10)
+        d.line([(x, 0), (x, H)], fill=mag, width=1)
+        d.line([(0, y), (W, y)], fill=mag, width=1)
+        d.text((x + 3, 3), str(i * 10), fill=mag)
+        d.text((3, y + 3), str(i * 10), fill=mag)
+    buf = io.BytesIO()
+    img.save(buf, 'PNG')
+    return base64.b64encode(buf.getvalue()).decode('ascii')
 
 
 def _fetch_b64(url, max_bytes=4_500_000):
@@ -149,9 +178,13 @@ def transcribe_published_art(post):
             {'type': 'text', 'text': 'IMAGEM 1 — FUNDO sem texto:'},
             {'type': 'image', 'source': {'type': 'base64', 'media_type': raw_mime,
                                          'data': raw_b64}},
-            {'type': 'text', 'text': 'IMAGEM 2 — ARTE FINAL:'},
-            {'type': 'image', 'source': {'type': 'base64', 'media_type': fin_mime,
-                                         'data': fin_b64}},
+            {'type': 'text', 'text': 'IMAGEM 2 — ARTE FINAL (com GRADE DE '
+                                      'MEDIÇÃO magenta sobreposta: linhas a '
+                                      'cada 10%, rótulos nas bordas — a grade '
+                                      'NÃO faz parte da arte):'},
+            # a grade re-encoda a copia em PNG — o media_type acompanha
+            {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/png',
+                                         'data': _overlay_measure_grid(fin_b64)}},
             {'type': 'text', 'text': (
                 f'Canvas: {W}x{H} pixels.\n'
                 f'TEXTOS APLICADOS (por papel):\n{json.dumps(known, ensure_ascii=False)}\n\n'
@@ -223,13 +256,17 @@ def transcribe_published_art(post):
             font_px = _solve_font_px(txt, solve_font,
                                      w_pct / 100.0 * W,
                                      d.get('n_lines'), font_px)
+            # Altura do bloco: CALCULADA (n_linhas x corpo x entrelinha) — a
+            # medida visual vinha inflada e deslocava a percepcao dos vizinhos.
+            n_lines = max(1, int(_clamp(d.get('n_lines'), 1, 8, 1)))
+            h_pct_calc = round(n_lines * font_px * 1.2 / H * 100.0, 2)
             el = {
                 'role': role,
                 'content': txt,   # SEMPRE o texto real do Post, nunca do modelo
                 'x_pct': round(_clamp(bb.get('x'), 0, 98, 5), 2),
                 'y_pct': round(_clamp(bb.get('y'), 0, 98, 5), 2),
                 'width_pct': round(w_pct, 2),
-                'height_pct': round(_clamp(bb.get('h'), 0, 100, 0), 2),
+                'height_pct': h_pct_calc,
                 'font_size_pct': round(font_px / basis * 100.0, 3),
                 'color': (d.get('color') or '#FFFFFF'),
                 'align': (d.get('align') if d.get('align') in ('left', 'center', 'right')
