@@ -1370,8 +1370,13 @@ def _draw_logo_at(overlay, logo_url, x, y, target_w, target_h=None):
     nw = max(16, int(lw * scale))
     nh = max(16, int(lh * scale))
     logo = logo.resize((nw, nh), Image.LANCZOS)
-    overlay.alpha_composite(logo, (x, y))
-    return (x, y, nw, nh)
+    # CENTRALIZA dentro da caixa (regra do dono 2026-07-10): o arquivo pode
+    # ficar mais estreito/baixo que o box apos o contain — sem centralizar,
+    # o logo 'cola' na borda esquerda (post 263).
+    ox = x + max(0, (target_w - nw) // 2)
+    oy = y + (max(0, (int(target_h) - nh) // 2) if target_h else 0)
+    overlay.alpha_composite(logo, (ox, oy))
+    return (ox, oy, nw, nh)
 
 
 def _draw_image_at(overlay, img_url, x, y, target_w, target_h):
