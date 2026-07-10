@@ -116,6 +116,11 @@ def _solve_font_px(text, font_path, box_w_px, n_lines, estimate_px):
     """Resolve GEOMETRICAMENTE o corpo da fonte: maior tamanho cujo texto,
     quebrado por palavra na LARGURA MEDIDA do bloco, cabe em <= n_lines
     (com a TTF REAL da KB — mata o erro de estimativa visual do modelo).
+
+    A estimativa VISUAL do modelo e o TETO (+15%): o solver so pode ENCOLHER
+    para evitar estouro, nunca inflar — quando o texto foi desenhado com
+    FOLGA dentro da caixa medida, "a maior fonte que cabe" e bem maior que a
+    fonte real da arte (caso higge/post 280: subtitulo 5.7% vs 3.2% reais).
     Fallback: estimativa do modelo."""
     try:
         from PIL import Image, ImageDraw, ImageFont
@@ -136,7 +141,11 @@ def _solve_font_px(text, font_path, box_w_px, n_lines, estimate_px):
                 lo = mid + 1
             else:
                 hi = mid - 1
-        return float(best) if best else estimate_px
+        if not best:
+            return estimate_px
+        if estimate_px:
+            return float(min(best, round(float(estimate_px) * 1.15)))
+        return float(best)
     except Exception:
         return estimate_px
 
