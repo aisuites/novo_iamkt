@@ -442,6 +442,45 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
         _log_usage_gemini(post, bg_result.get('model', ''), bg_result.get('cost_usd', 0),
                           bg_result.get('usage'), purpose='gemini_background')
 
+        # ---- GUARDA DE FUNDO LIMPO (deterministica) ----
+        # A referencia de layout pode contaminar o fundo com textos/lockups
+        # MESMO com todas as exclusoes no prompt (o Gemini prioriza a 'alta
+        # fidelidade' da referencia — provado no post 260 dev / 275 prod).
+        # Detecta texto via visao barata e, se houver, roda UMA passada de
+        # limpeza (Gemini edit). Falha da guarda NUNCA derruba a geracao.
+        bg_cleanup_done = False
+        try:
+            from apps.posts.services.simple_image_revise import (
+                detect_visible_text, edit_image_with_gemini, _BG_CLEANUP_PROMPT,
+            )
+            det = detect_visible_text(bg_bytes)
+            _record_ai_usage(post, step='image_generation', model=det['model'],
+                             usage_dict=det['usage'], purpose='bg_text_guard')
+            if det['has_text']:
+                logger.warning('[posts.simple] fundo CONTAMINADO com texto '
+                               'post=%s — rodando limpeza', post_id)
+                cl = edit_image_with_gemini(bg_bytes, _BG_CLEANUP_PROMPT)
+                _log_usage_gemini(post, cl['model'], cl['usage'].get('cost_usd', 0),
+                                  {'promptTokenCount': cl['usage'].get('input_tokens', 0)},
+                                  purpose='gemini_bg_cleanup')
+                # confirma que a limpeza resolveu antes de adotar
+                det2 = detect_visible_text(cl['png_bytes'])
+                _record_ai_usage(post, step='image_generation', model=det2['model'],
+                                 usage_dict=det2['usage'], purpose='bg_text_guard')
+                if not det2['has_text']:
+                    bg_bytes = cl['png_bytes']
+                    bg_cleanup_done = True
+                    logger.info('[posts.simple] fundo limpo com sucesso post=%s', post_id)
+                else:
+                    logger.warning('[posts.simple] limpeza nao removeu todo o '
+                                   'texto post=%s — segue com o fundo limpo '
+                                   'PARCIAL (melhor que o original)', post_id)
+                    bg_bytes = cl['png_bytes']
+                    bg_cleanup_done = True
+        except Exception:
+            logger.exception('[posts.simple] guarda de fundo falhou post=%s '
+                             '(segue com o fundo original)', post_id)
+
         raw_key, raw_url = _upload_image_to_s3(
             org_id=post.organization.id, post_id=post.id,
             png_bytes=bg_bytes, mime_type='image/png',
@@ -543,6 +582,7 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
         'orchestration': orchestration_dbg,
         'scene_prompt_final': scene_prompt,
         'model_bg': bg_result.get('model', ''),
+        'bg_cleanup': bg_cleanup_done,
         'model_final': apply_result['model'],
         # Original do Gemini preservado p/ comparacao no debug (Q1): se o
         # usuario editar, o publicado vira re-render Pillow e substitui
