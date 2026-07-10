@@ -320,7 +320,16 @@ def export_png(request, post_id):
 
 
 _VALID_FONT_ROLES = {'titulo', 'subtitulo', 'cta'}
-_FONTS_CACHE_DIR = Path('/app/fonts_cache')
+# Sandbox dos endpoints de fonte: /app/fonts_cache pode nao ser gravavel
+# (bind mount) e o resolver cai em fallback (/tmp/fonts_cache) — o sandbox
+# precisa aceitar o diretorio REAL usado pelo resolver, senao toda fonte
+# responde 403 e o modal degrada para serif.
+from apps.posts.services.font_resolver import FONTS_CACHE_DIR as _RESOLVER_FONTS_DIR
+_FONTS_CACHE_DIRS = {Path('/app/fonts_cache'), Path(_RESOLVER_FONTS_DIR).resolve()}
+
+
+def _in_fonts_cache(resolved: Path) -> bool:
+    return any(d == resolved or d in resolved.parents for d in _FONTS_CACHE_DIRS)
 
 # Sticker upload — limites e MIME aceitos
 _STICKER_MAX_BYTES = 8 * 1024 * 1024  # 8 MB hard cap
@@ -362,7 +371,7 @@ def todxs_font_file(request, post_id, key):
         return JsonResponse({'error': 'font_missing'}, status=404)
     try:
         resolved = Path(fp).resolve()
-        if _FONTS_CACHE_DIR not in resolved.parents or not resolved.is_file():
+        if not _in_fonts_cache(resolved) or not resolved.is_file():
             return JsonResponse({'error': 'path_forbidden'}, status=403)
     except Exception:
         return JsonResponse({'error': 'invalid_path'}, status=400)
@@ -413,7 +422,7 @@ def font_file(request, post_id, role):
     try:
         # Sandbox: so serve dentro de /app/fonts_cache
         resolved = Path(fp).resolve()
-        if _FONTS_CACHE_DIR not in resolved.parents and resolved != _FONTS_CACHE_DIR:
+        if not _in_fonts_cache(resolved):
             return JsonResponse({'error': 'path_forbidden'}, status=403)
         if not resolved.is_file():
             return JsonResponse({'error': 'file_missing'}, status=404)
