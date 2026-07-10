@@ -753,7 +753,7 @@ window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260710-hotfix-modal"></script>
+<script src="{% static 'js/posts.js' %}?v=20260710-wrap-vivo"></script>
 
 <script>
 // Inicializar lazyload para imagens dos posts com endpoint correto
@@ -1002,6 +1002,20 @@ function toggleCarrossel() {
             titleFont = (data.font_names && data.font_names.titulo) || 'serif';
             elements = JSON.parse(JSON.stringify(data.elements));
             initialElementsJson = JSON.stringify(elements);
+            // Pre-carrega as faces (regular e bold) antes do 1o render — sem
+            // isso o primeiro paint sai no fallback e o PESO parece errado.
+            try {
+                const loads = [];
+                Object.values(fontFamilyByRole).concat(Object.values(txFamilies))
+                    .forEach(f => {
+                        const fam = String(f).split(',')[0].replace(/'/g, '').trim();
+                        if (!fam) return;
+                        loads.push(document.fonts.load(`400 16px "${fam}"`));
+                        loads.push(document.fonts.load(`700 16px "${fam}"`));
+                    });
+                await Promise.race([Promise.all(loads),
+                                    new Promise(r => setTimeout(r, 2500))]);
+            } catch (e) { /* best-effort */ }
             bgEl.src = data.raw_image_url;
             currentRawKey = data.raw_image_s3_key || '';
             _updateRestoreBtn(data.background_history_size || 0);
@@ -1068,13 +1082,9 @@ function toggleCarrossel() {
         requestAnimationFrame(_fitTextToBoxes);
     }
     function _fitTextToBoxes() {
-        overlay.querySelectorAll('[data-fit="1"]').forEach(function (dom) {
-            if (!dom.clientHeight) return;  // modal ainda nao layoutado: nao encolher
-            var guard = 0, fs = parseFloat(dom.style.fontSize) || 0;
-            while (dom.scrollHeight > dom.clientHeight + 1 && fs > 8 && guard < 240) {
-                fs -= 1; dom.style.fontSize = fs + 'px'; guard++;
-            }
-        });
+        // DESATIVADO (2026-07-10): o encolhedor replicava o antigo auto-fit do
+        // Pillow e fazia o texto DIMINUIR ao estreitar a caixa no modal —
+        // divergindo do publicado (fit_text=False: fonte fixa, so re-quebra).
     }
 
     function _renderOne(el, idx) {
@@ -1128,7 +1138,12 @@ function toggleCarrossel() {
                 cursor:'pointer', userSelect:'none',
                 boxSizing:'border-box', whiteSpace: isTodxs ? 'pre' : 'pre-line' });
             // TODXS ja vem com tamanho/quebra calculados -> NAO re-encolher nem re-quebrar.
-            if (el.height_pct && !isTodxs) dom.style.height = el.height_pct + '%';
+            // Texto comum: altura declarada como MINIMO (o bloco cresce com as
+            // quebras — igual ao publicado); CTA usa altura exata (pill).
+            if (el.height_pct && !isTodxs) {
+                if (role === 'cta') dom.style.height = el.height_pct + '%';
+                else dom.style.minHeight = el.height_pct + '%';
+            }
             // CTA unificado: background_color + radius_pct + padding (so o CTA pinta fundo)
             if (role==='cta' && el.background_color) {
                 dom.style.background = el.background_color;
@@ -1146,9 +1161,12 @@ function toggleCarrossel() {
                 dom.style.justifyContent='center';
                 dom.style.alignItems = (role==='cta') ? 'center' : alignH;
             }
-            // REGRA PILLOW: encolher-pra-caber (fluxo simples). TODXS NAO: o tamanho
-            // ja vem calculado pelo compute_layout — re-encolher quebraria a paridade.
-            if (el.height_pct && !isTodxs) { dom.dataset.fit = '1'; dom.style.overflow = 'hidden'; }
+            // REGRA DO EDITOR (2026-07-10): a fonte do usuario e LEI — NUNCA
+            // encolher para caber. Caixa mais estreita = mais linhas (o wrap
+            // do proprio browser); altura declarada e guia de fluxo, nao clip
+            // (espelha o publicado com fit_text=False). CTA (pill) mantem o
+            // clip visual do fundo, mas tambem sem encolher fonte.
+            if (role==='cta' && el.background_color) dom.style.overflow = 'hidden';
             dom.textContent = el.content || '';
             // Texto VERTICAL (rotacionado): edita como texto, mas exibe girado.
             // bbox (width_pct/height_pct) = caixa JA rotacionada na tela.
