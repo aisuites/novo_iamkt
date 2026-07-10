@@ -30,6 +30,7 @@ urlpatterns = [
     path('reference/create/', views_upload.create_reference_image, name='reference_create'),
     
     # Ações de Posts
+    path('<int:post_id>/json/', views.post_json, name='post_json'),
     path('<int:post_id>/reject/', views_actions.reject_post, name='reject'),
     path('<int:post_id>/regenerate/', views_actions.regenerate_post, name='regenerate'),
     path('<int:post_id>/retry/', views_actions.retry_post, name='retry'),
