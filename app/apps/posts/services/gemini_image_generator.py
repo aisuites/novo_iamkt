@@ -728,8 +728,14 @@ def _build_prompt_text(
             '(NOTE: the scene below may mention text blocks, titles, CTAs or '
             'logos — treat ALL of those ONLY as RESERVED EMPTY SPACE (clean '
             'negative space in the described position/size). Do NOT render '
-            'any text, letters, numbers, typography or logos — they are '
-            'added later in post-production.)\n\n' + image_prompt_text
+            'any text, letters, numbers, typography or logos, and do NOT '
+            'render any BUTTON or CTA-like shape (pill, rounded rectangle, '
+            'badge, banner strip) — text AND buttons are added later in '
+            'post-production. EXCEPTION: text that is PHYSICALLY PRINTED on '
+            'a real-world object in the scene — product labels, packaging, '
+            'signage that is part of a referenced product — is part of that '
+            'object and MUST be preserved with fidelity.)\n\n'
+            + image_prompt_text
         )
     inline_anchored = _scene_has_inline_anchoring(image_prompt_text)
 
@@ -785,6 +791,14 @@ def _build_prompt_text(
                     'logos visible in the reference are NOT graphic elements — treat '
                     'every text/logo area of the reference as EMPTY SPACE and NEVER '
                     'reproduce any of them.',
+                    # BOTAO/CTA NAO E GRAFISMO: sem esta exclusao o comando de alta
+                    # fidelidade copia o PILL do CTA da arte de referencia como
+                    # "retangulo arredondado" vazio no fundo (bug higge post 283).
+                    'CRITICAL: BUTTONS and CTA shapes (pills, rounded rectangles '
+                    'behind text, badges, banner strips) visible in the reference are '
+                    'NOT graphic elements either — they are UI added in '
+                    'post-production. Treat their areas as EMPTY SPACE and NEVER '
+                    'draw an empty button-like shape in the background.',
                     'ALL graphic elements come strictly from the ATTACHED IMAGE — never from '
                     'imagination or from a text description.',
                 ])
@@ -856,7 +870,11 @@ def _build_prompt_text(
               [f'- Typography: {json.dumps(tipografia, ensure_ascii=False)}',
                '- Apply palette and typography ONLY to post text — not to referenced items.']),
             *(['- ABSOLUTELY NO text, letters, numbers, logos or typography in '
-               'this image — it is a clean background; text is added later.']
+               'this image — it is a clean background; text is added later. '
+               'Also NO button/CTA-like shapes (empty pills, rounded '
+               'rectangles, badges). EXCEPTION: text physically printed on a '
+               'referenced PRODUCT (label, packaging) is part of the product '
+               'identity and MUST be kept faithful.']
               if text_render_mode == 'pillow' else []),
             '- Do not copy text visible inside reference images.',
             '- If no people in references, do not add people.',

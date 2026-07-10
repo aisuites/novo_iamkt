@@ -468,13 +468,14 @@ def regenerate_background(request, post_id):
         return JsonResponse({
             'error': f'Limite de alterações de imagem atingido ({usadas}/{max_rev})',
         }, status=400)
-    PostChangeRequest.objects.create(
+    cr = PostChangeRequest.objects.create(
         post=post, message=message, change_type='image', is_initial=False,
         requester_email=getattr(request.user, 'email', '') or '',
     )
 
     from apps.posts.tasks import regenerate_background_task
-    regenerate_background_task.delay(post.id, message)
+    # cr.id vai junto: em falha a task ESTORNA a cota (deleta este registro).
+    regenerate_background_task.delay(post.id, message, cr.id)
     return JsonResponse({
         'success': True,
         'status': 'queued',

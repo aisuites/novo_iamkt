@@ -152,16 +152,24 @@ def edit_image_with_gemini(image_bytes: bytes, edit_prompt: str,
 
 _TEXT_GUARD_SYSTEM = (
     'You inspect an image and answer with ONE word. Question: does the image '
-    'contain ANY readable text, words, letters, numbers, wordmarks or logos '
-    '(anywhere, any size)? Product screens/displays with tiny UI do NOT '
-    'count. Answer strictly YES or NO.'
+    'contain any OVERLAY/DESIGN text — words, letters, numbers, wordmarks or '
+    'logos rendered ON TOP of the image as graphic design (headlines, '
+    'captions, watermarks, floating logos)? Text that is PHYSICALLY PART of '
+    'a real-world object in the photo does NOT count: product labels, '
+    'packaging, bottle/pouch print, store signage, screens/displays. '
+    'Answer strictly YES or NO.'
 )
 
 _BG_CLEANUP_PROMPT = (
-    'Remove ALL text, words, letters, numbers, typography, wordmarks and '
-    'logos from this image. Keep every graphic shape, color band, swoosh, '
+    'Remove ALL overlay/design text from this image: words, letters, '
+    'numbers, typography, wordmarks and logos rendered ON TOP of the image '
+    'as graphic design (headlines, captions, floating logos, watermarks). '
+    'DO NOT touch text that is physically printed on real-world objects in '
+    'the photo — product labels, packaging, bottle/pouch print, store '
+    'signage, screens: those are part of the product identity and MUST stay '
+    'EXACTLY as they are. Keep every graphic shape, color band, swoosh, '
     'curve and ALL photographic content EXACTLY as they are — only erase '
-    'the text/logo pixels, filling those areas with the underlying '
+    'the overlay text/logo pixels, filling those areas with the underlying '
     'background/graphics. Output an image only, same aspect ratio.'
 )
 

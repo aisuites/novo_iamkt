@@ -893,7 +893,39 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
     max_retries=1,
     default_retry_delay=30,
 )
-def regenerate_background_task(self, post_id: int, message: str):
+def regenerate_background_task(self, post_id: int, message: str,
+                               change_request_id=None):
+    """Wrapper: roda a alteracao de fundo e, em FALHA, estorna a cota
+    (deleta o PostChangeRequest criado pela view) e grava last_error no ctx
+    para o card do post exibir — sem isso a falha era silenciosa e consumia
+    a cota do usuario (post 281, Gemini 429 por credito esgotado)."""
+    result = _regenerate_background_impl(post_id, message)
+    from apps.posts.models import Post as _P, PostChangeRequest as _PCR
+    _ERR_MSG = ('Alteração da imagem de fundo falhou (serviço de imagem '
+                'indisponível). A solicitação não consumiu sua cota — '
+                'tente novamente.')
+    try:
+        p = _P.objects.get(id=post_id)
+        ctx = dict(p.local_pipeline_context or {})
+        if (result or {}).get('success'):
+            if ctx.get('last_error') == _ERR_MSG:
+                ctx.pop('last_error', None)
+                p.local_pipeline_context = ctx
+                p.save(update_fields=['local_pipeline_context'])
+        else:
+            if change_request_id:
+                _PCR.objects.filter(id=change_request_id, post_id=post_id).delete()
+                logger.info('[regen_bg] cota estornada post=%s cr=%s',
+                            post_id, change_request_id)
+            ctx['last_error'] = _ERR_MSG
+            p.local_pipeline_context = ctx
+            p.save(update_fields=['local_pipeline_context'])
+    except Exception:
+        logger.exception('[regen_bg] falha no estorno/last_error post=%s', post_id)
+    return result
+
+
+def _regenerate_background_impl(post_id: int, message: str):
     """
     Regera APENAS a imagem de fundo (sem texto) usando o Gemini com a imagem
     atual + a mensagem do usuario como ajuste. Nao altera _layout_elements,
