@@ -944,17 +944,39 @@ def regenerate_background_task(self, post_id: int, message: str):
         logger.error('[regen_bg] falha baixar imagem atual post=%s', post_id)
         return {'success': False, 'error': 'download_failed'}
 
-    # 2. Monta prompt: simples e direto
+    # 2. Prompt de edicao ENGENHEIRADO (gpt-4o-mini visao — o MESMO agente do
+    # fluxo de alteracao da pagina): a frase crua do usuario em PT rende
+    # edicoes fracas no Gemini (ex.: 'equipamento 50% menor' ignorado).
+    # Fallback: mensagem crua se o agente falhar.
     user_msg = (message or '').strip()
-    prompt_text = (
-        'Modify the attached image according to the user request below. '
-        'Keep the same subject, composition style and brand feel — apply ONLY the requested change.\n\n'
-        f'USER REQUEST (Portuguese): "{user_msg}"\n\n'
-        'STRICT RULES:\n'
-        '- Output an image only. No text, no typography, no letters, no logos anywhere.\n'
-        '- Keep the aspect ratio of the original image.\n'
-        '- Preserve identity of any product or person visible in the attached image.\n'
-    )
+    edit_core = ''
+    try:
+        from apps.posts.services.simple_image_revise import generate_edit_prompt
+        a = generate_edit_prompt(_b64.b64decode(cur_b64), user_msg)
+        edit_core = (a.get('prompt') or '').strip()
+        _record_ai_usage(post, step='image_generation', model=a.get('model', ''),
+                         usage_dict=a.get('usage') or {},
+                         purpose='regen_bg_edit_prompt')
+    except Exception:
+        logger.exception('[regen_bg] agente de edit-prompt falhou — usa msg crua')
+    if edit_core:
+        prompt_text = (
+            f'{edit_core}\n\n'
+            'STRICT RULES:\n'
+            '- Output an image only. No text, no typography, no letters, no logos anywhere.\n'
+            '- Keep the aspect ratio of the original image.\n'
+            '- Preserve identity of any product or person visible in the attached image.\n'
+        )
+    else:
+        prompt_text = (
+            'Modify the attached image according to the user request below. '
+            'Keep the same subject, composition style and brand feel — apply ONLY the requested change.\n\n'
+            f'USER REQUEST (Portuguese): "{user_msg}"\n\n'
+            'STRICT RULES:\n'
+            '- Output an image only. No text, no typography, no letters, no logos anywhere.\n'
+            '- Keep the aspect ratio of the original image.\n'
+            '- Preserve identity of any product or person visible in the attached image.\n'
+        )
 
     api_key = _os.environ.get('GEMINI_API_KEY')
     if not api_key:
@@ -1072,13 +1094,31 @@ def _refresh_editable_post_image(post):
         logger.info('[regen_bg] post sem _layout_elements, pula refresh')
         return
 
-    # TODXS: re-render com o renderizador DETERMINISTICO (draw_todxs), igual a
-    # geracao e ao editor — nao o HTML/Playwright generico (que nao reproduz a
-    # faixa/center_v/fixed_fs do todxs e quebra o layout no download).
-    if getattr(post, 'pipeline_used', '') == 'todxs':
+    # Pipelines com renderizador DETERMINISTICO proprio: usar o MESMO motor
+    # do save/export do editor (licao de junho: Playwright divergia — e no
+    # celery o launch do browser FALHA, deixando o publicado sem refresh:
+    # bug do post 258, 'alteracao nao aconteceu'). Playwright fica so p/ o
+    # pipeline local legado.
+    _pipe = getattr(post, 'pipeline_used', '') or ''
+    if _pipe == 'todxs':
         from apps.posts.views_overlay import _todxs_rerender_published
         _todxs_rerender_published(post, els)
         logger.info('[regen_bg] PostImage todxs re-renderizada via draw_todxs post=%s', post.id)
+        return
+    if _pipe == 'simple':
+        from apps.posts.views_overlay import _simple_rerender_published
+        _simple_rerender_published(post, els)
+        logger.info('[regen_bg] PostImage simple re-renderizada via render_layout_document post=%s', post.id)
+        return
+    if _pipe == 'vb':
+        from apps.posts.views_overlay import _vb_rerender_published
+        _vb_rerender_published(post, els)
+        logger.info('[regen_bg] PostImage vb re-renderizada post=%s', post.id)
+        return
+    if _pipe == 'samsung':
+        from apps.posts.views_overlay import _samsung_rerender_published
+        _samsung_rerender_published(post, els)
+        logger.info('[regen_bg] PostImage samsung re-renderizada post=%s', post.id)
         return
 
     raw_url = _get_raw_image_url(post)
