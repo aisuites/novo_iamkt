@@ -35,6 +35,7 @@ class PostAdmin(admin.ModelAdmin):
         'title',
         'social_network',
         'content_type',
+        'pipeline_used',
         'status',
         'user',
         'organization',
@@ -44,6 +45,7 @@ class PostAdmin(admin.ModelAdmin):
     ]
     list_filter = [
         'status',
+        'pipeline_used',
         'social_network',
         'content_type',
         'is_carousel',

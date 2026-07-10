@@ -524,15 +524,8 @@ def build_singleshot_prompt(archetype: str, content: dict, color_hex: str,
 
 def _contrast_on(hex_color: str) -> str:
     """Preto ou off-white conforme a luminancia do fundo (campo/faixa)."""
-    h = (hex_color or '#000000').lstrip('#')
-    if len(h) == 3:
-        h = ''.join(c * 2 for c in h)
-    try:
-        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
-    except Exception:
-        return '#000000'
-    lum = 0.299 * r + 0.587 * g + 0.114 * b
-    return '#000000' if lum > 150 else '#F4F1D9'
+    from apps.posts.services.artkit.text import contrast_on
+    return contrast_on(hex_color)
 
 
 def _text_el(z, content_text, color_hex, *, y=None, h=None):

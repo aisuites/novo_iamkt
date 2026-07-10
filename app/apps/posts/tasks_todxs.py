@@ -47,7 +47,7 @@ def generate_post_todxs_task(self, post_id: int):
     )
     from apps.posts.services.gemini_image_generator import _download_to_base64
     from apps.posts.services.todxs.skill_brain import run_skill_brain
-    from apps.posts.services.todxs.gemini_singleshot import generate_singleshot
+    from apps.posts.services.artkit.gemini import generate_singleshot
     from apps.posts.services.todxs import assets as todxs_assets
 
     post = Post.objects.get(id=post_id)
@@ -118,6 +118,8 @@ def generate_post_todxs_task(self, post_id: int):
         'color_name': color_name,
         'color_hex': color_hex,
         'content': content,
+        'caption': structured.get('caption') or '',
+        'hashtags': structured.get('hashtags') or [],
         'reference_id': structured.get('reference_id'),
         'reference_usage': structured.get('reference_usage'),
         'formato_label': formato_label,
@@ -134,12 +136,104 @@ def generate_post_todxs_task(self, post_id: int):
     _record_ai_usage(post, step='text_generation', model=brain.get('model'),
                      usage_dict=brain.get('usage') or {}, purpose='todxs_skill_brain')
 
+    # ---------------- PORTAO (duas etapas — flag por org, C1) ----------------
+    # Etapa A termina aqui: persiste os textos nos campos do Post (a UI do
+    # portao e a MESMA do simple: title/subtitle/caption/hashtags/descricao da
+    # imagem editaveis) e para em 'pending'. A Etapa B (render_post_todxs_task)
+    # roda quando o usuario dispara "Gerar Imagem".
+    if getattr(org, 'archetype_two_step', False):
+        from apps.posts.services.todxs.wireframes import (
+            background_mode as _bgm, build_background_prompt as _bgp,
+        )
+        _titulo_gate = content.get('titulo') or (content.get('blocos') or [''])[0] or ''
+        post.title = str(_titulo_gate).replace('\n', ' ') or post.title
+        post.subtitle = content.get('apoio') or content.get('kicker') or ''
+        post.caption = structured.get('caption') or ''
+        post.hashtags = structured.get('hashtags') or []
+        # Descricao da imagem editavel no portao = o prompt REAL do fundo.
+        # Com foto ESCOLHIDA pelo usuario (upload/ref) nao ha descricao: a
+        # imagem nao sera gerada por IA (campo vazio -> portao esconde).
+        from apps.posts.services.artkit.photo_source import has_user_photo
+        if (_bgm(archetype) in ('photo', 'solid_photo', 'image')
+                and not has_user_photo(post)):
+            post.image_prompt = _bgp(archetype, content, color_hex, fmt,
+                                     brand_summary=brand.get('kb_summary') or '')
+        else:
+            post.image_prompt = ''
+        # Mapa portao->zona: a Etapa B devolve as edicoes do usuario as zonas.
+        # (blocos/lista nao mapeia edicao de title — limitacao documentada v1)
+        todxs_ctx['gate_map'] = {
+            'title': 'titulo' if content.get('titulo') else None,
+            'subtitle': ('apoio' if content.get('apoio')
+                         else ('kicker' if content.get('kicker') else None)),
+        }
+        todxs_ctx['gate'] = {'stage': 'awaiting_approval',
+                             'at': dj_tz.now().isoformat()}
+        ctx['todxs'] = todxs_ctx
+        post.local_pipeline_context = ctx
+        post.status = 'pending'
+        post.save()
+        logger.info('[todxs] post=%s PORTAO: textos prontos (arquetipo=%s) — '
+                    'aguardando aprovacao do usuario', post_id, archetype)
+        return {'success': True, 'post_id': post_id, 'gate': True,
+                'archetype': archetype}
+
+    return _todxs_render_stage(self, post_id)
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=30)
+def render_post_todxs_task(self, post_id: int):
+    """Etapa B do portao (C1): renderiza apos a aprovacao do usuario, com as
+    EDICOES feitas no pending (title/subtitle/caption/hashtags/image_prompt)."""
+    return _todxs_render_stage(self, post_id, from_gate=True)
+
+
+def _todxs_render_stage(task, post_id: int, from_gate: bool = False):
+    """Etapas 2+3 (fundo + render Pillow + persistencia) — comum a etapa unica
+    e ao portao. Le TUDO do ctx persistido pela etapa 1; quando from_gate=True,
+    as edicoes do usuario no portao prevalecem sobre o output do brain."""
+    from apps.posts.models import Post
+    from apps.knowledge.models import KnowledgeBase
+    from apps.posts.tasks import (
+        _kb_colors, _build_kb_summary, _logos_from_org, _record_ai_usage,
+    )
+    from apps.posts.services.gemini_image_generator import _download_to_base64
+    from apps.posts.services.artkit.gemini import generate_singleshot
+    from apps.posts.services.todxs import assets as todxs_assets
+    from apps.posts.services.todxs.catalog import apply_org_wireframes
     from apps.posts.services.todxs.wireframes import (
-        WF, archetypes_for_format, background_mode,
-        build_singleshot_prompt, build_background_prompt,
+        WF, archetypes_for_format, background_mode, build_background_prompt,
     )
     from apps.posts.services.todxs import pillow_render
-    from django.db.models import Max
+
+    post = Post.objects.get(id=post_id)
+    org = post.organization
+    kb = KnowledgeBase.objects.filter(organization=org).first()
+    apply_org_wireframes(org)
+
+    ctx = post.local_pipeline_context or {}
+    todxs_ctx = ctx.get('todxs') or {}
+    trace = todxs_ctx.get('trace') or []
+    fmt, formato_label, ratio_label, formato_px = _formato_meta(post)
+
+    content = dict(todxs_ctx.get('content') or {})
+    archetype = (todxs_ctx.get('archetype') or '').strip().upper()
+    color_hex = todxs_ctx.get('color_hex') or '#000000'
+    caption = todxs_ctx.get('caption') or ''
+    hashtags = todxs_ctx.get('hashtags') or []
+    structured = {'caption': caption, 'hashtags': hashtags}
+
+    if from_gate:
+        # Edicoes do portao voltam as zonas / metadados
+        gm = todxs_ctx.get('gate_map') or {}
+        if gm.get('title') and (post.title or '').strip():
+            content[gm['title']] = post.title.strip()
+        if gm.get('subtitle') and (post.subtitle or '').strip():
+            content[gm['subtitle']] = post.subtitle.strip()
+        structured['caption'] = post.caption or caption
+        structured['hashtags'] = post.hashtags or hashtags
+        todxs_ctx['content'] = content
+        todxs_ctx['gate'] = {'stage': 'approved', 'at': dj_tz.now().isoformat()}
 
     if archetype not in WF() or archetype not in archetypes_for_format(fmt):
         archetype = archetypes_for_format(fmt)[0]  # fallback seguro
@@ -163,13 +257,32 @@ def generate_post_todxs_task(self, post_id: int):
         logo_url = logos[0] if logos else None
 
     # ---------------- Etapa 2: FUNDO ----------------
-    # solid -> Pillow desenha o campo de cor; photo/solid_photo/image -> Gemini gera
-    # a foto/cena (sem texto), e o Pillow aplica faixa/texto por cima.
+    # Prioridade da foto (C1.6, escolha feita NO MODAL): upload do usuario
+    # (adaptada pelo render a regiao/tratamento do arquetipo) > ref da KB
+    # selecionada > Gemini gera. 'image' (peca inteira, ex. D/F) segue SEMPRE
+    # Gemini — nao e foto crua, e a arte completa.
     photo_png = None
     bg_info = {'mode': mode}
-    if mode in ('photo', 'solid_photo', 'image'):
-        bg_prompt = build_background_prompt(
-            archetype, content, color_hex, fmt, brand_summary=brand.get('kb_summary') or '')
+    if mode in ('photo', 'solid_photo'):
+        from apps.posts.services.artkit.photo_source import resolve_user_photo
+        photo_png, _photo_origin = resolve_user_photo(post, kb)
+        if photo_png:
+            bg_info['origin'] = _photo_origin
+            # Tratamento que o GEMINI faria via prompt vira Pillow quando a
+            # foto e do usuario: duotone monocromatico na cor (ex.: B_DUO).
+            if (WF().get(archetype) or {}).get('gemini_duotone'):
+                from apps.posts.services.artkit.image import duotone_bytes
+                photo_png = duotone_bytes(photo_png, color_hex)
+                bg_info['treatment'] = 'duotone_pillow'
+            logger.info('[todxs] post=%s foto do usuario (%s) — Gemini pulado',
+                        post_id, _photo_origin)
+    if photo_png is None and mode in ('photo', 'solid_photo', 'image'):
+        # Descricao editada no portao prevalece; senao constroi do wireframe.
+        bg_prompt = (post.image_prompt or '').strip() if from_gate else ''
+        if not bg_prompt:
+            bg_prompt = build_background_prompt(
+                archetype, content, color_hex, fmt,
+                brand_summary=_build_kb_summary(org) or '')
         try:
             bg = generate_singleshot(prompt_text=bg_prompt, image_inputs=[])
             photo_png = bg['png_bytes']
@@ -180,58 +293,56 @@ def generate_post_todxs_task(self, post_id: int):
                              images_generated=1)
         except Exception as exc:
             logger.exception('[todxs] fundo (Gemini) falhou post=%s', post_id)
-            raise self.retry(exc=exc)
+            raise task.retry(exc=exc)
 
     # ---------------- Etapa 3: PILLOW (render publicado) ----------------
+    # ENGINE V3 (flag por org): converte a spec ativa on-the-fly e renderiza
+    # pelo motor único. Paridade pixel provada (goldens 9/9). Desligar a flag
+    # = volta instantâneo ao render dedicado.
+    engine_used = 'legacy'
     try:
-        pr = pillow_render.render_todxs(
-            archetype=archetype, content=content, color_hex=color_hex, fmt=fmt,
-            formato_px=formato_px, kb=kb, paleta=paleta,
-            photo_png=photo_png, x_png_bytes=x_png_bytes, logo_url=logo_url,
-        )
+        if getattr(org, 'archetype_engine_v3', False):
+            pr = pillow_render.render_todxs_v3(
+                archetype=archetype, content=content, color_hex=color_hex,
+                fmt=fmt, kb=kb, photo_png=photo_png,
+                x_png_bytes=x_png_bytes, logo_url=logo_url,
+            )
+            engine_used = 'v3'
+        else:
+            pr = pillow_render.render_todxs(
+                archetype=archetype, content=content, color_hex=color_hex, fmt=fmt,
+                formato_px=formato_px, kb=kb, paleta=paleta,
+                photo_png=photo_png, x_png_bytes=x_png_bytes, logo_url=logo_url,
+            )
     except Exception as exc:
-        logger.exception('[todxs] pillow render falhou post=%s', post_id)
-        raise self.retry(exc=exc)
+        logger.exception('[todxs] pillow render falhou post=%s (engine=%s)',
+                         post_id, engine_used)
+        raise task.retry(exc=exc)
 
-    raw_key, raw_url = _upload_image_to_s3(
-        org_id=org.id, post_id=post.id, png_bytes=pr['raw_png'], mime_type='image/png')
-    s3_key, s3_url = _upload_image_to_s3(
-        org_id=org.id, post_id=post.id, png_bytes=pr['final_png'], mime_type='image/png')
-
-    # ---------------- Persistencia ----------------
-    max_order = post.images.aggregate(Max('order'))['order__max']
-    PostImage.objects.create(
-        post=post, s3_key=s3_key, s3_url=s3_url,
-        order=(max_order if max_order is not None else -1) + 1,
+    # ---------------- Persistencia (nucleo comum: artkit.persist) ----------------
+    from apps.posts.services.artkit.persist import persist_rendered_art
+    up = persist_rendered_art(
+        post,
+        raw_png=pr['raw_png'], final_png=pr['final_png'], elements=pr['elements'],
+        title=(_titulo or '').replace('\n', ' ') or post.title,
+        subtitle=content.get('apoio') or content.get('kicker') or '',
+        caption=structured.get('caption') or '',
+        hashtags=structured.get('hashtags') or [],
+        image_prompt=f"TODXS arquetipo {archetype} ({fmt}) — render Pillow deterministico",
+        ia_model_image='todxs-pillow',
     )
-
-    # designer_payload -> a edicao avancada (canvas modal) consome estes elementos
-    dp = post.designer_payload if isinstance(post.designer_payload, dict) else {}
-    dp['_layout_elements'] = pr['elements']
-    post.designer_payload = dp
-    post.raw_image_s3_key = raw_key
+    raw_key, raw_url = up['raw_key'], up['raw_url']
+    s3_key, s3_url = up['s3_key'], up['s3_url']
 
     trace.append({'etapa': '2_background', **bg_info,
                   'raw_s3_key': raw_key, 'raw_url': raw_url, 'at': dj_tz.now().isoformat()})
-    trace.append({'etapa': '3_pillow_render', 'elements': pr['elements'],
+    trace.append({'etapa': '3_pillow_render', 'engine': engine_used,
+                  'elements': pr['elements'],
                   'fonts': pr['fonts_resolved'], 'final_s3_key': s3_key,
                   'final_url': s3_url, 'at': dj_tz.now().isoformat()})
 
     # imagens p/ inspecao no debug (sem Gemini-texto: o render e 100% Pillow)
     todxs_ctx['debug_images'] = {'fundo': raw_url, 'gemini_texto': None, 'pillow': s3_url}
-
-    post.title = (_titulo or '').replace('\n', ' ') or post.title
-    post.subtitle = content.get('apoio') or content.get('kicker') or ''
-    post.caption = structured.get('caption') or ''
-    post.hashtags = structured.get('hashtags') or []
-    post.image_prompt = f"TODXS arquetipo {archetype} ({fmt}) — render Pillow deterministico"
-    post.image_s3_key = s3_key
-    post.image_s3_url = s3_url
-    post.has_image = True
-    post.ia_model_image = 'todxs-pillow'
-    existing = post.generated_images if isinstance(post.generated_images, list) else []
-    existing.append({'s3_key': s3_key, 'url': s3_url})
-    post.generated_images = existing
 
     todxs_ctx['trace'] = trace
     ctx['todxs'] = todxs_ctx

@@ -37,21 +37,14 @@ _NON_EXCLUSIVE = {'produto', 'pessoa_modelo'}
 @require_http_methods(['POST'])
 def gerar_post_simples(request):
     """Cria Post com pipeline_used='simple' e dispara generate_post_simple_task."""
-    # Delegacao TODXS: a org slug='todxs' segue um fluxo exclusivo e isolado
-    # (skill todxs-social-posts). Nenhuma outra org muda de comportamento.
-    if getattr(request.user, 'organization', None) and request.user.organization.slug == 'todxs':
-        from .views_gerar_todxs import gerar_post_todxs
-        return gerar_post_todxs(request)
-
-    # Delegacao VB Gastronomia: fluxo exclusivo e isolado (arquetipos VB).
-    if getattr(request.user, 'organization', None) and request.user.organization.slug == 'vb-gastronomia':
-        from .views_gerar_vb import gerar_post_vb
-        return gerar_post_vb(request)
-
-    # Delegacao Samsung Healthcare: fluxo exclusivo (arquetipos Relentless/Medison).
-    if getattr(request.user, 'organization', None) and request.user.organization.slug == 'samsung-healthcare':
-        from .views_gerar_samsung import gerar_post_samsung
-        return gerar_post_samsung(request)
+    # Delegacao por REGISTRY (artkit): orgs com pipeline de arquetipos proprio
+    # seguem seu fluxo exclusivo; nenhuma outra org muda de comportamento.
+    # Nova org = 1 entrada em services/artkit/registry.py (sem tocar aqui).
+    from apps.posts.services.artkit.registry import view_for
+    org = getattr(request.user, 'organization', None)
+    handler = view_for(org.slug) if org else None
+    if handler:
+        return handler(request)
 
     if not getattr(settings, 'ENABLE_SIMPLE_PIPELINE', True):
         return JsonResponse(

@@ -19,13 +19,8 @@ _OFFWHITE = (244, 241, 217)
 
 
 def _hex_to_rgb(h):
-    h = (h or '#000000').lstrip('#')
-    if len(h) == 3:
-        h = ''.join(c * 2 for c in h)
-    try:
-        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
-    except Exception:
-        return (0, 0, 0)
+    from apps.posts.services.artkit.image import hex_to_rgb
+    return hex_to_rgb(h)
 
 
 def _parse_px(formato_px, default=(1080, 1350)):
@@ -138,14 +133,8 @@ def compose_seal_datauri(x_png_bytes, diameter=420, x_color=_OFFWHITE):
 
 def _cover(img, W, H):
     """Redimensiona (cover) e corta no centro para WxH."""
-    from PIL import Image
-    img = img.convert('RGB')
-    iw, ih = img.size
-    scale = max(W / iw, H / ih)
-    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
-    img = img.resize((nw, nh), Image.LANCZOS)
-    left, top = (nw - W) // 2, (nh - H) // 2
-    return img.crop((left, top, left + W, top + H))
+    from apps.posts.services.artkit.image import cover
+    return cover(img.convert('RGB'), W, H)  # todxs: converte RGB antes (historico)
 
 
 def build_background(archetype, fmt, color_hex, formato_px, photo_png=None):
@@ -321,6 +310,46 @@ def _round_corners(png_bytes, radius, bg=(244, 241, 217)):
     buf = io.BytesIO()
     out.save(buf, 'PNG')
     return buf.getvalue()
+
+
+def render_todxs_v3(*, archetype, content, color_hex, fmt, kb,
+                    photo_png=None, x_png_bytes=None, logo_url=None):
+    """Renderiza pelo ENGINE V3 (conversao on-the-fly da spec ativa, cor do
+    post baked) com os MESMOS inputs do render_todxs — paridade pixel provada
+    (golden_archetypes --check --engine v3: 9/9). Rollback = desligar a flag
+    archetype_engine_v3 da org."""
+    from .wireframes import WF
+    from apps.posts.services.artkit.convert import todxs_to_v3
+    from apps.posts.services.artkit import spec3
+    from apps.posts.services.artkit.engine import render_v3
+    from apps.posts.services.artkit.image import hex_to_rgb
+
+    src = WF().get(archetype) or {}
+    assets = {}
+    if photo_png:
+        assets['photo'] = photo_png
+    if x_png_bytes:
+        sc = src.get('seal_color')
+        if sc == 'ACCENT':
+            sc = color_hex
+        xc = hex_to_rgb(sc or '#F4F1D9')
+        if src.get('seal_style') == 'bare':
+            assets['seal'] = compose_simbolo_datauri(x_png_bytes, color=xc)
+        else:
+            assets['seal'] = compose_seal_datauri(x_png_bytes, x_color=xc)
+    if logo_url:
+        assets['wordmark'] = logo_url
+
+    weights = resolve_todxs_weights(kb) if kb else {}
+
+    def _loader(key, size):
+        from PIL import ImageFont
+        return ImageFont.truetype(weights.get(key), int(size))
+
+    norm = spec3.normalize(todxs_to_v3(archetype, fmt, color_hex, src=src))
+    return render_v3(norm, content=content,
+                     ctx={'font': _loader, 'font_paths': weights,
+                          'assets': assets, 'tokens': {}})
 
 
 def render_todxs(*, archetype, content, color_hex, fmt, formato_px, kb,

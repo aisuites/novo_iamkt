@@ -4,7 +4,8 @@ from django.contrib import messages
 from django.utils import timezone
 from .models import (
     User, Area, AuditLog, SystemConfig, PlanTemplate,
-    Organization, QuotaUsageDaily, QuotaAdjustment, QuotaAlert
+    Organization, QuotaUsageDaily, QuotaAdjustment, QuotaAlert,
+    AIUsageEvent
 )
 
 
@@ -161,7 +162,8 @@ class OrganizationAdmin(admin.ModelAdmin):
                 'trends_enabled',
                 'videos_avatar_enabled',
                 'email_marketing_enabled',
-                'archetype_selector_enabled'
+                'archetype_selector_enabled',
+                'advanced_editor_enabled'
             ),
             'description': 'Habilite/desabilite ferramentas para esta empresa'
         }),
@@ -555,5 +557,24 @@ class QuotaAlertAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
     
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AIUsageEvent)
+class AIUsageEventAdmin(admin.ModelAdmin):
+    """Eventos de custo de IA (C0.3) — fonte única p/ gasto org x mês."""
+    list_display = ['id', 'organization', 'source', 'pipeline', 'step',
+                    'purpose', 'model', 'post', 'cost_usd', 'cost_brl',
+                    'created_at']
+    list_filter = ['source', 'step', 'pipeline', 'created_at']
+    search_fields = ['organization__name', 'organization__slug', 'model',
+                     'purpose']
+    date_hierarchy = 'created_at'
+    readonly_fields = [f.name for f in AIUsageEvent._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
     def has_change_permission(self, request, obj=None):
         return False

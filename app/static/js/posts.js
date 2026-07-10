@@ -220,7 +220,7 @@
   // o s3_key da imagem ATIVA no estado — sem isso, o botão de download da página
   // presigna a chave antiga e baixa a arte SEM as edições.
   window.addEventListener('todxs:image-updated', (e) => {
-    const { postId, s3_key } = (e && e.detail) || {};
+    const { postId, s3_key, url } = (e && e.detail) || {};
     if (!postId || !s3_key) return;
     const post = postsState.items.find(p => p && String(p.id) === String(postId));
     if (!post || !Array.isArray(post.imagens) || !post.imagens.length) return;
@@ -228,6 +228,17 @@
     const item = post.imagens[idx];
     if (item && typeof item === 'object') item.s3_key = s3_key;
     else post.imagens[idx] = s3_key;
+    // Atualiza tambem o THUMB ja renderizado da galeria (a imagem grande e
+    // trocada pelo _saveElements; o thumb ficava com o src antigo ate reload).
+    if (dom.postGallery) {
+      const btn = dom.postGallery.querySelector(`.gallery-thumb[data-image-index="${idx}"]`);
+      const img = btn && btn.querySelector('img');
+      if (img) {
+        img.setAttribute('data-lazy-load', s3_key);
+        if (url) img.src = url;
+      }
+      if (btn) btn.dataset.s3Key = s3_key;
+    }
   });
 
   // Normalizar dados dos posts
@@ -832,8 +843,11 @@
     const endpoints = { local: '/posts/gerar-local/', simple: '/posts/gerar-simples/' };
     const endpoint = endpoints[pipeline] || '/posts/gerar/';
     
-    // Obter post_format_id do select (NOVO)
-    const postFormatId = dom.formatoSelect?.value || null;
+    // Obter post_format_id do select (NOVO). No modo template o payload manda
+    // null explicito (o select fica oculto; o formato legado vem do arquetipo).
+    const postFormatId = (payload.postFormatId !== undefined)
+      ? payload.postFormatId
+      : (dom.formatoSelect?.value || null);
     
     // Preparar payload JSON para Django
     const jsonPayload = {
@@ -969,14 +983,26 @@
           return;
         }
 
+        // Modo template: rede/formato, CTA e carrossel ficam OCULTOS no modal
+        // — o formato vem do ARQUETIPO escolhido e CTA/carrossel nao se
+        // aplicam ao render deterministico.
+        let tplFormats = null;
+        if (useTemplate) {
+          const arch = (aState.archetypes || [])
+            .find((a) => a.key === aState.selectedArchetype);
+          const f = (arch?.format || 'feed').toLowerCase();
+          tplFormats = [(f === 'story' || f === 'stories') ? 'stories' : 'feed'];
+        }
+
         const payload = {
           rede,
           tema,
           usuario: CURRENT_USER,
-          formatos,
-          carrossel,
-          qtdImagens,
-          ctaRequested,
+          formatos: useTemplate ? tplFormats : formatos,
+          carrossel: useTemplate ? false : carrossel,
+          qtdImagens: useTemplate ? 1 : qtdImagens,
+          ctaRequested: useTemplate ? false : ctaRequested,
+          postFormatId: useTemplate ? null : undefined,
           referenceImages,
           selectedLogoIds,
           selectedReferenceIds,
@@ -1255,6 +1281,14 @@
     
     // Imagem pronta
     if (post.imageStatus === 'ready' && post.imagens && post.imagens.length) {
+      // Imagem ativa INICIAL = a PUBLICADA/editavel (is_editable), nao a
+      // primeira da galeria: e ela que representa o post (e que tem o botao
+      // Edicao Avancada). As outras sao versoes/historico.
+      if (post.activeImageIndex === undefined || post.activeImageIndex === null) {
+        const edIdx = post.imagens.findIndex(
+          (it) => it && typeof it === 'object' && it.is_editable);
+        post.activeImageIndex = edIdx >= 0 ? edIdx : 0;
+      }
       const index = Math.max(0, Math.min(post.imagens.length - 1, post.activeImageIndex || 0));
       post.activeImageIndex = index;
 
@@ -1397,7 +1431,11 @@
         const isEditable = (activeImg && typeof activeImg === 'object')
             ? !!activeImg.is_editable
             : false;
-        if (isEditable && window.IS_ADMIN) {
+        // Liberado POR ORG (window.ADVANCED_EDITOR = flag da org OU equipe
+        // interna); fallback IS_ADMIN p/ cache de template antigo.
+        const canAdvancedEdit = (typeof window.ADVANCED_EDITOR !== 'undefined')
+            ? window.ADVANCED_EDITOR : window.IS_ADMIN;
+        if (isEditable && canAdvancedEdit) {
             const btnArteFinal = document.createElement('button');
             btnArteFinal.type = 'button';
             btnArteFinal.className = 'btn';
@@ -1521,23 +1559,66 @@
       btnReject.textContent = 'Gerar Novamente';
       btnReject.addEventListener('click', () => regeneratePost(post));
 
-      // Botão Alterar Cena - IA (revisa a cena via IA, limitado a 1)
-      const btnRequest = document.createElement('button');
-      btnRequest.type = 'button';
-      btnRequest.className = 'btn btn-outline-secondary';
-      btnRequest.textContent = 'Alterar Cena - IA';
-      const cenaRestantes = (typeof post.revisoesTextoRestantes === 'number') ? post.revisoesTextoRestantes : 1;
-      if (cenaRestantes <= 0) {
-        btnRequest.disabled = true;
-        btnRequest.title = 'Limite de alterações de cena atingido';
-      }
-      btnRequest.addEventListener('click', () => {
-        if (btnRequest.disabled) return;
+      // Botão de revisão por IA:
+      //  - simple: "Alterar Cena - IA" (revisa a cena via orquestrador, 1x)
+      //  - template (arquétipos, C1.4): "Ajustar textos com IA" + (quando a
+      //    imagem será GERADA por IA) "Ajustar imagem com IA" — limites
+      //    INDEPENDENTES de 1 cada. Correções pontuais => botão Editar.
+      let btnRequest;
+      let btnRequestImg = null;
+      const openRevisionInput = (kind) => {
+        post.templateRevisionKind = kind || null;
         post.textRequestOpen = true;
         post.pendingTextRequest = '';
         updatePostDetails(post);
         requestAnimationFrame(() => dom.textRequestInput?.focus());
-      });
+      };
+      if (post.isTemplate) {
+        const tplRev = post.tplRev || {};
+        btnRequest = document.createElement('button');
+        btnRequest.type = 'button';
+        btnRequest.className = 'btn btn-outline-secondary';
+        btnRequest.textContent = 'Ajustar textos com IA';
+        btnRequest.title = 'Reescreve os textos a partir do seu pedido. ' +
+          'Correções pontuais? Use Editar — é instantâneo.';
+        if ((tplRev.text ?? 1) <= 0) {
+          btnRequest.disabled = true;
+          btnRequest.title = 'Limite de ajustes de texto por IA atingido — use Editar';
+        }
+        btnRequest.addEventListener('click', () => {
+          if (btnRequest.disabled) return;
+          openRevisionInput('text');
+        });
+        if (post.aiImage) {
+          btnRequestImg = document.createElement('button');
+          btnRequestImg.type = 'button';
+          btnRequestImg.className = 'btn btn-outline-secondary';
+          btnRequestImg.textContent = 'Ajustar imagem com IA';
+          btnRequestImg.title = 'Reescreve a descrição da imagem que será gerada.';
+          if ((tplRev.image ?? 1) <= 0) {
+            btnRequestImg.disabled = true;
+            btnRequestImg.title = 'Limite de ajustes de imagem por IA atingido — edite a descrição em Editar';
+          }
+          btnRequestImg.addEventListener('click', () => {
+            if (btnRequestImg.disabled) return;
+            openRevisionInput('image');
+          });
+        }
+      } else {
+        btnRequest = document.createElement('button');
+        btnRequest.type = 'button';
+        btnRequest.className = 'btn btn-outline-secondary';
+        btnRequest.textContent = 'Alterar Cena - IA';
+        const cenaRestantes = (typeof post.revisoesTextoRestantes === 'number') ? post.revisoesTextoRestantes : 1;
+        if (cenaRestantes <= 0) {
+          btnRequest.disabled = true;
+          btnRequest.title = 'Limite de alterações de cena atingido';
+        }
+        btnRequest.addEventListener('click', () => {
+          if (btnRequest.disabled) return;
+          openRevisionInput(null);
+        });
+      }
       
       // Botão Editar
       const btnEdit = document.createElement('button');
@@ -1555,8 +1636,10 @@
         btnGenerate.textContent = 'Gerar Imagem';
         btnGenerate.addEventListener('click', () => startImageGeneration(post));
         
-        actionsContainer.append(btnReject, btnRequest, btnEdit, btnGenerate);
-        console.log('[DEBUG] 4 botões adicionados ao container');
+        actionsContainer.append(btnReject, btnRequest);
+        if (btnRequestImg) actionsContainer.append(btnRequestImg);
+        actionsContainer.append(btnEdit, btnGenerate);
+        console.log('[DEBUG] botões adicionados ao container');
       } else {
         // Botão Aprovar (se tem imagem)
         const btnApprove = document.createElement('button');
@@ -1565,7 +1648,9 @@
         btnApprove.textContent = 'Aprovar';
         btnApprove.addEventListener('click', () => approvePost(post));
         
-        actionsContainer.append(btnReject, btnRequest, btnEdit, btnApprove);
+        actionsContainer.append(btnReject, btnRequest);
+        if (btnRequestImg) actionsContainer.append(btnRequestImg);
+        actionsContainer.append(btnEdit, btnApprove);
       }
     }
   }
@@ -1928,15 +2013,27 @@
     post.statusLabel = statusInfo.generating?.label || 'Agente Gerando Conteúdo';
     renderPosts();
 
+    // Posts de TEMPLATE usam a revisão própria (C1.4): kind text|image,
+    // limites independentes. Simple continua no request-text-change.
+    const tplKind = post.isTemplate
+      ? (post.templateRevisionKind || 'text')
+      : null;
+    const endpoint = tplKind
+      ? `/posts/${serverId}/template-revision/`
+      : `/posts/${serverId}/request-text-change/`;
+    const body = tplKind
+      ? { kind: tplKind, mensagem: text }
+      : { mensagem: text };
+
     try {
-      const response = await fetch(`/posts/${serverId}/request-text-change/`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRFToken': CSRF_TOKEN,
           'Accept': 'application/json',
         },
-        body: JSON.stringify({ mensagem: text }),
+        body: JSON.stringify(body),
       });
       
       if (!response.ok) {
@@ -1949,7 +2046,14 @@
       post.status = data.status || 'agent';
       post.statusLabel = data.statusLabel || (statusInfo[post.status]?.label ?? 'Agente Alterando');
       
-      if (typeof data.revisoesRestantes === 'number') {
+      if (tplKind) {
+        // decrementa o contador local do kind revisado
+        post.tplRev = post.tplRev || {};
+        if (typeof data.revisoesRestantes === 'number') {
+          post.tplRev[tplKind] = data.revisoesRestantes;
+        }
+        post.templateRevisionKind = null;
+      } else if (typeof data.revisoesRestantes === 'number') {
         post.remaining_revisions = data.revisoesRestantes;
       }
       if (typeof data.revisoesTextoRestantes === 'number') {
@@ -1963,7 +2067,10 @@
       if (dom.textRequestInput) dom.textRequestInput.value = '';
 
       renderPosts();
-      window.toaster?.success('Alterando a cena com IA...');
+      window.toaster?.success(
+        tplKind === 'text' ? 'Ajustando os textos com IA...'
+          : tplKind === 'image' ? 'Ajustando a descrição da imagem com IA...'
+          : 'Alterando a cena com IA...');
       
     } catch (error) {
       console.error(error);
@@ -2436,12 +2543,6 @@
   // ============================================================
   // Modo "Usar template" (seletor de arquetipo) — orgs habilitadas
   // ============================================================
-  function currentTemplateFmt() {
-    const opt = dom.formatoSelect?.selectedOptions?.[0];
-    const txt = ((opt?.textContent || '') + ' ' + (opt?.dataset?.aspect || '')).toLowerCase();
-    return (txt.includes('stor') || txt.includes('9:16')) ? 'story' : 'feed';
-  }
-
   let _archetypeWired = false;
   function setupArchetypeMode() {
     const row = document.getElementById('genModeRow');
@@ -2455,10 +2556,6 @@
     row.querySelectorAll('.gen-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => setGenMode(btn.dataset.mode));
     });
-    // troca de formato -> refiltra o slider pelo formato (feed/story)
-    dom.formatoSelect?.addEventListener('change', () => {
-      if (orgAssetsState.genMode === 'template') renderArchetypeSlider();
-    });
   }
 
   function setGenMode(mode) {
@@ -2468,28 +2565,39 @@
       .forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
     const free = document.getElementById('freeGenFields');
     const panel = document.getElementById('archetypePanel');
-    // No modo "template" escondemos apenas logos e upload de novas imagens; a
-    // galeria de referencias (dentro de freeGenFields) fica VISIVEL para o
-    // usuario escolher a imagem de produto (ex.: arquetipo Samsung B).
+    // No modo "template" escondemos so os logos (o logo vem do proprio
+    // arquetipo/KB). Referencias E upload ficam VISIVEIS: o usuario pode
+    // escolher uma ref da KB OU subir uma imagem nova para ser ADAPTADA como
+    // foto de fundo do template (C1.6); sem escolha, a IA gera (fallback).
     const logoField = document.getElementById('logoField');
     const uploadField = document.getElementById('uploadRefField');
+    // Rede/formato, CTA e carrossel NAO se aplicam ao modo template: o formato
+    // vem do arquetipo escolhido e o render e deterministico (sem CTA/carrossel).
+    const linhaRedeFormato = document.getElementById('linhaRedeFormato');
+    const linhaCtaCarrossel = document.getElementById('linhaCtaCarrossel');
     const tpl = mode === 'template';
     if (free) free.style.display = '';            // sempre visivel (contem as refs)
     if (panel) panel.style.display = tpl ? '' : 'none';
     if (logoField) logoField.style.display = tpl ? 'none' : '';
-    if (uploadField) uploadField.style.display = tpl ? 'none' : '';
+    if (uploadField) uploadField.style.display = '';
+    if (linhaRedeFormato) linhaRedeFormato.style.display = tpl ? 'none' : '';
+    if (linhaCtaCarrossel) linhaCtaCarrossel.style.display = tpl ? 'none' : '';
+    // campos required escondidos bloqueiam o submit do form: solta o required
+    // no modo template e devolve no modo livre.
+    if (dom.redePost) dom.redePost.required = !tpl;
+    if (dom.formatoSelect) dom.formatoSelect.required = !tpl;
     if (tpl) renderArchetypeSlider();
   }
 
   function renderArchetypeSlider() {
     const slider = document.getElementById('archetypeSlider');
     if (!slider) return;
-    const fmt = currentTemplateFmt();
-    const list = (orgAssetsState.archetypes || [])
-      .filter((a) => a.format === fmt || a.format === 'both');
+    // Rede/formato ficam OCULTOS no modo template: mostramos TODOS os
+    // arquetipos e o formato (feed/story) vem do arquetipo escolhido.
+    const list = orgAssetsState.archetypes || [];
     slider.innerHTML = '';
     if (!list.length) {
-      slider.innerHTML = '<div class="asset-gallery-loading">Nenhum template para este formato.</div>';
+      slider.innerHTML = '<div class="asset-gallery-loading">Nenhum template cadastrado.</div>';
       return;
     }
     // se o arquetipo selecionado nao vale neste formato, limpa

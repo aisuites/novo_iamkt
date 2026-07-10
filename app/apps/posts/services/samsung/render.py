@@ -51,8 +51,8 @@ def _apply_case(text: str, case: str) -> str:
 
 
 def _hex2rgb(h):
-    h = _color(h).lstrip('#')
-    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    from apps.posts.services.artkit.image import hex_to_rgb
+    return hex_to_rgb(_color(h))
 
 
 def _gradient_bg(W, H, bg):
@@ -121,18 +121,13 @@ def _fetch(src) -> Image.Image:
 
 
 def _cover(img, w, h):
-    iw, ih = img.size
-    scale = max(w / iw, h / ih)
-    nw, nh = max(1, round(iw * scale)), max(1, round(ih * scale))
-    img = img.resize((nw, nh), Image.LANCZOS)
-    left, top = (nw - w) // 2, (nh - h) // 2
-    return img.crop((left, top, left + w, top + h))
+    from apps.posts.services.artkit.image import cover
+    return cover(img, w, h, rounding=round)  # samsung: round() historico
 
 
 def _contain(img, w, h):
-    iw, ih = img.size
-    scale = min(w / iw, h / ih)
-    return img.resize((max(1, round(iw * scale)), max(1, round(ih * scale))), Image.LANCZOS)
+    from apps.posts.services.artkit.image import contain
+    return contain(img, w, h)
 
 
 def _round_corners(img, radius, corners):

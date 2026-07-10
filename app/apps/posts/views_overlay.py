@@ -60,6 +60,7 @@ def overlay_data(request, post_id):
             'raw_image_url': _get_raw_image_url(post), 'logo_url': '',
             'canvas_w': cw, 'canvas_h': ch, 'font_names': {}, 'font_urls': {},
             'todxs_font_urls': vb_font_urls, 'pipeline': 'vb', 'status': post.status,
+            'palette': _editor_extras(post)[0], 'font_choices': _editor_extras(post)[1],
             'raw_image_s3_key': post.raw_image_s3_key or '', 'background_history_size': 0,
         })
 
@@ -73,6 +74,7 @@ def overlay_data(request, post_id):
             'raw_image_url': _get_raw_image_url(post), 'logo_url': '',
             'canvas_w': 1080, 'canvas_h': 1350, 'font_names': {}, 'font_urls': {},
             'todxs_font_urls': s_font_urls, 'pipeline': 'samsung', 'status': post.status,
+            'palette': _editor_extras(post)[0], 'font_choices': _editor_extras(post)[1],
             'raw_image_s3_key': post.raw_image_s3_key or '', 'background_history_size': 0,
         })
 
@@ -93,6 +95,11 @@ def overlay_data(request, post_id):
     for role in _VALID_FONT_ROLES:
         if font_paths.get(role):
             font_urls[role] = f'/posts/{post.id}/fonts/{role}/'
+        # Variante BOLD real (ex.: Montserrat 700): o modal registra um
+        # @font-face com font-weight:700 e o navegador usa o arquivo em vez
+        # de SINTETIZAR o negrito (que diverge do Pillow no publicado).
+        if font_paths.get(role + '_bold'):
+            font_urls[role + '_bold'] = f'/posts/{post.id}/fonts/{role}_bold/'
 
     # TODXS: fontes por CHAVE de uso (display/regular/caps_small) p/ o editor
     # desenhar com a mesma fonte do render Pillow (por elemento, nao por papel).
@@ -120,6 +127,9 @@ def overlay_data(request, post_id):
         # Tamanho do histórico de imagens de fundo — frontend usa pra
         # mostrar/esconder botão "Voltar imagem anterior".
         'background_history_size': len(history),
+        # Editor: paleta da KB (swatches) + fontes disponiveis (+ Texto)
+        'palette': _editor_extras(post)[0],
+        'font_choices': _editor_extras(post)[1],
     })
 
 
@@ -203,6 +213,9 @@ def simple_debug(request, post_id):
         'status': post.status,
         'bg_url': _presign(post.raw_image_s3_key, post.raw_image_s3_url or ''),
         'final_url': _presign(post.image_s3_key, post.image_s3_url or ''),
+        # Original do Gemini com texto (pode diferir do final se o usuario
+        # editou — o publicado vira re-render Pillow). Base da comparacao Q1.
+        'gemini_url': _presign(dbg.get('gemini_final_s3_key') or ''),
         'bg_prompt': dbg.get('bg_prompt', ''),
         'final_prompt': dbg.get('final_prompt', ''),
         'rules': dbg.get('rules', {}),
@@ -388,7 +401,8 @@ def font_file(request, post_id, role):
     Permite que o modal Arte Final injete @font-face apontando para a fonte
     real da KB (ou Google Fonts cacheado) — independente do Google Fonts CSS.
     """
-    if role not in _VALID_FONT_ROLES:
+    _base = role[:-5] if role.endswith('_bold') else role
+    if _base not in _VALID_FONT_ROLES:
         return JsonResponse({'error': 'role_invalido'}, status=400)
     post = get_object_or_404(Post, id=post_id, organization=request.organization)
     paths = _get_font_paths(post)
@@ -432,6 +446,22 @@ def regenerate_background(request, post_id):
         return JsonResponse({'error': 'message_required'}, status=400)
     if not post.raw_image_s3_key:
         return JsonResponse({'error': 'no_raw_image'}, status=400)
+
+    # LIMITE POR ORG: mesma contagem do fluxo da pagina (generate_image) —
+    # sem isso o modal permitia alteracoes ILIMITADAS mesmo com a quota
+    # esgotada (reportado pelo dono em 2026-07-09).
+    from apps.posts.models import PostChangeRequest
+    max_rev = post.organization.max_image_revisions
+    usadas = PostChangeRequest.objects.filter(
+        post=post, change_type='image', is_initial=False).count()
+    if usadas >= max_rev:
+        return JsonResponse({
+            'error': f'Limite de alterações de imagem atingido ({usadas}/{max_rev})',
+        }, status=400)
+    PostChangeRequest.objects.create(
+        post=post, message=message, change_type='image', is_initial=False,
+        requester_email=getattr(request.user, 'email', '') or '',
+    )
 
     from apps.posts.tasks import regenerate_background_task
     regenerate_background_task.delay(post.id, message)
@@ -576,10 +606,80 @@ def save_elements(request, post_id):
             image_url = _samsung_rerender_published(post, elements)
         except Exception:
             logger.exception('[overlay] re-render samsung (save) falhou post=%s', post.id)
+    elif post.pipeline_used == 'simple':
+        try:
+            image_url = _simple_rerender_published(post, elements)
+        except Exception:
+            logger.exception('[overlay] re-render simple (save) falhou post=%s', post.id)
     # image_s3_key: o front sincroniza o s3_key da imagem ativa (botao de download
     # da pagina presigna por chave — sem isso, baixaria a arte ANTIGA).
     return JsonResponse({'ok': True, 'image_url': image_url,
                          'image_s3_key': (post.image_s3_key if image_url else None)})
+
+
+def _simple_rerender_published(post, elements):
+    """SIMPLE (transcritor/C3): raw (fundo sem texto do Gemini) + elements
+    editados -> re-render Pillow (render_layout_document, o MESMO motor do
+    export) vira o PUBLICADO. Q1 conservador: isso so acontece quando o
+    usuario EDITA e salva — ele ve o resultado na hora e pode re-editar."""
+    import base64 as _b64
+    import io as _io
+    from apps.posts.models import PostImage
+    from apps.posts.tasks import _upload_image_to_s3
+    from apps.core.services.s3_service import S3Service
+    from apps.posts.services.gemini_image_generator import render_layout_document
+
+    raw_data = _download_as_data_uri(_get_raw_image_url(post))
+    if not raw_data:
+        return None
+    _, _, payload = raw_data.partition(',')
+    raw_bytes = _b64.b64decode(payload)
+
+    els = _prepare_stickers_for_export(elements)
+    png_bytes = render_layout_document(
+        raw_bytes, els,
+        fonts=_get_font_paths(post) or {},
+        logo_url=_get_logo_url(post),
+    )
+    if not png_bytes:
+        return None
+
+    old_key = post.image_s3_key
+    key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
+                                   png_bytes=png_bytes, mime_type='image/png')
+    # Atualiza SOMENTE a PostImage do publicado (a versao "editavel") — UMA
+    # linha, nunca as outras versoes da galeria (regra do dono: cada imagem
+    # permanece como foi gerada/corrigida). Sem linha casando, CRIA uma nova
+    # (mesmo padrao do _refresh_editable_post_image do regenerate).
+    _im = (post.images.filter(s3_key=old_key).order_by('-order').first()
+           if old_key else None)
+    if _im:
+        _im.s3_key, _im.s3_url = key, url
+        _im.save(update_fields=['s3_key', 's3_url'])
+    else:
+        from django.db.models import Max as _Max
+        _next = (post.images.aggregate(_Max('order'))['order__max'] or 0) + 1
+        PostImage.objects.create(post=post, s3_key=key, s3_url=url, order=_next)
+    post.image_s3_key, post.image_s3_url = key, url
+    gi = post.generated_images if isinstance(post.generated_images, list) else []
+    gi.append({'s3_key': key, 'url': url})
+    post.generated_images = gi
+    # Preserva o PNG original do Gemini p/ comparacao no debug (posts antigos
+    # sem a chave: o old_key da PRIMEIRA edicao e o original do Gemini).
+    ctx = post.local_pipeline_context or {}
+    si = ctx.get('simple_image') or {}
+    if old_key and not si.get('gemini_final_s3_key'):
+        si['gemini_final_s3_key'] = old_key
+        ctx['simple_image'] = si
+        post.local_pipeline_context = ctx
+        post.save(update_fields=['image_s3_key', 'image_s3_url',
+                                 'generated_images', 'local_pipeline_context'])
+    else:
+        post.save(update_fields=['image_s3_key', 'image_s3_url', 'generated_images'])
+    try:
+        return S3Service.generate_presigned_download_url(key, expires_in=86400)
+    except Exception:
+        return url
 
 
 def _vb_rerender_published(post, elements):
@@ -609,8 +709,19 @@ def _vb_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=out.getvalue(), mime_type='image/png')
-    if old_key:
-        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    # Atualiza SOMENTE a PostImage do publicado (a versao "editavel") — UMA
+    # linha, nunca as outras versoes da galeria (regra do dono: cada imagem
+    # permanece como foi gerada/corrigida). Sem linha casando, CRIA uma nova
+    # (mesmo padrao do _refresh_editable_post_image do regenerate).
+    _im = (post.images.filter(s3_key=old_key).order_by('-order').first()
+           if old_key else None)
+    if _im:
+        _im.s3_key, _im.s3_url = key, url
+        _im.save(update_fields=['s3_key', 's3_url'])
+    else:
+        from django.db.models import Max as _Max
+        _next = (post.images.aggregate(_Max('order'))['order__max'] or 0) + 1
+        PostImage.objects.create(post=post, s3_key=key, s3_url=url, order=_next)
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
@@ -648,8 +759,19 @@ def _samsung_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=out.getvalue(), mime_type='image/png')
-    if old_key:
-        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    # Atualiza SOMENTE a PostImage do publicado (a versao "editavel") — UMA
+    # linha, nunca as outras versoes da galeria (regra do dono: cada imagem
+    # permanece como foi gerada/corrigida). Sem linha casando, CRIA uma nova
+    # (mesmo padrao do _refresh_editable_post_image do regenerate).
+    _im = (post.images.filter(s3_key=old_key).order_by('-order').first()
+           if old_key else None)
+    if _im:
+        _im.s3_key, _im.s3_url = key, url
+        _im.save(update_fields=['s3_key', 's3_url'])
+    else:
+        from django.db.models import Max as _Max
+        _next = (post.images.aggregate(_Max('order'))['order__max'] or 0) + 1
+        PostImage.objects.create(post=post, s3_key=key, s3_url=url, order=_next)
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
@@ -686,8 +808,19 @@ def _todxs_rerender_published(post, elements):
     old_key = post.image_s3_key
     key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
                                    png_bytes=png, mime_type='image/png')
-    if old_key:
-        PostImage.objects.filter(post=post, s3_key=old_key).update(s3_key=key, s3_url=url)
+    # Atualiza SOMENTE a PostImage do publicado (a versao "editavel") — UMA
+    # linha, nunca as outras versoes da galeria (regra do dono: cada imagem
+    # permanece como foi gerada/corrigida). Sem linha casando, CRIA uma nova
+    # (mesmo padrao do _refresh_editable_post_image do regenerate).
+    _im = (post.images.filter(s3_key=old_key).order_by('-order').first()
+           if old_key else None)
+    if _im:
+        _im.s3_key, _im.s3_url = key, url
+        _im.save(update_fields=['s3_key', 's3_url'])
+    else:
+        from django.db.models import Max as _Max
+        _next = (post.images.aggregate(_Max('order'))['order__max'] or 0) + 1
+        PostImage.objects.create(post=post, s3_key=key, s3_url=url, order=_next)
     post.image_s3_key, post.image_s3_url = key, url
     gi = post.generated_images if isinstance(post.generated_images, list) else []
     gi.append({'s3_key': key, 'url': url})
@@ -745,10 +878,72 @@ def _prepare_stickers_for_export(elements: list) -> list:
     return out
 
 
+def _editor_extras(post):
+    """Paleta da KB (swatches no editor) + opcoes de fonte do pipeline
+    (seletor do '+ Texto' / troca de fonte)."""
+    palette = []
+    try:
+        from apps.knowledge.models import KnowledgeBase
+        from apps.posts.tasks import _kb_colors
+        kb = KnowledgeBase.objects.filter(organization=post.organization).first()
+        for c in (_kb_colors(kb) or []):
+            hexv = (c.get('hex') or c.get('cor') or '').strip()
+            if hexv:
+                palette.append({'nome': c.get('nome') or c.get('name') or '', 'hex': hexv})
+    except Exception:
+        logger.exception('[overlay] paleta falhou post=%s', post.pk)
+    pipe = (post.pipeline_used or '')
+    if pipe == 'todxs':
+        fonts = [{'key': 'display', 'label': 'Display (Black)'},
+                 {'key': 'medium', 'label': 'Medium'},
+                 {'key': 'regular', 'label': 'Regular'},
+                 {'key': 'caps_small', 'label': 'Caps (Vinila)'}]
+    elif pipe == 'vb':
+        fonts = [{'key': 'light', 'label': 'Light'},
+                 {'key': 'medium', 'label': 'Medium'},
+                 {'key': 'semibold', 'label': 'SemiBold'}]
+    elif pipe == 'samsung':
+        try:
+            from apps.posts.services.samsung.wireframes import FONT_FILES
+            fonts = [{'key': k, 'label': k.replace('_', ' ').title()} for k in FONT_FILES]
+        except Exception:
+            fonts = []
+    else:
+        fonts = [{'key': 'titulo', 'label': 'Fonte do Título'},
+                 {'key': 'subtitulo', 'label': 'Fonte do Subtítulo'},
+                 {'key': 'cta', 'label': 'Fonte do CTA'}]
+    return palette, fonts
+
+
+
+def _enrich_font_paths(post, elements):
+    """Elementos de texto NOVOS/alterados no editor trazem so `font_key` (o
+    front nao conhece caminhos) — resolve o arquivo p/ o Pillow. Necessario
+    no TODXS (draw le _font_path); vb/samsung resolvem por font_key no draw e
+    o simple resolve via fonts[font_key] no render_layout_document."""
+    if (getattr(post, 'pipeline_used', '') or '') != 'todxs':
+        return elements
+    try:
+        from apps.knowledge.models import KnowledgeBase
+        from apps.posts.services.todxs.pillow_render import resolve_todxs_weights
+        kb = KnowledgeBase.objects.filter(organization=post.organization).first()
+        weights = resolve_todxs_weights(kb) if kb else {}
+        for el in elements or []:
+            if ((el.get('role') or '') in ('titulo', 'subtitulo', 'cta')
+                    and el.get('font_key') and not el.get('_font_path')):
+                p = weights.get(el['font_key'])
+                if p:
+                    el['_font_path'] = p
+    except Exception:
+        logger.exception('[overlay] enrich font paths falhou post=%s', post.pk)
+    return elements
+
+
 def _save_elements(post_pk: int, elements: list) -> None:
     """Grava elementos no banco usando update() direto — evita conflitos de instância."""
     try:
         post = Post.objects.get(pk=post_pk)
+        elements = _enrich_font_paths(post, elements)
         dp = dict(post.designer_payload or {})
         dp['_layout_elements'] = elements
         Post.objects.filter(pk=post_pk).update(designer_payload=dp)
@@ -797,6 +992,13 @@ def _get_logo_url(post: Post) -> str:
 
 
 def _get_canvas(post: Post):
+    # SIMPLE transcrito: canvas = dimensoes REAIS da arte do Gemini (medidas
+    # na transcricao) — post_format pode divergir (ex.: 1200x630 vs 1424x752)
+    # e o modal desenharia em proporcao diferente do publicado.
+    _si = (post.local_pipeline_context or {}).get('simple_image') or {}
+    _cv = _si.get('canvas')
+    if isinstance(_cv, (list, tuple)) and len(_cv) == 2 and all(_cv):
+        return int(_cv[0]), int(_cv[1])
     if post.post_format:
         return post.post_format.width or 1080, post.post_format.height or 1080
     # TODXS: sem post_format -> deriva do formato salvo no contexto (feed 4:5 /
@@ -857,10 +1059,40 @@ def _get_font_paths(post: Post) -> dict:
         from apps.posts.tasks import _get_kb, _prepare_pillow_overlay, _formato_px
         kb = _get_kb(post)
         fonts_data = _prepare_pillow_overlay(post, kb, _formato_px(post))
-        return {
+        out = {
             'titulo':    fonts_data.get('pillow_title_font_path') or '',
             'subtitulo': fonts_data.get('pillow_subtitle_font_path') or '',
             'cta':       fonts_data.get('pillow_title_font_path') or '',
         }
+        # Variante BOLD real p/ reproduzir o PESO detectado pelo transcritor.
+        # O navegador SINTETIZA bold no modal; o Pillow nao — sem a variante o
+        # download sai regular. resolve_typography respeita o peso DECLARADO
+        # na Typography (ex.: Montserrat 400), entao aqui forcamos a MESMA
+        # familia no peso bold (Google 700 com fallback de vizinhos) ou uma
+        # CustomFont bold da KB.
+        try:
+            from apps.posts.services import font_resolver as _fr
+            bold_path = ''
+            for t in (list(kb.typography_settings.all().order_by('order'))
+                      if kb else []):
+                if t.font_source == 'google' and t.google_font_name:
+                    bold_path = _fr._load_google_font(t.google_font_name, 'bold') or ''
+                elif t.font_source == 'upload' and t.custom_font:
+                    nm = (t.custom_font.name or '').lower()
+                    if any(k in nm for k in ('bold', 'black', 'heavy')):
+                        bold_path = _fr._load_custom_font(t.custom_font) or ''
+                if bold_path:
+                    break
+            if not bold_path and kb:
+                bcf = next((c for c in kb.custom_fonts.all()
+                            if any(k in (c.name or '').lower()
+                                   for k in ('bold', 'black', 'heavy'))), None)
+                bold_path = (_fr._load_custom_font(bcf) or '') if bcf else ''
+            if bold_path:
+                for role in ('titulo', 'subtitulo', 'cta'):
+                    out[role + '_bold'] = bold_path
+        except Exception:
+            pass
+        return out
     except Exception:
         return {}

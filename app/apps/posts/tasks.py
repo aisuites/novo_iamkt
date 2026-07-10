@@ -399,6 +399,13 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
             )
             if _prompt_result:
                 orchestrator_image_prompt = _prompt_result.get('prompt', '')
+                if _prompt_result.get('usage'):
+                    _record_ai_usage(
+                        post, step='text_generation',
+                        model=_prompt_result.get('model', ''),
+                        usage_dict=_prompt_result['usage'],
+                        purpose='prompt_designer',
+                    )
 
             # 2. Elementos de layout via layout_engine
             _pillow_kw = _prepare_pillow_overlay(post, kb, formato_px)
@@ -565,6 +572,13 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
                     from apps.posts.services.post_orchestrator import adapt_layout_spec
                     adapted = adapt_layout_spec(dossier_spec, float(src_ar), tgt_ar, formato_px)
                     if adapted:
+                        _adapt_usage = adapted.pop('_usage', None)
+                        _adapt_model = adapted.pop('_model', '')
+                        if _adapt_usage:
+                            _record_ai_usage(post, step='text_generation',
+                                             model=_adapt_model,
+                                             usage_dict=_adapt_usage,
+                                             purpose='layout_adapt')
                         dossier_spec = adapted
                         logger.info('[posts.local] layout adaptado AR %s -> %s', src_ar, tgt_ar)
                 except Exception:
@@ -857,6 +871,7 @@ def generate_post_image_task(self, post_id: int, message: str = ''):
         result['model'],
         result.get('cost_usd', 0),
         usage_metadata=result.get('usage') or {},
+        purpose='gemini_main',
     )
 
     logger.info(
@@ -929,17 +944,39 @@ def regenerate_background_task(self, post_id: int, message: str):
         logger.error('[regen_bg] falha baixar imagem atual post=%s', post_id)
         return {'success': False, 'error': 'download_failed'}
 
-    # 2. Monta prompt: simples e direto
+    # 2. Prompt de edicao ENGENHEIRADO (gpt-4o-mini visao — o MESMO agente do
+    # fluxo de alteracao da pagina): a frase crua do usuario em PT rende
+    # edicoes fracas no Gemini (ex.: 'equipamento 50% menor' ignorado).
+    # Fallback: mensagem crua se o agente falhar.
     user_msg = (message or '').strip()
-    prompt_text = (
-        'Modify the attached image according to the user request below. '
-        'Keep the same subject, composition style and brand feel — apply ONLY the requested change.\n\n'
-        f'USER REQUEST (Portuguese): "{user_msg}"\n\n'
-        'STRICT RULES:\n'
-        '- Output an image only. No text, no typography, no letters, no logos anywhere.\n'
-        '- Keep the aspect ratio of the original image.\n'
-        '- Preserve identity of any product or person visible in the attached image.\n'
-    )
+    edit_core = ''
+    try:
+        from apps.posts.services.simple_image_revise import generate_edit_prompt
+        a = generate_edit_prompt(_b64.b64decode(cur_b64), user_msg)
+        edit_core = (a.get('prompt') or '').strip()
+        _record_ai_usage(post, step='image_generation', model=a.get('model', ''),
+                         usage_dict=a.get('usage') or {},
+                         purpose='regen_bg_edit_prompt')
+    except Exception:
+        logger.exception('[regen_bg] agente de edit-prompt falhou — usa msg crua')
+    if edit_core:
+        prompt_text = (
+            f'{edit_core}\n\n'
+            'STRICT RULES:\n'
+            '- Output an image only. No text, no typography, no letters, no logos anywhere.\n'
+            '- Keep the aspect ratio of the original image.\n'
+            '- Preserve identity of any product or person visible in the attached image.\n'
+        )
+    else:
+        prompt_text = (
+            'Modify the attached image according to the user request below. '
+            'Keep the same subject, composition style and brand feel — apply ONLY the requested change.\n\n'
+            f'USER REQUEST (Portuguese): "{user_msg}"\n\n'
+            'STRICT RULES:\n'
+            '- Output an image only. No text, no typography, no letters, no logos anywhere.\n'
+            '- Keep the aspect ratio of the original image.\n'
+            '- Preserve identity of any product or person visible in the attached image.\n'
+        )
 
     api_key = _os.environ.get('GEMINI_API_KEY')
     if not api_key:
@@ -1015,7 +1052,8 @@ def regenerate_background_task(self, post_id: int, message: str):
         cost_in = int(usage.get('promptTokenCount', 0) or 0) * 0.10 / 1_000_000
         cost_out = 0.04  # flat por imagem
         cost = round(cost_in + cost_out, 6)
-        _log_usage_gemini(post, model_used, cost, usage_metadata=usage)
+        _log_usage_gemini(post, model_used, cost, usage_metadata=usage,
+                          purpose='gemini_regenerate_background')
     except Exception:
         logger.exception('[regen_bg] falha logar custo')
 
@@ -1056,13 +1094,31 @@ def _refresh_editable_post_image(post):
         logger.info('[regen_bg] post sem _layout_elements, pula refresh')
         return
 
-    # TODXS: re-render com o renderizador DETERMINISTICO (draw_todxs), igual a
-    # geracao e ao editor — nao o HTML/Playwright generico (que nao reproduz a
-    # faixa/center_v/fixed_fs do todxs e quebra o layout no download).
-    if getattr(post, 'pipeline_used', '') == 'todxs':
+    # Pipelines com renderizador DETERMINISTICO proprio: usar o MESMO motor
+    # do save/export do editor (licao de junho: Playwright divergia — e no
+    # celery o launch do browser FALHA, deixando o publicado sem refresh:
+    # bug do post 258, 'alteracao nao aconteceu'). Playwright fica so p/ o
+    # pipeline local legado.
+    _pipe = getattr(post, 'pipeline_used', '') or ''
+    if _pipe == 'todxs':
         from apps.posts.views_overlay import _todxs_rerender_published
         _todxs_rerender_published(post, els)
         logger.info('[regen_bg] PostImage todxs re-renderizada via draw_todxs post=%s', post.id)
+        return
+    if _pipe == 'simple':
+        from apps.posts.views_overlay import _simple_rerender_published
+        _simple_rerender_published(post, els)
+        logger.info('[regen_bg] PostImage simple re-renderizada via render_layout_document post=%s', post.id)
+        return
+    if _pipe == 'vb':
+        from apps.posts.views_overlay import _vb_rerender_published
+        _vb_rerender_published(post, els)
+        logger.info('[regen_bg] PostImage vb re-renderizada post=%s', post.id)
+        return
+    if _pipe == 'samsung':
+        from apps.posts.views_overlay import _samsung_rerender_published
+        _samsung_rerender_published(post, els)
+        logger.info('[regen_bg] PostImage samsung re-renderizada post=%s', post.id)
         return
 
     raw_url = _get_raw_image_url(post)
@@ -1637,6 +1693,34 @@ def _brand_keywords_from_kb(kb) -> list:
             keywords.add(tok)
         elif tok.isupper() and 2 <= len(tok) <= 6:  # ex: acronimos de marca
             keywords.add(tok)
+    # NOMES DE FONTE da KB: fontes PROPRIETARIAS carregam a marca (ex.:
+    # "Vorwerk-Bold" na thermomix) — foi por ai que a marca vazou no prompt
+    # do fundo em 2026-07-09. Regras p/ NAO sanitizar palavras legitimas:
+    #   - SO fontes de UPLOAD (Google Fonts sao publicas, nao ativam prior
+    #     de marca — Montserrat/Roboto etc. ficam FORA);
+    #   - pesos/estilos e termos genericos de tipografia ficam fora;
+    #   - token minimo de 4 chars (evita 'SS', 'Ana', 'UI').
+    weight_words = {
+        'bold', 'medium', 'regular', 'light', 'black', 'heavy', 'semibold',
+        'extrabold', 'thin', 'italic', 'condensed', 'extended', 'book',
+        'sans', 'serif', 'mono', 'open', 'head', 'body', 'text', 'display',
+        'font', 'fonts', 'free', 'fontsfree', 'grotesk', 'neue', 'round',
+        'rounded', 'slab', 'script', 'caps', 'hairline', 'extralight',
+    }
+    font_names = []
+    try:
+        font_names += [getattr(t.custom_font, 'name', '') or ''
+                       for t in kb.typography_settings.all()
+                       if t.font_source == 'upload' and t.custom_font_id]
+        font_names += [c.name or '' for c in kb.custom_fonts.all()]
+    except Exception:
+        pass
+    for name in font_names:
+        for tok in _re.split(r'[\s_\-]+', str(name)):
+            tok = tok.strip()
+            if (len(tok) >= 4 and tok.lower() not in stop
+                    and tok.lower() not in weight_words):
+                keywords.add(tok)
     return sorted(keywords)
 
 
@@ -2038,10 +2122,13 @@ def _upload_image_to_s3(*, org_id: int, post_id: int, png_bytes: bytes, mime_typ
     return s3_key, s3_url
 
 
-def _log_usage_gemini(post, model: str, cost_usd: float, usage_metadata: dict = None):
+def _log_usage_gemini(post, model: str, cost_usd: float, usage_metadata: dict = None,
+                      purpose: str = ''):
     """
     Loga custo Gemini no Post.ai_usage_log.
     usage_metadata: dict do response.usageMetadata do Gemini (tokens reais)
+    purpose: granular (C0.2) — ex.: gemini_main, gemini_background,
+             gemini_text_apply, gemini_edit_image, gemini_regenerate_background
     """
     meta = usage_metadata or {}
     usage_dict = {
@@ -2055,6 +2142,7 @@ def _log_usage_gemini(post, model: str, cost_usd: float, usage_metadata: dict = 
         step='image_generation',
         model=model,
         usage_dict=usage_dict,
+        purpose=purpose,
         images_generated=1,
     )
 
@@ -2150,6 +2238,12 @@ def _record_ai_usage(post, *, step: str, model: str, usage_dict: dict,
         'total_image_cost_usd',
         'total_cost_usd',
     ])
+
+    # Evento na fonte única org-level (C0.3) — nunca levanta exceção.
+    from apps.core.services.ai_usage import record_ai_event
+    record_ai_event(getattr(post, 'organization', None), step=step, model=model,
+                    usage_dict=usage_dict, purpose=purpose, post=post,
+                    source='posts', images_generated=images_generated)
 
     logger.info(
         '[ai_cost] post=%s step=%s model=%s tokens_in=%d tokens_out=%d images=%d cost=$%s (R$%s)',
@@ -2434,3 +2528,6 @@ from apps.posts.tasks_vb import generate_post_vb_task  # noqa: E402,F401
 
 # Pipeline EXCLUSIVO da Samsung Healthcare (org slug='samsung-healthcare'): idem.
 from apps.posts.tasks_samsung import generate_post_samsung_task  # noqa: E402,F401
+
+# Revisao por IA no portao dos TEMPLATES (C1.4): task generica das 3 orgs.
+from apps.posts.tasks_archetype import revise_template_gate_task  # noqa: E402,F401

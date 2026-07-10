@@ -87,12 +87,121 @@ def generate_post_samsung_task(self, post_id: int):
     _record_ai_usage(post, step='text_generation', model=brain.get('model'),
                      usage_dict=brain.get('usage') or {}, purpose='samsung_skill_brain')
 
+    # Persiste o output da etapa 1 no ctx (fonte da etapa de render nas DUAS
+    # rotas: etapa unica e portao).
+    s_ctx.update({
+        'archetype': archetype,
+        'content': content,
+        'caption': structured.get('caption') or '',
+        'hashtags': structured.get('hashtags') or [],
+        'image_prompt': (structured.get('image_prompt') or '').strip(),
+        'brain_model': brain.get('model'),
+        'trace': trace,
+        'updated_at': dj_tz.now().isoformat(),
+    })
+    ctx['samsung'] = s_ctx
+    post.local_pipeline_context = ctx
+    post.ia_provider = 'anthropic'
+    post.ia_model_text = brain.get('model')
+    post.save(update_fields=['local_pipeline_context', 'ia_provider', 'ia_model_text'])
+
+    # ---------------- PORTAO (duas etapas — flag por org, C1) ----------------
+    if getattr(org, 'archetype_two_step', False):
+        post.title = (content.get('title') or '').replace('\n', ' ') or post.title
+        post.subtitle = content.get('body') or content.get('kicker') or ''
+        post.caption = structured.get('caption') or ''
+        post.hashtags = structured.get('hashtags') or []
+        # Foto do usuario (upload/ref) -> sem descricao (imagem nao sera IA)
+        from apps.posts.services.artkit.photo_source import has_user_photo
+        post.image_prompt = ('' if has_user_photo(post)
+                             else (structured.get('image_prompt') or '').strip())
+        s_ctx['gate_map'] = {'title': 'title' if content.get('title') else None,
+                             'subtitle': ('body' if content.get('body')
+                                          else ('kicker' if content.get('kicker') else None))}
+        s_ctx['gate'] = {'stage': 'awaiting_approval', 'at': dj_tz.now().isoformat()}
+        ctx['samsung'] = s_ctx
+        post.local_pipeline_context = ctx
+        post.status = 'pending'
+        post.save()
+        logger.info('[samsung] post=%s PORTAO: textos prontos (arquetipo=%s) — '
+                    'aguardando aprovacao do usuario', post_id, archetype)
+        return {'success': True, 'post_id': post_id, 'gate': True,
+                'archetype': archetype}
+
+    return _samsung_render_stage(self, post_id)
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=30)
+def render_post_samsung_task(self, post_id: int):
+    """Etapa B do portao (C1): renderiza apos a aprovacao do usuario, com as
+    EDICOES feitas no pending (title/subtitle/caption/hashtags/image_prompt)."""
+    return _samsung_render_stage(self, post_id, from_gate=True)
+
+
+def _samsung_render_stage(task, post_id: int, from_gate: bool = False):
+    """Etapas 2+3 (assets/foto + render Pillow + persistencia) — comum a etapa
+    unica e ao portao. Le tudo do ctx persistido pela etapa 1."""
+    from apps.posts.models import Post
+    from apps.knowledge.models import KnowledgeBase, Logo, ReferenceImage
+    from apps.core.services.s3_service import S3Service
+    from apps.posts.tasks import _record_ai_usage
+    from apps.posts.services.samsung.render import render_samsung
+    from apps.posts.services.samsung.wireframes import WF, archetypes_for_format
+    from apps.posts.services.samsung.catalog import apply_org_wireframes
+
+    post = Post.objects.get(id=post_id)
+    org = post.organization
+    kb = KnowledgeBase.objects.filter(organization=org).first()
+    apply_org_wireframes(org)
+
+    ctx = post.local_pipeline_context or {}
+    s_ctx = ctx.get('samsung') or {}
+    trace = s_ctx.get('trace') or []
+    fmt = 'feed'  # Samsung: formato único 4:5 por ora
+
+    archetype = (s_ctx.get('archetype') or 'A').strip().upper()
+    if archetype not in WF() or archetype not in archetypes_for_format(fmt):
+        archetype = archetypes_for_format(fmt)[0]
+    content = dict(s_ctx.get('content') or {})
+    structured = {'caption': s_ctx.get('caption') or '',
+                  'hashtags': s_ctx.get('hashtags') or []}
+    brain_model = s_ctx.get('brain_model') or post.ia_model_text
+    img_prompt = (s_ctx.get('image_prompt') or '').strip()
+
+    if from_gate:
+        gm = s_ctx.get('gate_map') or {}
+        if gm.get('title') and (post.title or '').strip():
+            content[gm['title']] = post.title.strip()
+        if gm.get('subtitle') and (post.subtitle or '').strip():
+            content[gm['subtitle']] = post.subtitle.strip()
+        structured['caption'] = post.caption or structured['caption']
+        structured['hashtags'] = post.hashtags or structured['hashtags']
+        # Descricao da imagem editada no portao prevalece.
+        if (post.image_prompt or '').strip():
+            img_prompt = post.image_prompt.strip()
+        s_ctx['content'] = content
+        s_ctx['gate'] = {'stage': 'approved', 'at': dj_tz.now().isoformat()}
+
     # ---------------- Etapa 2: imagem ----------------
     from apps.posts.services.samsung.render import _fetch as _samsung_fetch
     assets = {}
     photo_origin = None
     ref = None
-    img_prompt = (structured.get('image_prompt') or '').strip()
+
+    def _uploaded_url():
+        """Upload feito no MODAL (C1.6) — prioridade maxima na foto."""
+        try:
+            up = post.reference_image_files.order_by('order').first()
+        except Exception:
+            up = None
+        if not up:
+            return None
+        if up.s3_key:
+            try:
+                return S3Service.generate_presigned_download_url(up.s3_key, expires_in=3600)
+            except Exception:
+                pass
+        return up.s3_url or None
 
     def _selected_ref():
         ids = ctx.get('selected_reference_ids') or []
@@ -113,7 +222,7 @@ def generate_post_samsung_task(self, post_id: int):
             return False
 
     def _gemini(prompt, style):
-        from apps.posts.services.todxs.gemini_singleshot import generate_singleshot
+        from apps.posts.services.artkit.gemini import generate_singleshot
         g = generate_singleshot(prompt_text=prompt + style, image_inputs=[])
         _record_ai_usage(post, step='image_generation', model=g.get('model'),
                          usage_dict=g.get('usage') or {}, purpose='samsung_background',
@@ -121,14 +230,19 @@ def generate_post_samsung_task(self, post_id: int):
         return g['png_bytes']
 
     if archetype == 'B':
-        ref = _selected_ref()
-        url = _ref_url(ref)
+        # C1.6 (escolha feita NO MODAL): upload do usuario > ref selecionada
+        # > Gemini. A deteccao de transparencia decide produto vs fundo.
+        url = _uploaded_url()
+        _src = 'upload' if url else 'kb'
+        if not url:
+            ref = _selected_ref()
+            url = _ref_url(ref)
         if url and _is_transparent(url):
             assets['product_hero'] = url            # (2) PNG transparente -> compõe no navy
-            photo_origin = 'kb_product_transparent'
+            photo_origin = f'{_src}_product_transparent'
         elif url:
             assets['background_image'] = url         # (1) imagem opaca -> fundo inteiro
-            photo_origin = 'kb_product_opaque'
+            photo_origin = f'{_src}_product_opaque'
         elif img_prompt:                             # (3) nada escolhido -> Gemini gera
             try:
                 assets['background_image'] = _gemini(img_prompt, _GEMINI_STYLE_PRODUCT)
@@ -136,15 +250,28 @@ def generate_post_samsung_task(self, post_id: int):
             except Exception:
                 logger.exception('[samsung] gemini produto (B) falhou post=%s', post_id)
     else:
-        # A: foto via Gemini seguindo o tema; fallback ref da KB.
-        if img_prompt:
+        # A: C1.6 — a foto ESCOLHIDA pelo usuario no modal (upload > ref
+        # selecionada) vence o Gemini; sem escolha, Gemini gera pelo tema;
+        # ultimo fallback: ref mais importante da KB.
+        url = _uploaded_url()
+        if url:
+            assets['photo'] = url
+            photo_origin = 'user_upload'
+        else:
+            _sel = _selected_ref()
+            _sel_url = _ref_url(_sel)
+            if _sel_url:
+                ref = _sel
+                assets['photo'] = _sel_url
+                photo_origin = 'kb_reference_selected'
+        if 'photo' not in assets and img_prompt:
             try:
                 assets['photo'] = _gemini(img_prompt, _GEMINI_STYLE_PHOTO)
                 photo_origin = 'gemini'
             except Exception:
                 logger.exception('[samsung] gemini foto (A) falhou post=%s', post_id)
         if 'photo' not in assets:
-            ref = (_selected_ref() or ReferenceImage.objects.filter(knowledge_base=kb)
+            ref = (ReferenceImage.objects.filter(knowledge_base=kb)
                    .order_by('-importance', 'id').first())
             url = _ref_url(ref)
             if url:
@@ -162,30 +289,43 @@ def generate_post_samsung_task(self, post_id: int):
     assets['brand_lockup'] = lockup_url
 
     # ---------------- Etapa 3: render Pillow ----------------
+    # ENGINE V3 (flag por org): converte a spec ativa (banco-sobre-código, v2)
+    # on-the-fly e renderiza pelo motor único. Paridade pixel provada (A e B).
+    # Desligar a flag = volta instantâneo ao render dedicado.
+    engine_used = 'legacy'
     try:
-        pr = render_samsung(archetype=archetype, content=content, kb=kb, assets=assets)
+        if getattr(org, 'archetype_engine_v3', False):
+            from apps.posts.services.artkit.convert import samsung_to_v3
+            from apps.posts.services.artkit import spec3
+            from apps.posts.services.artkit.engine import render_v3
+            from apps.posts.services.samsung.render import _font
+            norm = spec3.normalize(samsung_to_v3(archetype, src=WF().get(archetype)))
+            pr = render_v3(norm, content=content,
+                           ctx={'font': _font, 'assets': assets, 'tokens': {}})
+            engine_used = 'v3'
+        else:
+            pr = render_samsung(archetype=archetype, content=content, kb=kb, assets=assets)
     except Exception as exc:
-        logger.exception('[samsung] render falhou post=%s', post_id)
-        raise self.retry(exc=exc)
+        logger.exception('[samsung] render falhou post=%s (engine=%s)', post_id, engine_used)
+        raise task.retry(exc=exc)
 
-    raw_key, raw_url = _upload_image_to_s3(
-        org_id=org.id, post_id=post.id, png_bytes=pr['raw_png'], mime_type='image/png')
-    s3_key, s3_url = _upload_image_to_s3(
-        org_id=org.id, post_id=post.id, png_bytes=pr['final_png'], mime_type='image/png')
-
-    # ---------------- Persistência ----------------
-    max_order = post.images.aggregate(Max('order'))['order__max']
-    PostImage.objects.create(
-        post=post, s3_key=s3_key, s3_url=s3_url,
-        order=(max_order if max_order is not None else -1) + 1,
+    # ---------------- Persistência (nucleo comum: artkit.persist) ----------------
+    from apps.posts.services.artkit.persist import persist_rendered_art
+    up = persist_rendered_art(
+        post,
+        raw_png=pr['raw_png'], final_png=pr['final_png'], elements=pr['elements'],
+        title=(content.get('title') or '').replace('\n', ' ') or post.title,
+        subtitle=content.get('body') or content.get('kicker') or '',
+        caption=structured.get('caption') or '',
+        hashtags=structured.get('hashtags') or [],
+        image_prompt=f'Samsung arquetipo {archetype} ({fmt}) — render Pillow deterministico',
+        ia_provider='anthropic', ia_model_text=brain_model,
+        ia_model_image='samsung-pillow',
     )
+    raw_url, s3_key, s3_url = up['raw_url'], up['s3_key'], up['s3_url']
 
-    dp = post.designer_payload if isinstance(post.designer_payload, dict) else {}
-    dp['_layout_elements'] = pr['elements']
-    post.designer_payload = dp
-    post.raw_image_s3_key = raw_key
-
-    trace.append({'etapa': '3_render', 'archetype': archetype, 'elements': pr['elements'],
+    trace.append({'etapa': '3_render', 'archetype': archetype, 'engine': engine_used,
+                  'elements': pr['elements'],
                   'fonts': pr['fonts_resolved'], 'photo_origin': photo_origin,
                   'photo_ref_id': ref.id if ref else None,
                   'final_s3_key': s3_key, 'at': dj_tz.now().isoformat()})
@@ -195,21 +335,6 @@ def generate_post_samsung_task(self, post_id: int):
         'updated_at': dj_tz.now().isoformat(),
     })
     ctx['samsung'] = s_ctx
-
-    post.title = (content.get('title') or '').replace('\n', ' ') or post.title
-    post.subtitle = content.get('body') or content.get('kicker') or ''
-    post.caption = structured.get('caption') or ''
-    post.hashtags = structured.get('hashtags') or []
-    post.image_prompt = f'Samsung arquetipo {archetype} ({fmt}) — render Pillow deterministico'
-    post.image_s3_key = s3_key
-    post.image_s3_url = s3_url
-    post.has_image = True
-    post.ia_provider = 'anthropic'
-    post.ia_model_text = brain.get('model')
-    post.ia_model_image = 'samsung-pillow'
-    existing = post.generated_images if isinstance(post.generated_images, list) else []
-    existing.append({'s3_key': s3_key, 'url': s3_url})
-    post.generated_images = existing
     post.local_pipeline_context = ctx
     post.status = 'image_ready'
     post.save()

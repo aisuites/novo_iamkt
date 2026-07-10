@@ -283,8 +283,45 @@
         </div>
         
         <form id="formGerarPost" class="modal-body">
+            <!-- Modo de geracao NO TOPO (so orgs com seletor de arquetipo).
+                 Em "Usar template", rede/formato, CTA e carrossel somem:
+                 o formato vem do arquetipo e CTA/carrossel nao se aplicam. -->
+            <style>
+              .gen-mode-toggle{display:inline-flex;border:1px solid #d1d5db;border-radius:10px;overflow:hidden;background:#f9fafb;}
+              .gen-mode-btn{padding:8px 16px;border:none;background:transparent;font:600 13px system-ui,Arial;color:#6b7280;cursor:pointer;}
+              .gen-mode-btn.active{background:#6d28d9;color:#fff;}
+              .archetype-slider{display:flex;gap:10px;overflow-x:auto;padding:6px 2px 10px;}
+              .archetype-card{flex:0 0 auto;width:112px;border:2px solid #e5e7eb;border-radius:10px;overflow:hidden;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s;}
+              .archetype-card.selected{border-color:#6d28d9;box-shadow:0 0 0 2px rgba(109,40,217,.22);}
+              .archetype-card .thumb{width:100%;height:140px;object-fit:cover;display:block;background:#f3f4f6;}
+              .archetype-card .ph{width:100%;height:140px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font:700 12px system-ui;text-align:center;padding:6px;background:#f3f4f6;}
+              .archetype-card .cap{padding:6px 8px;font:600 11px system-ui,Arial;color:#374151;line-height:1.25;}
+              .archetype-card .cap small{display:block;color:#9ca3af;font-weight:500;text-transform:uppercase;font-size:9px;letter-spacing:.04em;}
+              .archetype-palette{display:flex;flex-wrap:wrap;gap:10px;padding:4px 0;}
+              .color-dot{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1px #d1d5db;transition:transform .1s,box-shadow .1s;}
+              .color-dot.selected{box-shadow:0 0 0 2px #6d28d9;transform:scale(1.12);}
+            </style>
+            <div id="genModeRow" class="field" style="display:none;">
+                <label>Como gerar a arte</label>
+                <div class="gen-mode-toggle" role="tablist">
+                    <button type="button" class="gen-mode-btn active" data-mode="livre">Geracao livre</button>
+                    <button type="button" class="gen-mode-btn" data-mode="template">Usar template</button>
+                </div>
+                <small class="asset-hint">Geracao livre: a IA escolhe o template e a cor. Usar template: voce escolhe o arquetipo e a cor inspiracao.</small>
+            </div>
+
+            <!-- Painel do modo "Usar template" -->
+            <div id="archetypePanel" class="field" style="display:none;">
+                <label>Escolha o template (arquetipo)</label>
+                <div id="archetypeSlider" class="archetype-slider">
+                    <div class="asset-gallery-loading">Carregando templates...</div>
+                </div>
+                <label style="margin-top:10px;">Cor inspiracao</label>
+                <div id="archetypePalette" class="archetype-palette"></div>
+            </div>
+
             <!-- LINHA 1: Rede Social + Formato (Grid 2 colunas) -->
-            <div class="modal-row-grid">
+            <div class="modal-row-grid" id="linhaRedeFormato">
                 <div class="field">
                     <label for="redePost">
                         Rede Social
@@ -314,7 +351,7 @@
             </div>
             
             <!-- LINHA 2: CTA + Carrossel + Qtd (Grid 3 colunas) -->
-            <div class="modal-row-grid-3">
+            <div class="modal-row-grid-3" id="linhaCtaCarrossel">
                 <div class="field">
                     <label>Call to Action (CTA)</label>
                     <div class="cta-toggle-group">
@@ -359,41 +396,6 @@
                           maxlength="3000" placeholder="Restrições, exemplos, referências..." required></textarea>
             </div>
             
-            <!-- Modo de geracao (so orgs com seletor de arquetipo habilitado) -->
-            <style>
-              .gen-mode-toggle{display:inline-flex;border:1px solid #d1d5db;border-radius:10px;overflow:hidden;background:#f9fafb;}
-              .gen-mode-btn{padding:8px 16px;border:none;background:transparent;font:600 13px system-ui,Arial;color:#6b7280;cursor:pointer;}
-              .gen-mode-btn.active{background:#6d28d9;color:#fff;}
-              .archetype-slider{display:flex;gap:10px;overflow-x:auto;padding:6px 2px 10px;}
-              .archetype-card{flex:0 0 auto;width:112px;border:2px solid #e5e7eb;border-radius:10px;overflow:hidden;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s;}
-              .archetype-card.selected{border-color:#6d28d9;box-shadow:0 0 0 2px rgba(109,40,217,.22);}
-              .archetype-card .thumb{width:100%;height:140px;object-fit:cover;display:block;background:#f3f4f6;}
-              .archetype-card .ph{width:100%;height:140px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font:700 12px system-ui;text-align:center;padding:6px;background:#f3f4f6;}
-              .archetype-card .cap{padding:6px 8px;font:600 11px system-ui,Arial;color:#374151;line-height:1.25;}
-              .archetype-card .cap small{display:block;color:#9ca3af;font-weight:500;text-transform:uppercase;font-size:9px;letter-spacing:.04em;}
-              .archetype-palette{display:flex;flex-wrap:wrap;gap:10px;padding:4px 0;}
-              .color-dot{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1px #d1d5db;transition:transform .1s,box-shadow .1s;}
-              .color-dot.selected{box-shadow:0 0 0 2px #6d28d9;transform:scale(1.12);}
-            </style>
-            <div id="genModeRow" class="field" style="display:none;">
-                <label>Como gerar a arte</label>
-                <div class="gen-mode-toggle" role="tablist">
-                    <button type="button" class="gen-mode-btn active" data-mode="livre">Geracao livre</button>
-                    <button type="button" class="gen-mode-btn" data-mode="template">Usar template</button>
-                </div>
-                <small class="asset-hint">Geracao livre: a IA escolhe o template e a cor. Usar template: voce escolhe o arquetipo e a cor inspiracao.</small>
-            </div>
-
-            <!-- Painel do modo "Usar template" -->
-            <div id="archetypePanel" class="field" style="display:none;">
-                <label>Escolha o template (arquetipo)</label>
-                <div id="archetypeSlider" class="archetype-slider">
-                    <div class="asset-gallery-loading">Carregando templates...</div>
-                </div>
-                <label style="margin-top:10px;">Cor inspiracao</label>
-                <div id="archetypePalette" class="archetype-palette"></div>
-            </div>
-
             <div id="freeGenFields">
             <!-- LINHA 4: Logos da marca -->
             <div class="field" id="logoField">
@@ -540,6 +542,7 @@
                     <button type="button" id="btnUndo" title="Desfazer (Ctrl+Z)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">↶ Desfazer</button>
                     <button type="button" id="btnRedo" title="Refazer (Ctrl+Shift+Z)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">↷ Refazer</button>
                     <button type="button" id="btnAddImage" title="Adicionar imagem (sticker)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Imagem</button>
+                    <button type="button" id="btnAddText" title="Adicionar caixa de texto" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Texto</button>
                     <input type="file" id="stickerFileInput" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" style="display:none;">
                 </div>
                 <div id="panelEmpty" style="padding:24px 16px;color:#888;font-size:13px;text-align:center;">
@@ -565,6 +568,12 @@
                         <textarea id="ctrlText" rows="3" style="width:100%;font-size:13px;border:1px solid #ddd;border-radius:4px;padding:6px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
                     </div>
 
+                    <!-- Fonte (familias do pipeline/KB) -->
+                    <div id="ctrlFontWrap" style="margin-bottom:12px;display:none;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Fonte</label>
+                        <select id="ctrlFont" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:6px;font-size:12px;background:#fff;"></select>
+                    </div>
+
                     <!-- Tamanho da fonte -->
                     <div id="ctrlSizeWrap" style="margin-bottom:12px;">
                         <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Tamanho <span id="ctrlSizeVal">55</span>px</label>
@@ -575,6 +584,7 @@
                     <div id="ctrlColorWrap" style="margin-bottom:12px;">
                         <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Cor do texto</label>
                         <input type="color" id="ctrlColor" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                        <div id="paletteSwatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
                     </div>
 
                     <!-- Cor de fundo (CTA com background, grafismo) -->
@@ -584,6 +594,7 @@
                             <button type="button" id="btnRemoveBg" title="Remover fundo" style="border:none;background:none;cursor:pointer;font-size:11px;color:#999;padding:0;">remover</button>
                         </label>
                         <input type="color" id="ctrlBgColor" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                        <div id="paletteBgSwatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
                     </div>
 
                     <!-- Raio (CTA / grafismo) -->
@@ -669,8 +680,8 @@
             <strong style="font-size:13px;">Imagem final (com texto)</strong>
             <img id="simpleDebugFinal" style="width:100%;border:1px solid #ddd;border-radius:6px;margin-top:4px;" alt="final">
         </div>
-        <div style="flex:1;min-width:300px;">
-            <strong style="font-size:13px;">Gemini c/ texto (comparação — só TODXS)</strong>
+        <div style="flex:1;min-width:300px;" id="simpleDebugGeminiBox">
+            <strong style="font-size:13px;">Gemini c/ texto (original — comparação Q1)</strong>
             <img id="simpleDebugGemini" style="width:100%;border:1px solid #ddd;border-radius:6px;margin-top:4px;" alt="gemini-texto">
         </div>
     </div>
@@ -699,6 +710,7 @@
             document.getElementById('simpleDebugBg').src = d.bg_url || '';
             document.getElementById('simpleDebugFinal').src = d.final_url || '';
             document.getElementById('simpleDebugGemini').src = d.gemini_url || '';
+            document.getElementById('simpleDebugGeminiBox').style.display = d.gemini_url ? '' : 'none';
             document.getElementById('simpleDebugBgPrompt').textContent = d.bg_prompt || '(vazio — imagem ainda não gerada?)';
             document.getElementById('simpleDebugFinalPrompt').textContent = d.final_prompt || '(vazio)';
             document.getElementById('simpleDebugRules').textContent = JSON.stringify(d.rules || {}, null, 2);
@@ -734,13 +746,14 @@ try {
 
 window.CURRENT_USER = "{{ request.user.email|default:''|escapejs }}";
 window.IS_ADMIN = {{ is_admin|yesno:"true,false" }};
+window.ADVANCED_EDITOR = {{ advanced_editor|yesno:"true,false" }};
 window.ORGANIZATION_ID = {{ request.user.organization.id|default:0 }};
 </script>
 
 {% load static %}
 <script src="{% static 'js/image-preview-loader.js' %}?v=20260303-0530"></script>
 <script src="{% static 'js/uploads-simple.js' %}"></script>
-<script src="{% static 'js/posts.js' %}?v=20260625-retry"></script>
+<script src="{% static 'js/posts.js' %}?v=20260710-texto-paleta"></script>
 
 <script>
 // Inicializar lazyload para imagens dos posts com endpoint correto
@@ -913,6 +926,8 @@ function toggleCarrossel() {
     let titleFont = 'serif', logoUrl = null;
     let fontFamilyByRole = { titulo: 'serif', subtitulo: 'serif', cta: 'serif' };
     let txFamilies = {};  // TODXS: familias por chave de uso (display/regular/caps_small)
+    let editorPalette = [];   // paleta da KB [{nome, hex}] — swatches
+    let fontChoices = [];     // fontes do pipeline [{key, label}] — + Texto
     let currentPipeline = '';
     // History stack para undo/redo. Cada snapshot e um JSON.stringify(elements).
     let history = [];
@@ -990,6 +1005,10 @@ function toggleCarrossel() {
             _updateRestoreBtn(data.background_history_size || 0);
             fontFamilyByRole = _registerPostFonts(postId, data.font_urls || {}, data.font_names || {});
             txFamilies = _registerTodxsFonts(postId, data.todxs_font_urls || {});
+            editorPalette = data.palette || [];
+            fontChoices = data.font_choices || [];
+            _buildPaletteSwatches();
+            _buildFontSelect();
             // Aguarda imagem de fundo carregar — fitContainer depende de naturalWidth/Height
             await new Promise((resolve) => {
                 if (bgEl.complete && bgEl.naturalWidth > 0) return resolve();
@@ -1096,7 +1115,8 @@ function toggleCarrossel() {
             // TODXS: fonte por CHAVE de uso (mesma do Pillow) + leading + quebras fixas.
             const isTodxs = !!(el.font_key && txFamilies[el.font_key]);
             const fam = isTodxs ? txFamilies[el.font_key]
-                                : (fontFamilyByRole[role] || fontFamilyByRole.titulo || 'serif');
+                                : ((el.font_key && fontFamilyByRole[el.font_key])
+                                   || fontFamilyByRole[role] || fontFamilyByRole.titulo || 'serif');
             const alignH = (el.align==='center')?'center':((el.align==='right')?'flex-end':'flex-start');
             Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
                 width:el.width_pct+'%',
@@ -1176,6 +1196,11 @@ function toggleCarrossel() {
         const isImg  = role === 'image';
 
         ctrlTextWrap.style.display    = isText ? 'block' : 'none';
+        ctrlFontWrap.style.display    = (isText && fontChoices.length) ? 'block' : 'none';
+        if (isText && fontChoices.length) {
+            const cur = el.font_key || role;
+            ctrlFont.value = fontChoices.some(f => f.key === cur) ? cur : fontChoices[0].key;
+        }
         ctrlSizeWrap.style.display    = isText ? 'block' : 'none';
         ctrlColorWrap.style.display   = isText ? 'block' : 'none';
         ctrlStyleWrap.style.display   = isText ? 'flex'  : 'none';
@@ -1252,6 +1277,74 @@ function toggleCarrossel() {
         else if (role === 'grafismo') el.cor = ctrlBgColor.value;
         _renderAll();
         _bumpHistoryDebounced();
+    });
+
+    // ── Fonte por elemento (+ Texto / troca) ───────────────────────────────
+    const ctrlFontWrap = document.getElementById('ctrlFontWrap');
+    const ctrlFont = document.getElementById('ctrlFont');
+    function _buildFontSelect() {
+        ctrlFont.innerHTML = '';
+        fontChoices.forEach(f => {
+            const o = document.createElement('option');
+            o.value = f.key; o.textContent = f.label;
+            ctrlFont.appendChild(o);
+        });
+    }
+    ctrlFont.addEventListener('change', () => {
+        if (selectedIdx === null) return;
+        const el = elements[selectedIdx];
+        el.font_key = ctrlFont.value;
+        // caminho antigo nao vale mais — o backend re-resolve pelo font_key
+        delete el._font_path;
+        _renderAll(); _snapshotElements();
+    });
+
+    // ── Swatches da paleta da KB (cor do texto e cor do fundo) ─────────────
+    function _buildPaletteSwatches() {
+        [['paletteSwatches', (hex) => {
+            if (selectedIdx === null) return;
+            elements[selectedIdx].color = hex;
+            ctrlColor.value = _toHex6(hex);
+        }], ['paletteBgSwatches', (hex) => {
+            if (selectedIdx === null) return;
+            const el = elements[selectedIdx];
+            const role = (el.role||'').toLowerCase();
+            if (role === 'cta') el.background_color = hex;
+            else if (role === 'grafismo') el.cor = hex;
+            ctrlBgColor.value = _toHex6(hex);
+        }]].forEach(([id, apply]) => {
+            const box = document.getElementById(id);
+            if (!box) return;
+            box.innerHTML = '';
+            editorPalette.forEach(c => {
+                const d = document.createElement('span');
+                d.title = (c.nome ? c.nome + ' ' : '') + c.hex;
+                d.style.cssText = 'width:22px;height:22px;border-radius:50%;cursor:pointer;'
+                    + 'border:2px solid #fff;box-shadow:0 0 0 1px #ccc;display:inline-block;'
+                    + 'background:' + c.hex + ';';
+                d.addEventListener('click', () => { apply(c.hex); _renderAll(); _snapshotElements(); });
+                box.appendChild(d);
+            });
+        });
+    }
+
+    // ── + Texto: nova caixa de texto ───────────────────────────────────────
+    const btnAddText = document.getElementById('btnAddText');
+    btnAddText.addEventListener('click', () => {
+        if (!currentPostId) return;
+        const defFont = fontChoices.length ? fontChoices[0].key : null;
+        const defColor = (editorPalette[0] && editorPalette[0].hex) || '#FFFFFF';
+        const newEl = {
+            role: 'subtitulo', content: 'Novo texto',
+            x_pct: 8, y_pct: 8, width_pct: 45, height_pct: 10,
+            font_size_pct: 4.5, color: defColor, align: 'left',
+            weight: 'regular', visible: true,
+        };
+        if (defFont) newEl.font_key = defFont;
+        elements.push(newEl);
+        selectedIdx = elements.length - 1;
+        _renderAll(); _updatePanel(); _snapshotElements();
+        statusEl.textContent = 'Caixa de texto adicionada — edite o conteúdo no painel.';
     });
     btnRemoveBg.addEventListener('click', () => {
         if(selectedIdx===null)return;
@@ -1439,7 +1532,7 @@ function toggleCarrossel() {
                 body: JSON.stringify({ elements: els }),
             });
             const d = await r.json().catch(() => ({}));
-            // Atualiza o preview da pagina com a arte re-renderizada (TODXS) e
+            // Atualiza o preview da pagina com a arte re-renderizada e
             // ESPERA a imagem nova carregar antes de retornar (spinner some so apos).
             if (d && d.image_url) {
                 const frame = document.getElementById('postImageFrame');
@@ -1463,7 +1556,7 @@ function toggleCarrossel() {
         const els = elements.slice();
         // Pipelines que RE-RENDERIZAM o publicado no save (todxs, vb, samsung):
         // trava a tela com overlay ate a arte nova carregar no preview.
-        const rerenders = (currentPipeline === 'todxs' || currentPipeline === 'vb' || currentPipeline === 'samsung') && pid && els && els.length;
+        const rerenders = (currentPipeline === 'todxs' || currentPipeline === 'vb' || currentPipeline === 'samsung' || currentPipeline === 'simple') && pid && els && els.length;
         _stopBgPolling();
         if (rerenders) _showSaveOverlay();
         modal.style.display='none'; document.body.style.overflow='';
@@ -1525,7 +1618,10 @@ function toggleCarrossel() {
             _startBgPolling();
         } catch (e) {
             console.error('[bg-request]', e);
-            statusEl.textContent = 'Erro ao solicitar nova imagem.';
+            // Mostra a mensagem REAL do backend (ex.: limite de alteracoes
+            // atingido) em vez do erro generico.
+            statusEl.textContent = (e && e.message && e.message !== 'falha_solicitar')
+                ? e.message : 'Erro ao solicitar nova imagem.';
         } finally {
             btnBgRequestSubmit.disabled = false;
             btnBgRequestSubmit.textContent = 'Gerar nova imagem';
@@ -1648,7 +1744,13 @@ function toggleCarrossel() {
             const url = fontUrls && fontUrls[role];
             if (url) {
                 const family = `IAMKT_${postId}_${role}`;
-                css.push(`@font-face{font-family:'${family}';src:url('${url}') format('truetype');font-display:swap;}`);
+                css.push(`@font-face{font-family:'${family}';src:url('${url}') format('truetype');font-weight:400;font-display:swap;}`);
+                // Variante BOLD real (quando a KB/Google tem o peso): o browser
+                // usa o arquivo 700 em vez de SINTETIZAR — igual ao Pillow.
+                const boldUrl = fontUrls && fontUrls[role + '_bold'];
+                if (boldUrl) {
+                    css.push(`@font-face{font-family:'${family}';src:url('${boldUrl}') format('truetype');font-weight:700;font-display:swap;}`);
+                }
                 families[role] = `'${family}', '${(fontNames && fontNames[role]) || 'serif'}', serif`;
             } else {
                 families[role] = `'${(fontNames && fontNames[role]) || 'serif'}', serif`;

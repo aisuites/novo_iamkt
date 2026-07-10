@@ -886,4 +886,7 @@ def adapt_layout_spec(
                 pass
 
     merged['source'] = 'dossier_layout_aspect+format_adapted'
+    # usage viaja no spec (side-channel) — o caller registra o custo e faz pop.
+    merged['_usage'] = _extract_usage(resp)
+    merged['_model'] = MODEL
     return merged

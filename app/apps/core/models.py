@@ -518,6 +518,32 @@ class Organization(TimeStampedModel):
         verbose_name='Seletor de Arquétipo Habilitado'
     )
 
+    archetype_engine_v3 = models.BooleanField(
+        default=False,
+        help_text='Renderiza os arquétipos desta org pelo ENGINE V3 (motor único, '
+                  'spec convertida on-the-fly). Desligar = volta instantâneo ao '
+                  'pipeline dedicado. Rollout org a org.',
+        verbose_name='Engine V3 de Arquétipos'
+    )
+
+    advanced_editor_enabled = models.BooleanField(
+        default=False,
+        help_text='Mostra o botão "Edição Avançada" (editor de arte) para os '
+                  'usuários desta empresa. A equipe interna (staff/superuser) '
+                  'sempre vê, independente desta flag.',
+        verbose_name='Edição Avançada Habilitada'
+    )
+
+    archetype_two_step = models.BooleanField(
+        default=False,
+        help_text='Pipelines de arquétipo em DUAS ETAPAS: o brain gera os '
+                  'textos + descrição da imagem e o post para em "pending" '
+                  '(portão de aprovação, como no fluxo simples); só depois da '
+                  'aprovação roda Gemini + render. Desligar = etapa única '
+                  '(comportamento atual). Rollout org a org.',
+        verbose_name='Arquétipos em Duas Etapas'
+    )
+
     # Ciclo de Faturamento (Billing Cycle)
     billing_cycle_day = models.PositiveSmallIntegerField(
         default=1,
@@ -1106,3 +1132,55 @@ class PautaAuditLog(TimeStampedModel):
         elif self.organization:
             return f"{self.get_action_display()} · {self.organization.name} · {user_email}"
         return f"{self.get_action_display()} · {user_email}"
+
+
+class AIUsageEvent(models.Model):
+    """
+    Evento granular de custo de IA — fonte ÚNICA para relatórios de gasto
+    por org × mês (docs/redesenho-fluxos-geracao.md, C0.3).
+
+    Cobre TODA chamada que gasta tokens: com Post (fluxos de geração — o
+    Post.ai_usage_log continua como histórico embutido) e SEM Post (análise
+    visual de KB, brand layout, etc. — o custo "órfão" que antes sumia).
+    Pautas/trends seguem no IAModelUsage (app content); o relatório agrega os dois.
+    """
+    organization = models.ForeignKey(
+        'core.Organization', on_delete=models.CASCADE,
+        related_name='ai_usage_events', verbose_name='Organização',
+    )
+    post = models.ForeignKey(
+        'posts.Post', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='ai_usage_events', verbose_name='Post',
+    )
+    source = models.CharField(
+        max_length=30, blank=True, verbose_name='Origem',
+        help_text="Ex.: 'posts', 'knowledge', 'brand_layout'",
+    )
+    pipeline = models.CharField(
+        max_length=20, blank=True, verbose_name='Pipeline',
+        help_text='pipeline_used do post no momento do evento (quando houver)',
+    )
+    step = models.CharField(max_length=40, verbose_name='Etapa')
+    purpose = models.CharField(max_length=80, blank=True, verbose_name='Propósito')
+    model = models.CharField(max_length=80, blank=True, verbose_name='Modelo')
+    input_tokens = models.PositiveIntegerField(default=0)
+    output_tokens = models.PositiveIntegerField(default=0)
+    cache_read_tokens = models.PositiveIntegerField(default=0)
+    cache_creation_tokens = models.PositiveIntegerField(default=0)
+    images_generated = models.PositiveSmallIntegerField(default=0)
+    cost_usd = models.DecimalField(max_digits=10, decimal_places=6, default=0)
+    cost_brl = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Evento de Uso de IA'
+        verbose_name_plural = 'Eventos de Uso de IA'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['organization', '-created_at']),
+            models.Index(fields=['organization', 'source', '-created_at']),
+        ]
+
+    def __str__(self):
+        return (f'{self.organization_id} {self.source or "?"}/{self.step} '
+                f'{self.model} ${self.cost_usd}')

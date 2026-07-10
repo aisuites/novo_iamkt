@@ -12,13 +12,13 @@ class ImageValidator {
             logos: {
                 minDimensions: { width: 100, height: 100 },
                 maxDimensions: { width: 10000, height: 10000 },
-                maxFileSize: 5 * 1024 * 1024,  // 5MB
+                maxFileSize: 15 * 1024 * 1024,  // 15MB (original integro no S3; compactacao so no envio a IA)
                 allowedTypes: ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp']
             },
             references: {
                 minDimensions: { width: 200, height: 200 },
                 maxDimensions: { width: 10000, height: 10000 },
-                maxFileSize: 10 * 1024 * 1024,  // 10MB
+                maxFileSize: 15 * 1024 * 1024,  // 15MB (original integro no S3; compactacao so no envio a IA)
                 allowedTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
             },
             fonts: {
@@ -28,7 +28,7 @@ class ImageValidator {
             posts: {
                 minDimensions: { width: 200, height: 200 },
                 maxDimensions: { width: 10000, height: 10000 },
-                maxFileSize: 10 * 1024 * 1024,  // 10MB
+                maxFileSize: 15 * 1024 * 1024,  // 15MB (original integro no S3; compactacao so no envio a IA)
                 allowedTypes: ['image/png', 'image/jpeg', 'image/webp']
             }
         };

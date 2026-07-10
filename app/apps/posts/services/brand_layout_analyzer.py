@@ -171,6 +171,19 @@ def analyze_brand_layout_from_references(
     kb.brand_layout_spec = spec
     kb.save(update_fields=['brand_layout_spec'])
 
+    # Custo "órfão" (sem Post; ~1x por KB, cacheado) — rastreado por org (C0.3)
+    try:
+        from apps.core.services.ai_usage import record_ai_event
+        from apps.posts.services.artkit.brain import extract_usage
+        record_ai_event(
+            getattr(kb, 'organization', None),
+            step='vision_analysis', model=MODEL,
+            usage_dict=extract_usage(resp), source='brand_layout',
+            purpose='brand_layout_analysis',
+        )
+    except Exception:
+        logger.exception('[brand_layout] falha ao registrar custo')
+
     logger.info(
         '[brand_layout] kb=%s spec gerado a partir de %d refs',
         kb.id, len(analyzed_ids),
@@ -202,6 +215,10 @@ def _download_to_base64(url: str):
         ct = 'image/gif'
     elif ct not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
         ct = 'image/png'
+    # Uploads de ate 15MB: compacta SO para o envio a IA (limite 5MB/imagem
+    # do Claude; original fica intacto no S3).
+    from apps.posts.services.artkit.image import shrink_for_ai
+    data, ct = shrink_for_ai(data, ct)
     return base64.b64encode(data).decode('ascii'), ct
 
 

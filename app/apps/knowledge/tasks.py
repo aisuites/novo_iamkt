@@ -910,6 +910,16 @@ def _run_visual_dossier(instance, analyzer_callable) -> bool:
     instance.save(update_fields=[
         'visual_analysis', 'analysis_status', 'analyzed_at', 'analysis_cost_usd',
     ])
+
+    # Custo "órfão" (sem Post) agora rastreado por org (C0.3)
+    from apps.core.services.ai_usage import record_ai_event
+    kb = getattr(instance, 'knowledge_base', None)
+    record_ai_event(
+        getattr(kb, 'organization', None),
+        step='vision_analysis', model=result.get('model', ''),
+        usage_dict=usage, source='knowledge',
+        purpose=f'visual_dossier_{type(instance).__name__.lower()}',
+    )
     logger.info(
         '[visual_analyzer] %s %s OK (cost=$%s)',
         type(instance).__name__, instance.id, usage.get('cost_usd', 0),

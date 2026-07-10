@@ -291,6 +291,9 @@ def _download_to_base64(url: str) -> Tuple[Optional[str], str]:
 
     if content_type not in ('image/png', 'image/jpeg', 'image/webp'):
         content_type = 'image/png'
+    # Uploads de ate 15MB: compacta SO para o envio a IA (original fica no S3).
+    from apps.posts.services.artkit.image import shrink_for_ai
+    data, content_type = shrink_for_ai(data, content_type)
     return base64.b64encode(data).decode('ascii'), content_type
 
 
@@ -714,6 +717,20 @@ def _build_prompt_text(
     # O titulo/subtitulo (desenhados via Pillow) podem manter a marca; a CENA nao.
     if brand_keywords:
         image_prompt_text = _sanitize_brand_terms(image_prompt_text, brand_keywords)
+
+    # MODO PILLOW (fundo SEM texto): a cena do orquestrador pode DESCREVER o
+    # bloco de texto/logo (p/ compor o espaco) — e a instrucao ESPECIFICA
+    # vence a regra generica de no-text: o Gemini desenha o texto no fundo
+    # (bug thermomix post 257). Reinterpretacao explicita: mencoes de texto/
+    # logo viram ESPACO VAZIO reservado.
+    if text_render_mode == 'pillow' and image_prompt_text:
+        image_prompt_text = (
+            '(NOTE: the scene below may mention text blocks, titles, CTAs or '
+            'logos — treat ALL of those ONLY as RESERVED EMPTY SPACE (clean '
+            'negative space in the described position/size). Do NOT render '
+            'any text, letters, numbers, typography or logos — they are '
+            'added later in post-production.)\n\n' + image_prompt_text
+        )
     inline_anchored = _scene_has_inline_anchoring(image_prompt_text)
 
     if use_hybrid_en:
@@ -821,8 +838,18 @@ def _build_prompt_text(
             '',
             '[BRAND GUIDELINES]',
             f'- Brand palette: {json.dumps(paleta, ensure_ascii=False)}',
-            f'- Typography: {json.dumps(tipografia, ensure_ascii=False)}',
-            '- Apply palette and typography ONLY to post text — not to referenced items.',
+            # MODO PILLOW (fundo SEM texto): tipografia NAO entra no prompt —
+            # (a) os NOMES das fontes podem conter a marca (ex.: Vorwerk-Bold)
+            # e vazar priors que degradam a fidelidade do produto; (b) falar de
+            # "post text" num render sem texto convida o Gemini a DESENHAR
+            # texto no fundo. O texto e aplicado depois (Pillow, fonte real).
+            *([]
+              if text_render_mode == 'pillow' else
+              [f'- Typography: {json.dumps(tipografia, ensure_ascii=False)}',
+               '- Apply palette and typography ONLY to post text — not to referenced items.']),
+            *(['- ABSOLUTELY NO text, letters, numbers, logos or typography in '
+               'this image — it is a clean background; text is added later.']
+              if text_render_mode == 'pillow' else []),
             '- Do not copy text visible inside reference images.',
             '- If no people in references, do not add people.',
             '',
@@ -1459,7 +1486,15 @@ def render_layout_document(png_bytes, elements, paleta=None, fonts=None,
             'padding_pct': float(el.get('padding_pct', 0) or 0),
             'font_size_pct': float(el.get('font_size_pct', 6) or 6),
             'is_bold': is_bold,
-            'fpath': el.get('_font_path') or fonts.get(role) or fonts.get('titulo') or (_DEJAVU_BOLD if is_bold else _DEJAVU_REG),
+            # Resolucao da fonte: _font_path explicito > font_key escolhido no
+            # editor (+ Texto / troca de fonte) > fonte do role (bold: prefere
+            # a variante '<key>_bold' quando o elemento pede peso bold).
+            'fpath': (el.get('_font_path')
+                      or (lambda fk: (fonts.get(fk + '_bold') if is_bold else None)
+                          or fonts.get(fk))((el.get('font_key') or '').strip().lower())
+                      or (fonts.get(role + '_bold') if is_bold else None)
+                      or fonts.get(role) or fonts.get('titulo')
+                      or (_DEJAVU_BOLD if is_bold else _DEJAVU_REG)),
             'fb': _DEJAVU_BOLD if is_bold else _DEJAVU_REG,
             'align_raw': el.get('align') or 'left',
             'color_hex': el.get('color'),
