@@ -1653,25 +1653,32 @@ def _brand_keywords_from_kb(kb) -> list:
             keywords.add(tok)
         elif tok.isupper() and 2 <= len(tok) <= 6:  # ex: acronimos de marca
             keywords.add(tok)
-    # NOMES DE FONTE da KB: fontes proprietarias carregam a marca (ex.:
+    # NOMES DE FONTE da KB: fontes PROPRIETARIAS carregam a marca (ex.:
     # "Vorwerk-Bold" na thermomix) — foi por ai que a marca vazou no prompt
-    # do fundo em 2026-07-09. Pesos/estilos ficam de fora.
+    # do fundo em 2026-07-09. Regras p/ NAO sanitizar palavras legitimas:
+    #   - SO fontes de UPLOAD (Google Fonts sao publicas, nao ativam prior
+    #     de marca — Montserrat/Roboto etc. ficam FORA);
+    #   - pesos/estilos e termos genericos de tipografia ficam fora;
+    #   - token minimo de 4 chars (evita 'SS', 'Ana', 'UI').
     weight_words = {
         'bold', 'medium', 'regular', 'light', 'black', 'heavy', 'semibold',
         'extrabold', 'thin', 'italic', 'condensed', 'extended', 'book',
+        'sans', 'serif', 'mono', 'open', 'head', 'body', 'text', 'display',
+        'font', 'fonts', 'free', 'fontsfree', 'grotesk', 'neue', 'round',
+        'rounded', 'slab', 'script', 'caps', 'hairline', 'extralight',
     }
     font_names = []
     try:
-        font_names += [t.google_font_name or '' for t in kb.typography_settings.all()]
         font_names += [getattr(t.custom_font, 'name', '') or ''
-                       for t in kb.typography_settings.all() if t.custom_font_id]
+                       for t in kb.typography_settings.all()
+                       if t.font_source == 'upload' and t.custom_font_id]
         font_names += [c.name or '' for c in kb.custom_fonts.all()]
     except Exception:
         pass
     for name in font_names:
         for tok in _re.split(r'[\s_\-]+', str(name)):
             tok = tok.strip()
-            if (len(tok) >= 3 and tok.lower() not in stop
+            if (len(tok) >= 4 and tok.lower() not in stop
                     and tok.lower() not in weight_words):
                 keywords.add(tok)
     return sorted(keywords)
