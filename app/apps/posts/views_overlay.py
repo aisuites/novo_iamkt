@@ -308,6 +308,7 @@ def export_png(request, post_id):
             from apps.posts.services.gemini_image_generator import render_layout_document
             png_bytes = render_layout_document(
                 bg_bytes, elements, paleta=None, fonts=font_paths, logo_url=logo_url,
+                fit_text=False,   # export do editor: mesma regra do save
             )
     except Exception:
         logger.exception('[overlay] render (export) falhou post=%s', post_id)
@@ -640,6 +641,7 @@ def _simple_rerender_published(post, elements):
         raw_bytes, els,
         fonts=_get_font_paths(post) or {},
         logo_url=_get_logo_url(post),
+        fit_text=False,   # editor: fonte do usuario e lei; caixa so re-quebra
     )
     if not png_bytes:
         return None
