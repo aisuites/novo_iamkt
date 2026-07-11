@@ -729,9 +729,12 @@ def _build_prompt_text(
             'logos — treat ALL of those ONLY as RESERVED EMPTY SPACE (clean '
             'negative space in the described position/size). Do NOT render '
             'any text, letters, numbers, typography or logos, and do NOT '
-            'render any BUTTON or CTA-like shape (pill, rounded rectangle, '
-            'badge, banner strip) — text AND buttons are added later in '
-            'post-production. EXCEPTION: text that is PHYSICALLY PRINTED on '
+            'render any BUTTON/CTA placeholder — an empty pill, rounded '
+            'rectangle, badge or strip whose purpose is to HOLD text — text '
+            'AND buttons are added later in post-production. Decorative '
+            'graphic shapes of the brand (swooshes, blobs, color bands) '
+            'described in the scene are welcome. EXCEPTION: text that is '
+            'PHYSICALLY PRINTED on '
             'a real-world object in the scene — product labels, packaging, '
             'signage that is part of a referenced product — is part of that '
             'object and MUST be preserved with fidelity.)\n\n'
@@ -791,14 +794,15 @@ def _build_prompt_text(
                     'logos visible in the reference are NOT graphic elements — treat '
                     'every text/logo area of the reference as EMPTY SPACE and NEVER '
                     'reproduce any of them.',
-                    # BOTAO/CTA NAO E GRAFISMO: sem esta exclusao o comando de alta
-                    # fidelidade copia o PILL do CTA da arte de referencia como
-                    # "retangulo arredondado" vazio no fundo (bug higge post 283).
-                    'CRITICAL: BUTTONS and CTA shapes (pills, rounded rectangles '
-                    'behind text, badges, banner strips) visible in the reference are '
-                    'NOT graphic elements either — they are UI added in '
-                    'post-production. Treat their areas as EMPTY SPACE and NEVER '
-                    'draw an empty button-like shape in the background.',
+                    # BOTAO/CTA NAO E GRAFISMO — mas o criterio e "forma que
+                    # ENVOLVE texto", nao a geometria: um grafismo arredondado
+                    # SEM texto continua sendo grafismo legitimo a replicar.
+                    'CRITICAL: a shape that ENCLOSES or sits BEHIND text in the '
+                    'reference (button pill, CTA rectangle, badge or ribbon with '
+                    'words inside) is UI added in post-production — NOT a graphic '
+                    'element. Treat its area as EMPTY SPACE and NEVER draw an empty '
+                    'button-like placeholder. Shapes WITHOUT text inside them ARE '
+                    'legitimate graphic elements and MUST still be replicated.',
                     'ALL graphic elements come strictly from the ATTACHED IMAGE — never from '
                     'imagination or from a text description.',
                 ])
@@ -871,8 +875,9 @@ def _build_prompt_text(
                '- Apply palette and typography ONLY to post text — not to referenced items.']),
             *(['- ABSOLUTELY NO text, letters, numbers, logos or typography in '
                'this image — it is a clean background; text is added later. '
-               'Also NO button/CTA-like shapes (empty pills, rounded '
-               'rectangles, badges). EXCEPTION: text physically printed on a '
+               'Also NO empty button/CTA placeholders (pills, rounded '
+               'rectangles or badges meant to hold text) — decorative brand '
+               'shapes without text are fine. EXCEPTION: text physically printed on a '
                'referenced PRODUCT (label, packaging) is part of the product '
                'identity and MUST be kept faithful.']
               if text_render_mode == 'pillow' else []),
