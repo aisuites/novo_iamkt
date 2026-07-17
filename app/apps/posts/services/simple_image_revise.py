@@ -151,10 +151,20 @@ def edit_image_with_gemini(image_bytes: bytes, edit_prompt: str,
     }
 
 _TEXT_GUARD_SYSTEM = (
-    'You inspect an image and answer with ONE word. Question: does the image '
-    'contain ANY readable text, words, letters, numbers, wordmarks or logos '
-    '(anywhere, any size)? Product screens/displays with tiny UI do NOT '
-    'count. Answer strictly YES or NO.'
+    'You are a pre-flight check in a design pipeline. A BACKGROUND image was '
+    'generated to receive marketing text applied LATER as a graphic overlay. '
+    'Sometimes the generator mistakenly bakes that marketing text INTO the '
+    'background — that is the ONLY thing you must catch.\n'
+    'You will receive the exact marketing texts we are about to overlay. '
+    'Answer: does the background ALREADY contain those specific marketing '
+    'texts (or a clear paraphrase) rendered as a big DESIGN OVERLAY / '
+    'headline / caption / CTA button floating over the scene?\n'
+    'Do NOT count text that belongs to the photographed objects: product '
+    'packaging, brand names printed on the product, labels, weights, a '
+    'device screen/display, store signage — those are part of the scene and '
+    'MUST stay.\n'
+    'Answer ONE word: YES (our marketing text is baked in - needs cleanup) '
+    'or NO (only product/scene text or none - skip cleanup).'
 )
 
 _BG_CLEANUP_PROMPT = (
@@ -166,20 +176,31 @@ _BG_CLEANUP_PROMPT = (
 )
 
 
-def detect_visible_text(image_bytes: bytes) -> dict:
-    """Guarda de fundo limpo: gpt-4o-mini (visao) responde se ha texto/logo
-    legivel na imagem. Retorna {has_text: bool, usage, model}."""
+def detect_visible_text(image_bytes: bytes, title: str = '', subtitle: str = '',
+                        cta: str = '') -> dict:
+    """Guarda de fundo limpo: gpt-4o-mini (visao) responde se o FUNDO ja contem
+    o texto de DESIGN que vamos aplicar (titulo/subtitulo/cta) impresso como
+    overlay. Texto do PRODUTO (rotulo/embalagem/tela) NAO conta. Retorna
+    {has_text: bool, usage, model}."""
     api_key = getattr(settings, 'OPENAI_API_KEY', '') or ''
     if not api_key:
         raise RuntimeError('OPENAI_API_KEY ausente')
     from openai import OpenAI
     client = OpenAI(api_key=api_key)
     b64 = base64.b64encode(image_bytes).decode('ascii')
+    guard_text = (
+        'Marketing texts we will overlay:\n'
+        f'- Title: "{title or ""}"\n'
+        f'- Subtitle: "{subtitle or ""}"\n'
+        f'- CTA: "{cta or ""}"\n'
+        'Does the background already contain THESE as a design overlay?'
+    )
     resp = client.chat.completions.create(
         model=_PROMPT_MODEL,
         messages=[
             {'role': 'system', 'content': _TEXT_GUARD_SYSTEM},
             {'role': 'user', 'content': [
+                {'type': 'text', 'text': guard_text},
                 {'type': 'image_url',
                  'image_url': {'url': f'data:image/png;base64,{b64}'}},
             ]},

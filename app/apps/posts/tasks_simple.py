@@ -453,7 +453,7 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
             from apps.posts.services.simple_image_revise import (
                 detect_visible_text, edit_image_with_gemini, _BG_CLEANUP_PROMPT,
             )
-            det = detect_visible_text(bg_bytes)
+            det = detect_visible_text(bg_bytes, post.title, post.subtitle, post.cta)
             _record_ai_usage(post, step='image_generation', model=det['model'],
                              usage_dict=det['usage'], purpose='bg_text_guard')
             if det['has_text']:
@@ -464,7 +464,7 @@ def generate_post_simple_image_task(self, post_id: int, message: str = ''):
                                   {'promptTokenCount': cl['usage'].get('input_tokens', 0)},
                                   purpose='gemini_bg_cleanup')
                 # confirma que a limpeza resolveu antes de adotar
-                det2 = detect_visible_text(cl['png_bytes'])
+                det2 = detect_visible_text(cl['png_bytes'], post.title, post.subtitle, post.cta)
                 _record_ai_usage(post, step='image_generation', model=det2['model'],
                                  usage_dict=det2['usage'], purpose='bg_text_guard')
                 if not det2['has_text']:
