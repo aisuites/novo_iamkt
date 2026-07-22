@@ -110,6 +110,7 @@ class Post(models.Model):
             ('todxs', 'TODXS (arquetipos, render deterministico)'),
             ('vb', 'VB Gastronomia (arquetipos, render deterministico)'),
             ('samsung', 'Samsung Healthcare (arquetipos, render deterministico)'),
+            ('thermomix', 'Thermomix (arquetipos, engine v3)'),
         ],
         default='n8n',
         verbose_name='Pipeline usada',

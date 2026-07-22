@@ -49,6 +49,7 @@ urlpatterns = [
     path('<int:post_id>/fonts/<str:role>/', views_overlay.font_file, name='font_file'),
     path('<int:post_id>/todxs-font/<str:key>/', views_overlay.todxs_font_file, name='todxs_font_file'),
     path('<int:post_id>/samsung-font/<str:key>/', views_overlay.samsung_font_file, name='samsung_font_file'),
+    path('<int:post_id>/thermomix-font/<str:key>/', views_overlay.thermomix_font_file, name='thermomix_font_file'),
     path('<int:post_id>/stickers/', views_overlay.upload_sticker, name='upload_sticker'),
     path('<int:post_id>/regenerate-background/', views_overlay.regenerate_background, name='regenerate_background'),
     path('<int:post_id>/restore-background/', views_overlay.restore_background, name='restore_background'),

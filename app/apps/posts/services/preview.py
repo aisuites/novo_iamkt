@@ -45,6 +45,12 @@ def placeholder_photo_png(w=1080, h=1350):
 def list_cases(org):
     """[(archetype_key, fmt)] disponiveis para a org (specs do banco+codigo)."""
     slug = org.slug
+    if slug == 'thermomix':
+        from apps.posts.services.thermomix.catalog import apply_org_wireframes
+        from apps.posts.services.thermomix.wireframes import WF
+        apply_org_wireframes(org)
+        return [(k, f) for k, s in sorted(WF().items())
+                for f in (s.get('formats') or ['feed'])]
     if slug == 'vb-gastronomia':
         from apps.posts.services.vb.catalog import apply_org_specs
         from apps.posts.services.vb.specs import SP
@@ -71,6 +77,9 @@ def render_preview(org, kb, archetype, fmt=None, color=None, content_override=No
     — usado pelo golden_archetypes --engine v3 p/ provar paridade pixel."""
     slug = org.slug
     override = content_override or {}
+    if slug == 'thermomix':
+        # v3-nativa: nao ha renderizador legado, todo preview e engine v3
+        return _thermomix_v3(org, kb, archetype, fmt, color, override)
     if engine == 'v3':
         if slug == 'vb-gastronomia':
             raise ValueError('vb-gastronomia ainda nao tem conversor v3')
@@ -167,6 +176,39 @@ def _samsung(org, kb, archetype, fmt, color, override):
     content.update(override)
 
     pr = render_samsung(archetype=archetype, content=content, kb=kb, assets={})
+    return pr['final_png']
+
+
+def _thermomix_v3(org, kb, archetype, fmt, color, override):
+    """Preview v3-nativo da thermomix: spec do BANCO (catalog) + fontes Vorwerk
+    da KB + placeholders (foto cinza; lockups/icones/retrato so quando o asset
+    existir — engine pula asset ausente)."""
+    from apps.posts.services.thermomix.catalog import apply_org_wireframes
+    from apps.posts.services.thermomix.wireframes import WF, DEFAULT_CONTENT
+    from apps.posts.services.thermomix.assets import (font_paths, font_loader,
+                                                      resolve_asset_urls)
+    from apps.posts.services.artkit import spec3
+    from apps.posts.services.artkit.engine import render_v3
+
+    apply_org_wireframes(org)
+    spec = WF().get(archetype)
+    if not spec:
+        raise ValueError(f'arquetipo {archetype!r} nao existe (tem: {sorted(WF().keys())})')
+
+    content = dict(DEFAULT_CONTENT.get(archetype) or {})
+    content.update(override)
+
+    w, h = spec.get('canvas', [1080, 1350])
+    assets = resolve_asset_urls(kb)
+    if (spec.get('background') or {}).get('type') in ('photo_upload', 'photo_gemini',
+                                                      'photo_ref'):
+        assets['background_image'] = placeholder_photo_png(int(w), int(h))
+
+    paths = font_paths(kb, spec.get('fonts') or {})
+    norm = spec3.normalize(spec)
+    pr = render_v3(norm, content=content,
+                   ctx={'font': font_loader(paths), 'font_paths': paths,
+                        'assets': assets, 'tokens': {}})
     return pr['final_png']
 
 

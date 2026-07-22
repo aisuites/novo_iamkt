@@ -165,6 +165,9 @@ def normalize(spec: dict) -> dict:
             nz['radius'] = fb(z['radius'])
         if isinstance(z.get('border'), dict) and 'width' in z['border']:
             nz['border'] = dict(z['border'], width=fb(z['border']['width']))
+        if isinstance(z.get('lines'), list):   # zonas shape (cta circle/pill)
+            nz['lines'] = [dict(ln, fs=fb(ln['fs'])) if 'fs' in ln else dict(ln)
+                           for ln in z['lines']]
         zones.append(nz)
     out['zones'] = zones
     return out

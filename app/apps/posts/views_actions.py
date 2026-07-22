@@ -225,6 +225,7 @@ def generate_image(request, post_id):
             'todxs': ('apps.posts.tasks_todxs', 'render_post_todxs_task'),
             'vb': ('apps.posts.tasks_vb', 'render_post_vb_task'),
             'samsung': ('apps.posts.tasks_samsung', 'render_post_samsung_task'),
+            'thermomix': ('apps.posts.tasks_thermomix', 'render_post_thermomix_task'),
         }
         if post.pipeline_used in _ARCHETYPE_RENDER_TASKS:
             import importlib
@@ -471,7 +472,7 @@ def template_revision(request, post_id):
     """
     try:
         post = Post.objects.get(id=post_id, organization=request.organization)
-        if post.pipeline_used not in ('todxs', 'vb', 'samsung'):
+        if post.pipeline_used not in ('todxs', 'vb', 'samsung', 'thermomix'):
             return JsonResponse({'success': False,
                                  'error': 'Apenas posts de template'}, status=400)
         if post.status != 'pending':

@@ -81,9 +81,20 @@ def generate_singleshot(*, prompt_text: str, image_inputs: list, temperature: fl
 
     usage_meta = response_json.get('usageMetadata', {}) or {}
     input_tokens = int(usage_meta.get('promptTokenCount', 0) or 0)
-    images_out = max(1, len(response_json.get('candidates', []) or []))
-    input_cost = Decimal(input_tokens) * Decimal('0.10') / Decimal('1000000')
-    output_cost = Decimal(images_out) * Decimal('0.04')
+    # 1 imagem FATURAVEL por chamada (rascunho de thinking NAO e cobrado —
+    # confirmado com dinheiro real na reconciliacao de 2026-07-15).
+    images_out = 1
+    # Tarifa OFICIAL por modelo (ai.google.dev/gemini-api/docs/pricing,
+    # conferida 2026-07-13; a correcao definitiva centralizada em ai_usage.py
+    # esta na branch do fluxo OpenAI e substitui esta tabela no merge):
+    #   Pro (3-pro-image):  input $2.00/1M, imagem 1K-2K $0.134
+    #   Flash (flash-image): input $0.50/1M, imagem 1K $0.067
+    if 'flash' in (model_used or '').lower():
+        in_rate, img_rate = Decimal('0.50'), Decimal('0.067')
+    else:
+        in_rate, img_rate = Decimal('2.00'), Decimal('0.134')
+    input_cost = Decimal(input_tokens) * in_rate / Decimal('1000000')
+    output_cost = Decimal(images_out) * img_rate
     cost = float(input_cost + output_cost)
 
     return {

@@ -12,21 +12,53 @@ from . import register
 @register('scrim')
 def scrim(img, draw, params, ctx):
     """Escurece um lado p/ legibilidade de texto sobre foto (origem: samsung B).
-    params: color (token|hex), alpha (0-255, default 205), to (FRACAO de W onde
-    o gradiente zera, default 0.6 — unitless por definicao do efeito)."""
+    params: color (token|hex), alpha (0-255, default 205), to (FRACAO do eixo
+    onde o gradiente zera, default 0.6 — unitless por definicao do efeito),
+    axis ('x' default = esquerda->direita; 'y' = topo->base, origem thermomix)."""
     W, H = img.size
     from apps.posts.services.artkit.image import hex_to_rgb
     color = hex_to_rgb(ctx['color'](params.get('color', '#0A1420')))
     a0 = int(params.get('alpha', 205))
-    split = max(1, int(float(params.get('to', 0.6)) * W))
-    mask = Image.new('L', (W, 1))
-    mpx = mask.load()
-    for x in range(W):
-        t = min(1.0, x / split)
-        mpx[x, 0] = int(a0 * (1 - t))
+    axis = params.get('axis', 'x')
+    span = H if axis == 'y' else W
+    split = max(1, int(float(params.get('to', 0.6)) * span))
+    if axis == 'y':
+        mask = Image.new('L', (1, H))
+        mpx = mask.load()
+        for y in range(H):
+            t = min(1.0, y / split)
+            mpx[0, y] = int(a0 * (1 - t))
+    else:
+        mask = Image.new('L', (W, 1))
+        mpx = mask.load()
+        for x in range(W):
+            t = min(1.0, x / split)
+            mpx[x, 0] = int(a0 * (1 - t))
     mask = mask.resize((W, H))
     ov = Image.new('RGB', (W, H), color)
     return Image.composite(ov, img, mask)
+
+
+@register('panel')
+def panel(img, draw, params, ctx):
+    """Faixa/painel translucido atras de blocos de texto (origem: thermomix A).
+    params geometricos (unidade da spec): x (ux), y (uy), w (ux), h (uy),
+    radius (ub, default 0). color = token|hex; alpha 0-255 (default 191 = 75%).
+    layer tipico: 'raw' (cozido no fundo editavel, antes do snapshot)."""
+    from apps.posts.services.artkit.image import hex_to_rgb
+    col = hex_to_rgb(ctx['color'](params.get('color', '#FFFFFF')))
+    alpha = int(params.get('alpha', 191))
+    x, y = ctx['ux'](params['x']), ctx['uy'](params['y'])
+    w, h = ctx['ux'](params['w']), ctx['uy'](params['h'])
+    r = ctx['ub'](params.get('radius', 0))
+    base = img.convert('RGBA') if img.mode != 'RGBA' else img
+    ov = Image.new('RGBA', base.size, (0, 0, 0, 0))
+    from PIL import ImageDraw as _ImageDraw
+    od = _ImageDraw.Draw(ov)
+    od.rounded_rectangle([x, y, x + w - 1, y + h - 1], radius=r,
+                         fill=col + (alpha,))
+    out = Image.alpha_composite(base, ov)
+    return out if img.mode == 'RGBA' else out.convert('RGB')
 
 
 @register('guide_line')

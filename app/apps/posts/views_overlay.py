@@ -78,6 +78,27 @@ def overlay_data(request, post_id):
             'raw_image_s3_key': post.raw_image_s3_key or '', 'background_history_size': 0,
         })
 
+    # Thermomix (v3-nativa): editor generico; fontes Vorwerk (CustomFont da KB)
+    # servidas por font_key via /posts/<id>/thermomix-font/<key>/.
+    if post.pipeline_used == 'thermomix':
+        from apps.posts.services.thermomix.catalog import apply_org_wireframes
+        from apps.posts.services.thermomix.wireframes import WF
+        apply_org_wireframes(post.organization)
+        t_ctx = (post.local_pipeline_context or {}).get('thermomix') or {}
+        spec = WF().get((t_ctx.get('archetype') or '').strip()) \
+            or next(iter(WF().values()))
+        cw, ch = spec.get('canvas', [1080, 1350])
+        t_font_urls = {k: f'/posts/{post.id}/thermomix-font/{k}/'
+                       for k in (spec.get('fonts') or {})}
+        return JsonResponse({
+            'elements': _get_elements(post),
+            'raw_image_url': _get_raw_image_url(post), 'logo_url': '',
+            'canvas_w': int(cw), 'canvas_h': int(ch), 'font_names': {}, 'font_urls': {},
+            'todxs_font_urls': t_font_urls, 'pipeline': 'thermomix', 'status': post.status,
+            'palette': _editor_extras(post)[0], 'font_choices': _editor_extras(post)[1],
+            'raw_image_s3_key': post.raw_image_s3_key or '', 'background_history_size': 0,
+        })
+
     elements = _get_elements(post)
     raw_image_url = _get_raw_image_url(post)
     logo_url = _get_logo_url(post)
@@ -304,6 +325,21 @@ def export_png(request, post_id):
                 base = base.resize((canvas_w, canvas_h), Image.LANCZOS)
             base = draw_samsung_compose(base, elements, canvas_w, canvas_h)
             _o = _io3.BytesIO(); base.convert('RGB').save(_o, 'PNG'); png_bytes = _o.getvalue()
+        elif post.pipeline_used == 'thermomix':
+            from apps.posts.services.thermomix.compose import draw_thermomix_compose
+            from apps.posts.services.thermomix.catalog import apply_org_wireframes
+            from apps.knowledge.models import KnowledgeBase as _KB
+            from PIL import Image
+            import io as _io4
+            apply_org_wireframes(post.organization)
+            _kb = _KB.objects.filter(organization=post.organization).first()
+            _tx = (post.local_pipeline_context or {}).get('thermomix') or {}
+            base = Image.open(_io4.BytesIO(bg_bytes)).convert('RGBA')
+            if base.size != (canvas_w, canvas_h):
+                base = base.resize((canvas_w, canvas_h), Image.LANCZOS)
+            base = draw_thermomix_compose(base, elements, canvas_w, canvas_h,
+                                          _kb, archetype=_tx.get('archetype'))
+            _o = _io4.BytesIO(); base.convert('RGB').save(_o, 'PNG'); png_bytes = _o.getvalue()
         else:
             from apps.posts.services.gemini_image_generator import render_layout_document
             png_bytes = render_layout_document(
@@ -399,6 +435,44 @@ def samsung_font_file(request, post_id, key):
         return JsonResponse({'error': 'font_missing'}, status=404)
     mime, _m = mimetypes.guess_type(fp)
     resp = FileResponse(open(fp, 'rb'), content_type=mime or 'font/otf')
+    resp['Cache-Control'] = 'private, max-age=3600'
+    resp['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+
+@login_required
+@require_GET
+def thermomix_font_file(request, post_id, key):
+    """Serve a fonte Vorwerk por font_key (display/corpo/corpo_bold), resolvida
+    do CustomFont da KB (cache local do font_resolver) — editor == Pillow."""
+    post = get_object_or_404(Post, id=post_id, organization=request.organization)
+    from apps.knowledge.models import KnowledgeBase
+    from apps.posts.services.thermomix.catalog import apply_org_wireframes
+    from apps.posts.services.thermomix.wireframes import WF
+    from apps.posts.services.thermomix.assets import font_paths
+
+    apply_org_wireframes(post.organization)
+    t_ctx = (post.local_pipeline_context or {}).get('thermomix') or {}
+    spec = WF().get((t_ctx.get('archetype') or '').strip()) or next(iter(WF().values()))
+    fonts_map = spec.get('fonts') or {}
+    if key not in fonts_map:
+        return JsonResponse({'error': 'key_invalida'}, status=400)
+    kb = KnowledgeBase.objects.filter(organization=post.organization).first()
+    fp = (font_paths(kb, fonts_map) or {}).get(key)
+    if not fp:
+        return JsonResponse({'error': 'font_missing'}, status=404)
+    try:
+        resolved = Path(fp).resolve()
+        if not resolved.is_file():
+            return JsonResponse({'error': 'font_missing'}, status=404)
+        # fora do cache de fontes so os fallbacks DejaVu do sistema
+        if not _in_fonts_cache(resolved) and 'dejavu' not in resolved.name.lower():
+            return JsonResponse({'error': 'path_forbidden'}, status=403)
+    except Exception:
+        return JsonResponse({'error': 'invalid_path'}, status=400)
+    mime, _m = mimetypes.guess_type(resolved.name)
+    resp = FileResponse(open(resolved, 'rb'),
+                        content_type=mime or ('font/otf' if resolved.suffix.lower() == '.otf' else 'font/ttf'))
     resp['Cache-Control'] = 'private, max-age=3600'
     resp['Access-Control-Allow-Origin'] = '*'
     return resp
@@ -616,6 +690,11 @@ def save_elements(request, post_id):
             image_url = _samsung_rerender_published(post, elements)
         except Exception:
             logger.exception('[overlay] re-render samsung (save) falhou post=%s', post.id)
+    elif post.pipeline_used == 'thermomix':
+        try:
+            image_url = _thermomix_rerender_published(post, elements)
+        except Exception:
+            logger.exception('[overlay] re-render thermomix (save) falhou post=%s', post.id)
     elif post.pipeline_used == 'simple':
         try:
             image_url = _simple_rerender_published(post, elements)
@@ -740,6 +819,59 @@ def _vb_rerender_published(post, elements):
     post.save(update_fields=['image_s3_key', 'image_s3_url', 'generated_images'])
     try:
         return S3Service.generate_presigned_download_url(key, expires_in=86400)
+    except Exception:
+        return url
+
+
+def _thermomix_rerender_published(post, elements):
+    """Redesenha a arte Thermomix (raw + elementos editados) e atualiza a
+    imagem publicada (espelha _samsung_rerender_published; desenhador do
+    engine v3 => editor == publicado)."""
+    import base64 as _b64
+    from apps.posts.models import PostImage
+    from apps.posts.services.thermomix.compose import draw_thermomix_compose
+    from apps.posts.services.thermomix.catalog import apply_org_wireframes
+    from apps.posts.tasks import _upload_image_to_s3
+    from apps.knowledge.models import KnowledgeBase as _KB
+    from PIL import Image
+    import io as _io
+
+    raw_data = _download_as_data_uri(_get_raw_image_url(post))
+    if not raw_data:
+        return None
+    _, _, payload = raw_data.partition(',')
+    base = Image.open(_io.BytesIO(_b64.b64decode(payload))).convert('RGBA')
+    cw, ch = _get_canvas(post)
+    if base.size != (cw, ch):
+        base = base.resize((cw, ch), Image.LANCZOS)
+    apply_org_wireframes(post.organization)
+    kb = _KB.objects.filter(organization=post.organization).first()
+    tx = (post.local_pipeline_context or {}).get('thermomix') or {}
+    els = _prepare_stickers_for_export(elements)
+    base = draw_thermomix_compose(base, els, cw, ch, kb,
+                                  archetype=tx.get('archetype'))
+    out = _io.BytesIO(); base.convert('RGB').save(out, 'PNG')
+
+    old_key = post.image_s3_key
+    key, url = _upload_image_to_s3(org_id=post.organization_id, post_id=post.id,
+                                   png_bytes=out.getvalue(), mime_type='image/png')
+    _im = (post.images.filter(s3_key=old_key).order_by('-order').first()
+           if old_key else None)
+    if _im:
+        _im.s3_key, _im.s3_url = key, url
+        _im.save(update_fields=['s3_key', 's3_url'])
+    else:
+        from django.db.models import Max as _Max
+        _next = (post.images.aggregate(_Max('order'))['order__max'] or 0) + 1
+        PostImage.objects.create(post=post, s3_key=key, s3_url=url, order=_next)
+    post.image_s3_key, post.image_s3_url = key, url
+    gi = post.generated_images if isinstance(post.generated_images, list) else []
+    gi.append({'s3_key': key, 'url': url})
+    post.generated_images = gi
+    post.save(update_fields=['image_s3_key', 'image_s3_url', 'generated_images'])
+    try:
+        from apps.core.services.s3_service import S3Service
+        return S3Service.generate_presigned_download_url(key, expires_in=3600)
     except Exception:
         return url
 
@@ -919,6 +1051,10 @@ def _editor_extras(post):
             fonts = [{'key': k, 'label': k.replace('_', ' ').title()} for k in FONT_FILES]
         except Exception:
             fonts = []
+    elif pipe == 'thermomix':
+        fonts = [{'key': 'display', 'label': 'Display (Vorwerk Bold)'},
+                 {'key': 'corpo', 'label': 'Corpo (Vorwerk Medium)'},
+                 {'key': 'corpo_bold', 'label': 'Corpo Bold'}]
     else:
         fonts = [{'key': 'titulo', 'label': 'Fonte do Título'},
                  {'key': 'subtitulo', 'label': 'Fonte do Subtítulo'},
@@ -1021,6 +1157,19 @@ def _get_canvas(post: Post):
             return w, h
         except Exception:
             pass
+    # Thermomix: canvas vem da SPEC v3 do arquetipo usado.
+    if (post.pipeline_used or '') == 'thermomix':
+        try:
+            from apps.posts.services.thermomix.catalog import apply_org_wireframes
+            from apps.posts.services.thermomix.wireframes import WF
+            apply_org_wireframes(post.organization)
+            _tx = (post.local_pipeline_context or {}).get('thermomix') or {}
+            spec = WF().get((_tx.get('archetype') or '').strip()) \
+                or next(iter(WF().values()))
+            cw, ch = spec.get('canvas', [1080, 1350])
+            return int(cw), int(ch)
+        except Exception:
+            return 1080, 1350
     return 1080, 1080
 
 

@@ -543,7 +543,14 @@
                     <button type="button" id="btnRedo" title="Refazer (Ctrl+Shift+Z)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">↷ Refazer</button>
                     <button type="button" id="btnAddImage" title="Adicionar imagem (sticker)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Imagem</button>
                     <button type="button" id="btnAddText" title="Adicionar caixa de texto" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Texto</button>
+                    <button type="button" id="btnAddOverlay" title="Adicionar overlay sobre a imagem de fundo" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Overlay</button>
                     <input type="file" id="stickerFileInput" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" style="display:none;">
+                </div>
+                <!-- Seletor de elementos: acha qualquer elemento, inclusive OCULTOS -->
+                <div style="padding:8px 12px;border-bottom:1px solid #eee;background:#fafafa;">
+                    <select id="elementListSelect" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:5px 6px;font-size:12px;box-sizing:border-box;">
+                        <option value="">— selecionar elemento —</option>
+                    </select>
                 </div>
                 <div id="panelEmpty" style="padding:24px 16px;color:#888;font-size:13px;text-align:center;">
                     <div style="font-size:28px;margin-bottom:8px;">↖</div>
@@ -587,7 +594,17 @@
                         <div id="paletteSwatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
                     </div>
 
-                    <!-- Cor de fundo (CTA com background, grafismo) -->
+                    <!-- Preenchimento (grafismo): 1º item — solido | degrade -->
+                    <div id="ctrlFillWrap" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Preenchimento</label>
+                        <select id="ctrlFillType" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:5px 6px;font-size:12px;box-sizing:border-box;">
+                            <option value="solido">Sólido</option>
+                            <option value="linear">Degradê linear</option>
+                            <option value="radial">Degradê radial</option>
+                        </select>
+                    </div>
+
+                    <!-- Cor de fundo (CTA com background; grafismo SOLIDO) -->
                     <div id="ctrlBgColorWrap" style="display:none;margin-bottom:12px;">
                         <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;align-items:center;">
                             <span>Cor do fundo</span>
@@ -595,6 +612,63 @@
                         </label>
                         <input type="color" id="ctrlBgColor" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
                         <div id="paletteBgSwatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+                    </div>
+
+                    <!-- Opacidade (grafismo SOLIDO) -->
+                    <div id="ctrlOpacityWrap" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Opacidade <span id="ctrlOpacityVal">100</span>%</label>
+                        <input type="range" id="ctrlOpacity" min="0" max="100" step="5" style="width:100%;accent-color:#471811;">
+                    </div>
+
+                    <!-- Cor degradê (grafismo DEGRADE): paradas -> escala -> angulo -->
+                    <div id="ctrlGradWrap" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Cor degradê (cor · opac.% · pos.%)</label>
+                        <div id="ctrlGradStops"></div>
+                        <button type="button" id="btnAddStop" style="width:100%;margin-top:6px;padding:5px;border:1px dashed #bbb;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;color:#555;">+ adicionar cor</button>
+                        <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;margin-top:8px;">Escala <span id="ctrlGradScaleVal">100</span>%</label>
+                        <input type="range" id="ctrlGradScale" min="10" max="100" step="5" style="width:100%;accent-color:#471811;">
+                        <div id="ctrlGradAngleRow" style="display:flex;gap:6px;align-items:center;margin-top:8px;">
+                            <label style="font-size:11px;color:#555;flex:1;">Ângulo (0° = ↑, 90° = →)</label>
+                            <input type="number" id="ctrlGradAngle" min="0" max="359" step="1" value="90" style="width:70px;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:12px;box-sizing:border-box;">
+                        </div>
+                    </div>
+
+                    <!-- Sombra (textos) -->
+                    <div id="ctrlShadowWrap" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Sombra do texto</label>
+                        <select id="ctrlShadowOn" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:5px 6px;font-size:12px;box-sizing:border-box;">
+                            <option value="off">Sem sombra</option>
+                            <option value="on">Com sombra</option>
+                        </select>
+                        <div id="ctrlShadowCtrls" style="display:none;margin-top:8px;">
+                            <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Opacidade <span id="ctrlShadowOpVal">50</span>%</label>
+                            <input type="range" id="ctrlShadowOp" min="5" max="100" step="5" style="width:100%;accent-color:#471811;">
+                            <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;margin-top:6px;">Desfoque <span id="ctrlShadowBlurVal">6</span>px</label>
+                            <input type="range" id="ctrlShadowBlur" min="0" max="30" step="1" style="width:100%;accent-color:#471811;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+                                <div><label style="font-size:10px;color:#999;">Desloc. X px</label><input type="number" id="ctrlShadowDx" min="-60" max="60" step="1" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:12px;box-sizing:border-box;"></div>
+                                <div><label style="font-size:10px;color:#999;">Desloc. Y px</label><input type="number" id="ctrlShadowDy" min="-60" max="60" step="1" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:12px;box-sizing:border-box;"></div>
+                            </div>
+                            <label style="font-size:11px;color:#555;display:block;margin:6px 0 4px;">Cor da sombra</label>
+                            <input type="color" id="ctrlShadowColor" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                        </div>
+                    </div>
+
+                    <!-- Blur do fundo / vidro fosco (grafismo) -->
+                    <div id="ctrlBlurWrap" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Desfoque do fundo <span id="ctrlBlurVal">0</span>px</label>
+                        <input type="range" id="ctrlBlur" min="0" max="40" step="1" style="width:100%;accent-color:#471811;">
+                        <div id="ctrlBlurDirWrap" style="display:none;margin-top:8px;">
+                            <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Direção do desfoque</label>
+                            <select id="ctrlBlurDir" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:5px 6px;font-size:12px;box-sizing:border-box;">
+                                <option value="uniforme">Uniforme</option>
+                                <option value="horizontal">Forte à esquerda → nítido à direita</option>
+                                <option value="horizontal-inv">Forte à direita → nítido à esquerda</option>
+                                <option value="vertical">Forte no topo → nítido embaixo</option>
+                                <option value="vertical-inv">Forte embaixo → nítido no topo</option>
+                                <option value="radial">Forte nas bordas → nítido no centro</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Raio (CTA / grafismo) -->
@@ -905,6 +979,33 @@ function toggleCarrossel() {
     const ctrlRadius    = document.getElementById('ctrlRadius');
     const ctrlRadiusVal = document.getElementById('ctrlRadiusVal');
     const ctrlRadiusWrap= document.getElementById('ctrlRadiusWrap');
+    const ctrlOpacity   = document.getElementById('ctrlOpacity');
+    const ctrlOpacityVal= document.getElementById('ctrlOpacityVal');
+    const ctrlOpacityWrap = document.getElementById('ctrlOpacityWrap');
+    const ctrlFillWrap  = document.getElementById('ctrlFillWrap');
+    const ctrlFillType  = document.getElementById('ctrlFillType');
+    const ctrlGradWrap  = document.getElementById('ctrlGradWrap');
+    const ctrlGradAngleRow = document.getElementById('ctrlGradAngleRow');
+    const ctrlGradAngle = document.getElementById('ctrlGradAngle');
+    const ctrlGradScale = document.getElementById('ctrlGradScale');
+    const ctrlGradScaleVal = document.getElementById('ctrlGradScaleVal');
+    const ctrlGradStops = document.getElementById('ctrlGradStops');
+    const btnAddStop    = document.getElementById('btnAddStop');
+    const ctrlShadowWrap = document.getElementById('ctrlShadowWrap');
+    const ctrlShadowOn  = document.getElementById('ctrlShadowOn');
+    const ctrlShadowCtrls = document.getElementById('ctrlShadowCtrls');
+    const ctrlShadowOp  = document.getElementById('ctrlShadowOp');
+    const ctrlShadowOpVal = document.getElementById('ctrlShadowOpVal');
+    const ctrlShadowBlur = document.getElementById('ctrlShadowBlur');
+    const ctrlShadowBlurVal = document.getElementById('ctrlShadowBlurVal');
+    const ctrlShadowDx  = document.getElementById('ctrlShadowDx');
+    const ctrlShadowDy  = document.getElementById('ctrlShadowDy');
+    const ctrlShadowColor = document.getElementById('ctrlShadowColor');
+    const ctrlBlur      = document.getElementById('ctrlBlur');
+    const ctrlBlurVal   = document.getElementById('ctrlBlurVal');
+    const ctrlBlurWrap  = document.getElementById('ctrlBlurWrap');
+    const ctrlBlurDir   = document.getElementById('ctrlBlurDir');
+    const ctrlBlurDirWrap = document.getElementById('ctrlBlurDirWrap');
     const ctrlBold      = document.getElementById('ctrlBold');
     const ctrlStyleWrap = document.getElementById('ctrlStyleWrap');
     const ctrlX         = document.getElementById('ctrlX');
@@ -1078,9 +1179,39 @@ function toggleCarrossel() {
     function _renderAll() {
         overlay.innerHTML = '';
         elements.forEach((el,i) => _renderOne(el,i));
+        _refreshElementList();
         // Fit pass: replica o auto-fit do Pillow (encolhe a fonte ate caber na caixa).
         requestAnimationFrame(_fitTextToBoxes);
     }
+
+    // ── Seletor de elementos (acha qualquer um, inclusive OCULTOS) ─────────
+    const elementListSelect = document.getElementById('elementListSelect');
+    function _refreshElementList() {
+        if (!elementListSelect) return;
+        const cur = selectedIdx;
+        elementListSelect.innerHTML = '<option value="">— selecionar elemento —</option>';
+        // Ordem VISUAL de empilhamento: 1 = o mais ACIMA (fim do array/DOM);
+        // numero maior = mais para o fundo. Reordenar com ↑/↓ re-renderiza
+        // (_renderAll) e esta lista acompanha na hora.
+        for (let n = 0; n < elements.length; n++) {
+            const i = elements.length - 1 - n;   // topo -> fundo
+            const el = elements[i];
+            const role = (el.role||'').toLowerCase();
+            const label = ROLE_LABELS[role] || role || 'elemento';
+            const zone = el.zone ? ` · ${el.zone}` : '';
+            const hidden = (el.visible === false) ? ' (oculto)' : '';
+            const o = document.createElement('option');
+            o.value = String(i);
+            o.textContent = `${n+1}. ${label}${zone}${hidden}`;
+            elementListSelect.appendChild(o);
+        }
+        elementListSelect.value = (cur === null || cur === undefined) ? '' : String(cur);
+    }
+    if (elementListSelect) elementListSelect.addEventListener('change', () => {
+        const v = elementListSelect.value;
+        if (v === '') return;
+        _selectElement(+v);
+    });
     function _fitTextToBoxes() {
         // DESATIVADO (2026-07-10): o encolhedor replicava o antigo auto-fit do
         // Pillow e fazia o texto DIMINUIR ao estreitar a caixa no modal —
@@ -1098,9 +1229,63 @@ function toggleCarrossel() {
             if (!['faixa','pill','retangulo'].includes(forma)) return;
             dom = document.createElement('div');
             const raio = ((el.raio_pct||0)/100*canvasW*scale).toFixed(1);
+            // Preenchimento com alpha NA COR (rgba) — nao usar style.opacity,
+            // senao o backdrop-blur esmaeceria junto. Mesma regra do Pillow.
+            const op = Math.max(0, Math.min(100, (el.opacidade == null) ? 100 : Number(el.opacidade)));
+            const gr = (el.grad && (el.grad.stops || el.grad.cor2)) ? el.grad : null;
+            let bg;
+            if (gr && gr.stops && gr.stops.length) {
+                // degrade estilo Photoshop: stops + angulo + escala (= Pillow)
+                const esc = Math.max(10, Math.min(100, Number(gr.escala == null ? 100 : gr.escala))) / 100;
+                const sorted = gr.stops.slice().sort((a,b) => (+a.pos||0) - (+b.pos||0));
+                const stopsCss = sorted.map(s =>
+                    `${_rgba(s.cor||'#000000', (s.opacidade==null?100:+s.opacidade)/100)} ` +
+                    `${(Math.max(0,Math.min(100,+s.pos||0))*esc).toFixed(1)}%`).join(', ');
+                bg = (gr.tipo === 'radial')
+                    ? `radial-gradient(circle, ${stopsCss})`
+                    : `linear-gradient(${Math.round(Number(gr.angulo == null ? 90 : gr.angulo))}deg, ${stopsCss})`;
+            } else if (gr) {
+                const op2 = Math.max(0, Math.min(100, (gr.opacidade2 == null) ? op : Number(gr.opacidade2)));
+                const c1 = _rgba(el.cor||'#000000', op/100), c2 = _rgba(gr.cor2, op2/100);
+                bg = (gr.tipo === 'radial')
+                    ? `radial-gradient(circle, ${c1}, ${c2})`
+                    : `linear-gradient(${gr.direcao==='vertical'?'180deg':'90deg'}, ${c1}, ${c2})`;
+            } else {
+                bg = _rgba(el.cor||'#000000', op/100);
+            }
             Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
                 width:el.width_pct+'%', height:el.height_pct+'%',
-                background:el.cor||'#000', borderRadius:raio+'px', boxSizing:'border-box', cursor:'pointer' });
+                borderRadius:raio+'px', boxSizing:'border-box', cursor:'pointer' });
+            const bl = Number(el.blur||0);
+            const bdir = (bl > 0 && el.blur_grad && el.blur_grad.direcao) || null;
+            if (bl > 0 && bdir) {
+                // Blur DIRECIONAL: camadas separadas — o desfoque leva a mascara
+                // de gradiente; o preenchimento fica inteiro (igual ao Pillow).
+                dom.style.overflow = 'hidden';
+                const MASKS = {
+                    'horizontal':     'linear-gradient(90deg, #000, transparent)',
+                    'horizontal-inv': 'linear-gradient(90deg, transparent, #000)',
+                    'vertical':       'linear-gradient(180deg, #000, transparent)',
+                    'vertical-inv':   'linear-gradient(180deg, transparent, #000)',
+                    'radial':         'radial-gradient(circle, transparent 25%, #000 85%)',
+                };
+                const blurDiv = document.createElement('div');
+                Object.assign(blurDiv.style, { position:'absolute', inset:'0',
+                    backdropFilter:`blur(${(bl*scale).toFixed(1)}px)`,
+                    webkitBackdropFilter:`blur(${(bl*scale).toFixed(1)}px)`,
+                    maskImage:MASKS[bdir]||'none', webkitMaskImage:MASKS[bdir]||'none',
+                    pointerEvents:'none' });
+                const fillDiv = document.createElement('div');
+                Object.assign(fillDiv.style, { position:'absolute', inset:'0',
+                    background:bg, pointerEvents:'none' });
+                dom.appendChild(blurDiv); dom.appendChild(fillDiv);
+            } else {
+                dom.style.background = bg;
+                if (bl > 0) {   // vidro fosco uniforme (px do canvas -> px de tela)
+                    dom.style.backdropFilter = `blur(${(bl*scale).toFixed(1)}px)`;
+                    dom.style.webkitBackdropFilter = dom.style.backdropFilter;
+                }
+            }
 
         } else if (role === 'logo' && logoUrl) {
             dom = document.createElement('img');
@@ -1167,6 +1352,14 @@ function toggleCarrossel() {
             // (espelha o publicado com fit_text=False). CTA (pill) mantem o
             // clip visual do fundo, mas tambem sem encolher fonte.
             if (role==='cta' && el.background_color) dom.style.overflow = 'hidden';
+            // Sombra do texto (mesmos parametros do Pillow: dx/dy/blur em px
+            // do canvas -> px de tela; cor + opacidade)
+            if (el.shadow && typeof el.shadow === 'object') {
+                const sh = el.shadow;
+                dom.style.textShadow = `${((sh.dx||0)*scale).toFixed(1)}px ` +
+                    `${((sh.dy||0)*scale).toFixed(1)}px ${((sh.blur||0)*scale).toFixed(1)}px ` +
+                    `${_rgba(sh.cor||'#000000', ((sh.opacidade==null?50:+sh.opacidade))/100)}`;
+            }
             dom.textContent = el.content || '';
             // Texto VERTICAL (rotacionado): edita como texto, mas exibe girado.
             // bbox (width_pct/height_pct) = caixa JA rotacionada na tela.
@@ -1224,8 +1417,9 @@ function toggleCarrossel() {
         ctrlSizeWrap.style.display    = isText ? 'block' : 'none';
         ctrlColorWrap.style.display   = isText ? 'block' : 'none';
         ctrlStyleWrap.style.display   = isText ? 'flex'  : 'none';
-        // Cor de fundo: CTA sempre (pode adicionar) ou grafismo
-        ctrlBgColorWrap.style.display = (isGraf || isCta) ? 'block' : 'none';
+        // Cor de fundo: CTA sempre (pode adicionar); grafismo SO no modo solido
+        // (no degrade as cores vivem nas paradas)
+        ctrlBgColorWrap.style.display = (isCta || (isGraf && !el.grad)) ? 'block' : 'none';
         // Raio: grafismo (raio_pct) ou CTA (radius_pct)
         ctrlRadiusWrap.style.display  = (isGraf || isCta) ? 'block' : 'none';
 
@@ -1251,6 +1445,46 @@ function toggleCarrossel() {
             const rp = +(el.raio_pct||0).toFixed(1);
             ctrlRadius.value = rp; ctrlRadiusVal.textContent = rp;
             btnRemoveBg.style.display = 'none';
+        }
+        // Opacidade / preenchimento / blur: so grafismo (faixas do template);
+        // opacidade so no modo SOLIDO (no degrade cada parada tem a sua)
+        ctrlOpacityWrap.style.display = (isGraf && !el.grad) ? 'block' : 'none';
+        ctrlFillWrap.style.display    = isGraf ? 'block' : 'none';
+        ctrlBlurWrap.style.display    = isGraf ? 'block' : 'none';
+        if (isGraf) {
+            const op = (el.opacidade == null) ? 100 : Math.round(Number(el.opacidade));
+            ctrlOpacity.value = op; ctrlOpacityVal.textContent = op;
+            if (el.grad && !el.grad.stops) _gradToV2(el);   // migra formato legado
+            const gr = el.grad || null;
+            ctrlFillType.value = !gr ? 'solido' : (gr.tipo === 'radial' ? 'radial' : 'linear');
+            ctrlGradWrap.style.display = gr ? 'block' : 'none';
+            if (gr) {
+                ctrlGradAngleRow.style.display = gr.tipo === 'radial' ? 'none' : 'flex';
+                ctrlGradAngle.value = Math.round(Number(gr.angulo == null ? 90 : gr.angulo));
+                const esc = Math.round(Number(gr.escala == null ? 100 : gr.escala));
+                ctrlGradScale.value = esc; ctrlGradScaleVal.textContent = esc;
+                _renderGradStops(el);
+            }
+            const bl = Math.round(Number(el.blur || 0));
+            ctrlBlur.value = bl; ctrlBlurVal.textContent = bl;
+            ctrlBlurDirWrap.style.display = bl > 0 ? 'block' : 'none';
+            ctrlBlurDir.value = (el.blur_grad && el.blur_grad.direcao) || 'uniforme';
+        }
+        // Sombra: so textos
+        ctrlShadowWrap.style.display = isText ? 'block' : 'none';
+        if (isText) {
+            const sh = (el.shadow && typeof el.shadow === 'object') ? el.shadow : null;
+            ctrlShadowOn.value = sh ? 'on' : 'off';
+            ctrlShadowCtrls.style.display = sh ? 'block' : 'none';
+            if (sh) {
+                const sop = Math.round(Number(sh.opacidade == null ? 50 : sh.opacidade));
+                ctrlShadowOp.value = sop; ctrlShadowOpVal.textContent = sop;
+                const sbl = Math.round(Number(sh.blur == null ? 6 : sh.blur));
+                ctrlShadowBlur.value = sbl; ctrlShadowBlurVal.textContent = sbl;
+                ctrlShadowDx.value = Math.round(Number(sh.dx || 0));
+                ctrlShadowDy.value = Math.round(Number(sh.dy || 0));
+                ctrlShadowColor.value = _toHex6(sh.cor || '#000000');
+            }
         }
 
         ctrlX.value = +(el.x_pct||0).toFixed(1);
@@ -1366,6 +1600,22 @@ function toggleCarrossel() {
         _renderAll(); _updatePanel(); _snapshotElements();
         statusEl.textContent = 'Caixa de texto adicionada — edite o conteúdo no painel.';
     });
+
+    // ── + Overlay: veu sobre a imagem de fundo (ABAIXO dos demais elementos;
+    // por isso entra no INICIO da lista — Pillow e DOM desenham na mesma ordem)
+    const btnAddOverlay = document.getElementById('btnAddOverlay');
+    btnAddOverlay.addEventListener('click', () => {
+        if (!currentPostId) return;
+        elements.unshift({
+            role: 'grafismo', forma: 'retangulo', zone: 'overlay',
+            cor: '#000000', opacidade: 30, raio_pct: 0,
+            x_pct: 0, y_pct: 0, width_pct: 100, height_pct: 100,
+            visible: true,
+        });
+        selectedIdx = 0;
+        _renderAll(); _updatePanel(); _snapshotElements();
+        statusEl.textContent = 'Overlay adicionado — ajuste cor, opacidade, degradê e desfoque no painel.';
+    });
     btnRemoveBg.addEventListener('click', () => {
         if(selectedIdx===null)return;
         const el = elements[selectedIdx];
@@ -1384,6 +1634,184 @@ function toggleCarrossel() {
         ctrlRadiusVal.textContent = r;
         if ((el.role||'').toLowerCase() === 'cta') el.radius_pct = r;
         else if ((el.role||'').toLowerCase() === 'grafismo') el.raio_pct = r;
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlOpacity.addEventListener('input', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        if ((el.role||'').toLowerCase() !== 'grafismo') return;
+        const op = +ctrlOpacity.value;
+        ctrlOpacityVal.textContent = op;
+        el.opacidade = op;
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    // ── Degradê estilo Photoshop: angulo + escala + paradas ────────────────
+    function _gradToV2(el) {
+        // migra o formato legado {tipo, direcao, cor2, opacidade2} p/ stops
+        const op = (el.opacidade == null) ? 100 : +el.opacidade;
+        const g = el.grad || {};
+        el.grad = {
+            tipo: g.tipo === 'radial' ? 'radial' : 'linear',
+            angulo: g.direcao === 'vertical' ? 180 : 90,
+            escala: 100,
+            stops: [
+                {cor: el.cor || '#FFFFFF', opacidade: op, pos: 0},
+                {cor: g.cor2 || '#FFFFFF',
+                 opacidade: (g.opacidade2 == null) ? op : +g.opacidade2, pos: 100},
+            ],
+        };
+    }
+    function _selGraf() {
+        if (selectedIdx === null) return null;
+        const el = elements[selectedIdx];
+        return ((el.role||'').toLowerCase() === 'grafismo') ? el : null;
+    }
+    function _renderGradStops(el) {
+        ctrlGradStops.innerHTML = '';
+        const stops = (el.grad && el.grad.stops) || [];
+        stops.forEach((s, i) => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:4px;';
+            const cor = document.createElement('input');
+            cor.type = 'color'; cor.value = _toHex6(s.cor || '#FFFFFF');
+            cor.style.cssText = 'width:36px;height:26px;border:1px solid #ddd;border-radius:4px;cursor:pointer;padding:0;';
+            const opc = document.createElement('input');
+            opc.type = 'number'; opc.min = 0; opc.max = 100; opc.step = 5;
+            opc.value = (s.opacidade == null) ? 100 : Math.round(+s.opacidade);
+            opc.title = 'Opacidade %';
+            opc.style.cssText = 'width:52px;border:1px solid #ddd;border-radius:4px;padding:4px;font-size:12px;';
+            const pos = document.createElement('input');
+            pos.type = 'number'; pos.min = 0; pos.max = 100; pos.step = 1;
+            pos.value = Math.round(+(s.pos || 0));
+            pos.title = 'Posição %';
+            pos.style.cssText = 'width:52px;border:1px solid #ddd;border-radius:4px;padding:4px;font-size:12px;';
+            const del = document.createElement('button');
+            del.type = 'button'; del.textContent = '×'; del.title = 'Remover parada';
+            del.style.cssText = 'width:24px;height:26px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;color:#c00;';
+            del.disabled = stops.length <= 2;
+            cor.addEventListener('input', () => { s.cor = cor.value; _renderAll(); _bumpHistoryDebounced(); });
+            opc.addEventListener('input', () => { s.opacidade = +opc.value; _renderAll(); _bumpHistoryDebounced(); });
+            pos.addEventListener('input', () => { s.pos = +pos.value; _renderAll(); _bumpHistoryDebounced(); });
+            del.addEventListener('click', () => {
+                el.grad.stops.splice(i, 1);
+                _renderGradStops(el); _renderAll(); _snapshotElements();
+            });
+            row.append(cor, opc, pos, del);
+            ctrlGradStops.appendChild(row);
+            // Swatches da PALETA da KB por parada (alem do seletor nativo)
+            if (editorPalette.length) {
+                const sw = document.createElement('div');
+                sw.style.cssText = 'display:flex;gap:4px;margin:0 0 6px 2px;';
+                editorPalette.forEach(c => {
+                    const dot = document.createElement('div');
+                    dot.title = `${c.nome || ''} (${c.hex})`;
+                    dot.style.cssText = 'width:16px;height:16px;border-radius:50%;cursor:pointer;' +
+                        `border:1px solid #ccc;background:${c.hex};`;
+                    dot.addEventListener('click', () => {
+                        s.cor = c.hex; cor.value = _toHex6(c.hex);
+                        _renderAll(); _bumpHistoryDebounced();
+                    });
+                    sw.appendChild(dot);
+                });
+                ctrlGradStops.appendChild(sw);
+            }
+        });
+    }
+    ctrlFillType.addEventListener('change', () => {
+        const el = _selGraf(); if (!el) return;
+        const v = ctrlFillType.value;
+        if (v === 'solido') {
+            delete el.grad;
+        } else {
+            if (!el.grad || !el.grad.stops) _gradToV2(el);
+            el.grad.tipo = v;
+        }
+        _updatePanel();   // reordena a visibilidade (cor/opacidade vs degrade)
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlGradAngle.addEventListener('input', () => {
+        const el = _selGraf(); if (!el || !el.grad) return;
+        el.grad.angulo = Math.max(0, Math.min(359, +ctrlGradAngle.value || 0));
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlGradScale.addEventListener('input', () => {
+        const el = _selGraf(); if (!el || !el.grad) return;
+        const esc = +ctrlGradScale.value;
+        ctrlGradScaleVal.textContent = esc;
+        el.grad.escala = esc;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    btnAddStop.addEventListener('click', () => {
+        const el = _selGraf(); if (!el || !el.grad || !el.grad.stops) return;
+        el.grad.stops.push({cor: '#FFFFFF', opacidade: 100, pos: 50});
+        _renderGradStops(el); _renderAll(); _snapshotElements();
+    });
+
+    // ── Sombra do texto ────────────────────────────────────────────────────
+    function _selText() {
+        if (selectedIdx === null) return null;
+        const el = elements[selectedIdx];
+        return ['titulo','subtitulo','cta'].includes((el.role||'').toLowerCase()) ? el : null;
+    }
+    ctrlShadowOn.addEventListener('change', () => {
+        const el = _selText(); if (!el) return;
+        if (ctrlShadowOn.value === 'on') {
+            if (!el.shadow || typeof el.shadow !== 'object')
+                el.shadow = {dx: 2, dy: 3, blur: 6, opacidade: 50, cor: '#000000'};
+        } else {
+            delete el.shadow;
+        }
+        ctrlShadowCtrls.style.display = el.shadow ? 'block' : 'none';
+        _updatePanel(); _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlShadowOp.addEventListener('input', () => {
+        const el = _selText(); if (!el || !el.shadow) return;
+        el.shadow.opacidade = +ctrlShadowOp.value;
+        ctrlShadowOpVal.textContent = el.shadow.opacidade;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlShadowBlur.addEventListener('input', () => {
+        const el = _selText(); if (!el || !el.shadow) return;
+        el.shadow.blur = +ctrlShadowBlur.value;
+        ctrlShadowBlurVal.textContent = el.shadow.blur;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlShadowDx.addEventListener('input', () => {
+        const el = _selText(); if (!el || !el.shadow) return;
+        el.shadow.dx = +ctrlShadowDx.value || 0;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlShadowDy.addEventListener('input', () => {
+        const el = _selText(); if (!el || !el.shadow) return;
+        el.shadow.dy = +ctrlShadowDy.value || 0;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlShadowColor.addEventListener('input', () => {
+        const el = _selText(); if (!el || !el.shadow) return;
+        el.shadow.cor = ctrlShadowColor.value;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlBlur.addEventListener('input', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        if ((el.role||'').toLowerCase() !== 'grafismo') return;
+        const bl = +ctrlBlur.value;
+        ctrlBlurVal.textContent = bl;
+        if (bl > 0) el.blur = bl; else { delete el.blur; delete el.blur_grad; }
+        ctrlBlurDirWrap.style.display = bl > 0 ? 'block' : 'none';
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlBlurDir.addEventListener('change', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        if ((el.role||'').toLowerCase() !== 'grafismo') return;
+        const v = ctrlBlurDir.value;
+        if (v === 'uniforme') delete el.blur_grad;
+        else el.blur_grad = {direcao: v};
         _renderAll();
         _bumpHistoryDebounced();
     });
@@ -1806,6 +2234,11 @@ function toggleCarrossel() {
         const v=getComputedStyle(d).color; document.body.removeChild(d);
         const m=v.match(/\d+/g); if(!m) return '#000000';
         return '#'+m.slice(0,3).map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
+    }
+    function _rgba(c, alpha) {
+        const hex = _toHex6(c);
+        const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+        return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha)).toFixed(3)})`;
     }
 })();
 </script>
