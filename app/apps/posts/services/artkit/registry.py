@@ -36,6 +36,14 @@ ART_PIPELINES = {
         'view': 'apps.posts.views_gerar_samsung.gerar_post_samsung',
         'wireframes': 'apps.posts.services.samsung.wireframes.WIREFRAMES',
     },
+    # thermomix nasce DIRETO no engine v3 (sem renderizador legado). Sem 'view'
+    # ainda: enquanto a task/view nao existem, a geracao segue pelo pipeline
+    # simples (view_for devolve None) — o registry ja serve seed + preview.
+    'thermomix': {
+        'pipeline_used': 'thermomix',
+        'context_key': 'thermomix',
+        'wireframes': 'apps.posts.services.thermomix.wireframes.WIREFRAMES',
+    },
 }
 
 
@@ -50,12 +58,13 @@ def get_pipeline(slug):
 
 
 def view_for(slug):
-    """Handler de geracao da org, ou None."""
+    """Handler de geracao da org, ou None (entrada sem view = ainda sem task
+    dedicada; a geracao cai no fluxo padrao)."""
     entry = get_pipeline(slug)
-    return _resolve(entry['view']) if entry else None
+    return _resolve(entry['view']) if entry and entry.get('view') else None
 
 
 def wireframes_for(slug):
     """Dict {key: spec} do codigo da org, ou None (fonte do seed_archetypes)."""
     entry = get_pipeline(slug)
-    return _resolve(entry['wireframes']) if entry else None
+    return _resolve(entry['wireframes']) if entry and entry.get('wireframes') else None

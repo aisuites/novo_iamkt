@@ -1,0 +1,167 @@
+"""
+Arquetipos da THERMOMIX no dialeto AUTORADO (medicao visual sobre referencia).
+
+Este dialeto e o formato de AUTORIA: coordenadas normalizadas (bbox_norm 0-1),
+blocos por categoria e conteudo-exemplo com segmentos (trechos com cor/peso
+proprios). E o mesmo formato que o futuro agente extrator (Fase 2 do plano)
+emitira a partir de wireframe+imagem. A conversao para a spec v3 do engine
+(services/thermomix/convert.py: authored_to_v3) acontece no seed — o banco
+(PostArchetype.spec) guarda a spec v3 pronta.
+
+Decisoes do dono (2026-07-21/22):
+  - verde = o da PALETA da KB (#00AC46), nao o hex estimado da referencia;
+  - selo (circulo) e pill seguem o contrato do CTA unificado (background_color
+    + radius + texto centralizado);
+  - lockups/icones serao subidos na KB (asset_ref abaixo indica o SLOT, o
+    arquivo e ligado na aplicacao);
+  - foto de fundo e retrato vem do MODAL (usage_type 'fundo' / 'pessoa');
+    sem upload de fundo -> Gemini gera pela descricao do post.
+"""
+
+VERDE = '#00AC46'          # primaria da paleta thermomix na KB (dono, 2026-07-21)
+TEXTO_ESCURO = '#23282A'   # cinza-escuro da paleta da KB
+BRANCO = '#FFFFFF'
+
+TMX_A = {
+    'meta': {
+        'schema_version': 1,
+        'id': 'tmx-A',
+        'marca': 'thermomix',
+        'nome': 'Workshop: foto full-bleed + infos + retrato',
+        'medicao': 'estimativa-visual',
+        'formato': 'feed',
+        'dimensoes': {'w': 1080, 'h': 1350},
+    },
+
+    'fundo': {
+        'tipo': 'foto',
+        'notas': ('Upload do usuario (usage_type=fundo); sem upload a IA gera '
+                  'pela descricao. Scrim escuro degrade no topo p/ legibilidade.'),
+        'scrim_topo': {'alpha': 140, 'ate_norm': 0.35},
+    },
+
+    'tokens': {
+        'cores': {'verde': VERDE, 'texto_escuro': TEXTO_ESCURO, 'branco': BRANCO},
+        # nomes de CustomFont da KB (Vorwerk); resolvidos em assets.py
+        'tipografia': {'display': 'Vorwerk-Bold', 'corpo': 'Vorwerk-Medium',
+                       'corpo_bold': 'Vorwerk-Bold'},
+    },
+
+    'blocos': [
+        {
+            'categoria': 'LOGOTIPO',
+            'key': 'lockup_marca',
+            'label': 'Lockup thermomix workshop',
+            'bbox_norm': [0.082, 0.075, 0.53, 0.095],
+            'asset_ref': 'brand_lockup',
+        },
+        {
+            'categoria': 'SELO',
+            'key': 'selo',
+            'label': 'Selo cidade',
+            'bbox_norm': [0.72, 0.072, 0.172, 0.138],
+            'forma': {'tipo': 'circulo', 'cor': 'verde'},
+            'conteudo_fixo': {
+                'align': 'center', 'valign': 'center',
+                'linhas': [
+                    {'key': 'selo_cidade', 'font_size_px': 36, 'segmentos': [
+                        {'t': 'São Paulo', 'cor': 'branco', 'weight': 500}]},
+                    {'key': 'selo_estado', 'font_size_px': 52, 'segmentos': [
+                        {'t': 'SP', 'cor': 'branco', 'weight': 700}]},
+                ],
+            },
+        },
+        {
+            'categoria': 'TITULO',
+            'key': 'titulo',
+            'label': 'Titulo do workshop',
+            'bbox_norm': [0.082, 0.222, 0.52, 0.147],
+            'texto': {'familia': 'display', 'weight': 700, 'font_size_px': 94,
+                      'min_font_px': 60, 'line_height': 1.05, 'align': 'left',
+                      'max_linhas': 2, 'overflow': 'shrink', 'cor': 'branco'},
+            'exemplo': 'Cozinha do Dia a dia',
+        },
+        {
+            'categoria': 'LISTA',
+            'key': 'faixa_data',
+            'label': 'Data e horario',
+            'bbox_norm': [0.082, 0.403, 0.46, 0.10],
+            'forma': {'tipo': 'faixa', 'cor': 'branco', 'opacidade': 0.75},
+            'icones': [
+                {'ref': 'icone_calendario', 'bbox_norm': [0.086, 0.408, 0.051, 0.041]},
+            ],
+            'indent_norm': 0.065,
+            'linhas': [
+                {'key': 'data', 'font_size_px': 60, 'familia': 'corpo_bold',
+                 'segmentos': [{'t': '27/07', 'cor': 'verde', 'weight': 700}]},
+                {'key': 'horarios', 'font_size_px': 42, 'familia': 'corpo',
+                 'segmentos': [
+                     {'t': 'às ', 'cor': 'texto_escuro', 'weight': 400},
+                     {'t': '14h30', 'cor': 'texto_escuro', 'weight': 700},
+                     {'t': ' ou ', 'cor': 'texto_escuro', 'weight': 400},
+                     {'t': '18h30', 'cor': 'texto_escuro', 'weight': 700}]},
+            ],
+        },
+        {
+            'categoria': 'LISTA',
+            'key': 'faixa_infos',
+            'label': 'Infos fixas',
+            'bbox_norm': [0.082, 0.512, 0.46, 0.125],
+            'forma': {'tipo': 'faixa', 'cor': 'branco', 'opacidade': 0.75},
+            'icones': [
+                {'ref': 'icone_pessoas', 'bbox_norm': [0.086, 0.517, 0.051, 0.038]},
+                {'ref': 'icone_whatsapp', 'bbox_norm': [0.086, 0.566, 0.051, 0.038]},
+            ],
+            'indent_norm': 0.065,
+            'linhas': [
+                {'key': 'modalidade', 'font_size_px': 42, 'familia': 'corpo',
+                 'segmentos': [
+                     {'t': 'Presencial', 'cor': 'verde', 'weight': 700},
+                     {'t': ' ou ', 'cor': 'texto_escuro', 'weight': 400},
+                     {'t': 'online', 'cor': 'verde', 'weight': 700}]},
+                {'key': 'reserva_1', 'font_size_px': 42, 'familia': 'corpo',
+                 'segmentos': [
+                     {'t': 'Reserve sua vaga através', 'cor': 'texto_escuro',
+                      'weight': 400}]},
+                {'key': 'reserva_2', 'font_size_px': 42, 'familia': 'corpo',
+                 'segmentos': [
+                     {'t': 'do WhatsApp ', 'cor': 'texto_escuro', 'weight': 400},
+                     {'t': '(11) 94353-2087', 'cor': 'texto_escuro', 'weight': 700},
+                     {'t': '.', 'cor': 'texto_escuro', 'weight': 400}]},
+            ],
+        },
+        {
+            'categoria': 'ASSET_RETRATO',
+            'key': 'retrato',
+            'label': 'Retrato apresentadora',
+            'bbox_norm': [0.07, 0.70, 0.19, 0.30],
+            'z': 1,
+            'notas': 'Upload do usuario (usage_type=pessoa); sangra na base.',
+        },
+        {
+            'categoria': 'SELO',
+            'key': 'pill_nome',
+            'label': 'Pill nome apresentadora',
+            'bbox_norm': [0.176, 0.828, 0.297, 0.044],
+            'z': 2,
+            'forma': {'tipo': 'pill', 'cor': 'branco'},
+            'conteudo_fixo': {
+                'align': 'center', 'valign': 'center',
+                'linhas': [
+                    {'key': 'apresentadora', 'font_size_px': 26, 'segmentos': [
+                        {'t': 'Com ', 'cor': 'texto_escuro', 'weight': 400},
+                        {'t': 'Carina Boniatti', 'cor': 'verde', 'weight': 700}]},
+                ],
+            },
+        },
+        {
+            'categoria': 'ASSINATURA',
+            'key': 'assinatura',
+            'label': 'Lockup distribuidor',
+            'bbox_norm': [0.262, 0.916, 0.465, 0.059],
+            'asset_ref': 'distribuidor',
+        },
+    ],
+}
+
+AUTHORED = {'tmx-A': TMX_A}

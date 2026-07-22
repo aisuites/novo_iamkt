@@ -36,8 +36,10 @@ def _wireframes_for(slug: str) -> dict:
 
 
 def _fmt(spec) -> str:
-    # todxs/samsung: spec['formatos'] = lista; vb: spec['formato'] = string.
-    formatos = spec.get('formatos') or ([spec['formato']] if spec.get('formato') else None)
+    # todxs/samsung: spec['formatos'] = lista; vb: spec['formato'] = string;
+    # specs v3 (thermomix): spec['formats'] = lista.
+    formatos = (spec.get('formatos') or spec.get('formats')
+                or ([spec['formato']] if spec.get('formato') else None))
     s = set(formatos or ['feed'])
     if {'feed', 'story'} <= s:
         return 'both'
