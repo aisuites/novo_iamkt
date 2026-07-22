@@ -271,8 +271,10 @@ def layout_element_zones(zones, content, ctx, W, H):
                             bw = max(1, int(pct[2] / 100.0 * W))
                             bh = max(1, int(pct[3] / 100.0 * H))
                             from .image import cover as _cov
-                            img = _cov(img.convert('RGB'), bw, bh,
-                                       rounding=round).convert('RGBA')
+                            # PRESERVA o alpha: PNG transparente (ex.: retrato
+                            # recortado) deixa a arte aparecer atras — nunca
+                            # convert('RGB'), que expoe a cor sob a transparencia
+                            img = _cov(img, bw, bh, rounding=round)
                         els.append({'role': 'image', 'zone': z['key'],
                                     'url': _datauri(img),
                                     'x_pct': pct[0], 'y_pct': pct[1],
