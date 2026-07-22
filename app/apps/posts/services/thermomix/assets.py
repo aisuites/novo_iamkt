@@ -47,15 +47,20 @@ def resolve_asset_urls(kb) -> dict:
         logos = [l for l in Logo.objects.filter(knowledge_base=kb).order_by('id')
                  if not (l.name or '').startswith('._')]
 
+        def _norm(s):
+            return (s or '').lower().replace('_', ' ')
+
         def _pick(term, evitar='negative'):
-            cands = [l for l in logos if term in (l.name or '').lower()]
+            cands = [l for l in logos if term in _norm(l.name)]
             # prod tem variantes 'negative': prefere a SEM negative
-            return next((l for l in cands if evitar not in (l.name or '').lower()),
+            return next((l for l in cands if evitar not in _norm(l.name)),
                         cands[0] if cands else None)
-        white = _pick('white')
+        # topo: lockup 'thermomix workshop' dedicado (Logo WS, dono 2026-07-22)
+        # quando existir na KB; fallback = versao white vertical
+        topo = _pick('logo ws') or _pick('white')
         horiz = _pick('horizontal')
-        if white:
-            out['brand_lockup'] = _presigned(white)
+        if topo:
+            out['brand_lockup'] = _presigned(topo)
         if horiz:
             out['distribuidor'] = _presigned(horiz)
     except Exception:
