@@ -382,9 +382,9 @@ def _span_fonts(el, size):
     return reg, bold
 
 
-def _draw_spans_line(draw, el, spans, x, y, bw, size, align):
+def _draw_spans_line(draw, el, spans, x, y, bw, size, align, fill_override=None):
     """Desenha UMA linha composta de trechos (cor/peso proprios), alinhada
-    pelo comprimento TOTAL dos runs. Retorna sem quebrar (linha unica)."""
+    pelo comprimento TOTAL dos runs. fill_override: cor unica (sombra)."""
     from .image import hex_to_rgb
     reg, bold = _span_fonts(el, size)
     runs = [(s, bold if int(s.get('weight', 400)) >= 700 else reg)
@@ -395,11 +395,11 @@ def _draw_spans_line(draw, el, spans, x, y, bw, size, align):
         (x + bw - total if align == 'right' else x)
     for (s, f), wd in zip(runs, widths):
         draw.text((lx, y), s['t'], font=f,
-                  fill=hex_to_rgb(s.get('color') or el.get('color') or '#000000'))
+                  fill=fill_override or hex_to_rgb(s.get('color') or el.get('color') or '#000000'))
         lx += wd
 
 
-def _draw_element_text(draw, el, W, H):
+def _draw_element_text(base, draw, el, W, H):
     from PIL import ImageFont
     from .image import hex_to_rgb
     basis = min(W, H)
@@ -410,10 +410,15 @@ def _draw_element_text(draw, el, W, H):
     align = (el.get('align') or 'left').lower()
     content = str(el.get('content', ''))
     spans = el.get('spans')
+    shadow = el.get('shadow') if isinstance(el.get('shadow'), dict) else None
     # Trechos (spans): valem enquanto o texto plano bater com a juncao dos
     # runs (edicao do content sem re-editar os trechos -> desenho plano).
     if spans and '\n' not in content and \
             ''.join(s.get('t', '') for s in spans) == content:
+        if shadow:
+            _apply_text_shadow(base, shadow, lambda sd, dx, dy, col:
+                               _draw_spans_line(sd, el, spans, x + dx, y + dy,
+                                                bw, size, align, fill_override=col))
         _draw_spans_line(draw, el, spans, x, y, bw, size, align)
         return
     try:
@@ -422,11 +427,90 @@ def _draw_element_text(draw, el, W, H):
         font = ImageFont.load_default()
     fill = hex_to_rgb(el.get('color') or '#000000')
     line_h = size * float(el.get('_leading', 1.16))
-    for line in content.split('\n'):
-        lw = draw.textlength(line, font=font)
-        lx = x + (bw - lw) / 2 if align == 'center' else (x + bw - lw if align == 'right' else x)
-        draw.text((lx, y), line, font=font, fill=fill)
-        y += line_h
+
+    def _paint(dd, ox, oy, col):
+        yy = y + oy
+        for line in content.split('\n'):
+            lw = dd.textlength(line, font=font)
+            lx = x + (bw - lw) / 2 if align == 'center' else (x + bw - lw if align == 'right' else x)
+            dd.text((lx + ox, yy), line, font=font, fill=col)
+            yy += line_h
+
+    if shadow:
+        _apply_text_shadow(base, shadow, _paint)
+    _paint(draw, 0, 0, fill)
+
+
+def _grad_fill_stops(w, h, grad):
+    """Preenchimento degrade estilo Photoshop: `stops` [{cor, opacidade, pos}],
+    tipo 'linear' (angulo em graus, convencao CSS: 0=para cima, 90=direita)
+    ou 'radial' (centro->borda); `escala` (10-100%) comprime a rampa — o resto
+    satura na ultima parada. Calculado em resolucao reduzida + resize BICUBIC."""
+    import math
+    from .image import hex_to_rgb
+    raw = sorted((dict(s) for s in (grad.get('stops') or [])),
+                 key=lambda s: float(s.get('pos', 0) or 0))
+    if not raw:
+        return None
+    pts = []
+    for s in raw:
+        r, g, b = hex_to_rgb(s.get('cor') or '#000000')
+        a = int(round(max(0.0, min(100.0, float(s.get('opacidade', 100)))) / 100 * 255))
+        pts.append((max(0.0, min(1.0, float(s.get('pos', 0) or 0) / 100.0)), (r, g, b, a)))
+    escala = max(0.05, min(1.0, float(grad.get('escala', 100) or 100) / 100.0))
+    tipo = grad.get('tipo', 'linear')
+    ang = math.radians(float(grad.get('angulo', 90) or 90))
+    lw, lh = max(2, min(w, 160)), max(2, min(h, 160))
+    img = Image.new('RGBA', (lw, lh))
+    px = img.load()
+    if tipo == 'radial':
+        cx, cy = lw / 2.0, lh / 2.0
+        maxd = math.hypot(cx, cy) or 1.0
+    else:
+        dx, dy = math.sin(ang), -math.cos(ang)
+        projs = [xx * dx + yy * dy for xx in (0, lw - 1) for yy in (0, lh - 1)]
+        pmin = min(projs)
+        span = (max(projs) - pmin) or 1.0
+
+    def col(t):
+        t = max(0.0, min(1.0, t / escala))
+        if t <= pts[0][0]:
+            return pts[0][1]
+        if t >= pts[-1][0]:
+            return pts[-1][1]
+        for (p0, c0), (p1, c1) in zip(pts, pts[1:]):
+            if t <= p1:
+                f = 0.0 if p1 == p0 else (t - p0) / (p1 - p0)
+                return tuple(int(round(c0[i] + (c1[i] - c0[i]) * f)) for i in range(4))
+        return pts[-1][1]
+
+    for yy in range(lh):
+        for xx in range(lw):
+            if tipo == 'radial':
+                t = math.hypot(xx - cx, yy - cy) / maxd
+            else:
+                t = ((xx * dx + yy * dy) - pmin) / span
+            px[xx, yy] = col(t)
+    return img.resize((w, h), Image.BICUBIC)
+
+
+def _apply_text_shadow(base, shadow, paint):
+    """Sombra de texto: `paint(draw, dx, dy, rgba)` desenha o MESMO texto num
+    layer transparente deslocado; GaussianBlur; compoe sob o texto nitido.
+    base deve ser RGBA."""
+    from PIL import ImageFilter
+    from .image import hex_to_rgb
+    dx = int(shadow.get('dx', 2) or 0)
+    dy = int(shadow.get('dy', 3) or 0)
+    blur = int(shadow.get('blur', 6) or 0)
+    op = shadow.get('opacidade')
+    a = int(round(max(0.0, min(100.0, 50.0 if op is None else float(op))) / 100 * 255))
+    col = hex_to_rgb(shadow.get('cor') or '#000000') + (a,)
+    layer = Image.new('RGBA', base.size, (0, 0, 0, 0))
+    paint(ImageDraw.Draw(layer), dx, dy, col)
+    if blur > 0:
+        layer = layer.filter(ImageFilter.GaussianBlur(blur))
+    base.alpha_composite(layer)
 
 
 def _grad_mask(w, h, tipo, direcao):
@@ -512,7 +596,11 @@ def _draw_element_grafismo(base, draw, el, W, H):
             m = bmask.crop((x0 - x, y0 - y, x1 - x, y1 - y))
             base.paste(blurred, (x0, y0), m)
 
-    if grad:
+    if grad and grad.get('stops'):
+        # formato NOVO (estilo Photoshop): stops + angulo + escala
+        fill = _grad_fill_stops(w, h, grad) or Image.new('RGBA', (w, h), c1 + (a1,))
+    elif grad:
+        # formato legado: 2 cores + direcao horizontal|vertical
         c2 = hex_to_rgb(grad.get('cor2') or el.get('cor') or '#000000')
         op2 = grad.get('opacidade2')
         a2 = int(round(float(op2) / 100.0 * 255)) if op2 is not None else a1
@@ -576,7 +664,7 @@ def draw_layout_elements(base, elements, ctx, W, H):
 
     for el in normal:
         if (el.get('role') or '') in ('titulo', 'subtitulo', 'cta') and el.get('content'):
-            _draw_element_text(draw, el, W, H)
+            _draw_element_text(base, draw, el, W, H)
 
     for el in zed:
         role = (el.get('role') or '')
@@ -585,7 +673,7 @@ def draw_layout_elements(base, elements, ctx, W, H):
         elif role in ('image', 'logo'):
             _draw_element_image(base, el, W, H, assets)
         elif role in ('titulo', 'subtitulo', 'cta') and el.get('content'):
-            _draw_element_text(draw, el, W, H)
+            _draw_element_text(base, draw, el, W, H)
 
 
 def render_v3(spec, *, content, ctx):

@@ -616,20 +616,46 @@
                         <input type="range" id="ctrlOpacity" min="0" max="100" step="5" style="width:100%;accent-color:#471811;">
                     </div>
 
-                    <!-- Preenchimento: solido | degrade H/V | radial (grafismo) -->
+                    <!-- Preenchimento (grafismo): solido | degrade estilo Photoshop
+                         (angulo livre + escala + paradas de cor com opacidade/posicao) -->
                     <div id="ctrlFillWrap" style="display:none;margin-bottom:12px;">
                         <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Preenchimento</label>
                         <select id="ctrlFillType" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:5px 6px;font-size:12px;box-sizing:border-box;">
                             <option value="solido">Sólido</option>
-                            <option value="linear-h">Degradê horizontal</option>
-                            <option value="linear-v">Degradê vertical</option>
+                            <option value="linear">Degradê linear</option>
                             <option value="radial">Degradê radial</option>
                         </select>
-                        <div id="ctrlBgColor2Wrap" style="display:none;margin-top:8px;">
-                            <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Cor 2 (fim do degradê)</label>
-                            <input type="color" id="ctrlBgColor2" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
-                            <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;margin-top:8px;">Opacidade cor 2 <span id="ctrlOpacity2Val">100</span>%</label>
-                            <input type="range" id="ctrlOpacity2" min="0" max="100" step="5" style="width:100%;accent-color:#471811;">
+                        <div id="ctrlGradWrap" style="display:none;margin-top:8px;">
+                            <div id="ctrlGradAngleRow" style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+                                <label style="font-size:11px;color:#555;flex:1;">Ângulo (0° = ↑, 90° = →)</label>
+                                <input type="number" id="ctrlGradAngle" min="0" max="359" step="1" value="90" style="width:70px;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:12px;box-sizing:border-box;">
+                            </div>
+                            <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Escala <span id="ctrlGradScaleVal">100</span>%</label>
+                            <input type="range" id="ctrlGradScale" min="10" max="100" step="5" style="width:100%;accent-color:#471811;">
+                            <label style="font-size:11px;color:#555;display:block;margin:8px 0 4px;">Paradas (cor · opac.% · pos.%)</label>
+                            <div id="ctrlGradStops"></div>
+                            <button type="button" id="btnAddStop" style="width:100%;margin-top:6px;padding:5px;border:1px dashed #bbb;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;color:#555;">+ adicionar parada</button>
+                        </div>
+                    </div>
+
+                    <!-- Sombra (textos) -->
+                    <div id="ctrlShadowWrap" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Sombra do texto</label>
+                        <select id="ctrlShadowOn" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:5px 6px;font-size:12px;box-sizing:border-box;">
+                            <option value="off">Sem sombra</option>
+                            <option value="on">Com sombra</option>
+                        </select>
+                        <div id="ctrlShadowCtrls" style="display:none;margin-top:8px;">
+                            <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Opacidade <span id="ctrlShadowOpVal">50</span>%</label>
+                            <input type="range" id="ctrlShadowOp" min="5" max="100" step="5" style="width:100%;accent-color:#471811;">
+                            <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;margin-top:6px;">Desfoque <span id="ctrlShadowBlurVal">6</span>px</label>
+                            <input type="range" id="ctrlShadowBlur" min="0" max="30" step="1" style="width:100%;accent-color:#471811;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+                                <div><label style="font-size:10px;color:#999;">Desloc. X px</label><input type="number" id="ctrlShadowDx" min="-60" max="60" step="1" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:12px;box-sizing:border-box;"></div>
+                                <div><label style="font-size:10px;color:#999;">Desloc. Y px</label><input type="number" id="ctrlShadowDy" min="-60" max="60" step="1" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 6px;font-size:12px;box-sizing:border-box;"></div>
+                            </div>
+                            <label style="font-size:11px;color:#555;display:block;margin:6px 0 4px;">Cor da sombra</label>
+                            <input type="color" id="ctrlShadowColor" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
                         </div>
                     </div>
 
@@ -957,10 +983,23 @@ function toggleCarrossel() {
     const ctrlOpacityWrap = document.getElementById('ctrlOpacityWrap');
     const ctrlFillWrap  = document.getElementById('ctrlFillWrap');
     const ctrlFillType  = document.getElementById('ctrlFillType');
-    const ctrlBgColor2Wrap = document.getElementById('ctrlBgColor2Wrap');
-    const ctrlBgColor2  = document.getElementById('ctrlBgColor2');
-    const ctrlOpacity2  = document.getElementById('ctrlOpacity2');
-    const ctrlOpacity2Val = document.getElementById('ctrlOpacity2Val');
+    const ctrlGradWrap  = document.getElementById('ctrlGradWrap');
+    const ctrlGradAngleRow = document.getElementById('ctrlGradAngleRow');
+    const ctrlGradAngle = document.getElementById('ctrlGradAngle');
+    const ctrlGradScale = document.getElementById('ctrlGradScale');
+    const ctrlGradScaleVal = document.getElementById('ctrlGradScaleVal');
+    const ctrlGradStops = document.getElementById('ctrlGradStops');
+    const btnAddStop    = document.getElementById('btnAddStop');
+    const ctrlShadowWrap = document.getElementById('ctrlShadowWrap');
+    const ctrlShadowOn  = document.getElementById('ctrlShadowOn');
+    const ctrlShadowCtrls = document.getElementById('ctrlShadowCtrls');
+    const ctrlShadowOp  = document.getElementById('ctrlShadowOp');
+    const ctrlShadowOpVal = document.getElementById('ctrlShadowOpVal');
+    const ctrlShadowBlur = document.getElementById('ctrlShadowBlur');
+    const ctrlShadowBlurVal = document.getElementById('ctrlShadowBlurVal');
+    const ctrlShadowDx  = document.getElementById('ctrlShadowDx');
+    const ctrlShadowDy  = document.getElementById('ctrlShadowDy');
+    const ctrlShadowColor = document.getElementById('ctrlShadowColor');
     const ctrlBlur      = document.getElementById('ctrlBlur');
     const ctrlBlurVal   = document.getElementById('ctrlBlurVal');
     const ctrlBlurWrap  = document.getElementById('ctrlBlurWrap');
@@ -1192,9 +1231,19 @@ function toggleCarrossel() {
             // Preenchimento com alpha NA COR (rgba) — nao usar style.opacity,
             // senao o backdrop-blur esmaeceria junto. Mesma regra do Pillow.
             const op = Math.max(0, Math.min(100, (el.opacidade == null) ? 100 : Number(el.opacidade)));
-            const gr = (el.grad && el.grad.cor2) ? el.grad : null;
+            const gr = (el.grad && (el.grad.stops || el.grad.cor2)) ? el.grad : null;
             let bg;
-            if (gr) {
+            if (gr && gr.stops && gr.stops.length) {
+                // degrade estilo Photoshop: stops + angulo + escala (= Pillow)
+                const esc = Math.max(10, Math.min(100, Number(gr.escala == null ? 100 : gr.escala))) / 100;
+                const sorted = gr.stops.slice().sort((a,b) => (+a.pos||0) - (+b.pos||0));
+                const stopsCss = sorted.map(s =>
+                    `${_rgba(s.cor||'#000000', (s.opacidade==null?100:+s.opacidade)/100)} ` +
+                    `${(Math.max(0,Math.min(100,+s.pos||0))*esc).toFixed(1)}%`).join(', ');
+                bg = (gr.tipo === 'radial')
+                    ? `radial-gradient(circle, ${stopsCss})`
+                    : `linear-gradient(${Math.round(Number(gr.angulo == null ? 90 : gr.angulo))}deg, ${stopsCss})`;
+            } else if (gr) {
                 const op2 = Math.max(0, Math.min(100, (gr.opacidade2 == null) ? op : Number(gr.opacidade2)));
                 const c1 = _rgba(el.cor||'#000000', op/100), c2 = _rgba(gr.cor2, op2/100);
                 bg = (gr.tipo === 'radial')
@@ -1302,6 +1351,14 @@ function toggleCarrossel() {
             // (espelha o publicado com fit_text=False). CTA (pill) mantem o
             // clip visual do fundo, mas tambem sem encolher fonte.
             if (role==='cta' && el.background_color) dom.style.overflow = 'hidden';
+            // Sombra do texto (mesmos parametros do Pillow: dx/dy/blur em px
+            // do canvas -> px de tela; cor + opacidade)
+            if (el.shadow && typeof el.shadow === 'object') {
+                const sh = el.shadow;
+                dom.style.textShadow = `${((sh.dx||0)*scale).toFixed(1)}px ` +
+                    `${((sh.dy||0)*scale).toFixed(1)}px ${((sh.blur||0)*scale).toFixed(1)}px ` +
+                    `${_rgba(sh.cor||'#000000', ((sh.opacidade==null?50:+sh.opacidade))/100)}`;
+            }
             dom.textContent = el.content || '';
             // Texto VERTICAL (rotacionado): edita como texto, mas exibe girado.
             // bbox (width_pct/height_pct) = caixa JA rotacionada na tela.
@@ -1394,20 +1451,37 @@ function toggleCarrossel() {
         if (isGraf) {
             const op = (el.opacidade == null) ? 100 : Math.round(Number(el.opacidade));
             ctrlOpacity.value = op; ctrlOpacityVal.textContent = op;
+            if (el.grad && !el.grad.stops) _gradToV2(el);   // migra formato legado
             const gr = el.grad || null;
-            ctrlFillType.value = !gr ? 'solido'
-                : (gr.tipo === 'radial' ? 'radial'
-                   : (gr.direcao === 'vertical' ? 'linear-v' : 'linear-h'));
-            ctrlBgColor2Wrap.style.display = gr ? 'block' : 'none';
+            ctrlFillType.value = !gr ? 'solido' : (gr.tipo === 'radial' ? 'radial' : 'linear');
+            ctrlGradWrap.style.display = gr ? 'block' : 'none';
             if (gr) {
-                ctrlBgColor2.value = _toHex6(gr.cor2 || '#FFFFFF');
-                const op2 = (gr.opacidade2 == null) ? op : Math.round(Number(gr.opacidade2));
-                ctrlOpacity2.value = op2; ctrlOpacity2Val.textContent = op2;
+                ctrlGradAngleRow.style.display = gr.tipo === 'radial' ? 'none' : 'flex';
+                ctrlGradAngle.value = Math.round(Number(gr.angulo == null ? 90 : gr.angulo));
+                const esc = Math.round(Number(gr.escala == null ? 100 : gr.escala));
+                ctrlGradScale.value = esc; ctrlGradScaleVal.textContent = esc;
+                _renderGradStops(el);
             }
             const bl = Math.round(Number(el.blur || 0));
             ctrlBlur.value = bl; ctrlBlurVal.textContent = bl;
             ctrlBlurDirWrap.style.display = bl > 0 ? 'block' : 'none';
             ctrlBlurDir.value = (el.blur_grad && el.blur_grad.direcao) || 'uniforme';
+        }
+        // Sombra: so textos
+        ctrlShadowWrap.style.display = isText ? 'block' : 'none';
+        if (isText) {
+            const sh = (el.shadow && typeof el.shadow === 'object') ? el.shadow : null;
+            ctrlShadowOn.value = sh ? 'on' : 'off';
+            ctrlShadowCtrls.style.display = sh ? 'block' : 'none';
+            if (sh) {
+                const sop = Math.round(Number(sh.opacidade == null ? 50 : sh.opacidade));
+                ctrlShadowOp.value = sop; ctrlShadowOpVal.textContent = sop;
+                const sbl = Math.round(Number(sh.blur == null ? 6 : sh.blur));
+                ctrlShadowBlur.value = sbl; ctrlShadowBlurVal.textContent = sbl;
+                ctrlShadowDx.value = Math.round(Number(sh.dx || 0));
+                ctrlShadowDy.value = Math.round(Number(sh.dy || 0));
+                ctrlShadowColor.value = _toHex6(sh.cor || '#000000');
+            }
         }
 
         ctrlX.value = +(el.x_pct||0).toFixed(1);
@@ -1570,41 +1644,137 @@ function toggleCarrossel() {
         _renderAll();
         _bumpHistoryDebounced();
     });
-    ctrlFillType.addEventListener('change', () => {
-        if(selectedIdx===null)return;
+    // ── Degradê estilo Photoshop: angulo + escala + paradas ────────────────
+    function _gradToV2(el) {
+        // migra o formato legado {tipo, direcao, cor2, opacidade2} p/ stops
+        const op = (el.opacidade == null) ? 100 : +el.opacidade;
+        const g = el.grad || {};
+        el.grad = {
+            tipo: g.tipo === 'radial' ? 'radial' : 'linear',
+            angulo: g.direcao === 'vertical' ? 180 : 90,
+            escala: 100,
+            stops: [
+                {cor: el.cor || '#FFFFFF', opacidade: op, pos: 0},
+                {cor: g.cor2 || '#FFFFFF',
+                 opacidade: (g.opacidade2 == null) ? op : +g.opacidade2, pos: 100},
+            ],
+        };
+    }
+    function _selGraf() {
+        if (selectedIdx === null) return null;
         const el = elements[selectedIdx];
-        if ((el.role||'').toLowerCase() !== 'grafismo') return;
+        return ((el.role||'').toLowerCase() === 'grafismo') ? el : null;
+    }
+    function _renderGradStops(el) {
+        ctrlGradStops.innerHTML = '';
+        const stops = (el.grad && el.grad.stops) || [];
+        stops.forEach((s, i) => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:4px;';
+            const cor = document.createElement('input');
+            cor.type = 'color'; cor.value = _toHex6(s.cor || '#FFFFFF');
+            cor.style.cssText = 'width:36px;height:26px;border:1px solid #ddd;border-radius:4px;cursor:pointer;padding:0;';
+            const opc = document.createElement('input');
+            opc.type = 'number'; opc.min = 0; opc.max = 100; opc.step = 5;
+            opc.value = (s.opacidade == null) ? 100 : Math.round(+s.opacidade);
+            opc.title = 'Opacidade %';
+            opc.style.cssText = 'width:52px;border:1px solid #ddd;border-radius:4px;padding:4px;font-size:12px;';
+            const pos = document.createElement('input');
+            pos.type = 'number'; pos.min = 0; pos.max = 100; pos.step = 1;
+            pos.value = Math.round(+(s.pos || 0));
+            pos.title = 'Posição %';
+            pos.style.cssText = 'width:52px;border:1px solid #ddd;border-radius:4px;padding:4px;font-size:12px;';
+            const del = document.createElement('button');
+            del.type = 'button'; del.textContent = '×'; del.title = 'Remover parada';
+            del.style.cssText = 'width:24px;height:26px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;color:#c00;';
+            del.disabled = stops.length <= 2;
+            cor.addEventListener('input', () => { s.cor = cor.value; _renderAll(); _bumpHistoryDebounced(); });
+            opc.addEventListener('input', () => { s.opacidade = +opc.value; _renderAll(); _bumpHistoryDebounced(); });
+            pos.addEventListener('input', () => { s.pos = +pos.value; _renderAll(); _bumpHistoryDebounced(); });
+            del.addEventListener('click', () => {
+                el.grad.stops.splice(i, 1);
+                _renderGradStops(el); _renderAll(); _snapshotElements();
+            });
+            row.append(cor, opc, pos, del);
+            ctrlGradStops.appendChild(row);
+        });
+    }
+    ctrlFillType.addEventListener('change', () => {
+        const el = _selGraf(); if (!el) return;
         const v = ctrlFillType.value;
         if (v === 'solido') {
             delete el.grad;
         } else {
-            const cor2 = (el.grad && el.grad.cor2) || ctrlBgColor2.value || '#FFFFFF';
-            el.grad = (v === 'radial')
-                ? {tipo:'radial', cor2}
-                : {tipo:'linear', direcao:(v==='linear-v'?'vertical':'horizontal'), cor2};
-            ctrlBgColor2.value = _toHex6(cor2);
+            if (!el.grad || !el.grad.stops) _gradToV2(el);
+            el.grad.tipo = v;
+            ctrlGradAngleRow.style.display = v === 'radial' ? 'none' : 'flex';
+            _renderGradStops(el);
         }
-        ctrlBgColor2Wrap.style.display = el.grad ? 'block' : 'none';
+        ctrlGradWrap.style.display = el.grad ? 'block' : 'none';
         _renderAll();
         _bumpHistoryDebounced();
     });
-    ctrlBgColor2.addEventListener('input', () => {
-        if(selectedIdx===null)return;
-        const el = elements[selectedIdx];
-        if ((el.role||'').toLowerCase() !== 'grafismo' || !el.grad) return;
-        el.grad.cor2 = ctrlBgColor2.value;
-        _renderAll();
-        _bumpHistoryDebounced();
+    ctrlGradAngle.addEventListener('input', () => {
+        const el = _selGraf(); if (!el || !el.grad) return;
+        el.grad.angulo = Math.max(0, Math.min(359, +ctrlGradAngle.value || 0));
+        _renderAll(); _bumpHistoryDebounced();
     });
-    ctrlOpacity2.addEventListener('input', () => {
-        if(selectedIdx===null)return;
+    ctrlGradScale.addEventListener('input', () => {
+        const el = _selGraf(); if (!el || !el.grad) return;
+        const esc = +ctrlGradScale.value;
+        ctrlGradScaleVal.textContent = esc;
+        el.grad.escala = esc;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    btnAddStop.addEventListener('click', () => {
+        const el = _selGraf(); if (!el || !el.grad || !el.grad.stops) return;
+        el.grad.stops.push({cor: '#FFFFFF', opacidade: 100, pos: 50});
+        _renderGradStops(el); _renderAll(); _snapshotElements();
+    });
+
+    // ── Sombra do texto ────────────────────────────────────────────────────
+    function _selText() {
+        if (selectedIdx === null) return null;
         const el = elements[selectedIdx];
-        if ((el.role||'').toLowerCase() !== 'grafismo' || !el.grad) return;
-        const op2 = +ctrlOpacity2.value;
-        ctrlOpacity2Val.textContent = op2;
-        el.grad.opacidade2 = op2;
-        _renderAll();
-        _bumpHistoryDebounced();
+        return ['titulo','subtitulo','cta'].includes((el.role||'').toLowerCase()) ? el : null;
+    }
+    ctrlShadowOn.addEventListener('change', () => {
+        const el = _selText(); if (!el) return;
+        if (ctrlShadowOn.value === 'on') {
+            if (!el.shadow || typeof el.shadow !== 'object')
+                el.shadow = {dx: 2, dy: 3, blur: 6, opacidade: 50, cor: '#000000'};
+        } else {
+            delete el.shadow;
+        }
+        ctrlShadowCtrls.style.display = el.shadow ? 'block' : 'none';
+        _updatePanel(); _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlShadowOp.addEventListener('input', () => {
+        const el = _selText(); if (!el || !el.shadow) return;
+        el.shadow.opacidade = +ctrlShadowOp.value;
+        ctrlShadowOpVal.textContent = el.shadow.opacidade;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlShadowBlur.addEventListener('input', () => {
+        const el = _selText(); if (!el || !el.shadow) return;
+        el.shadow.blur = +ctrlShadowBlur.value;
+        ctrlShadowBlurVal.textContent = el.shadow.blur;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlShadowDx.addEventListener('input', () => {
+        const el = _selText(); if (!el || !el.shadow) return;
+        el.shadow.dx = +ctrlShadowDx.value || 0;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlShadowDy.addEventListener('input', () => {
+        const el = _selText(); if (!el || !el.shadow) return;
+        el.shadow.dy = +ctrlShadowDy.value || 0;
+        _renderAll(); _bumpHistoryDebounced();
+    });
+    ctrlShadowColor.addEventListener('input', () => {
+        const el = _selText(); if (!el || !el.shadow) return;
+        el.shadow.cor = ctrlShadowColor.value;
+        _renderAll(); _bumpHistoryDebounced();
     });
     ctrlBlur.addEventListener('input', () => {
         if(selectedIdx===null)return;
