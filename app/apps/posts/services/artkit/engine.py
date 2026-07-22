@@ -197,11 +197,16 @@ def layout_element_zones(zones, content, ctx, W, H):
 
         if role == 'grafismo':
             hexcol = color(z.get('color'))
+            grad = None
+            if isinstance(z.get('grad'), dict):
+                grad = dict(z['grad'], cor2=color(z['grad'].get('cor2')))
             els.append({'role': 'grafismo', 'forma': z.get('forma', 'retangulo'),
                         'zone': z['key'], 'cor': hexcol, 'color': hexcol,
                         'x_pct': pct[0], 'y_pct': pct[1], 'width_pct': pct[2],
                         'height_pct': pct[3], 'raio_pct': z.get('raio_pct', 0),
                         'opacidade': int(z.get('opacidade', 100)),
+                        **({'grad': grad} if grad else {}),
+                        **({'blur': int(z['blur'])} if z.get('blur') else {}),
                         **({'z': z['z']} if z.get('z') else {})})
             continue
 
@@ -424,26 +429,90 @@ def _draw_element_text(draw, el, W, H):
         y += line_h
 
 
+def _grad_mask(w, h, tipo, direcao):
+    """Mascara L (0->255) do degrade: linear H/V ou radial (centro->borda)."""
+    if tipo == 'radial':
+        import math
+        side = 64
+        g = Image.new('L', (side, side))
+        px = g.load()
+        cx = cy = side / 2.0
+        maxd = math.hypot(cx, cy)
+        for yy in range(side):
+            for xx in range(side):
+                px[xx, yy] = int(255 * min(1.0, math.hypot(xx - cx, yy - cy) / maxd))
+        return g.resize((w, h), Image.BICUBIC)
+    n = 256
+    if direcao == 'vertical':
+        g = Image.new('L', (1, n))
+        px = g.load()
+        for i in range(n):
+            px[0, i] = int(255 * i / (n - 1))
+    else:
+        g = Image.new('L', (n, 1))
+        px = g.load()
+        for i in range(n):
+            px[i, 0] = int(255 * i / (n - 1))
+    return g.resize((w, h), Image.BILINEAR)
+
+
 def _draw_element_grafismo(base, draw, el, W, H):
+    """Grafismo: solido, degrade (linear H/V | radial) e/ou blur de fundo
+    ("vidro fosco"). Caminho historico (solido opaco, sem blur) desenha
+    EXATAMENTE como antes (goldens)."""
     from .image import hex_to_rgb
     x = int(float(el.get('x_pct', 0)) / 100 * W)
     y = int(float(el.get('y_pct', 0)) / 100 * H)
-    w = int(float(el.get('width_pct', 0)) / 100 * W)
-    h = int(float(el.get('height_pct', 0)) / 100 * H)
-    fill = hex_to_rgb(el.get('cor') or el.get('color') or '#000000')
+    w = max(1, int(float(el.get('width_pct', 0)) / 100 * W))
+    h = max(1, int(float(el.get('height_pct', 0)) / 100 * H))
+    c1 = hex_to_rgb(el.get('cor') or el.get('color') or '#000000')
     r = int(float(el.get('raio_pct') or 0) / 100 * W)
     op = el.get('opacidade')
-    alpha = int(round(float(op) / 100.0 * 255)) if op is not None else 255
-    if alpha < 255:    # faixa translucida (thermomix): overlay com alpha
-        ov = Image.new('RGBA', base.size, (0, 0, 0, 0))
-        od = ImageDraw.Draw(ov)
-        od.rounded_rectangle([x, y, x + w, y + h], radius=max(0, r),
-                             fill=fill + (alpha,))
-        base.alpha_composite(ov)
-    elif r > 0:        # pill/circulo (mesma regra do editor: raio em % de W)
-        draw.rounded_rectangle([x, y, x + w, y + h], radius=r, fill=fill)
-    else:              # retangulo puro: caminho historico intacto (goldens)
-        draw.rectangle([x, y, x + w, y + h], fill=fill)
+    a1 = int(round(float(op) / 100.0 * 255)) if op is not None else 255
+    grad = el.get('grad') if isinstance(el.get('grad'), dict) else None
+    blur = int(el.get('blur') or 0)
+
+    if not grad and blur <= 0:
+        if a1 < 255:   # faixa translucida solida
+            ov = Image.new('RGBA', base.size, (0, 0, 0, 0))
+            ImageDraw.Draw(ov).rounded_rectangle(
+                [x, y, x + w, y + h], radius=max(0, r), fill=c1 + (a1,))
+            base.alpha_composite(ov)
+        elif r > 0:    # pill/circulo (mesma regra do editor: raio em % de W)
+            draw.rounded_rectangle([x, y, x + w, y + h], radius=r, fill=c1)
+        else:          # retangulo puro: caminho historico intacto (goldens)
+            draw.rectangle([x, y, x + w, y + h], fill=c1)
+        return
+
+    mask = Image.new('L', (w, h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, w - 1, h - 1],
+                                           radius=max(0, r), fill=255)
+    if blur > 0:       # desfoca o que ja esta POR BAIXO da faixa (vidro fosco)
+        from PIL import ImageFilter
+        x0, y0 = max(0, x), max(0, y)
+        x1, y1 = min(base.width, x + w), min(base.height, y + h)
+        if x1 > x0 and y1 > y0:
+            region = base.crop((x0, y0, x1, y1))
+            blurred = region.filter(ImageFilter.GaussianBlur(blur))
+            m = mask.crop((x0 - x, y0 - y, x1 - x, y1 - y))
+            base.paste(blurred, (x0, y0), m)
+
+    if grad:
+        c2 = hex_to_rgb(grad.get('cor2') or el.get('cor') or '#000000')
+        op2 = grad.get('opacidade2')
+        a2 = int(round(float(op2) / 100.0 * 255)) if op2 is not None else a1
+        gm = _grad_mask(w, h, grad.get('tipo', 'linear'),
+                        grad.get('direcao', 'horizontal'))
+        fill = Image.composite(Image.new('RGBA', (w, h), c2 + (a2,)),
+                               Image.new('RGBA', (w, h), c1 + (a1,)), gm)
+    else:
+        fill = Image.new('RGBA', (w, h), c1 + (a1,))
+
+    from PIL import ImageChops
+    fill.putalpha(ImageChops.multiply(fill.split()[3], mask))
+    ov = Image.new('RGBA', base.size, (0, 0, 0, 0))
+    ov.paste(fill, (x, y))
+    base.alpha_composite(ov)
 
 
 def _draw_element_image(base, el, W, H, assets):

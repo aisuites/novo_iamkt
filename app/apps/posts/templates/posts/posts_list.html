@@ -609,6 +609,27 @@
                         <input type="range" id="ctrlOpacity" min="5" max="100" step="5" style="width:100%;accent-color:#471811;">
                     </div>
 
+                    <!-- Preenchimento: solido | degrade H/V | radial (grafismo) -->
+                    <div id="ctrlFillWrap" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Preenchimento</label>
+                        <select id="ctrlFillType" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:5px 6px;font-size:12px;box-sizing:border-box;">
+                            <option value="solido">Sólido</option>
+                            <option value="linear-h">Degradê horizontal</option>
+                            <option value="linear-v">Degradê vertical</option>
+                            <option value="radial">Degradê radial</option>
+                        </select>
+                        <div id="ctrlBgColor2Wrap" style="display:none;margin-top:8px;">
+                            <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Cor 2 (fim do degradê)</label>
+                            <input type="color" id="ctrlBgColor2" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                        </div>
+                    </div>
+
+                    <!-- Blur do fundo / vidro fosco (grafismo) -->
+                    <div id="ctrlBlurWrap" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Desfoque do fundo <span id="ctrlBlurVal">0</span>px</label>
+                        <input type="range" id="ctrlBlur" min="0" max="40" step="1" style="width:100%;accent-color:#471811;">
+                    </div>
+
                     <!-- Peso + alinhamento -->
                     <div id="ctrlStyleWrap" style="margin-bottom:12px;display:flex;gap:8px;">
                         <div style="flex:1;">
@@ -914,6 +935,13 @@ function toggleCarrossel() {
     const ctrlOpacity   = document.getElementById('ctrlOpacity');
     const ctrlOpacityVal= document.getElementById('ctrlOpacityVal');
     const ctrlOpacityWrap = document.getElementById('ctrlOpacityWrap');
+    const ctrlFillWrap  = document.getElementById('ctrlFillWrap');
+    const ctrlFillType  = document.getElementById('ctrlFillType');
+    const ctrlBgColor2Wrap = document.getElementById('ctrlBgColor2Wrap');
+    const ctrlBgColor2  = document.getElementById('ctrlBgColor2');
+    const ctrlBlur      = document.getElementById('ctrlBlur');
+    const ctrlBlurVal   = document.getElementById('ctrlBlurVal');
+    const ctrlBlurWrap  = document.getElementById('ctrlBlurWrap');
     const ctrlBold      = document.getElementById('ctrlBold');
     const ctrlStyleWrap = document.getElementById('ctrlStyleWrap');
     const ctrlX         = document.getElementById('ctrlX');
@@ -1107,12 +1135,28 @@ function toggleCarrossel() {
             if (!['faixa','pill','retangulo'].includes(forma)) return;
             dom = document.createElement('div');
             const raio = ((el.raio_pct||0)/100*canvasW*scale).toFixed(1);
-            // opacidade (0-100): mesma regra do Pillow (_draw_element_grafismo)
-            const op = (el.opacidade == null) ? 100 : Number(el.opacidade);
+            // Preenchimento com alpha NA COR (rgba) — nao usar style.opacity,
+            // senao o backdrop-blur esmaeceria junto. Mesma regra do Pillow.
+            const op = Math.max(0, Math.min(100, (el.opacidade == null) ? 100 : Number(el.opacidade)));
+            const gr = (el.grad && el.grad.cor2) ? el.grad : null;
+            let bg;
+            if (gr) {
+                const op2 = Math.max(0, Math.min(100, (gr.opacidade2 == null) ? op : Number(gr.opacidade2)));
+                const c1 = _rgba(el.cor||'#000000', op/100), c2 = _rgba(gr.cor2, op2/100);
+                bg = (gr.tipo === 'radial')
+                    ? `radial-gradient(circle, ${c1}, ${c2})`
+                    : `linear-gradient(${gr.direcao==='vertical'?'180deg':'90deg'}, ${c1}, ${c2})`;
+            } else {
+                bg = _rgba(el.cor||'#000000', op/100);
+            }
             Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
                 width:el.width_pct+'%', height:el.height_pct+'%',
-                background:el.cor||'#000', borderRadius:raio+'px', boxSizing:'border-box', cursor:'pointer',
-                opacity:String(Math.max(0, Math.min(100, op))/100) });
+                background:bg, borderRadius:raio+'px', boxSizing:'border-box', cursor:'pointer' });
+            const bl = Number(el.blur||0);
+            if (bl > 0) {   // vidro fosco (blur em px do canvas -> px de tela)
+                dom.style.backdropFilter = `blur(${(bl*scale).toFixed(1)}px)`;
+                dom.style.webkitBackdropFilter = dom.style.backdropFilter;
+            }
 
         } else if (role === 'logo' && logoUrl) {
             dom = document.createElement('img');
@@ -1264,11 +1308,21 @@ function toggleCarrossel() {
             ctrlRadius.value = rp; ctrlRadiusVal.textContent = rp;
             btnRemoveBg.style.display = 'none';
         }
-        // Opacidade: so grafismo (faixas translucidas do template)
+        // Opacidade / preenchimento / blur: so grafismo (faixas do template)
         ctrlOpacityWrap.style.display = isGraf ? 'block' : 'none';
+        ctrlFillWrap.style.display    = isGraf ? 'block' : 'none';
+        ctrlBlurWrap.style.display    = isGraf ? 'block' : 'none';
         if (isGraf) {
             const op = (el.opacidade == null) ? 100 : Math.round(Number(el.opacidade));
             ctrlOpacity.value = op; ctrlOpacityVal.textContent = op;
+            const gr = el.grad || null;
+            ctrlFillType.value = !gr ? 'solido'
+                : (gr.tipo === 'radial' ? 'radial'
+                   : (gr.direcao === 'vertical' ? 'linear-v' : 'linear-h'));
+            ctrlBgColor2Wrap.style.display = gr ? 'block' : 'none';
+            if (gr) ctrlBgColor2.value = _toHex6(gr.cor2 || '#FFFFFF');
+            const bl = Math.round(Number(el.blur || 0));
+            ctrlBlur.value = bl; ctrlBlurVal.textContent = bl;
         }
 
         ctrlX.value = +(el.x_pct||0).toFixed(1);
@@ -1412,6 +1466,42 @@ function toggleCarrossel() {
         const op = +ctrlOpacity.value;
         ctrlOpacityVal.textContent = op;
         el.opacidade = op;
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlFillType.addEventListener('change', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        if ((el.role||'').toLowerCase() !== 'grafismo') return;
+        const v = ctrlFillType.value;
+        if (v === 'solido') {
+            delete el.grad;
+        } else {
+            const cor2 = (el.grad && el.grad.cor2) || ctrlBgColor2.value || '#FFFFFF';
+            el.grad = (v === 'radial')
+                ? {tipo:'radial', cor2}
+                : {tipo:'linear', direcao:(v==='linear-v'?'vertical':'horizontal'), cor2};
+            ctrlBgColor2.value = _toHex6(cor2);
+        }
+        ctrlBgColor2Wrap.style.display = el.grad ? 'block' : 'none';
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlBgColor2.addEventListener('input', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        if ((el.role||'').toLowerCase() !== 'grafismo' || !el.grad) return;
+        el.grad.cor2 = ctrlBgColor2.value;
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlBlur.addEventListener('input', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        if ((el.role||'').toLowerCase() !== 'grafismo') return;
+        const bl = +ctrlBlur.value;
+        ctrlBlurVal.textContent = bl;
+        if (bl > 0) el.blur = bl; else delete el.blur;
         _renderAll();
         _bumpHistoryDebounced();
     });
@@ -1834,6 +1924,11 @@ function toggleCarrossel() {
         const v=getComputedStyle(d).color; document.body.removeChild(d);
         const m=v.match(/\d+/g); if(!m) return '#000000';
         return '#'+m.slice(0,3).map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
+    }
+    function _rgba(c, alpha) {
+        const hex = _toHex6(c);
+        const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+        return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha)).toFixed(3)})`;
     }
 })();
 </script>
