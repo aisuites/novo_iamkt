@@ -612,8 +612,8 @@
 
                     <!-- Opacidade (grafismo) -->
                     <div id="ctrlOpacityWrap" style="display:none;margin-bottom:12px;">
-                        <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Opacidade <span id="ctrlOpacityVal">100</span>%</label>
-                        <input type="range" id="ctrlOpacity" min="5" max="100" step="5" style="width:100%;accent-color:#471811;">
+                        <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Opacidade (cor 1) <span id="ctrlOpacityVal">100</span>%</label>
+                        <input type="range" id="ctrlOpacity" min="0" max="100" step="5" style="width:100%;accent-color:#471811;">
                     </div>
 
                     <!-- Preenchimento: solido | degrade H/V | radial (grafismo) -->
@@ -628,6 +628,8 @@
                         <div id="ctrlBgColor2Wrap" style="display:none;margin-top:8px;">
                             <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Cor 2 (fim do degradê)</label>
                             <input type="color" id="ctrlBgColor2" style="width:100%;height:30px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+                            <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;margin-top:8px;">Opacidade cor 2 <span id="ctrlOpacity2Val">100</span>%</label>
+                            <input type="range" id="ctrlOpacity2" min="0" max="100" step="5" style="width:100%;accent-color:#471811;">
                         </div>
                     </div>
 
@@ -957,6 +959,8 @@ function toggleCarrossel() {
     const ctrlFillType  = document.getElementById('ctrlFillType');
     const ctrlBgColor2Wrap = document.getElementById('ctrlBgColor2Wrap');
     const ctrlBgColor2  = document.getElementById('ctrlBgColor2');
+    const ctrlOpacity2  = document.getElementById('ctrlOpacity2');
+    const ctrlOpacity2Val = document.getElementById('ctrlOpacity2Val');
     const ctrlBlur      = document.getElementById('ctrlBlur');
     const ctrlBlurVal   = document.getElementById('ctrlBlurVal');
     const ctrlBlurWrap  = document.getElementById('ctrlBlurWrap');
@@ -1395,7 +1399,11 @@ function toggleCarrossel() {
                 : (gr.tipo === 'radial' ? 'radial'
                    : (gr.direcao === 'vertical' ? 'linear-v' : 'linear-h'));
             ctrlBgColor2Wrap.style.display = gr ? 'block' : 'none';
-            if (gr) ctrlBgColor2.value = _toHex6(gr.cor2 || '#FFFFFF');
+            if (gr) {
+                ctrlBgColor2.value = _toHex6(gr.cor2 || '#FFFFFF');
+                const op2 = (gr.opacidade2 == null) ? op : Math.round(Number(gr.opacidade2));
+                ctrlOpacity2.value = op2; ctrlOpacity2Val.textContent = op2;
+            }
             const bl = Math.round(Number(el.blur || 0));
             ctrlBlur.value = bl; ctrlBlurVal.textContent = bl;
             ctrlBlurDirWrap.style.display = bl > 0 ? 'block' : 'none';
@@ -1585,6 +1593,16 @@ function toggleCarrossel() {
         const el = elements[selectedIdx];
         if ((el.role||'').toLowerCase() !== 'grafismo' || !el.grad) return;
         el.grad.cor2 = ctrlBgColor2.value;
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlOpacity2.addEventListener('input', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        if ((el.role||'').toLowerCase() !== 'grafismo' || !el.grad) return;
+        const op2 = +ctrlOpacity2.value;
+        ctrlOpacity2Val.textContent = op2;
+        el.grad.opacidade2 = op2;
         _renderAll();
         _bumpHistoryDebounced();
     });
