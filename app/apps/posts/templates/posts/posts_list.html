@@ -1146,16 +1146,21 @@ function toggleCarrossel() {
         if (!elementListSelect) return;
         const cur = selectedIdx;
         elementListSelect.innerHTML = '<option value="">— selecionar elemento —</option>';
-        elements.forEach((el, i) => {
+        // Ordem VISUAL de empilhamento: 1 = o mais ACIMA (fim do array/DOM);
+        // numero maior = mais para o fundo. Reordenar com ↑/↓ re-renderiza
+        // (_renderAll) e esta lista acompanha na hora.
+        for (let n = 0; n < elements.length; n++) {
+            const i = elements.length - 1 - n;   // topo -> fundo
+            const el = elements[i];
             const role = (el.role||'').toLowerCase();
             const label = ROLE_LABELS[role] || role || 'elemento';
             const zone = el.zone ? ` · ${el.zone}` : '';
             const hidden = (el.visible === false) ? ' (oculto)' : '';
             const o = document.createElement('option');
             o.value = String(i);
-            o.textContent = `${i+1}. ${label}${zone}${hidden}`;
+            o.textContent = `${n+1}. ${label}${zone}${hidden}`;
             elementListSelect.appendChild(o);
-        });
+        }
         elementListSelect.value = (cur === null || cur === undefined) ? '' : String(cur);
     }
     if (elementListSelect) elementListSelect.addEventListener('change', () => {
