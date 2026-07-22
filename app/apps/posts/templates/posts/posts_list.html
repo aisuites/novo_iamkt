@@ -543,7 +543,14 @@
                     <button type="button" id="btnRedo" title="Refazer (Ctrl+Shift+Z)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">↷ Refazer</button>
                     <button type="button" id="btnAddImage" title="Adicionar imagem (sticker)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Imagem</button>
                     <button type="button" id="btnAddText" title="Adicionar caixa de texto" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Texto</button>
+                    <button type="button" id="btnAddOverlay" title="Adicionar overlay sobre a imagem de fundo" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;">+ Overlay</button>
                     <input type="file" id="stickerFileInput" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" style="display:none;">
+                </div>
+                <!-- Seletor de elementos: acha qualquer elemento, inclusive OCULTOS -->
+                <div style="padding:8px 12px;border-bottom:1px solid #eee;background:#fafafa;">
+                    <select id="elementListSelect" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:5px 6px;font-size:12px;box-sizing:border-box;">
+                        <option value="">— selecionar elemento —</option>
+                    </select>
                 </div>
                 <div id="panelEmpty" style="padding:24px 16px;color:#888;font-size:13px;text-align:center;">
                     <div style="font-size:28px;margin-bottom:8px;">↖</div>
@@ -628,6 +635,17 @@
                     <div id="ctrlBlurWrap" style="display:none;margin-bottom:12px;">
                         <label style="font-size:11px;color:#555;display:flex;justify-content:space-between;">Desfoque do fundo <span id="ctrlBlurVal">0</span>px</label>
                         <input type="range" id="ctrlBlur" min="0" max="40" step="1" style="width:100%;accent-color:#471811;">
+                        <div id="ctrlBlurDirWrap" style="display:none;margin-top:8px;">
+                            <label style="font-size:11px;color:#555;display:block;margin-bottom:4px;">Direção do desfoque</label>
+                            <select id="ctrlBlurDir" style="width:100%;border:1px solid #ddd;border-radius:4px;padding:5px 6px;font-size:12px;box-sizing:border-box;">
+                                <option value="uniforme">Uniforme</option>
+                                <option value="horizontal">Forte à esquerda → nítido à direita</option>
+                                <option value="horizontal-inv">Forte à direita → nítido à esquerda</option>
+                                <option value="vertical">Forte no topo → nítido embaixo</option>
+                                <option value="vertical-inv">Forte embaixo → nítido no topo</option>
+                                <option value="radial">Forte nas bordas → nítido no centro</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Peso + alinhamento -->
@@ -942,6 +960,8 @@ function toggleCarrossel() {
     const ctrlBlur      = document.getElementById('ctrlBlur');
     const ctrlBlurVal   = document.getElementById('ctrlBlurVal');
     const ctrlBlurWrap  = document.getElementById('ctrlBlurWrap');
+    const ctrlBlurDir   = document.getElementById('ctrlBlurDir');
+    const ctrlBlurDirWrap = document.getElementById('ctrlBlurDirWrap');
     const ctrlBold      = document.getElementById('ctrlBold');
     const ctrlStyleWrap = document.getElementById('ctrlStyleWrap');
     const ctrlX         = document.getElementById('ctrlX');
@@ -1115,9 +1135,34 @@ function toggleCarrossel() {
     function _renderAll() {
         overlay.innerHTML = '';
         elements.forEach((el,i) => _renderOne(el,i));
+        _refreshElementList();
         // Fit pass: replica o auto-fit do Pillow (encolhe a fonte ate caber na caixa).
         requestAnimationFrame(_fitTextToBoxes);
     }
+
+    // ── Seletor de elementos (acha qualquer um, inclusive OCULTOS) ─────────
+    const elementListSelect = document.getElementById('elementListSelect');
+    function _refreshElementList() {
+        if (!elementListSelect) return;
+        const cur = selectedIdx;
+        elementListSelect.innerHTML = '<option value="">— selecionar elemento —</option>';
+        elements.forEach((el, i) => {
+            const role = (el.role||'').toLowerCase();
+            const label = ROLE_LABELS[role] || role || 'elemento';
+            const zone = el.zone ? ` · ${el.zone}` : '';
+            const hidden = (el.visible === false) ? ' (oculto)' : '';
+            const o = document.createElement('option');
+            o.value = String(i);
+            o.textContent = `${i+1}. ${label}${zone}${hidden}`;
+            elementListSelect.appendChild(o);
+        });
+        elementListSelect.value = (cur === null || cur === undefined) ? '' : String(cur);
+    }
+    if (elementListSelect) elementListSelect.addEventListener('change', () => {
+        const v = elementListSelect.value;
+        if (v === '') return;
+        _selectElement(+v);
+    });
     function _fitTextToBoxes() {
         // DESATIVADO (2026-07-10): o encolhedor replicava o antigo auto-fit do
         // Pillow e fazia o texto DIMINUIR ao estreitar a caixa no modal —
@@ -1151,11 +1196,36 @@ function toggleCarrossel() {
             }
             Object.assign(dom.style, { position:'absolute', left:el.x_pct+'%', top:el.y_pct+'%',
                 width:el.width_pct+'%', height:el.height_pct+'%',
-                background:bg, borderRadius:raio+'px', boxSizing:'border-box', cursor:'pointer' });
+                borderRadius:raio+'px', boxSizing:'border-box', cursor:'pointer' });
             const bl = Number(el.blur||0);
-            if (bl > 0) {   // vidro fosco (blur em px do canvas -> px de tela)
-                dom.style.backdropFilter = `blur(${(bl*scale).toFixed(1)}px)`;
-                dom.style.webkitBackdropFilter = dom.style.backdropFilter;
+            const bdir = (bl > 0 && el.blur_grad && el.blur_grad.direcao) || null;
+            if (bl > 0 && bdir) {
+                // Blur DIRECIONAL: camadas separadas — o desfoque leva a mascara
+                // de gradiente; o preenchimento fica inteiro (igual ao Pillow).
+                dom.style.overflow = 'hidden';
+                const MASKS = {
+                    'horizontal':     'linear-gradient(90deg, #000, transparent)',
+                    'horizontal-inv': 'linear-gradient(90deg, transparent, #000)',
+                    'vertical':       'linear-gradient(180deg, #000, transparent)',
+                    'vertical-inv':   'linear-gradient(180deg, transparent, #000)',
+                    'radial':         'radial-gradient(circle, transparent 25%, #000 85%)',
+                };
+                const blurDiv = document.createElement('div');
+                Object.assign(blurDiv.style, { position:'absolute', inset:'0',
+                    backdropFilter:`blur(${(bl*scale).toFixed(1)}px)`,
+                    webkitBackdropFilter:`blur(${(bl*scale).toFixed(1)}px)`,
+                    maskImage:MASKS[bdir]||'none', webkitMaskImage:MASKS[bdir]||'none',
+                    pointerEvents:'none' });
+                const fillDiv = document.createElement('div');
+                Object.assign(fillDiv.style, { position:'absolute', inset:'0',
+                    background:bg, pointerEvents:'none' });
+                dom.appendChild(blurDiv); dom.appendChild(fillDiv);
+            } else {
+                dom.style.background = bg;
+                if (bl > 0) {   // vidro fosco uniforme (px do canvas -> px de tela)
+                    dom.style.backdropFilter = `blur(${(bl*scale).toFixed(1)}px)`;
+                    dom.style.webkitBackdropFilter = dom.style.backdropFilter;
+                }
             }
 
         } else if (role === 'logo' && logoUrl) {
@@ -1323,6 +1393,8 @@ function toggleCarrossel() {
             if (gr) ctrlBgColor2.value = _toHex6(gr.cor2 || '#FFFFFF');
             const bl = Math.round(Number(el.blur || 0));
             ctrlBlur.value = bl; ctrlBlurVal.textContent = bl;
+            ctrlBlurDirWrap.style.display = bl > 0 ? 'block' : 'none';
+            ctrlBlurDir.value = (el.blur_grad && el.blur_grad.direcao) || 'uniforme';
         }
 
         ctrlX.value = +(el.x_pct||0).toFixed(1);
@@ -1438,6 +1510,22 @@ function toggleCarrossel() {
         _renderAll(); _updatePanel(); _snapshotElements();
         statusEl.textContent = 'Caixa de texto adicionada — edite o conteúdo no painel.';
     });
+
+    // ── + Overlay: veu sobre a imagem de fundo (ABAIXO dos demais elementos;
+    // por isso entra no INICIO da lista — Pillow e DOM desenham na mesma ordem)
+    const btnAddOverlay = document.getElementById('btnAddOverlay');
+    btnAddOverlay.addEventListener('click', () => {
+        if (!currentPostId) return;
+        elements.unshift({
+            role: 'grafismo', forma: 'retangulo', zone: 'overlay',
+            cor: '#000000', opacidade: 30, raio_pct: 0,
+            x_pct: 0, y_pct: 0, width_pct: 100, height_pct: 100,
+            visible: true,
+        });
+        selectedIdx = 0;
+        _renderAll(); _updatePanel(); _snapshotElements();
+        statusEl.textContent = 'Overlay adicionado — ajuste cor, opacidade, degradê e desfoque no painel.';
+    });
     btnRemoveBg.addEventListener('click', () => {
         if(selectedIdx===null)return;
         const el = elements[selectedIdx];
@@ -1501,7 +1589,18 @@ function toggleCarrossel() {
         if ((el.role||'').toLowerCase() !== 'grafismo') return;
         const bl = +ctrlBlur.value;
         ctrlBlurVal.textContent = bl;
-        if (bl > 0) el.blur = bl; else delete el.blur;
+        if (bl > 0) el.blur = bl; else { delete el.blur; delete el.blur_grad; }
+        ctrlBlurDirWrap.style.display = bl > 0 ? 'block' : 'none';
+        _renderAll();
+        _bumpHistoryDebounced();
+    });
+    ctrlBlurDir.addEventListener('change', () => {
+        if(selectedIdx===null)return;
+        const el = elements[selectedIdx];
+        if ((el.role||'').toLowerCase() !== 'grafismo') return;
+        const v = ctrlBlurDir.value;
+        if (v === 'uniforme') delete el.blur_grad;
+        else el.blur_grad = {direcao: v};
         _renderAll();
         _bumpHistoryDebounced();
     });

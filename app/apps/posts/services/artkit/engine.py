@@ -488,13 +488,28 @@ def _draw_element_grafismo(base, draw, el, W, H):
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, w - 1, h - 1],
                                            radius=max(0, r), fill=255)
     if blur > 0:       # desfoca o que ja esta POR BAIXO da faixa (vidro fosco)
-        from PIL import ImageFilter
+        from PIL import ImageFilter, ImageChops
+        bmask = mask
+        bg_dir = (el.get('blur_grad') or {}).get('direcao') \
+            if isinstance(el.get('blur_grad'), dict) else None
+        if bg_dir:     # blur DIRECIONAL: intensidade esvanece no sentido pedido
+            if bg_dir.startswith('horizontal'):
+                gm = _grad_mask(w, h, 'linear', 'horizontal')
+                if bg_dir == 'horizontal':          # forte a ESQUERDA
+                    gm = ImageChops.invert(gm)
+            elif bg_dir.startswith('vertical'):
+                gm = _grad_mask(w, h, 'linear', 'vertical')
+                if bg_dir == 'vertical':            # forte no TOPO
+                    gm = ImageChops.invert(gm)
+            else:                                   # radial: forte nas BORDAS
+                gm = _grad_mask(w, h, 'radial', '')
+            bmask = ImageChops.multiply(mask, gm)
         x0, y0 = max(0, x), max(0, y)
         x1, y1 = min(base.width, x + w), min(base.height, y + h)
         if x1 > x0 and y1 > y0:
             region = base.crop((x0, y0, x1, y1))
             blurred = region.filter(ImageFilter.GaussianBlur(blur))
-            m = mask.crop((x0 - x, y0 - y, x1 - x, y1 - y))
+            m = bmask.crop((x0 - x, y0 - y, x1 - x, y1 - y))
             base.paste(blurred, (x0, y0), m)
 
     if grad:
