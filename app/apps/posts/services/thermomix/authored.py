@@ -166,4 +166,149 @@ TMX_A = {
     ],
 }
 
-AUTHORED = {'tmx-A': TMX_A}
+TMX_A_STORY = {
+    'meta': {
+        'schema_version': 1,
+        'id': 'tmx-A_story',
+        'marca': 'thermomix',
+        'nome': 'Workshop: foto full-bleed + infos + retrato (story)',
+        'medicao': 'estimativa-visual',
+        'formato': 'story',
+        'dimensoes': {'w': 1080, 'h': 1920},
+        # safe area IG story (0.14 topo / 0.20 base) — blocos de TEXTO dentro;
+        # retrato/pill/assinatura aceitam a zona de risco (fiel a arte original)
+        'safe_area': {'topo_norm': 0.14, 'base_norm': 0.20},
+    },
+
+    'fundo': {
+        'tipo': 'foto',
+        'notas': ('Mesma foto da variante feed, reenquadrada 9:16 (upload '
+                  'usage_type=fundo; sem upload a IA gera). Scrim no topo.'),
+        'scrim_topo': {'alpha': 140, 'ate_norm': 0.30},
+    },
+
+    'tokens': {
+        'cores': {'verde': VERDE, 'texto_escuro': TEXTO_ESCURO, 'branco': BRANCO},
+        'tipografia': {'display': 'Vorwerk-Bold', 'corpo': 'Vorwerk-Medium',
+                       'corpo_bold': 'Vorwerk-Bold'},
+    },
+
+    'blocos': [
+        {
+            'categoria': 'LOGOTIPO',
+            'key': 'lockup_marca',
+            'label': 'Lockup thermomix workshop',
+            'bbox_norm': [0.082, 0.103, 0.53, 0.067],
+            'asset_ref': 'brand_lockup',
+        },
+        {
+            'categoria': 'SELO',
+            'key': 'selo',
+            'label': 'Selo cidade',
+            'bbox_norm': [0.73, 0.106, 0.175, 0.098],
+            'forma': {'tipo': 'circulo', 'cor': 'verde'},
+            # tamanhos/pesos = defaults aprovados pelo dono na variante feed
+            'conteudo_fixo': {
+                'align': 'center', 'valign': 'center',
+                'linhas': [
+                    {'key': 'selo_cidade', 'font_size_px': 34, 'segmentos': [
+                        {'t': 'São Paulo', 'cor': 'branco', 'weight': 400}]},
+                    {'key': 'selo_estado', 'font_size_px': 63, 'segmentos': [
+                        {'t': 'SP', 'cor': 'branco', 'weight': 700}]},
+                ],
+            },
+        },
+        {
+            'categoria': 'TITULO',
+            'key': 'titulo',
+            'label': 'Titulo do workshop',
+            'bbox_norm': [0.082, 0.222, 0.52, 0.103],
+            'texto': {'familia': 'display', 'weight': 700, 'font_size_px': 94,
+                      'min_font_px': 60, 'line_height': 1.05, 'align': 'left',
+                      'max_linhas': 2, 'overflow': 'shrink', 'cor': 'branco'},
+            'exemplo': 'Cozinha do Dia a dia',
+        },
+        {
+            'categoria': 'LISTA',
+            'key': 'faixa_data',
+            'label': 'Data e horario',
+            'bbox_norm': [0.082, 0.366, 0.46, 0.072],
+            'forma': {'tipo': 'faixa', 'cor': 'branco', 'opacidade': 0.75},
+            'icones': [
+                {'ref': 'icone_calendario', 'bbox_norm': [0.086, 0.369, 0.051, 0.029]},
+            ],
+            'indent_norm': 0.065,
+            'linhas': [
+                {'key': 'data', 'font_size_px': 60, 'familia': 'corpo_bold',
+                 'segmentos': [{'t': '27/07', 'cor': 'verde', 'weight': 700}]},
+                {'key': 'horarios', 'font_size_px': 42, 'familia': 'corpo',
+                 'segmentos': [
+                     {'t': 'às ', 'cor': 'texto_escuro', 'weight': 400},
+                     {'t': '14h30', 'cor': 'texto_escuro', 'weight': 700},
+                     {'t': ' ou ', 'cor': 'texto_escuro', 'weight': 400},
+                     {'t': '18h30', 'cor': 'texto_escuro', 'weight': 700}]},
+            ],
+        },
+        {
+            'categoria': 'LISTA',
+            'key': 'faixa_infos',
+            'label': 'Infos fixas',
+            'bbox_norm': [0.082, 0.447, 0.46, 0.097],
+            'forma': {'tipo': 'faixa', 'cor': 'branco', 'opacidade': 0.75},
+            'icones': [
+                {'ref': 'icone_pessoas', 'bbox_norm': [0.086, 0.450, 0.051, 0.029]},
+                {'ref': 'icone_whatsapp', 'bbox_norm': [0.086, 0.487, 0.051, 0.029]},
+            ],
+            'indent_norm': 0.065,
+            'linhas': [
+                {'key': 'modalidade', 'font_size_px': 42, 'familia': 'corpo',
+                 'segmentos': [
+                     {'t': 'Presencial', 'cor': 'verde', 'weight': 700},
+                     {'t': ' ou ', 'cor': 'texto_escuro', 'weight': 400},
+                     {'t': 'online', 'cor': 'verde', 'weight': 700}]},
+                {'key': 'reserva_1', 'font_size_px': 42, 'familia': 'corpo',
+                 'segmentos': [
+                     {'t': 'Reserve sua vaga através', 'cor': 'texto_escuro',
+                      'weight': 400}]},
+                {'key': 'reserva_2', 'font_size_px': 42, 'familia': 'corpo',
+                 'segmentos': [
+                     {'t': 'do WhatsApp ', 'cor': 'texto_escuro', 'weight': 400},
+                     {'t': '(11) 94353-2087', 'cor': 'texto_escuro', 'weight': 700},
+                     {'t': '.', 'cor': 'texto_escuro', 'weight': 400}]},
+            ],
+        },
+        {
+            'categoria': 'ASSET_RETRATO',
+            'key': 'retrato',
+            'label': 'Retrato apresentadora',
+            'bbox_norm': [0.07, 0.75, 0.20, 0.25],
+            'z': 1,
+            'notas': 'Upload do usuario (usage_type=pessoa); sangra na base.',
+        },
+        {
+            'categoria': 'SELO',
+            'key': 'pill_nome',
+            'label': 'Pill nome apresentadora',
+            'bbox_norm': [0.19, 0.858, 0.30, 0.033],
+            'z': 2,
+            'forma': {'tipo': 'pill', 'cor': 'branco'},
+            'conteudo_fixo': {
+                'align': 'center', 'valign': 'center',
+                'linhas': [
+                    {'key': 'apresentadora', 'font_size_px': 26, 'segmentos': [
+                        {'t': 'Com ', 'cor': 'texto_escuro', 'weight': 400},
+                        {'t': 'Carina Boniatti', 'cor': 'verde', 'weight': 700}]},
+                ],
+            },
+        },
+        {
+            'categoria': 'ASSINATURA',
+            'key': 'assinatura',
+            'label': 'Lockup distribuidor',
+            'bbox_norm': [0.27, 0.92, 0.46, 0.05],
+            'asset_ref': 'distribuidor',
+        },
+    ],
+}
+
+AUTHORED = {'tmx-A': TMX_A, 'tmx-A_story': TMX_A_STORY}

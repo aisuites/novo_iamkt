@@ -19,12 +19,17 @@ from django.utils import timezone as dj_tz
 
 logger = logging.getLogger(__name__)
 
-_GEMINI_STYLE_FOOD = (
-    ' Editorial food photography, appetizing, realistic, natural light, real '
-    'everyday Brazilian home cooking, shallow depth of field, generous negative '
-    'space on the LEFT half of the frame for text overlay. Vertical 4:5 '
-    'composition. Absolutely NO text, NO letters, NO logos, NO watermarks, NO '
-    'brand names, NO faces.')
+def _gemini_style_food(spec) -> str:
+    """Estilo do fundo Gemini; proporcao segue o canvas da spec (feed 4:5 /
+    story 9:16)."""
+    w, h = (spec or {}).get('canvas', [1080, 1350])
+    aspect = '9:16 tall vertical (story)' if h > w * 1.5 else 'Vertical 4:5'
+    return (
+        ' Editorial food photography, appetizing, realistic, natural light, real '
+        'everyday Brazilian home cooking, shallow depth of field, generous negative '
+        f'space on the LEFT half of the frame for text overlay. {aspect} '
+        'composition. Absolutely NO text, NO letters, NO logos, NO watermarks, NO '
+        'brand names, NO faces.')
 
 
 def _default_archetype():
@@ -244,8 +249,9 @@ def _thermomix_render_stage(task, post_id: int, from_gate: bool = False):
     if 'background_image' not in assets and img_prompt:
         try:
             from apps.posts.services.artkit.gemini import generate_singleshot
-            g = generate_singleshot(prompt_text=img_prompt + _GEMINI_STYLE_FOOD,
-                                    image_inputs=[])
+            g = generate_singleshot(
+                prompt_text=img_prompt + _gemini_style_food(WF().get(archetype)),
+                image_inputs=[])
             _record_ai_usage(post, step='image_generation', model=g.get('model'),
                              usage_dict=g.get('usage') or {},
                              purpose='thermomix_background', images_generated=1)
