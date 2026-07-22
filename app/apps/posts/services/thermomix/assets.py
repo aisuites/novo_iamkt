@@ -44,7 +44,9 @@ def resolve_asset_urls(kb) -> dict:
         return out
     try:
         from apps.knowledge.models import Logo
-        logos = [l for l in Logo.objects.filter(knowledge_base=kb).order_by('id')
+        # mais RECENTE primeiro: re-upload de um lockup (ex.: Logo WS em SVG)
+        # substitui o antigo de mesmo nome sem precisar apagar nada
+        logos = [l for l in Logo.objects.filter(knowledge_base=kb).order_by('-id')
                  if not (l.name or '').startswith('._')]
 
         def _norm(s):

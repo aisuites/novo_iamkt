@@ -365,15 +365,16 @@ def analyze_brand_asset(
     return {'structured': structured, 'raw_text': raw, 'usage': usage, 'model': MODEL}
 
 
-def _svg_to_png(svg_bytes: bytes) -> Optional[bytes]:
+def _svg_to_png(svg_bytes: bytes, scale: float = 2) -> Optional[bytes]:
     """Rasteriza SVG -> PNG. Usa PyMuPDF (ja instalado); cai para cairosvg /
-    svglib se disponiveis. Retorna None se nenhuma lib funcionar."""
+    svglib se disponiveis. Retorna None se nenhuma lib funcionar.
+    `scale`: multiplicador de resolucao (lockups/logos pedem 4x)."""
     # PyMuPDF (fitz) — ja presente no projeto, sem dependencia extra
     try:
         import fitz  # PyMuPDF
         doc = fitz.open(stream=svg_bytes, filetype='svg')
         page = doc[0]
-        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=True)
+        pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=True)
         return pix.tobytes('png')
     except Exception:
         pass

@@ -149,9 +149,9 @@ def _fetch(src):
         return Image.open(io.BytesIO(data)).convert('RGBA')
     except Exception:
         head = data[:512].lstrip().lower()
-        if head.startswith(b'<?xml') or b'<svg' in head:   # icones SVG da KB
+        if head.startswith(b'<?xml') or b'<svg' in head:   # SVGs da KB
             from apps.knowledge.services.visual_asset_analyzer import _svg_to_png
-            png = _svg_to_png(data)
+            png = _svg_to_png(data, scale=4)   # 4x: nitidez p/ lockups/logos
             if png:
                 return Image.open(io.BytesIO(png)).convert('RGBA')
         raise

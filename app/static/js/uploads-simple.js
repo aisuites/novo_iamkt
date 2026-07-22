@@ -212,7 +212,7 @@ async function uploadFileToS3(file, type, uploadUrlEndpoint, createRecordEndpoin
             body: new URLSearchParams({
                 s3Key: urlData.data.s3_key,
                 name: file.name.replace(/\.[^/.]+$/, ''),
-                fileFormat: file.type.split('/')[1],
+                fileFormat: file.type === 'image/svg+xml' ? 'svg' : file.type.split('/')[1],
                 ...(type === 'logo' ? {logoType: 'principal', isPrimary: 'true'} : {category: 'geral'})
             })
         });
