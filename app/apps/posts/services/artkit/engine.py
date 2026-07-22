@@ -145,7 +145,16 @@ def _fetch(src):
         req = urllib.request.Request(src, headers={'User-Agent': 'Mozilla/5.0 IAMKT'})
         with urllib.request.urlopen(req, timeout=30) as r:
             data = r.read()
-    return Image.open(io.BytesIO(data)).convert('RGBA')
+    try:
+        return Image.open(io.BytesIO(data)).convert('RGBA')
+    except Exception:
+        head = data[:512].lstrip().lower()
+        if head.startswith(b'<?xml') or b'<svg' in head:   # icones SVG da KB
+            from apps.knowledge.services.visual_asset_analyzer import _svg_to_png
+            png = _svg_to_png(data)
+            if png:
+                return Image.open(io.BytesIO(png)).convert('RGBA')
+        raise
 
 
 def _datauri(img):
@@ -494,8 +503,12 @@ def render_v3(spec, *, content, ctx):
         src = assets.get(z['key']) or assets.get('photo')
         if src:
             try:
+                fetched = _fetch(src)
+                if z.get('recolor'):   # ex.: icones SVG neutros -> cor da marca
+                    from .image import hex_to_rgb, recolor_opaque
+                    fetched = recolor_opaque(fetched, hex_to_rgb(color(z['recolor'])))
                 if z.get('fit') == 'contain':
-                    img = _contain(_fetch(src), w, h)
+                    img = _contain(fetched, w, h)
                     ha, va = z.get('halign', 'center'), z.get('anchor', 'top')
                     ox = (x + (w - img.width) // 2 if ha == 'center'
                           else x + w - img.width if ha == 'right' else x)
@@ -503,7 +516,7 @@ def render_v3(spec, *, content, ctx):
                           else y + (h - img.height) // 2 if va == 'center' else y)
                     base.paste(img, (ox, oy), img if img.mode == 'RGBA' else None)
                 else:
-                    src_img = _fetch(src)
+                    src_img = fetched
                     if z.get('fetch') == 'rgb':   # historico todxs/vb
                         src_img = src_img.convert('RGB')
                     rounding = int if z.get('cover_rounding') == 'int' else round

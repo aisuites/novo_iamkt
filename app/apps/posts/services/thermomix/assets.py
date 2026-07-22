@@ -23,12 +23,22 @@ def _presigned(logo):
         return logo.s3_url or None
 
 
+# slot da spec -> termo no NOME do asset da KB (estavel entre dev/prod)
+_ICON_SLOTS = {
+    'icone_calendario': 'calendar',
+    'icone_pessoas': 'user',
+    'icone_whatsapp': 'whatsapp',
+}
+
+
 def resolve_asset_urls(kb) -> dict:
-    """{slot: url} dos lockups da KB para os slots da spec (dono, 2026-07-22):
-      brand_lockup (topo)      = versao 'white' vertical (sobre foto)
-      distribuidor (assinatura) = versao 'horizontal'
-    Regra por NOME do arquivo (estavel entre dev/prod); ausente = slot vazio
-    (o engine pula a zona)."""
+    """{slot: url} dos assets da KB para os slots da spec (dono, 2026-07-22):
+      brand_lockup (topo)       = Logo versao 'white' vertical (sobre foto)
+      distribuidor (assinatura) = Logo versao 'horizontal'
+      icone_calendario/pessoas/whatsapp = BrandgraficModule com
+        'calendar'/'user'/'whatsapp' no nome
+    Regra por NOME (estavel entre dev/prod); ausente = slot vazio (o engine
+    pula a zona)."""
     out = {}
     if kb is None:
         return out
@@ -43,6 +53,15 @@ def resolve_asset_urls(kb) -> dict:
             out['distribuidor'] = _presigned(horiz)
     except Exception:
         logger.warning('[thermomix.assets] falha ao resolver lockups', exc_info=True)
+    try:
+        from apps.knowledge.models import BrandgraficModule
+        mods = list(BrandgraficModule.objects.filter(knowledge_base=kb))
+        for slot, term in _ICON_SLOTS.items():
+            m = next((g for g in mods if term in (g.name or '').lower()), None)
+            if m:
+                out[slot] = _presigned(m)
+    except Exception:
+        logger.warning('[thermomix.assets] falha ao resolver icones', exc_info=True)
     return {k: v for k, v in out.items() if v}
 
 

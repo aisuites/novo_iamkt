@@ -121,6 +121,7 @@ def authored_to_v3(a: dict) -> dict:
             for ic in (b.get('icones') or []):
                 zones.append({'key': ic['ref'], 'role': 'image',
                               'asset': ic['ref'], 'fit': 'contain',
+                              'recolor': ic.get('cor', 'verde'),
                               'box': _px_box(ic['bbox_norm'], W, H),
                               'optional': True})
             indent = float(b.get('indent_norm', 0.0))
