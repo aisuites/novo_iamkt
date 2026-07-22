@@ -371,6 +371,7 @@ def _in_fonts_cache(resolved: Path) -> bool:
 _STICKER_MAX_BYTES = 8 * 1024 * 1024  # 8 MB hard cap
 _STICKER_ACCEPTED_MIME = {
     'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif',
+    'image/svg+xml',   # rasterizado p/ PNG no upload (editor e Pillow leem PNG)
 }
 
 
@@ -630,6 +631,18 @@ def upload_sticker(request, post_id):
 
     import time
     safe_name = ''.join(c if c.isalnum() or c in ('.', '-', '_') else '_' for c in f.name)[:120]
+    body = f.read()
+
+    # SVG: rasteriza p/ PNG (4x, nitido) ja no upload — editor (<img>) e o
+    # Pillow do publicado continuam recebendo bitmap, sem caso especial.
+    if ct == 'image/svg+xml' or safe_name.lower().endswith('.svg'):
+        from apps.knowledge.services.visual_asset_analyzer import _svg_to_png
+        png = _svg_to_png(body, scale=4)
+        if not png:
+            return JsonResponse({'error': 'svg_invalido'}, status=415)
+        body, ct = png, 'image/png'
+        safe_name = (safe_name.rsplit('.', 1)[0] or 'sticker') + '.png'
+
     ts = int(time.time() * 1000)
     s3_key = f'org-{post.organization.id}/posts/stickers/{ts}-post{post.id}-{safe_name}'
 
@@ -642,7 +655,7 @@ def upload_sticker(request, post_id):
         )
         bucket = getattr(dj_settings, 'AWS_BUCKET_NAME', None) or os.environ.get('AWS_BUCKET_NAME', '')
         client.put_object(
-            Bucket=bucket, Key=s3_key, Body=f.read(), ContentType=ct,
+            Bucket=bucket, Key=s3_key, Body=body, ContentType=ct,
             ServerSideEncryption='AES256',
         )
     except Exception:
