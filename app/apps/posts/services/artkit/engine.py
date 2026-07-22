@@ -199,7 +199,13 @@ def layout_element_zones(zones, content, ctx, W, H):
             hexcol = color(z.get('color'))
             grad = None
             if isinstance(z.get('grad'), dict):
-                grad = dict(z['grad'], cor2=color(z['grad'].get('cor2')))
+                g = dict(z['grad'])
+                if g.get('stops'):   # formato Photoshop: resolve tokens por parada
+                    g['stops'] = [dict(s, cor=color(s.get('cor')))
+                                  for s in g['stops']]
+                else:
+                    g['cor2'] = color(g.get('cor2'))
+                grad = g
             els.append({'role': 'grafismo', 'forma': z.get('forma', 'retangulo'),
                         'zone': z['key'], 'cor': hexcol, 'color': hexcol,
                         'x_pct': pct[0], 'y_pct': pct[1], 'width_pct': pct[2],
@@ -207,6 +213,8 @@ def layout_element_zones(zones, content, ctx, W, H):
                         'opacidade': int(z.get('opacidade', 100)),
                         **({'grad': grad} if grad else {}),
                         **({'blur': int(z['blur'])} if z.get('blur') else {}),
+                        **({'blur_grad': z['blur_grad']} if z.get('blur_grad') else {}),
+                        **({'visible': False} if z.get('visible') is False else {}),
                         **({'z': z['z']} if z.get('z') else {})})
             continue
 
@@ -920,6 +928,20 @@ def render_v3(spec, *, content, ctx):
         if z.get('font') in font_files:
             fonts_resolved[z['font']] = font_files[z['font']]
         fill = color(z.get('color', 'white'))
+        shadow = z.get('shadow') if isinstance(z.get('shadow'), dict) else None
+        if shadow:   # sombra padrao declarada na SPEC (ex.: titulo thermomix)
+            if base.mode != 'RGBA':
+                base = base.convert('RGBA')
+                draw = ImageDraw.Draw(base)
+
+            def _paint_sombra(sd, ox, oy, col, _lines=lines, _font=font,
+                              _size=size, _x=x, _y=y, _lead=leading):
+                yy = _y + oy
+                for ln in _lines:
+                    _draw_line(sd, (_x + ox, yy), ln, _font, col,
+                               z.get('tracking', 0.0))
+                    yy += _size * _lead
+            _apply_text_shadow(base, shadow, _paint_sombra)
         ly = y
         for ln in lines:
             _draw_line(draw, (x, ly), ln, font, fill, z.get('tracking', 0.0))
@@ -934,6 +956,7 @@ def render_v3(spec, *, content, ctx):
             'color': fill, 'align': z.get('align', 'left'), 'case': 'none',
             '_leading': leading, '_font_file': font_files.get(z.get('font')),
             'tracking': z.get('tracking', 0.0),
+            **({'shadow': shadow} if shadow else {}),
         })
 
     # ---- 7. effects final ----

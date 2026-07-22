@@ -85,6 +85,18 @@ def authored_to_v3(a: dict) -> dict:
         cat = b['categoria']
         box = _px_box(b['bbox_norm'], W, H)
 
+        if cat == 'OVERLAY':
+            # veu full-canvas (elemento grafismo editavel); ordem dos blocos =
+            # ordem de empilhamento (primeiro = mais ao fundo)
+            zones.append({'key': b['key'], 'layer': 'elements',
+                          'role': 'grafismo', 'forma': 'retangulo',
+                          'color': b.get('cor', 'branco'),
+                          'opacidade': int(b.get('opacidade', 100)),
+                          'box': box, 'note': b.get('label'),
+                          **({'grad': b['grad']} if b.get('grad') else {}),
+                          **({'blur': int(b['blur'])} if b.get('blur') else {})})
+            continue
+
         if cat == 'LOGOTIPO':
             zones.append({'key': b['key'], 'role': 'brand_lockup',
                           'asset': b.get('asset_ref', 'brand_lockup'),
@@ -107,18 +119,21 @@ def authored_to_v3(a: dict) -> dict:
                 'align': t.get('align', 'left'), 'fit': 'shrink',
                 'color': t.get('cor', 'branco'), 'weight': 'bold',
                 'note': b.get('label'),
+                **({'shadow': t['sombra']} if t.get('sombra') else {}),
             })
 
         elif cat == 'LISTA':
             forma = b.get('forma') or {}
             if forma.get('tipo') == 'faixa':
                 # faixa translucida como ELEMENTO grafismo (editavel no editor:
-                # posicao/tamanho/opacidade), nao mais effect cozido no raw
+                # posicao/tamanho/opacidade), nao mais effect cozido no raw;
+                # 'oculto' = nasce invisivel (religavel pelo olhinho)
                 zones.append({'key': b['key'], 'layer': 'elements',
                               'role': 'grafismo', 'forma': 'faixa',
                               'color': forma.get('cor', 'branco'),
                               'opacidade': int(round(float(forma.get('opacidade', 0.75)) * 100)),
-                              'box': box, 'note': b.get('label')})
+                              'box': box, 'note': b.get('label'),
+                              **({'visible': False} if b.get('oculto') else {})})
             for ic in (b.get('icones') or []):
                 zones.append({'key': ic['ref'], 'layer': 'elements',
                               'role': 'image', 'asset': ic['ref'],
