@@ -61,12 +61,13 @@ TMX_A = {
             'label': 'Selo cidade',
             'bbox_norm': [0.72, 0.072, 0.172, 0.138],
             'forma': {'tipo': 'circulo', 'cor': 'verde'},
+            # tamanhos/pesos ajustados pelo dono no editor (prints 2026-07-22)
             'conteudo_fixo': {
                 'align': 'center', 'valign': 'center',
                 'linhas': [
-                    {'key': 'selo_cidade', 'font_size_px': 36, 'segmentos': [
-                        {'t': 'São Paulo', 'cor': 'branco', 'weight': 500}]},
-                    {'key': 'selo_estado', 'font_size_px': 52, 'segmentos': [
+                    {'key': 'selo_cidade', 'font_size_px': 34, 'segmentos': [
+                        {'t': 'São Paulo', 'cor': 'branco', 'weight': 400}]},
+                    {'key': 'selo_estado', 'font_size_px': 63, 'segmentos': [
                         {'t': 'SP', 'cor': 'branco', 'weight': 700}]},
                 ],
             },
@@ -158,7 +159,8 @@ TMX_A = {
             'categoria': 'ASSINATURA',
             'key': 'assinatura',
             'label': 'Lockup distribuidor',
-            'bbox_norm': [0.262, 0.916, 0.465, 0.059],
+            # posicao/tamanho ajustados pelo dono no editor (prints 2026-07-22)
+            'bbox_norm': [0.30, 0.855, 0.53, 0.145],
             'asset_ref': 'distribuidor',
         },
     ],
