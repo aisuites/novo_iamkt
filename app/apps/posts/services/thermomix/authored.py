@@ -48,6 +48,25 @@ TMX_A = {
     },
 
     'blocos': [
+        # ---- overlays padrao (mesmo tratamento do story; primeiro = fundo) ----
+        {
+            'categoria': 'OVERLAY',
+            'key': 'overlay_luz',
+            'label': 'Overlay luz esquerda',
+            'bbox_norm': [0.0, 0.0, 1.0, 1.0],
+            'grad': {'tipo': 'linear', 'angulo': 90, 'escala': 100, 'stops': [
+                {'cor': 'branco', 'opacidade': 100, 'pos': 0},
+                {'cor': 'branco', 'opacidade': 0, 'pos': 100}]},
+        },
+        {
+            'categoria': 'OVERLAY',
+            'key': 'overlay_scrim',
+            'label': 'Overlay scrim topo',
+            'bbox_norm': [0.0, 0.0, 1.0, 1.0],
+            'grad': {'tipo': 'linear', 'angulo': 180, 'escala': 40, 'stops': [
+                {'cor': '#000000', 'opacidade': 45, 'pos': 0},
+                {'cor': 'branco', 'opacidade': 0, 'pos': 100}]},
+        },
         {
             'categoria': 'LOGOTIPO',
             'key': 'lockup_marca',
@@ -81,7 +100,10 @@ TMX_A = {
             'bbox_norm': [0.082, 0.222, 0.52, 0.147],
             'texto': {'familia': 'display', 'weight': 700, 'font_size_px': 94,
                       'min_font_px': 60, 'line_height': 1.05, 'align': 'left',
-                      'max_linhas': 2, 'overflow': 'shrink', 'cor': 'branco'},
+                      'max_linhas': 2, 'overflow': 'shrink', 'cor': 'branco',
+                      # sombra padrao (mesma do story)
+                      'sombra': {'dx': 2, 'dy': 3, 'blur': 16,
+                                 'opacidade': 50, 'cor': '#000000'}},
             'exemplo': 'Cozinha do Dia a dia',
         },
         {
@@ -90,6 +112,7 @@ TMX_A = {
             'label': 'Data e horario',
             'bbox_norm': [0.082, 0.403, 0.46, 0.10],
             'forma': {'tipo': 'faixa', 'cor': 'branco', 'opacidade': 0.75},
+            'oculto': True,
             'icones': [
                 {'ref': 'icone_calendario', 'bbox_norm': [0.086, 0.408, 0.051, 0.041]},
             ],
@@ -111,6 +134,7 @@ TMX_A = {
             'label': 'Infos fixas',
             'bbox_norm': [0.082, 0.512, 0.46, 0.125],
             'forma': {'tipo': 'faixa', 'cor': 'branco', 'opacidade': 0.75},
+            'oculto': True,
             'icones': [
                 {'ref': 'icone_pessoas', 'bbox_norm': [0.086, 0.517, 0.051, 0.038]},
                 {'ref': 'icone_whatsapp', 'bbox_norm': [0.086, 0.566, 0.051, 0.038]},
