@@ -52,7 +52,9 @@ TMX_A = {
             'categoria': 'LOGOTIPO',
             'key': 'lockup_marca',
             'label': 'Lockup thermomix workshop',
-            'bbox_norm': [0.082, 0.075, 0.53, 0.095],
+            # tamanho/posicao de referencia do dono (prints 2026-07-22):
+            # largura 59.5%; caixa JUSTA p/ o aspecto ~3.6:1 do SVG novo
+            'bbox_norm': [0.085, 0.075, 0.595, 0.132],
             'asset_ref': 'brand_lockup',
         },
         {
@@ -198,7 +200,8 @@ TMX_A_STORY = {
             'categoria': 'LOGOTIPO',
             'key': 'lockup_marca',
             'label': 'Lockup thermomix workshop',
-            'bbox_norm': [0.082, 0.103, 0.53, 0.067],
+            # mesma largura de referencia da feed (59.5%), caixa justa 3.6:1
+            'bbox_norm': [0.085, 0.100, 0.595, 0.093],
             'asset_ref': 'brand_lockup',
         },
         {

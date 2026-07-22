@@ -50,16 +50,17 @@ def resolve_asset_urls(kb) -> dict:
                  if not (l.name or '').startswith('._')]
 
         def _norm(s):
-            return (s or '').lower().replace('_', ' ')
+            return (s or '').lower().replace('_', ' ').replace('-', ' ')
 
-        def _pick(term, evitar='negative'):
-            cands = [l for l in logos if term in _norm(l.name)]
+        def _pick(*terms, evitar='negative'):
+            cands = [l for l in logos if any(t in _norm(l.name) for t in terms)]
             # prod tem variantes 'negative': prefere a SEM negative
             return next((l for l in cands if evitar not in _norm(l.name)),
                         cands[0] if cands else None)
-        # topo: lockup 'thermomix workshop' dedicado (Logo WS, dono 2026-07-22)
-        # quando existir na KB; fallback = versao white vertical
-        topo = _pick('logo ws') or _pick('white')
+        # topo: lockup 'thermomix workshop' dedicado quando existir na KB
+        # ('logo ws' / 'workshop' no nome; o MAIS RECENTE vence — o SVG
+        # logo-thermomix-workshop supera o PNG Logo WS); fallback = white
+        topo = _pick('logo ws', 'workshop') or _pick('white')
         horiz = _pick('horizontal')
         if topo:
             out['brand_lockup'] = _presigned(topo)
