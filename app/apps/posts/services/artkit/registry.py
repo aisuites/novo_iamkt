@@ -36,12 +36,11 @@ ART_PIPELINES = {
         'view': 'apps.posts.views_gerar_samsung.gerar_post_samsung',
         'wireframes': 'apps.posts.services.samsung.wireframes.WIREFRAMES',
     },
-    # thermomix nasce DIRETO no engine v3 (sem renderizador legado). Sem 'view'
-    # ainda: enquanto a task/view nao existem, a geracao segue pelo pipeline
-    # simples (view_for devolve None) — o registry ja serve seed + preview.
+    # thermomix nasce DIRETO no engine v3 (sem renderizador legado).
     'thermomix': {
         'pipeline_used': 'thermomix',
         'context_key': 'thermomix',
+        'view': 'apps.posts.views_gerar_thermomix.gerar_post_thermomix',
         'wireframes': 'apps.posts.services.thermomix.wireframes.WIREFRAMES',
     },
 }
