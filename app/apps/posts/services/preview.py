@@ -185,7 +185,8 @@ def _thermomix_v3(org, kb, archetype, fmt, color, override):
     existir — engine pula asset ausente)."""
     from apps.posts.services.thermomix.catalog import apply_org_wireframes
     from apps.posts.services.thermomix.wireframes import WF, DEFAULT_CONTENT
-    from apps.posts.services.thermomix.assets import font_paths, font_loader
+    from apps.posts.services.thermomix.assets import (font_paths, font_loader,
+                                                      resolve_asset_urls)
     from apps.posts.services.artkit import spec3
     from apps.posts.services.artkit.engine import render_v3
 
@@ -198,7 +199,7 @@ def _thermomix_v3(org, kb, archetype, fmt, color, override):
     content.update(override)
 
     w, h = spec.get('canvas', [1080, 1350])
-    assets = {}
+    assets = resolve_asset_urls(kb)
     if (spec.get('background') or {}).get('type') in ('photo_upload', 'photo_gemini',
                                                       'photo_ref'):
         assets['background_image'] = placeholder_photo_png(int(w), int(h))

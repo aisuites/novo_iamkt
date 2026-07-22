@@ -194,6 +194,50 @@ def layout_element_zones(zones, content, ctx, W, H):
                         'height_pct': pct[3], 'raio_pct': 0, 'opacidade': 100})
             continue
 
+        if role == 'cta' and z.get('shape'):
+            # Selo circulo / pill (origem thermomix): decompoe no contrato do
+            # CTA unificado — 1 grafismo pill (fundo) + 1 elemento de TEXTO por
+            # linha, centrados H/V na area. shape 'circle' = box quadrado com
+            # raio = metade da altura (pill total).
+            hexbg = color(z.get('bg'))
+            raio_pct = (pct[3] / 100.0 * H / 2.0) / W * 100.0
+            els.append({'role': 'grafismo', 'forma': 'pill', 'zone': z['key'],
+                        'cor': hexbg, 'color': hexbg,
+                        'x_pct': pct[0], 'y_pct': pct[1], 'width_pct': pct[2],
+                        'height_pct': pct[3], 'raio_pct': round(raio_pct, 3),
+                        'opacidade': 100})
+            lines = []
+            for ln in (z.get('lines') or []):
+                val = (content or {}).get(ln.get('key'))
+                if not val:
+                    continue
+                fs_px = max(8, int(round((ln.get('fs') or 0.03) * basis)))
+                lines.append((ln, str(val), fs_px))
+            lead = 1.15
+            total_pct = sum(fs * lead for _, _, fs in lines) / H * 100.0
+            ly = pct[1] + max(0.0, (pct[3] - total_pct) / 2.0)
+            for ln, val, fs_px in lines:
+                segs = ln.get('spans') or []
+                first = segs[0] if segs else {}
+                fam = ln.get('font', 'corpo')
+                els.append({
+                    'role': 'subtitulo', 'zone': ln['key'], 'content': val,
+                    'x_pct': pct[0], 'y_pct': round(ly, 2),
+                    'width_pct': pct[2],
+                    'height_pct': round(fs_px * lead / H * 100.0, 2),
+                    'font_size_pct': round(fs_px / basis * 100.0, 3),
+                    'weight': 'bold' if int(first.get('weight', 400)) >= 700 else 'regular',
+                    'case': 'none', 'align': 'center',
+                    'color': color(first.get('color')),
+                    'spans': [dict(s, color=color(s.get('color'))) for s in segs],
+                    '_font_path': font_paths.get(fam),
+                    '_font_path_bold': font_paths.get(f'{fam}_bold')
+                    or font_paths.get(fam),
+                    '_leading': lead, 'font_key': fam,
+                })
+                ly += fs_px * lead / H * 100.0
+            continue
+
         if role == 'image':
             if z.get('recolor'):
                 els.append({'role': 'logo', 'zone': z['key'],
@@ -279,22 +323,62 @@ def _paste_contain_el(base, sticker, el, W, H):
     base.alpha_composite(sticker, (x, y))
 
 
+def _span_fonts(el, size):
+    """(font_regular, font_bold) do elemento no corpo pedido."""
+    from PIL import ImageFont
+    try:
+        reg = ImageFont.truetype(el.get('_font_path'), size)
+    except Exception:
+        reg = ImageFont.load_default()
+    try:
+        bold = ImageFont.truetype(el.get('_font_path_bold') or el.get('_font_path'),
+                                  size)
+    except Exception:
+        bold = reg
+    return reg, bold
+
+
+def _draw_spans_line(draw, el, spans, x, y, bw, size, align):
+    """Desenha UMA linha composta de trechos (cor/peso proprios), alinhada
+    pelo comprimento TOTAL dos runs. Retorna sem quebrar (linha unica)."""
+    from .image import hex_to_rgb
+    reg, bold = _span_fonts(el, size)
+    runs = [(s, bold if int(s.get('weight', 400)) >= 700 else reg)
+            for s in spans]
+    widths = [draw.textlength(s['t'], font=f) for s, f in runs]
+    total = sum(widths)
+    lx = x + (bw - total) / 2 if align == 'center' else \
+        (x + bw - total if align == 'right' else x)
+    for (s, f), wd in zip(runs, widths):
+        draw.text((lx, y), s['t'], font=f,
+                  fill=hex_to_rgb(s.get('color') or el.get('color') or '#000000'))
+        lx += wd
+
+
 def _draw_element_text(draw, el, W, H):
     from PIL import ImageFont
     from .image import hex_to_rgb
     basis = min(W, H)
     size = max(8, int(float(el.get('font_size_pct', 5)) / 100.0 * basis))
-    try:
-        font = ImageFont.truetype(el.get('_font_path'), size)
-    except Exception:
-        font = ImageFont.load_default()
     x = float(el.get('x_pct', 0)) / 100.0 * W
     y = float(el.get('y_pct', 0)) / 100.0 * H
     bw = float(el.get('width_pct', 60)) / 100.0 * W
     align = (el.get('align') or 'left').lower()
+    content = str(el.get('content', ''))
+    spans = el.get('spans')
+    # Trechos (spans): valem enquanto o texto plano bater com a juncao dos
+    # runs (edicao do content sem re-editar os trechos -> desenho plano).
+    if spans and '\n' not in content and \
+            ''.join(s.get('t', '') for s in spans) == content:
+        _draw_spans_line(draw, el, spans, x, y, bw, size, align)
+        return
+    try:
+        font = ImageFont.truetype(el.get('_font_path'), size)
+    except Exception:
+        font = ImageFont.load_default()
     fill = hex_to_rgb(el.get('color') or '#000000')
     line_h = size * float(el.get('_leading', 1.16))
-    for line in str(el.get('content', '')).split('\n'):
+    for line in content.split('\n'):
         lw = draw.textlength(line, font=font)
         lx = x + (bw - lw) / 2 if align == 'center' else (x + bw - lw if align == 'right' else x)
         draw.text((lx, y), line, font=font, fill=fill)
@@ -315,8 +399,12 @@ def draw_layout_elements(base, elements, ctx, W, H):
             y = int(float(el.get('y_pct', 0)) / 100 * H)
             w = int(float(el.get('width_pct', 0)) / 100 * W)
             h = int(float(el.get('height_pct', 0)) / 100 * H)
-            draw.rectangle([x, y, x + w, y + h],
-                           fill=hex_to_rgb(el.get('cor') or el.get('color') or '#000000'))
+            fill = hex_to_rgb(el.get('cor') or el.get('color') or '#000000')
+            r = int(float(el.get('raio_pct') or 0) / 100 * W)
+            if r > 0:   # pill/circulo (mesma regra do editor: raio em % de W)
+                draw.rounded_rectangle([x, y, x + w, y + h], radius=r, fill=fill)
+            else:       # retangulo puro: caminho historico intacto (goldens)
+                draw.rectangle([x, y, x + w, y + h], fill=fill)
 
     for el in elements:
         role = (el.get('role') or '')
@@ -494,7 +582,9 @@ def render_v3(spec, *, content, ctx):
                 logger.exception('[engine.v3] partner_logo falhou')
             continue
         if role in ('logo_fixo', 'brand_lockup') or z.get('category') == 'brand_lockup':
-            src = assets.get('brand_lockup') or assets.get(z.get('asset') or '')
+            # asset da ZONA primeiro (orgs com 2+ lockups, ex. thermomix
+            # topo/assinatura); fallback no slot global 'brand_lockup'
+            src = assets.get(z.get('asset') or '') or assets.get('brand_lockup')
             if not src:
                 continue
             x, y, w, h = px_box(z['box'])
@@ -519,6 +609,49 @@ def render_v3(spec, *, content, ctx):
         x, y, w, h = px_box(z['box'])
         leading = z.get('leading', 1.1)
         start_px = max(1, int(round((z.get('fs') or 0.037) * basis)))
+
+        # ---- linha com TRECHOS (spans): runs de cor/peso na mesma linha ----
+        # Vale enquanto o content bater com a juncao dos trechos (content
+        # editado sem re-editar trechos -> cai no desenho plano abaixo).
+        spans = z.get('spans')
+        if spans and ''.join(s.get('t', '') for s in spans) == text:
+            min_px = max(6, int(round((z.get('min_fs') or (12 / basis)) * basis)))
+            bold_key = z.get('font_bold') or z['font']
+            size = start_px
+            while size > min_px:      # shrink pelo comprimento TOTAL dos runs
+                reg, bold = font_loader(z['font'], size), font_loader(bold_key, size)
+                total = sum(draw.textlength(
+                    s['t'], font=bold if int(s.get('weight', 400)) >= 700 else reg)
+                    for s in spans)
+                if total <= w:
+                    break
+                size -= int(z.get('fit_step', 1))
+            reg, bold = font_loader(z['font'], size), font_loader(bold_key, size)
+            lx = x
+            hex_spans = [dict(s, color=color(s.get('color'))) for s in spans]
+            for s in hex_spans:
+                f = bold if int(s.get('weight', 400)) >= 700 else reg
+                from .image import hex_to_rgb as _h2r
+                draw.text((lx, y), s['t'], font=f, fill=_h2r(s['color']))
+                lx += draw.textlength(s['t'], font=f)
+            for fk in (z['font'], bold_key):
+                if fk in font_files:
+                    fonts_resolved[fk] = font_files[fk]
+            elements.append({
+                'role': _EDITOR_ROLE.get(z['key'], 'subtitulo'), 'zone': z['key'],
+                'content': text, 'spans': hex_spans,
+                'x_pct': round(x / W * 100, 3), 'y_pct': round(y / H * 100, 3),
+                'width_pct': round(w / W * 100, 3), 'height_pct': round(h / H * 100, 3),
+                'font_size_pct': round(size / basis * 100, 4), 'font_key': z['font'],
+                'font_key_bold': bold_key,
+                'weight': z.get('weight', 'regular'),
+                'color': color(z.get('color', 'white')),
+                'align': z.get('align', 'left'), 'case': 'none',
+                '_leading': leading, '_font_file': font_files.get(z.get('font')),
+                '_font_file_bold': font_files.get(bold_key),
+            })
+            continue
+
         fit_mode = z.get('fit', 'shrink')
         if fit_mode == 'fixed':
             font = font_loader(z['font'], start_px)

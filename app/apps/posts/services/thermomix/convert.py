@@ -41,15 +41,18 @@ def _plain(segmentos):
     return ''.join(s['t'] for s in (segmentos or []))
 
 
-def _line_zone(linha, x, y, w, fs):
+def _line_zone(linha, x, y, w, fs, fontes):
     """Zona de texto de UMA linha de LISTA. Estilo base = 1o segmento."""
     segs = linha.get('segmentos') or []
     first = segs[0] if segs else {}
+    fam = linha.get('familia', 'corpo')
+    bold = f'{fam}_bold' if f'{fam}_bold' in (fontes or {}) else fam
     return {
         'key': linha['key'],
         'role': 'subtitulo',
         'box': [x, y, w, int(round(fs * LINE_GAP))],
-        'font': linha.get('familia', 'corpo'),
+        'font': fam,
+        'font_bold': bold,
         'fs': fs,
         'min_fs': int(round(fs * 0.7)),
         'max_lines': 1,
@@ -126,7 +129,7 @@ def authored_to_v3(a: dict) -> dict:
             ty = box[1] + LIST_PAD_TOP_PX
             for linha in (b.get('linhas') or []):
                 fs = int(linha.get('font_size_px', 42))
-                zones.append(_line_zone(linha, tx, ty, tw, fs))
+                zones.append(_line_zone(linha, tx, ty, tw, fs, fontes))
                 ty += int(round(fs * LINE_GAP))
 
         elif cat == 'ASSET_RETRATO':
