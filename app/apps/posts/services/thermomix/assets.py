@@ -44,9 +44,16 @@ def resolve_asset_urls(kb) -> dict:
         return out
     try:
         from apps.knowledge.models import Logo
-        logos = list(Logo.objects.filter(knowledge_base=kb))
-        white = next((l for l in logos if 'white' in (l.name or '').lower()), None)
-        horiz = next((l for l in logos if 'horizontal' in (l.name or '').lower()), None)
+        logos = [l for l in Logo.objects.filter(knowledge_base=kb).order_by('id')
+                 if not (l.name or '').startswith('._')]
+
+        def _pick(term, evitar='negative'):
+            cands = [l for l in logos if term in (l.name or '').lower()]
+            # prod tem variantes 'negative': prefere a SEM negative
+            return next((l for l in cands if evitar not in (l.name or '').lower()),
+                        cands[0] if cands else None)
+        white = _pick('white')
+        horiz = _pick('horizontal')
         if white:
             out['brand_lockup'] = _presigned(white)
         if horiz:
@@ -73,8 +80,10 @@ def font_paths(kb, fonts_map: dict) -> dict:
         if kb is not None:
             try:
                 from apps.posts.services.font_resolver import _load_custom_font
-                cf = kb.custom_fonts.filter(name__iexact=cf_name).first() \
-                    or kb.custom_fonts.filter(name__icontains=cf_name).first()
+                # exclui lixo AppleDouble do macOS ('._Vorwerk-*'): nao e fonte
+                fontes = kb.custom_fonts.exclude(name__startswith='._')
+                cf = fontes.filter(name__iexact=cf_name).first() \
+                    or fontes.filter(name__icontains=cf_name).first()
                 path = _load_custom_font(cf) if cf else None
             except Exception:
                 logger.warning('[thermomix.assets] falha ao resolver fonte %r',
