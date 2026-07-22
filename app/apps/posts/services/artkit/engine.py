@@ -197,10 +197,12 @@ def layout_element_zones(zones, content, ctx, W, H):
 
         if role == 'grafismo':
             hexcol = color(z.get('color'))
-            els.append({'role': 'grafismo', 'forma': 'retangulo',
-                        'cor': hexcol, 'color': hexcol,
+            els.append({'role': 'grafismo', 'forma': z.get('forma', 'retangulo'),
+                        'zone': z['key'], 'cor': hexcol, 'color': hexcol,
                         'x_pct': pct[0], 'y_pct': pct[1], 'width_pct': pct[2],
-                        'height_pct': pct[3], 'raio_pct': 0, 'opacidade': 100})
+                        'height_pct': pct[3], 'raio_pct': z.get('raio_pct', 0),
+                        'opacidade': int(z.get('opacidade', 100)),
+                        **({'z': z['z']} if z.get('z') else {})})
             continue
 
         if role == 'cta' and z.get('shape'):
@@ -209,12 +211,13 @@ def layout_element_zones(zones, content, ctx, W, H):
             # linha, centrados H/V na area. shape 'circle' = box quadrado com
             # raio = metade da altura (pill total).
             hexbg = color(z.get('bg'))
+            zorder = {'z': z['z']} if z.get('z') else {}
             raio_pct = (pct[3] / 100.0 * H / 2.0) / W * 100.0
             els.append({'role': 'grafismo', 'forma': 'pill', 'zone': z['key'],
                         'cor': hexbg, 'color': hexbg,
                         'x_pct': pct[0], 'y_pct': pct[1], 'width_pct': pct[2],
                         'height_pct': pct[3], 'raio_pct': round(raio_pct, 3),
-                        'opacidade': 100})
+                        'opacidade': 100, **zorder})
             lines = []
             for ln in (z.get('lines') or []):
                 val = (content or {}).get(ln.get('key'))
@@ -242,12 +245,39 @@ def layout_element_zones(zones, content, ctx, W, H):
                     '_font_path': font_paths.get(fam),
                     '_font_path_bold': font_paths.get(f'{fam}_bold')
                     or font_paths.get(fam),
-                    '_leading': lead, 'font_key': fam,
+                    '_leading': lead, 'font_key': fam, **zorder,
                 })
                 ly += fs_px * lead / H * 100.0
             continue
 
         if role == 'image':
+            # Zona com 'fit' declarado (thermomix): busca o asset, aplica
+            # recolor/cover/contain AQUI e emite DATAURI ja processado ->
+            # elemento auto-contido, editavel (mover/redimensionar/ocultar).
+            if z.get('fit') in ('cover', 'contain'):
+                uri = assets.get(z.get('asset') or z['key'])
+                if uri:
+                    try:
+                        img = _fetch(uri)
+                        if z.get('recolor'):
+                            from .image import hex_to_rgb, recolor_opaque
+                            img = recolor_opaque(img, hex_to_rgb(color(z['recolor'])))
+                        if z.get('fit') == 'cover':
+                            bw = max(1, int(pct[2] / 100.0 * W))
+                            bh = max(1, int(pct[3] / 100.0 * H))
+                            from .image import cover as _cov
+                            img = _cov(img.convert('RGB'), bw, bh,
+                                       rounding=round).convert('RGBA')
+                        els.append({'role': 'image', 'zone': z['key'],
+                                    'url': _datauri(img),
+                                    'x_pct': pct[0], 'y_pct': pct[1],
+                                    'width_pct': pct[2], 'height_pct': pct[3],
+                                    **({'z': z['z']} if z.get('z') else {})})
+                    except Exception:
+                        logger.exception('[engine.v3] elemento imagem (fetch) '
+                                         'falhou zona=%s', z['key'])
+                continue
+            # dialeto historico todxs: recolor sem fit = logo/wordmark
             if z.get('recolor'):
                 els.append({'role': 'logo', 'zone': z['key'],
                             'x_pct': pct[0], 'y_pct': pct[1], 'width_pct': pct[2],
@@ -394,49 +424,83 @@ def _draw_element_text(draw, el, W, H):
         y += line_h
 
 
-def draw_layout_elements(base, elements, ctx, W, H):
-    """Desenha os elementos resolvidos: grafismos -> imagens/logos -> texto
-    (mesma ordem de camadas do desenhador todxs). `base` deve ser RGBA."""
+def _draw_element_grafismo(base, draw, el, W, H):
+    from .image import hex_to_rgb
+    x = int(float(el.get('x_pct', 0)) / 100 * W)
+    y = int(float(el.get('y_pct', 0)) / 100 * H)
+    w = int(float(el.get('width_pct', 0)) / 100 * W)
+    h = int(float(el.get('height_pct', 0)) / 100 * H)
+    fill = hex_to_rgb(el.get('cor') or el.get('color') or '#000000')
+    r = int(float(el.get('raio_pct') or 0) / 100 * W)
+    op = el.get('opacidade')
+    alpha = int(round(float(op) / 100.0 * 255)) if op is not None else 255
+    if alpha < 255:    # faixa translucida (thermomix): overlay com alpha
+        ov = Image.new('RGBA', base.size, (0, 0, 0, 0))
+        od = ImageDraw.Draw(ov)
+        od.rounded_rectangle([x, y, x + w, y + h], radius=max(0, r),
+                             fill=fill + (alpha,))
+        base.alpha_composite(ov)
+    elif r > 0:        # pill/circulo (mesma regra do editor: raio em % de W)
+        draw.rounded_rectangle([x, y, x + w, y + h], radius=r, fill=fill)
+    else:              # retangulo puro: caminho historico intacto (goldens)
+        draw.rectangle([x, y, x + w, y + h], fill=fill)
+
+
+def _draw_element_image(base, el, W, H, assets):
     import base64
     from .image import hex_to_rgb, recolor_opaque
+    role = (el.get('role') or '')
+    if role == 'image' and (el.get('url') or '').startswith('data:'):
+        try:
+            _, _, payload = el['url'].partition(',')
+            st = Image.open(io.BytesIO(base64.b64decode(payload))).convert('RGBA')
+            _paste_contain_el(base, st, el, W, H)
+        except Exception:
+            logger.exception('[engine.v3] elemento imagem falhou (%s)', el.get('zone'))
+    elif role == 'logo':
+        src = assets.get(el.get('zone') or 'wordmark') or assets.get('wordmark')
+        if not src:
+            return
+        try:
+            lg = _fetch(src).convert('RGBA')
+            lg = recolor_opaque(lg, hex_to_rgb(el.get('logo_color') or '#F4F1D9'))
+            _paste_contain_el(base, lg, el, W, H)
+        except Exception:
+            logger.exception('[engine.v3] elemento logo falhou (%s)', el.get('zone'))
+
+
+def draw_layout_elements(base, elements, ctx, W, H):
+    """Desenha os elementos resolvidos: grafismos -> imagens/logos -> texto
+    (mesma ordem de camadas do desenhador todxs). Elementos com `z` saem das
+    passadas e sao desenhados POR CIMA, em ordem de z (ex.: thermomix, retrato
+    z=1 sob a pill z=2). `base` deve ser RGBA. Respeita visible=False."""
     draw = ImageDraw.Draw(base)
     assets = ctx.get('assets') or {}
 
-    for el in elements:
+    visiveis = [e for e in elements if e.get('visible') is not False]
+    normal = [e for e in visiveis if not e.get('z')]
+    zed = sorted([e for e in visiveis if e.get('z')],
+                 key=lambda e: (e.get('z'), 0 if (e.get('role') or '') == 'grafismo' else 1))
+
+    for el in normal:
         if (el.get('role') or '') == 'grafismo':
-            x = int(float(el.get('x_pct', 0)) / 100 * W)
-            y = int(float(el.get('y_pct', 0)) / 100 * H)
-            w = int(float(el.get('width_pct', 0)) / 100 * W)
-            h = int(float(el.get('height_pct', 0)) / 100 * H)
-            fill = hex_to_rgb(el.get('cor') or el.get('color') or '#000000')
-            r = int(float(el.get('raio_pct') or 0) / 100 * W)
-            if r > 0:   # pill/circulo (mesma regra do editor: raio em % de W)
-                draw.rounded_rectangle([x, y, x + w, y + h], radius=r, fill=fill)
-            else:       # retangulo puro: caminho historico intacto (goldens)
-                draw.rectangle([x, y, x + w, y + h], fill=fill)
+            _draw_element_grafismo(base, draw, el, W, H)
 
-    for el in elements:
-        role = (el.get('role') or '')
-        if role == 'image' and (el.get('url') or '').startswith('data:'):
-            try:
-                _, _, payload = el['url'].partition(',')
-                st = Image.open(io.BytesIO(base64.b64decode(payload))).convert('RGBA')
-                _paste_contain_el(base, st, el, W, H)
-            except Exception:
-                logger.exception('[engine.v3] elemento imagem falhou (%s)', el.get('zone'))
-        elif role == 'logo':
-            src = assets.get(el.get('zone') or 'wordmark') or assets.get('wordmark')
-            if not src:
-                continue
-            try:
-                lg = _fetch(src).convert('RGBA')
-                lg = recolor_opaque(lg, hex_to_rgb(el.get('logo_color') or '#F4F1D9'))
-                _paste_contain_el(base, lg, el, W, H)
-            except Exception:
-                logger.exception('[engine.v3] elemento logo falhou (%s)', el.get('zone'))
+    for el in normal:
+        if (el.get('role') or '') in ('image', 'logo'):
+            _draw_element_image(base, el, W, H, assets)
 
-    for el in elements:
+    for el in normal:
         if (el.get('role') or '') in ('titulo', 'subtitulo', 'cta') and el.get('content'):
+            _draw_element_text(draw, el, W, H)
+
+    for el in zed:
+        role = (el.get('role') or '')
+        if role == 'grafismo':
+            _draw_element_grafismo(base, draw, el, W, H)
+        elif role in ('image', 'logo'):
+            _draw_element_image(base, el, W, H, assets)
+        elif role in ('titulo', 'subtitulo', 'cta') and el.get('content'):
             _draw_element_text(draw, el, W, H)
 
 

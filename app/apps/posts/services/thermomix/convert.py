@@ -112,15 +112,17 @@ def authored_to_v3(a: dict) -> dict:
         elif cat == 'LISTA':
             forma = b.get('forma') or {}
             if forma.get('tipo') == 'faixa':
-                effects.append({
-                    'name': 'panel', 'layer': 'raw',
-                    'x': box[0], 'y': box[1], 'w': box[2], 'h': box[3],
-                    'color': forma.get('cor', 'branco'),
-                    'alpha': int(round(float(forma.get('opacidade', 0.75)) * 255)),
-                })
+                # faixa translucida como ELEMENTO grafismo (editavel no editor:
+                # posicao/tamanho/opacidade), nao mais effect cozido no raw
+                zones.append({'key': b['key'], 'layer': 'elements',
+                              'role': 'grafismo', 'forma': 'faixa',
+                              'color': forma.get('cor', 'branco'),
+                              'opacidade': int(round(float(forma.get('opacidade', 0.75)) * 100)),
+                              'box': box, 'note': b.get('label')})
             for ic in (b.get('icones') or []):
-                zones.append({'key': ic['ref'], 'role': 'image',
-                              'asset': ic['ref'], 'fit': 'contain',
+                zones.append({'key': ic['ref'], 'layer': 'elements',
+                              'role': 'image', 'asset': ic['ref'],
+                              'fit': 'contain',
                               'recolor': ic.get('cor', 'verde'),
                               'box': _px_box(ic['bbox_norm'], W, H),
                               'optional': True})
@@ -134,8 +136,9 @@ def authored_to_v3(a: dict) -> dict:
                 ty += int(round(fs * LINE_GAP))
 
         elif cat == 'ASSET_RETRATO':
-            zones.append({'key': b['key'], 'role': 'image', 'asset': b['key'],
-                          'box': box, 'fit': 'cover', 'optional': True,
+            zones.append({'key': b['key'], 'layer': 'elements', 'role': 'image',
+                          'asset': b['key'], 'box': box, 'fit': 'cover',
+                          'z': int(b.get('z', 1)), 'optional': True,
                           'note': b.get('label')})
 
         elif cat == 'SELO':
@@ -143,6 +146,7 @@ def authored_to_v3(a: dict) -> dict:
             fixo = b.get('conteudo_fixo') or {}
             zones.append({
                 'key': b['key'], 'layer': 'elements', 'role': 'cta',
+                'z': int(b['z']) if b.get('z') else None,
                 'box': box, 'optional': True, 'note': b.get('label'),
                 'shape': 'circle' if forma.get('tipo') == 'circulo' else 'pill',
                 'bg': forma.get('cor', 'verde'),
