@@ -34,18 +34,18 @@
     <label class="font-semibold block mb-3">
       {% if presenters|length == 1 %}Visual de {{ presenter.grouper.name }}{% else %}{{ presenter.grouper.name }}{% endif %}
     </label>
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;">
       {% for look in presenter.list %}
-      <label class="card look-option" style="cursor:pointer;text-align:center;padding:12px;position:relative;">
+      <label class="card look-option" style="cursor:pointer;text-align:center;padding:8px;position:relative;width:86px;" title="{{ look.name }}">
         <input type="radio" name="look" value="{{ look.pk }}"
                {% if form_data.look == look.pk|stringformat:"s" or looks|length == 1 and forloop.first and forloop.parentloop.first or not form_data.look and look.is_default %}checked{% endif %}
                style="position:absolute;opacity:0;">
         {% if look.preview_image %}
-          <img src="{{ look.preview_image.url }}" alt="{{ look.name }}" class="rounded mx-auto mb-2" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;">
+          <img src="{{ look.preview_image.url }}" alt="{{ look.name }}" class="rounded mx-auto mb-1" style="width:66px;aspect-ratio:3/4;object-fit:cover;border-radius:6px;">
         {% else %}
-          <div class="rounded mx-auto mb-2 flex items-center justify-center text-3xl" style="width:100%;aspect-ratio:3/4;background:var(--bg-muted,#f3f0fa);border-radius:8px;">🧑</div>
+          <div class="rounded mx-auto mb-1 flex items-center justify-center text-2xl" style="width:66px;aspect-ratio:3/4;background:var(--bg-muted,#f3f0fa);border-radius:6px;">🧑</div>
         {% endif %}
-        <span class="font-semibold text-sm">{{ look.name }}</span>
+        <span class="text-sm" style="font-size:11px;line-height:1.2;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ look.name }}</span>
       </label>
       {% endfor %}
     </div>
