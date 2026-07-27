@@ -5,10 +5,10 @@
 {% block content %}
 <div class="mb-6">
   <h1 class="text-3xl font-bold text-purple mb-2">🎬 Novo Vídeo Avatar</h1>
-  <p class="text-lg text-muted">Escolha o apresentador e escreva o que ele vai falar</p>
+  <p class="text-lg text-muted">Escolha o visual do apresentador e escreva o que ele vai falar</p>
 </div>
 
-{% if not avatars %}
+{% if not looks %}
 <div class="card" style="max-width:720px;">
   <div class="text-center" style="padding:24px;">
     <p class="text-4xl mb-3">🧑‍🎤</p>
@@ -28,24 +28,29 @@
   </div>
   {% endif %}
 
+  {% regroup looks by avatar as presenters %}
+  {% for presenter in presenters %}
   <div class="mb-6">
-    <label class="font-semibold block mb-3">Apresentador</label>
+    <label class="font-semibold block mb-3">
+      {% if presenters|length == 1 %}Visual de {{ presenter.grouper.name }}{% else %}{{ presenter.grouper.name }}{% endif %}
+    </label>
     <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-      {% for avatar in avatars %}
-      <label class="card avatar-option" style="cursor:pointer;text-align:center;padding:12px;">
-        <input type="radio" name="avatar" value="{{ avatar.pk }}"
-               {% if form_data.avatar == avatar.pk|stringformat:"s" or avatars|length == 1 and forloop.first or not form_data.avatar and avatar.is_default %}checked{% endif %}
+      {% for look in presenter.list %}
+      <label class="card look-option" style="cursor:pointer;text-align:center;padding:12px;position:relative;">
+        <input type="radio" name="look" value="{{ look.pk }}"
+               {% if form_data.look == look.pk|stringformat:"s" or looks|length == 1 and forloop.first and forloop.parentloop.first or not form_data.look and look.is_default %}checked{% endif %}
                style="position:absolute;opacity:0;">
-        {% if avatar.preview_image %}
-          <img src="{{ avatar.preview_image.url }}" alt="{{ avatar.name }}" class="rounded-full mx-auto mb-2" style="width:72px;height:72px;object-fit:cover;">
+        {% if look.preview_image %}
+          <img src="{{ look.preview_image.url }}" alt="{{ look.name }}" class="rounded mx-auto mb-2" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;">
         {% else %}
-          <div class="rounded-full mx-auto mb-2 flex items-center justify-center text-3xl" style="width:72px;height:72px;background:var(--bg-muted,#f3f0fa);">🧑</div>
+          <div class="rounded mx-auto mb-2 flex items-center justify-center text-3xl" style="width:100%;aspect-ratio:3/4;background:var(--bg-muted,#f3f0fa);border-radius:8px;">🧑</div>
         {% endif %}
-        <span class="font-semibold text-sm">{{ avatar.name }}</span>
+        <span class="font-semibold text-sm">{{ look.name }}</span>
       </label>
       {% endfor %}
     </div>
   </div>
+  {% endfor %}
 
   <div class="mb-6">
     <label for="script_text" class="font-semibold block mb-2">Texto do vídeo</label>
@@ -72,7 +77,7 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if avatars %}
+{% if looks %}
 <script>
   const textarea = document.getElementById('script_text');
   const counter = document.getElementById('char-count');
@@ -80,8 +85,8 @@
   textarea.addEventListener('input', update);
   update();
 
-  // destaque visual do avatar selecionado
-  const options = document.querySelectorAll('.avatar-option');
+  // destaque visual do look selecionado
+  const options = document.querySelectorAll('.look-option');
   const paint = () => options.forEach(o => {
     const on = o.querySelector('input').checked;
     o.style.outline = on ? '2px solid var(--purple, #7c3aed)' : 'none';

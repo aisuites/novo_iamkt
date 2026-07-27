@@ -40,7 +40,7 @@ def require_videos_avatar(view_func):
 def videos_list(request):
     from apps.content.models import VideoAvatar
     qs = VideoAvatar.objects.for_request(request).select_related(
-        'status', 'avatar', 'created_by').order_by('-created_at')
+        'status', 'avatar', 'look', 'created_by').order_by('-created_at')
     paginator = Paginator(qs, 12)
     videos = paginator.get_page(request.GET.get('page'))
     return render(request, 'content/videos_avatar_list.html', {'videos': videos})
@@ -50,21 +50,26 @@ def videos_list(request):
 @require_organization
 @require_videos_avatar
 def video_create(request):
-    from apps.content.models import HeygenAvatar, VideoAvatar, VideoAvatarStatus
+    from apps.content.models import HeygenLook, VideoAvatar, VideoAvatarStatus
 
-    # Sem avatar no catálogo o template mostra o aviso (o app não renderiza
-    # django.messages nas páginas internas — redirect+message sai mudo)
-    avatars = HeygenAvatar.objects.for_request(request).filter(is_active=True)
+    # Cards = LOOKS ativos de apresentadores ativos da org, agrupados por
+    # apresentador no template. Catálogo vazio → o template mostra o aviso
+    # (o app não renderiza django.messages nas páginas internas)
+    looks = (HeygenLook.objects
+             .filter(avatar__organization=request.organization,
+                     avatar__is_active=True, is_active=True)
+             .select_related('avatar')
+             .order_by('avatar__name', '-is_default', 'name'))
 
     form_error = None
-    if request.method == 'POST' and avatars.exists():
-        avatar_id = request.POST.get('avatar')
+    if request.method == 'POST' and looks.exists():
+        look_pk = request.POST.get('look')
         script = (request.POST.get('script_text') or '').strip()
         action = (request.POST.get('avatar_action') or '').strip()
 
-        avatar = avatars.filter(pk=avatar_id).first()
-        if avatar is None:
-            form_error = 'Escolha um apresentador.'
+        look = looks.filter(pk=look_pk).first()
+        if look is None:
+            form_error = 'Escolha um visual do apresentador.'
         elif not script:
             form_error = 'Escreva o texto que o apresentador vai falar.'
         elif len(script) > SCRIPT_MAX_CHARS:
@@ -74,7 +79,8 @@ def video_create(request):
                 code='pending', defaults={'label': 'Na fila'})
             video = VideoAvatar.objects.create(
                 organization=request.organization,
-                avatar=avatar,
+                avatar=look.avatar,
+                look=look,
                 created_by=request.user,
                 script_text=script,
                 avatar_action=action,
@@ -89,7 +95,7 @@ def video_create(request):
             return redirect('content:video_avatar_detail', pk=video.pk)
 
     context = {
-        'avatars': avatars,
+        'looks': looks,
         'script_max': SCRIPT_MAX_CHARS,
         'form_error': form_error,
         'form_data': request.POST if request.method == 'POST' else {},
@@ -104,7 +110,7 @@ def video_detail(request, pk):
     from apps.content.models import VideoAvatar
     video = get_object_or_404(
         VideoAvatar.objects.for_request(request).select_related(
-            'status', 'avatar', 'created_by'),
+            'status', 'avatar', 'look', 'created_by'),
         pk=pk,
     )
     return render(request, 'content/videos_avatar_detail.html', {'video': video})

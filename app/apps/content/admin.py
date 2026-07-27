@@ -111,19 +111,53 @@ class ContentMetricsAdmin(admin.ModelAdmin):
         return False
 
 
+class HeygenLookInline(admin.TabularInline):
+    from .models import HeygenLook
+    model = HeygenLook
+    extra = 0
+    fields = ['name', 'look_id', 'avatar_type', 'preview_image',
+              'is_active', 'is_default']
+    readonly_fields = ['avatar_type']
+
+
 @admin.register(HeygenAvatar)
 class HeygenAvatarAdmin(admin.ModelAdmin):
-    """Catálogo de avatares HeyGen por org — cadastro pela equipe interna.
-    IDs vêm do command `heygen_setup` (lista looks e vozes pt-BR da conta)."""
-    list_display = ['name', 'organization', 'look_id', 'voice_id', 'engine',
-                    'is_active', 'is_default']
+    """Apresentadores HeyGen por org — cadastro pela equipe interna.
+    Preencha group_id + voice_id e use a ação "Sincronizar looks" para
+    puxar os looks da HeyGen (entram INATIVOS; ative os que o cliente
+    pode usar). IDs: command `heygen_setup` ou plataforma HeyGen."""
+    list_display = ['name', 'organization', 'group_id', 'voice_id', 'engine',
+                    'is_active', 'looks_count']
     list_filter = ['organization', 'is_active', 'engine']
-    search_fields = ['name', 'look_id', 'organization__name']
+    search_fields = ['name', 'group_id', 'organization__name']
+    inlines = [HeygenLookInline]
+    actions = ['sync_looks']
+
+    @admin.display(description='Looks (ativos/total)')
+    def looks_count(self, obj):
+        total = obj.looks.count()
+        active = obj.looks.filter(is_active=True).count()
+        return f'{active}/{total}'
+
+    @admin.action(description='Sincronizar looks da HeyGen')
+    def sync_looks(self, request, queryset):
+        from django.contrib import messages
+        from apps.content.services import heygen
+        for avatar in queryset:
+            try:
+                r = heygen.sync_group_looks(avatar)
+                messages.success(
+                    request,
+                    f'{avatar.name}: {r["created"]} novos (inativos), '
+                    f'{r["deactivated"]} desativados, '
+                    f'{r["remote_total"]} looks no grupo.')
+            except heygen.HeygenError as e:
+                messages.error(request, f'{avatar.name}: {e}')
 
 
 @admin.register(VideoAvatar)
 class VideoAvatarAdmin(admin.ModelAdmin):
-    list_display = ['id', 'organization', 'avatar', 'created_by', 'status',
+    list_display = ['id', 'organization', 'avatar', 'look', 'created_by', 'status',
                     'video_duration', 'cost_usd', 'created_at']
     list_filter = ['organization', 'status']
     search_fields = ['script_text', 'heygen_video_id', 'organization__name']

@@ -7,9 +7,13 @@ Uso:
   python manage.py heygen_setup --list-looks [--group <group_id>]
   python manage.py heygen_setup --list-voices
 
-  # 2. Cadastrar um avatar para uma org (valida o look na API antes):
+  # 2. Cadastrar um APRESENTADOR para uma org (por GROUP, não por look) —
+  #    já sincroniza os looks do grupo (entram inativos, ative no admin):
   python manage.py heygen_setup --org thermomix --name "Apresentadora" \
-      --look-id lk_abc123 --voice-id v_123 [--engine avatar_v] [--default]
+      --group-id 6816bb70... --voice-id v_123 [--engine avatar_v]
+
+  # 3. Re-sincronizar looks depois (ou use a ação no admin):
+  python manage.py heygen_sync --org thermomix
 
 Também serve de smoke test da HEYGEN_API_KEY.
 """
@@ -27,13 +31,11 @@ class Command(BaseCommand):
         parser.add_argument('--language', default='Portuguese',
                             help='Idioma do filtro de vozes (default: Portuguese)')
         parser.add_argument('--org', help='Slug da organização')
-        parser.add_argument('--name', help='Nome de exibição do avatar')
-        parser.add_argument('--look-id')
+        parser.add_argument('--name', help='Nome de exibição do apresentador')
+        parser.add_argument('--group-id', help='ID do avatar GROUP na HeyGen')
         parser.add_argument('--voice-id')
         parser.add_argument('--engine', default='avatar_iv',
                             choices=['avatar_iv', 'avatar_v'])
-        parser.add_argument('--default', action='store_true',
-                            help='Marca como avatar padrão da org')
 
     def handle(self, *args, **opts):
         from apps.content.services import heygen
@@ -59,10 +61,10 @@ class Command(BaseCommand):
                     f"{voice.get('language', '')}")
             return
 
-        # cadastro
-        required = ['org', 'name', 'look_id', 'voice_id']
+        # cadastro do apresentador (por GROUP) + sync dos looks
+        required = ['org', 'name', 'group_id', 'voice_id']
         if not all(opts.get(k) for k in required):
-            raise CommandError('Para cadastrar: --org --name --look-id --voice-id '
+            raise CommandError('Para cadastrar: --org --name --group-id --voice-id '
                                '(ou use --list-avatars / --list-looks / --list-voices)')
 
         from apps.core.models import Organization
@@ -73,32 +75,29 @@ class Command(BaseCommand):
         except Organization.DoesNotExist:
             raise CommandError(f"Organização '{opts['org']}' não encontrada")
 
-        # valida o look na API (pega avatar_not_found e engine incompatível AGORA,
-        # não no primeiro render do cliente)
-        look = heygen.get_look(opts['look_id'])
-        supported = look.get('supported_api_engines') or []
-        if supported and opts['engine'] not in supported:
+        # valida o grupo AGORA (pega ID errado antes do primeiro render)
+        remote_looks = heygen.list_looks(opts['group_id'])
+        if not remote_looks:
             raise CommandError(
-                f"Look {opts['look_id']} não suporta engine {opts['engine']} "
-                f"(suportados: {', '.join(supported)})")
+                f"Grupo {opts['group_id']} sem looks na HeyGen — confira o ID "
+                "(é o GROUP, não o look) e se o treino terminou")
 
         avatar, created = HeygenAvatar.objects.update_or_create(
             organization=org,
-            look_id=opts['look_id'],
+            group_id=opts['group_id'],
             defaults={
                 'name': opts['name'],
                 'voice_id': opts['voice_id'],
                 'engine': opts['engine'],
-                'is_default': opts['default'],
                 'is_active': True,
             },
         )
-        if opts['default']:
-            HeygenAvatar.objects.filter(organization=org).exclude(
-                pk=avatar.pk).update(is_default=False)
-
         verb = 'criado' if created else 'atualizado'
         self.stdout.write(self.style.SUCCESS(
-            f'HeygenAvatar #{avatar.pk} {verb}: "{avatar.name}" para {org.name} '
-            f'(look={avatar.look_id}, voice={avatar.voice_id}, engine={avatar.engine})'))
-        self.stdout.write('Lembre de subir a preview_image pelo admin para o seletor.')
+            f'Apresentador #{avatar.pk} {verb}: "{avatar.name}" para {org.name} '
+            f'(group={avatar.group_id}, voice={avatar.voice_id})'))
+
+        r = heygen.sync_group_looks(avatar)
+        self.stdout.write(self.style.SUCCESS(
+            f'Looks sincronizados: {r["created"]} novos (INATIVOS), '
+            f'{r["remote_total"]} no grupo. Ative os liberados no admin.'))

@@ -550,15 +550,13 @@ class ContentMetrics(models.Model):
 
 class HeygenAvatar(models.Model):
     """
-    Avatar HeyGen liberado para uma organização (catálogo por org).
+    APRESENTADOR HeyGen liberado para uma organização (a PESSOA, não o visual).
 
-    Cadastrado APENAS pela equipe interna (admin), a partir de um avatar já
-    criado na plataforma HeyGen. O look_id é o ID do LOOK (não do grupo) e a
-    voz acompanha o avatar. O cliente só escolhe entre os avatares ativos da
-    sua org no formulário de novo vídeo.
+    Espelha a hierarquia da HeyGen: avatar group (pessoa) → looks (variações
+    de roupa/cenário, em HeygenLook). A voz pertence à pessoa e vale para
+    todos os looks. Cadastrado APENAS pela equipe interna; os looks são
+    puxados da API via sync (heygen_sync / botão no admin).
     """
-    from apps.core.storage import AvatarImageStorage
-
     organization = models.ForeignKey(
         'core.Organization',
         on_delete=models.CASCADE,
@@ -567,57 +565,113 @@ class HeygenAvatar(models.Model):
     )
     name = models.CharField(
         max_length=120,
-        help_text='Nome de exibição para o cliente (ex.: "Apresentadora Ana")',
+        help_text='Nome de exibição para o cliente (ex.: "Mauricio")',
         verbose_name='Nome',
     )
-    look_id = models.CharField(
+    group_id = models.CharField(
         max_length=64,
-        help_text='ID do LOOK na HeyGen (não o ID do grupo) — GET /v3/avatars/looks',
-        verbose_name='Look ID (HeyGen)',
+        blank=True,
+        help_text='ID do avatar GROUP na HeyGen — permite sincronizar os looks '
+                  'automaticamente (GET /v3/avatars/looks?group_id=...)',
+        verbose_name='Group ID (HeyGen)',
     )
     voice_id = models.CharField(
         max_length=64,
-        help_text='Voz pt-BR da HeyGen usada com este avatar — GET /v3/voices',
+        help_text='Voz pt-BR da HeyGen usada com este apresentador — GET /v3/voices',
         verbose_name='Voice ID (HeyGen)',
     )
     engine = models.CharField(
         max_length=16,
         default='avatar_iv',
         choices=[('avatar_iv', 'Avatar IV'), ('avatar_v', 'Avatar V')],
-        help_text='Confirmar em supported_api_engines do look antes de usar avatar_v',
+        help_text='Confirmar em supported_api_engines dos looks antes de usar avatar_v',
         verbose_name='Engine',
+    )
+    is_active = models.BooleanField(default=True, verbose_name='Ativo')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    objects = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Apresentador HeyGen'
+        verbose_name_plural = 'Apresentadores HeyGen'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'group_id'],
+                name='uniq_heygen_avatar_org_group',
+                condition=~models.Q(group_id=''),
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.name} ({self.organization.name})'
+
+
+class HeygenLook(models.Model):
+    """
+    Look (visual) de um apresentador: roupa + cenário + enquadramento.
+    É o que vai como avatar_id no POST /v3/videos. Criado na plataforma
+    HeyGen e puxado pelo sync; a equipe controla o que o cliente vê
+    via is_active (looks novos entram INATIVOS — curadoria).
+    """
+    from apps.core.storage import AvatarImageStorage
+
+    avatar = models.ForeignKey(
+        HeygenAvatar,
+        on_delete=models.CASCADE,
+        related_name='looks',
+        verbose_name='Apresentador',
+    )
+    look_id = models.CharField(
+        max_length=64,
+        help_text='ID do LOOK na HeyGen (vai no payload do vídeo)',
+        verbose_name='Look ID (HeyGen)',
+    )
+    name = models.CharField(
+        max_length=160,
+        help_text='Nome de exibição (ex.: "Escritório", "Casual")',
+        verbose_name='Nome',
+    )
+    avatar_type = models.CharField(
+        max_length=24,
+        blank=True,
+        help_text='photo_avatar | digital_twin (informativo, vem do sync)',
+        verbose_name='Tipo',
     )
     preview_image = models.ImageField(
         upload_to='heygen/%Y/%m/',
         storage=AvatarImageStorage(),
         blank=True,
         null=True,
-        help_text='Foto do avatar exibida no seletor do formulário',
+        help_text='Foto exibida no card do formulário (o sync baixa da HeyGen)',
         verbose_name='Imagem de Preview',
     )
-    is_active = models.BooleanField(default=True, verbose_name='Ativo')
+    is_active = models.BooleanField(
+        default=False,
+        help_text='Só looks ativos aparecem para o cliente (curadoria da equipe)',
+        verbose_name='Ativo',
+    )
     is_default = models.BooleanField(
         default=False,
-        help_text='Pré-selecionado no formulário quando a org tem mais de um',
+        help_text='Pré-selecionado no formulário',
         verbose_name='Padrão',
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
 
-    objects = OrganizationScopedManager()
-
     class Meta:
         ordering = ['-is_default', 'name']
-        verbose_name = 'Avatar HeyGen'
-        verbose_name_plural = 'Avatares HeyGen'
+        verbose_name = 'Look HeyGen'
+        verbose_name_plural = 'Looks HeyGen'
         constraints = [
             models.UniqueConstraint(
-                fields=['organization', 'look_id'],
-                name='uniq_heygen_avatar_org_look',
+                fields=['avatar', 'look_id'],
+                name='uniq_heygen_look_avatar_look',
             ),
         ]
 
     def __str__(self):
-        return f'{self.name} ({self.organization.name})'
+        return f'{self.avatar.name} — {self.name}'
 
 
 class HeygenWebhookEvent(models.Model):
@@ -674,8 +728,17 @@ class VideoAvatar(models.Model):
         null=True,
         blank=True,
         related_name='videos',
-        help_text='Avatar do catálogo da org escolhido pelo cliente',
-        verbose_name='Avatar HeyGen',
+        help_text='Apresentador do catálogo da org',
+        verbose_name='Apresentador HeyGen',
+    )
+    look = models.ForeignKey(
+        HeygenLook,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='videos',
+        help_text='Look (visual) escolhido — é o avatar_id enviado à HeyGen',
+        verbose_name='Look HeyGen',
     )
     created_by = models.ForeignKey(
         User,

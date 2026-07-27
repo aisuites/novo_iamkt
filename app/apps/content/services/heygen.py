@@ -113,13 +113,13 @@ def estimate_cost_usd(script, engine='avatar_iv', speed=1.0):
 
 def create_avatar_video(video, idempotency_key):
     """
-    POST /v3/videos para um VideoAvatar com avatar do catálogo. Retorna video_id.
+    POST /v3/videos para um VideoAvatar com look do catálogo. Retorna video_id.
     202 + callback via webhook; o worker NÃO espera o render.
     """
     avatar = video.avatar
     payload = {
         'type': 'avatar',
-        'avatar_id': avatar.look_id,
+        'avatar_id': video.look.look_id,
         'voice_id': avatar.voice_id,
         'script': video.script_text,
         'aspect_ratio': 'auto',
@@ -182,3 +182,65 @@ def list_looks(group_id=None):
 
 def list_voices(language='Portuguese'):
     return _paginate('/v3/voices', params={'language': language}, limit=100)
+
+
+def sync_group_looks(avatar, activate_new=False):
+    """
+    Sincroniza os looks do avatar group da HeyGen para o catálogo local.
+
+    - Look novo: criado INATIVO por padrão (curadoria da equipe no admin),
+      com preview baixado da HeyGen.
+    - Look que sumiu do grupo: desativado (nunca deletado — vídeos antigos
+      referenciam).
+    Retorna dict com contadores.
+    """
+    from django.core.files.base import ContentFile
+
+    from apps.content.models import HeygenLook
+
+    if not avatar.group_id:
+        raise HeygenError('no_group_id',
+                          f'Apresentador "{avatar.name}" sem group_id configurado')
+
+    remote = list_looks(avatar.group_id)
+    remote_ids = set()
+    created = updated = 0
+
+    for item in remote:
+        look_id = item.get('id')
+        if not look_id or item.get('status') != 'completed':
+            continue  # look ainda treinando não entra no catálogo
+        remote_ids.add(look_id)
+        look, was_created = HeygenLook.objects.get_or_create(
+            avatar=avatar, look_id=look_id,
+            defaults={
+                'name': item.get('name') or look_id,
+                'avatar_type': item.get('avatar_type', ''),
+                'is_active': activate_new,
+            },
+        )
+        if was_created:
+            created += 1
+            preview_url = item.get('preview_image_url')
+            if preview_url:
+                try:
+                    resp = requests.get(preview_url, timeout=60)
+                    if resp.ok:
+                        look.preview_image.save(f'{look_id}.jpg',
+                                                ContentFile(resp.content))
+                except requests.RequestException:
+                    logger.warning('[heygen sync] preview falhou p/ look %s', look_id)
+        else:
+            new_type = item.get('avatar_type', '')
+            if new_type and look.avatar_type != new_type:
+                look.avatar_type = new_type
+                look.save(update_fields=['avatar_type'])
+                updated += 1
+
+    gone = avatar.looks.filter(is_active=True).exclude(look_id__in=remote_ids)
+    deactivated = gone.update(is_active=False)
+
+    logger.info('[heygen sync] %s: %d criados, %d atualizados, %d desativados',
+                avatar.name, created, updated, deactivated)
+    return {'created': created, 'updated': updated,
+            'deactivated': deactivated, 'remote_total': len(remote_ids)}

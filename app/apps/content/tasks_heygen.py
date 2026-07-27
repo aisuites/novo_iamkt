@@ -30,14 +30,15 @@ def create_heygen_video_task(self, video_id):
     from apps.content.models import VideoAvatar
     from apps.content.services import heygen
 
-    video = VideoAvatar.objects.select_related('organization', 'avatar').get(pk=video_id)
+    video = VideoAvatar.objects.select_related(
+        'organization', 'avatar', 'look').get(pk=video_id)
     if video.heygen_video_id:
         logger.info('[heygen] vídeo %s já tem heygen_video_id, ignorando', video_id)
         return video.heygen_video_id
-    if not video.avatar:
+    if not video.avatar or not video.look:
         video.status = _status('failed', 'Falhou')
         video.error_code = 'no_avatar'
-        video.error_message = 'Vídeo sem avatar do catálogo associado.'
+        video.error_message = 'Vídeo sem apresentador/look do catálogo associado.'
         video.save(update_fields=['status', 'error_code', 'error_message'])
         return None
 
