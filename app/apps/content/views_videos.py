@@ -52,25 +52,23 @@ def videos_list(request):
 def video_create(request):
     from apps.content.models import HeygenAvatar, VideoAvatar, VideoAvatarStatus
 
+    # Sem avatar no catálogo o template mostra o aviso (o app não renderiza
+    # django.messages nas páginas internas — redirect+message sai mudo)
     avatars = HeygenAvatar.objects.for_request(request).filter(is_active=True)
-    if not avatars.exists():
-        messages.error(request, 'Nenhum avatar cadastrado para sua organização. '
-                                'Fale com a equipe IAMKT.')
-        return redirect('content:videos_avatar')
 
-    if request.method == 'POST':
+    form_error = None
+    if request.method == 'POST' and avatars.exists():
         avatar_id = request.POST.get('avatar')
         script = (request.POST.get('script_text') or '').strip()
         action = (request.POST.get('avatar_action') or '').strip()
 
         avatar = avatars.filter(pk=avatar_id).first()
         if avatar is None:
-            messages.error(request, 'Escolha um avatar válido.')
+            form_error = 'Escolha um apresentador.'
         elif not script:
-            messages.error(request, 'Escreva o texto que o avatar vai falar.')
+            form_error = 'Escreva o texto que o apresentador vai falar.'
         elif len(script) > SCRIPT_MAX_CHARS:
-            messages.error(request, f'O texto passou de {SCRIPT_MAX_CHARS} '
-                                    'caracteres.')
+            form_error = f'O texto passou de {SCRIPT_MAX_CHARS} caracteres.'
         else:
             status, _ = VideoAvatarStatus.objects.get_or_create(
                 code='pending', defaults={'label': 'Na fila'})
@@ -88,13 +86,12 @@ def video_create(request):
             from apps.content.tasks_heygen import create_heygen_video_task
             create_heygen_video_task.delay(video.pk)
 
-            messages.success(request, 'Pedido recebido! Seu vídeo está sendo '
-                                      'gerado — acompanhe nesta página.')
             return redirect('content:video_avatar_detail', pk=video.pk)
 
     context = {
         'avatars': avatars,
         'script_max': SCRIPT_MAX_CHARS,
+        'form_error': form_error,
         'form_data': request.POST if request.method == 'POST' else {},
     }
     return render(request, 'content/videos_avatar_form.html', context)

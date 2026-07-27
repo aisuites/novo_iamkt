@@ -29,6 +29,9 @@ class VideoAvatarStorage(S3Boto3Storage):
     default_acl = None
     querystring_auth = True
     querystring_expire = 3600  # 1 hora
+    # AWS_S3_CUSTOM_DOMAIN global desliga a assinatura no django-storages;
+    # sem custom_domain a URL sai presigned (bucket é privado)
+    custom_domain = None
 
 
 class VideoThumbnailStorage(S3Boto3Storage):
@@ -50,7 +53,9 @@ class VideoThumbnailStorage(S3Boto3Storage):
     location = 'videos/thumbnails'
     file_overwrite = False
     default_acl = None
-    querystring_auth = False
+    # bucket bloqueia acesso público — todo o app serve S3 com URL assinada
+    querystring_auth = True
+    custom_domain = None
 
 
 class AvatarImageStorage(S3Boto3Storage):
@@ -72,4 +77,6 @@ class AvatarImageStorage(S3Boto3Storage):
     location = 'videos/avatars'
     file_overwrite = False
     default_acl = None
-    querystring_auth = False
+    # bucket bloqueia acesso público — todo o app serve S3 com URL assinada
+    querystring_auth = True
+    custom_domain = None
