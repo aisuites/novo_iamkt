@@ -159,6 +159,9 @@ def _paginate(path, params=None, limit=50, max_pages=10):
     items = []
     for _ in range(max_pages):
         data = _request('GET', path, params=params)
+        if isinstance(data, list):  # alguns endpoints devolvem data como lista
+            items.extend(data)
+            break
         page = (data.get('items') or data.get('avatars') or data.get('looks')
                 or data.get('voices') or [])
         items.extend(page)
