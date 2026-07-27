@@ -61,11 +61,18 @@ def video_create(request):
              .select_related('avatar')
              .order_by('avatar__name', '-is_default', 'name'))
 
+    SPEED_CHOICES = {'0.85': 0.85, '1.0': 1.0, '1.15': 1.15}
+    ASPECT_CHOICES = ('auto', '9:16', '16:9', '1:1')
+
     form_error = None
     if request.method == 'POST' and looks.exists():
         look_pk = request.POST.get('look')
         script = (request.POST.get('script_text') or '').strip()
         action = (request.POST.get('avatar_action') or '').strip()
+        speed = SPEED_CHOICES.get(request.POST.get('voice_speed', '1.0'), 1.0)
+        aspect = request.POST.get('aspect_ratio', 'auto')
+        if aspect not in ASPECT_CHOICES:
+            aspect = 'auto'
 
         look = looks.filter(pk=look_pk).first()
         if look is None:
@@ -84,6 +91,8 @@ def video_create(request):
                 created_by=request.user,
                 script_text=script,
                 avatar_action=action,
+                voice_speed=speed,
+                aspect_ratio=aspect,
                 status=status,
             )
             from apps.core.emails import send_video_avatar_received
@@ -99,6 +108,10 @@ def video_create(request):
         'script_max': SCRIPT_MAX_CHARS,
         'form_error': form_error,
         'form_data': request.POST if request.method == 'POST' else {},
+        'speed_options': [('0.85', '🐢 Calma'), ('1.0', 'Normal'),
+                          ('1.15', '⚡ Acelerada')],
+        'aspect_options': [('auto', 'Auto'), ('9:16', '9:16'),
+                           ('16:9', '16:9'), ('1:1', '1:1')],
     }
     return render(request, 'content/videos_avatar_form.html', context)
 

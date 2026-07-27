@@ -63,7 +63,8 @@ def create_heygen_video_task(self, video_id):
 
     video.heygen_video_id = heygen_id or ''
     video.idempotency_key = key
-    video.estimated_duration = heygen.estimate_seconds(video.script_text)
+    video.estimated_duration = heygen.estimate_seconds(
+        video.script_text, video.voice_speed or 1.0)
     video.status = _status('processing', 'Processando')
     video.save(update_fields=['heygen_video_id', 'idempotency_key',
                               'estimated_duration', 'status'])

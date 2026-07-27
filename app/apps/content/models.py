@@ -765,8 +765,22 @@ class VideoAvatar(models.Model):
     avatar_action = models.CharField(
         max_length=200,
         blank=True,
-        help_text="Ação desejada: 'acenar', 'sorrir', 'olhar para câmera', etc.",
-        verbose_name='Ação do Avatar'
+        help_text="Direção de atuação enviada como motion_prompt (Avatar IV): "
+                  "'fale gesticulando', 'tom animado', 'sorria no final'...",
+        verbose_name='Gestos / Atuação'
+    )
+    voice_speed = models.FloatField(
+        default=1.0,
+        help_text='Velocidade da fala (0.5–2.0); vai em voice_settings.speed',
+        verbose_name='Velocidade da Fala',
+    )
+    aspect_ratio = models.CharField(
+        max_length=8,
+        default='auto',
+        choices=[('auto', 'Automático (segue o look)'), ('9:16', 'Vertical 9:16'),
+                 ('16:9', 'Horizontal 16:9'), ('1:1', 'Quadrado 1:1')],
+        help_text='Formato do vídeo enviado à HeyGen',
+        verbose_name='Formato',
     )
     
     # Vídeo gerado (upload pela equipe)

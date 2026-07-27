@@ -62,10 +62,40 @@
   </div>
 
   <div class="mb-6">
-    <label for="avatar_action" class="font-semibold block mb-2">Tom / observações <span class="text-muted font-normal">(opcional)</span></label>
+    <label for="avatar_action" class="font-semibold block mb-2">Gestos / atuação <span class="text-muted font-normal">(opcional)</span></label>
     <input type="text" id="avatar_action" name="avatar_action" class="input w-full" style="width:100%;"
            maxlength="200" value="{{ form_data.avatar_action|default:'' }}"
-           placeholder="Ex.: tom animado, fala pausada...">
+           placeholder="Ex.: fale gesticulando com as mãos, tom animado, sorria no final...">
+    <p class="text-sm text-muted mt-1">Direção de atuação para o apresentador (movimentos e expressão).</p>
+  </div>
+
+  <div class="mb-6" style="display:flex;gap:24px;flex-wrap:wrap;">
+    <div>
+      <label class="font-semibold block mb-2">Velocidade da fala</label>
+      <div style="display:flex;gap:8px;">
+        {% for val, lbl in speed_options %}
+        <label class="btn btn-secondary speed-option" style="cursor:pointer;padding:8px 14px;">
+          <input type="radio" name="voice_speed" value="{{ val }}"
+                 {% if form_data.voice_speed == val or not form_data.voice_speed and val == '1.0' %}checked{% endif %}
+                 style="position:absolute;opacity:0;">
+          {{ lbl }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div>
+      <label class="font-semibold block mb-2">Formato</label>
+      <div style="display:flex;gap:8px;">
+        {% for val, lbl in aspect_options %}
+        <label class="btn btn-secondary aspect-option" style="cursor:pointer;padding:8px 14px;">
+          <input type="radio" name="aspect_ratio" value="{{ val }}"
+                 {% if form_data.aspect_ratio == val or not form_data.aspect_ratio and val == 'auto' %}checked{% endif %}
+                 style="position:absolute;opacity:0;">
+          {{ lbl }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
   </div>
 
   <div class="flex gap-3">
@@ -85,8 +115,8 @@
   textarea.addEventListener('input', update);
   update();
 
-  // destaque visual do look selecionado
-  const options = document.querySelectorAll('.look-option');
+  // destaque visual da opção selecionada (looks, velocidade, formato)
+  const options = document.querySelectorAll('.look-option, .speed-option, .aspect-option');
   const paint = () => options.forEach(o => {
     const on = o.querySelector('input').checked;
     o.style.outline = on ? '2px solid var(--purple, #7c3aed)' : 'none';

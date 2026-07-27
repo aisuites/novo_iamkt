@@ -117,19 +117,23 @@ def create_avatar_video(video, idempotency_key):
     202 + callback via webhook; o worker NÃO espera o render.
     """
     avatar = video.avatar
+    speed = min(2.0, max(0.5, float(video.voice_speed or 1.0)))
     payload = {
         'type': 'avatar',
         'avatar_id': video.look.look_id,
         'voice_id': avatar.voice_id,
         'script': video.script_text,
-        'aspect_ratio': 'auto',
+        'aspect_ratio': video.aspect_ratio or 'auto',
         'resolution': '1080p',
-        'voice_settings': {'locale': 'pt-BR', 'speed': 1.0},
+        'voice_settings': {'locale': 'pt-BR', 'speed': speed},
         'title': f'iamkt {video.organization.slug} video#{video.pk}',
         'callback_id': f'{video.organization.slug}:{video.pk}',
     }
     if avatar.engine and avatar.engine != 'avatar_iv':
         payload['engine'] = {'type': avatar.engine}
+    elif video.avatar_action:
+        # motion_prompt é exclusivo do Avatar IV (a API rejeita no avatar_v)
+        payload['motion_prompt'] = video.avatar_action
     callback_url = getattr(settings, 'HEYGEN_CALLBACK_URL', '')
     if callback_url:
         payload['callback_url'] = callback_url
