@@ -65,6 +65,12 @@
           <span class="icon">📈</span>
           <span>Trends</span>
         </a>
+        {% if request.organization.videos_avatar_enabled or user.is_staff %}
+        <a href="{% url 'content:videos_avatar' %}" class="sidebar-link {% if 'videos-avatar' in request.path %}active{% endif %}">
+          <span class="icon">🎬</span>
+          <span>Vídeos Avatar</span>
+        </a>
+        {% endif %}
       </nav>
     </div>
 

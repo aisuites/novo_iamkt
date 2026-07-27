@@ -159,6 +159,14 @@ NOTIFICATION_EMAIL_SUPORTE = config('NOTIFICATION_EMAIL_SUPORTE', default='supor
 # SITE URL (for emails)
 SITE_URL = config('SITE_URL', default='https://iamkt.aisuites.com.br')
 
+# HEYGEN (Vídeos Avatar — docs-aplicacao/skills/heygen)
+HEYGEN_API_KEY = config('HEYGEN_API_KEY', default='')
+HEYGEN_WEBHOOK_SECRET = config('HEYGEN_WEBHOOK_SECRET', default='')
+# mantém o secret antigo durante rotação (rotate-secret invalida na hora)
+HEYGEN_WEBHOOK_SECRET_ANTERIOR = config('HEYGEN_WEBHOOK_SECRET_ANTERIOR', default='')
+HEYGEN_CALLBACK_URL = config('HEYGEN_CALLBACK_URL',
+                             default=f'{SITE_URL}/content/webhooks/heygen/')
+
 # DEFAULT PRIMARY KEY
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

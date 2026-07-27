@@ -1,0 +1,73 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Novo Vídeo Avatar - IAMKT{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-3xl font-bold text-purple mb-2">🎬 Novo Vídeo Avatar</h1>
+  <p class="text-lg text-muted">Escolha o apresentador e escreva o que ele vai falar</p>
+</div>
+
+<form method="post" class="card" style="max-width:720px;">
+  {% csrf_token %}
+
+  <div class="mb-6">
+    <label class="font-semibold block mb-3">Apresentador</label>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {% for avatar in avatars %}
+      <label class="card avatar-option" style="cursor:pointer;text-align:center;padding:12px;">
+        <input type="radio" name="avatar" value="{{ avatar.pk }}"
+               {% if form_data.avatar == avatar.pk|stringformat:"s" or avatars|length == 1 and forloop.first or not form_data.avatar and avatar.is_default %}checked{% endif %}
+               style="position:absolute;opacity:0;">
+        {% if avatar.preview_image %}
+          <img src="{{ avatar.preview_image.url }}" alt="{{ avatar.name }}" class="rounded-full mx-auto mb-2" style="width:72px;height:72px;object-fit:cover;">
+        {% else %}
+          <div class="rounded-full mx-auto mb-2 flex items-center justify-center text-3xl" style="width:72px;height:72px;background:var(--bg-muted,#f3f0fa);">🧑</div>
+        {% endif %}
+        <span class="font-semibold text-sm">{{ avatar.name }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="mb-6">
+    <label for="script_text" class="font-semibold block mb-2">Texto do vídeo</label>
+    <textarea id="script_text" name="script_text" rows="5" maxlength="{{ script_max }}"
+              class="input w-full" style="width:100%;"
+              placeholder="Escreva exatamente o que o apresentador vai falar..."
+              required>{{ form_data.script_text|default:'' }}</textarea>
+    <p class="text-sm text-muted mt-1"><span id="char-count">0</span>/{{ script_max }} caracteres</p>
+  </div>
+
+  <div class="mb-6">
+    <label for="avatar_action" class="font-semibold block mb-2">Tom / observações <span class="text-muted font-normal">(opcional)</span></label>
+    <input type="text" id="avatar_action" name="avatar_action" class="input w-full" style="width:100%;"
+           maxlength="200" value="{{ form_data.avatar_action|default:'' }}"
+           placeholder="Ex.: tom animado, fala pausada...">
+  </div>
+
+  <div class="flex gap-3">
+    <button type="submit" class="btn btn-primary">Gerar Vídeo</button>
+    <a href="{% url 'content:videos_avatar' %}" class="btn btn-secondary">Cancelar</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const textarea = document.getElementById('script_text');
+  const counter = document.getElementById('char-count');
+  const update = () => counter.textContent = textarea.value.length;
+  textarea.addEventListener('input', update);
+  update();
+
+  // destaque visual do avatar selecionado
+  const options = document.querySelectorAll('.avatar-option');
+  const paint = () => options.forEach(o => {
+    const on = o.querySelector('input').checked;
+    o.style.outline = on ? '2px solid var(--purple, #7c3aed)' : 'none';
+  });
+  options.forEach(o => o.addEventListener('change', paint));
+  paint();
+</script>
+{% endblock %}

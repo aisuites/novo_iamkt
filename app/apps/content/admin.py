@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
-    Pauta, Asset, TrendMonitor, 
-    WebInsight, IAModelUsage, ContentMetrics
+    Pauta, Asset, TrendMonitor,
+    WebInsight, IAModelUsage, ContentMetrics,
+    HeygenAvatar, VideoAvatar,
 )
 # NOTA: Post foi movido para apps.posts.admin
 
@@ -108,3 +109,24 @@ class ContentMetricsAdmin(admin.ModelAdmin):
     
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(HeygenAvatar)
+class HeygenAvatarAdmin(admin.ModelAdmin):
+    """Catálogo de avatares HeyGen por org — cadastro pela equipe interna.
+    IDs vêm do command `heygen_setup` (lista looks e vozes pt-BR da conta)."""
+    list_display = ['name', 'organization', 'look_id', 'voice_id', 'engine',
+                    'is_active', 'is_default']
+    list_filter = ['organization', 'is_active', 'engine']
+    search_fields = ['name', 'look_id', 'organization__name']
+
+
+@admin.register(VideoAvatar)
+class VideoAvatarAdmin(admin.ModelAdmin):
+    list_display = ['id', 'organization', 'avatar', 'created_by', 'status',
+                    'video_duration', 'cost_usd', 'created_at']
+    list_filter = ['organization', 'status']
+    search_fields = ['script_text', 'heygen_video_id', 'organization__name']
+    readonly_fields = ['heygen_video_id', 'idempotency_key', 'estimated_duration',
+                       'cost_usd', 'error_code', 'error_message',
+                       'created_at', 'updated_at', 'delivered_at']

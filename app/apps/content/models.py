@@ -548,6 +548,91 @@ class ContentMetrics(models.Model):
         return total
 
 
+class HeygenAvatar(models.Model):
+    """
+    Avatar HeyGen liberado para uma organização (catálogo por org).
+
+    Cadastrado APENAS pela equipe interna (admin), a partir de um avatar já
+    criado na plataforma HeyGen. O look_id é o ID do LOOK (não do grupo) e a
+    voz acompanha o avatar. O cliente só escolhe entre os avatares ativos da
+    sua org no formulário de novo vídeo.
+    """
+    from apps.core.storage import AvatarImageStorage
+
+    organization = models.ForeignKey(
+        'core.Organization',
+        on_delete=models.CASCADE,
+        related_name='heygen_avatars',
+        verbose_name='Organização',
+    )
+    name = models.CharField(
+        max_length=120,
+        help_text='Nome de exibição para o cliente (ex.: "Apresentadora Ana")',
+        verbose_name='Nome',
+    )
+    look_id = models.CharField(
+        max_length=64,
+        help_text='ID do LOOK na HeyGen (não o ID do grupo) — GET /v3/avatars/looks',
+        verbose_name='Look ID (HeyGen)',
+    )
+    voice_id = models.CharField(
+        max_length=64,
+        help_text='Voz pt-BR da HeyGen usada com este avatar — GET /v3/voices',
+        verbose_name='Voice ID (HeyGen)',
+    )
+    engine = models.CharField(
+        max_length=16,
+        default='avatar_iv',
+        choices=[('avatar_iv', 'Avatar IV'), ('avatar_v', 'Avatar V')],
+        help_text='Confirmar em supported_api_engines do look antes de usar avatar_v',
+        verbose_name='Engine',
+    )
+    preview_image = models.ImageField(
+        upload_to='heygen/%Y/%m/',
+        storage=AvatarImageStorage(),
+        blank=True,
+        null=True,
+        help_text='Foto do avatar exibida no seletor do formulário',
+        verbose_name='Imagem de Preview',
+    )
+    is_active = models.BooleanField(default=True, verbose_name='Ativo')
+    is_default = models.BooleanField(
+        default=False,
+        help_text='Pré-selecionado no formulário quando a org tem mais de um',
+        verbose_name='Padrão',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    objects = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ['-is_default', 'name']
+        verbose_name = 'Avatar HeyGen'
+        verbose_name_plural = 'Avatares HeyGen'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'look_id'],
+                name='uniq_heygen_avatar_org_look',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.name} ({self.organization.name})'
+
+
+class HeygenWebhookEvent(models.Model):
+    """Dedup de entregas do webhook HeyGen (Heygen-Event-Id é único por entrega)."""
+    event_id = models.CharField(max_length=128, unique=True, verbose_name='Event ID')
+    received_at = models.DateTimeField(auto_now_add=True, verbose_name='Recebido em')
+
+    class Meta:
+        verbose_name = 'Evento de Webhook HeyGen'
+        verbose_name_plural = 'Eventos de Webhook HeyGen'
+
+    def __str__(self):
+        return self.event_id
+
+
 class VideoAvatarStatus(models.Model):
     """Status possíveis para vídeos avatar"""
     code = models.CharField(max_length=40, unique=True, verbose_name='Código')
@@ -583,10 +668,30 @@ class VideoAvatar(models.Model):
     )
     
     # Entrada do cliente
+    avatar = models.ForeignKey(
+        HeygenAvatar,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='videos',
+        help_text='Avatar do catálogo da org escolhido pelo cliente',
+        verbose_name='Avatar HeyGen',
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='videos_avatar',
+        help_text='Usuário que solicitou o vídeo (recebe os emails)',
+        verbose_name='Solicitado por',
+    )
     avatar_image = models.ImageField(
         upload_to='%Y/%m/%d/',
         storage=AvatarImageStorage(),
-        help_text="Imagem do avatar/personagem (foto/ilustração)",
+        blank=True,
+        null=True,
+        help_text="Legado (fluxo manual): imagem enviada pelo cliente",
         verbose_name='Imagem do Avatar'
     )
     script_text = models.TextField(
@@ -666,6 +771,47 @@ class VideoAvatar(models.Model):
         blank=True,
         help_text="ID do job de processamento (se aplicável)",
         verbose_name='Thread ID'
+    )
+
+    # Integração HeyGen (fecha na criação + webhook; ver skill heygen-django)
+    heygen_video_id = models.CharField(
+        max_length=64,
+        blank=True,
+        db_index=True,
+        help_text='video_id retornado pelo POST /v3/videos',
+        verbose_name='Video ID (HeyGen)',
+    )
+    idempotency_key = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        unique=True,
+        help_text='Idempotency-Key enviada à HeyGen (uuid5 determinístico) — '
+                  'retry do Celery nunca gera vídeo cobrado em dobro',
+        verbose_name='Idempotency Key',
+    )
+    estimated_duration = models.FloatField(
+        default=0,
+        help_text='Duração estimada pelo roteiro (s) antes do render; a real '
+                  'fica em video_duration',
+        verbose_name='Duração Estimada',
+    )
+    cost_usd = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        default=0,
+        help_text='Custo real (duração × tarifa/s), fechado no webhook',
+        verbose_name='Custo (USD)',
+    )
+    error_code = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text='Código de erro da HeyGen quando status=failed',
+        verbose_name='Código de Erro',
+    )
+    error_message = models.TextField(
+        blank=True,
+        verbose_name='Mensagem de Erro',
     )
     
     # Timestamps

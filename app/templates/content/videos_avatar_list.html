@@ -1,0 +1,45 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Vídeos Avatar - IAMKT{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-3xl font-bold text-purple mb-2">🎬 Vídeos Avatar</h1>
+    <p class="text-lg text-muted">Vídeos com apresentador virtual da sua marca</p>
+  </div>
+  <a href="{% url 'content:video_avatar_create' %}" class="btn btn-primary">+ Novo Vídeo</a>
+</div>
+
+{% if videos %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  {% for video in videos %}
+  <a href="{% url 'content:video_avatar_detail' video.pk %}" class="card hover:shadow-lg transition">
+    {% if video.video_thumbnail %}
+      <img src="{{ video.video_thumbnail.url }}" alt="Thumbnail" class="rounded mb-3" style="width:100%;aspect-ratio:16/9;object-fit:cover;">
+    {% else %}
+      <div class="rounded mb-3 flex items-center justify-center text-4xl" style="width:100%;aspect-ratio:16/9;background:var(--bg-muted,#f3f0fa);">🎬</div>
+    {% endif %}
+    <p class="font-semibold" style="overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">{{ video.script_text|truncatechars:90 }}</p>
+    <p class="text-sm text-muted">{{ video.created_at|date:"d/m/Y H:i" }}{% if video.avatar %} · {{ video.avatar.name }}{% endif %}</p>
+    <span class="badge badge-soft">{{ video.status.label }}</span>
+  </a>
+  {% endfor %}
+</div>
+
+{% if videos.has_other_pages %}
+<div class="mt-6 flex gap-2">
+  {% if videos.has_previous %}<a href="?page={{ videos.previous_page_number }}" class="btn btn-secondary">← Anterior</a>{% endif %}
+  <span class="text-muted" style="align-self:center;">Página {{ videos.number }} de {{ videos.paginator.num_pages }}</span>
+  {% if videos.has_next %}<a href="?page={{ videos.next_page_number }}" class="btn btn-secondary">Próxima →</a>{% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="card text-center">
+  <p class="text-4xl mb-3">🎬</p>
+  <p class="text-muted mb-4">Nenhum vídeo criado ainda.</p>
+  <a href="{% url 'content:video_avatar_create' %}" class="btn btn-primary">Criar meu primeiro vídeo</a>
+</div>
+{% endif %}
+{% endblock %}
