@@ -907,18 +907,16 @@ class VideoAvatar(models.Model):
         return f"Vídeo #{self.pk} - {self.organization.name}"
     
     def save(self, *args, **kwargs):
-        # Calcular prazo de entrega na criação
+        # Prazo de entrega: geração via HeyGen leva minutos; 1h é o SLA
+        # "algo deu errado" (o util de 48h úteis do fluxo manual nunca existiu)
         if not self.pk and not self.expected_delivery_at:
-            from apps.core.utils import calculate_video_delivery_deadline
+            from datetime import timedelta
+
             from django.conf import settings
             from django.utils import timezone
-            
-            self.expected_delivery_at = calculate_video_delivery_deadline(
-                self.created_at or timezone.now(),
-                base_hours=getattr(settings, 'VIDEO_AVATAR_SLA_HOURS', 48),
-                include_weekends=getattr(settings, 'VIDEO_AVATAR_INCLUDE_WEEKENDS', False),
-                business_hours_only=getattr(settings, 'VIDEO_AVATAR_BUSINESS_HOURS_ONLY', True)
-            )
+
+            sla_minutes = getattr(settings, 'VIDEO_AVATAR_SLA_MINUTES', 60)
+            self.expected_delivery_at = timezone.now() + timedelta(minutes=sla_minutes)
         
         # Marcar como entregue quando vídeo é adicionado pela primeira vez
         if self.video_file and not self.delivered_at:
