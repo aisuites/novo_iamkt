@@ -37,6 +37,11 @@ def heygen_webhook(request):
     event_id = request.headers.get('Heygen-Event-Id', '')
 
     if not (signature and timestamp and event_id):
+        # diagnóstico: nomes dos headers recebidos (sem valores — podem ter secret)
+        logger.warning('[heygen webhook] entrega sem headers de assinatura; '
+                       'headers=%s ua=%s',
+                       sorted(request.headers.keys()),
+                       request.headers.get('User-Agent', '?'))
         return HttpResponseBadRequest('headers ausentes')
 
     try:
