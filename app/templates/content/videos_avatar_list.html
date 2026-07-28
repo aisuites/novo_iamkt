@@ -8,7 +8,10 @@
     <h1 class="text-3xl font-bold text-purple mb-2">🎬 Vídeos Avatar</h1>
     <p class="text-lg text-muted">Vídeos com apresentador virtual da sua marca</p>
   </div>
-  <a href="{% url 'content:video_avatar_create' %}" class="btn btn-primary">+ Novo Vídeo</a>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="{% url 'content:heygen_presenters' %}" class="btn btn-secondary">🧑‍🎤 Apresentadores</a>
+    <a href="{% url 'content:video_avatar_create' %}" class="btn btn-primary">+ Novo Vídeo</a>
+  </div>
 </div>
 
 {% if videos %}

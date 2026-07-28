@@ -188,6 +188,85 @@ def list_voices(language='Portuguese'):
     return _paginate('/v3/voices', params={'language': language}, limit=100)
 
 
+ASSET_SIMPLE_UPLOAD_MAX = 32 * 1024 * 1024  # acima disso, direct upload
+
+
+def upload_asset(fileobj, filename, content_type='video/mp4'):
+    """
+    Sobe um arquivo para a HeyGen e retorna o asset_id.
+    ≤32MB: POST /v3/assets direto. Maior: fluxo direct-upload
+    (init → PUT → complete).
+    """
+    data = fileobj.read()
+    size = len(data)
+
+    if size <= ASSET_SIMPLE_UPLOAD_MAX:
+        resp = requests.post(
+            f'{BASE_URL}/v3/assets',
+            files={'file': (filename, data, content_type)},
+            headers={'X-Api-Key': getattr(settings, 'HEYGEN_API_KEY', '')},
+            timeout=300,
+        )
+        if not resp.ok:
+            try:
+                err = resp.json().get('error', {})
+            except ValueError:
+                err = {}
+            raise HeygenError(err.get('code', ''), err.get('message', resp.text[:300]),
+                              http_status=resp.status_code)
+        body = resp.json().get('data', {})
+        return body.get('asset_id') or body.get('id')
+
+    # direct upload (arquivos grandes)
+    init = _request('POST', '/v3/assets/direct-uploads',
+                    json={'filename': filename, 'content_type': content_type,
+                          'size': size})
+    upload_url = init.get('upload_url') or init.get('url')
+    asset_id = init.get('asset_id') or init.get('id')
+    if not upload_url or not asset_id:
+        raise HeygenError('direct_upload_init_failed',
+                          f'resposta inesperada do init: {list(init.keys())}')
+    put = requests.put(upload_url, data=data,
+                       headers={'Content-Type': content_type}, timeout=600)
+    put.raise_for_status()
+    # complete pode devolver resource_not_ready enquanto o PUT aterrissa — retry
+    for _ in range(5):
+        try:
+            _request('POST', f'/v3/assets/{asset_id}/complete')
+            break
+        except HeygenError as exc:
+            if exc.code != 'resource_not_ready':
+                raise
+            import time
+            time.sleep(3)
+    return asset_id
+
+
+def create_digital_twin(name, asset_id):
+    """
+    POST /v3/avatars type=digital_twin a partir do footage. Treino é
+    assíncrono. Retorna (group_id, look_id) — ids podem vir em formatos
+    diferentes conforme a versão da API, por isso o parse defensivo.
+    """
+    data = _request('POST', '/v3/avatars',
+                    json={'type': 'digital_twin', 'name': name,
+                          'asset_id': asset_id})
+    group = data.get('avatar_group') or {}
+    item = data.get('avatar_item') or {}
+    group_id = (group.get('id') or data.get('group_id')
+                or data.get('avatar_group_id') or '')
+    look_id = item.get('id') or data.get('avatar_id') or data.get('id') or ''
+    if not group_id and look_id:
+        # fallback: o detalhe do look informa o grupo
+        try:
+            group_id = get_look(look_id).get('group_id', '')
+        except HeygenError:
+            pass
+    logger.info('[heygen] digital twin criado name=%s group=%s look=%s',
+                name, group_id, look_id)
+    return group_id, look_id
+
+
 def sync_group_looks(avatar, activate_new=False):
     """
     Sincroniza os looks do avatar group da HeyGen para o catálogo local.

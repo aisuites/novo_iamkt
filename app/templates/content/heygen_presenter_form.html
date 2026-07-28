@@ -1,0 +1,213 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Criar Apresentador - IAMKT{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <a href="{% url 'content:heygen_presenters' %}" class="text-muted">← Apresentadores</a>
+  <h1 class="text-3xl font-bold text-purple mt-1">🧑‍🎤 Criar Apresentador</h1>
+  <p class="text-lg text-muted">Grave (ou envie) um vídeo seu falando — criamos o avatar e a voz</p>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="card" style="max-width:640px;" id="presenter-form">
+  {% csrf_token %}
+
+  {% if form_error %}
+  <div class="mb-4" style="padding:12px 16px;background:#fdecec;border-left:4px solid #dc2626;border-radius:6px;color:#7f1d1d;">
+    {{ form_error }}
+  </div>
+  {% endif %}
+
+  <div class="mb-4" style="padding:12px 16px;background:#f0f7ff;border-left:4px solid #2563eb;border-radius:6px;">
+    <p class="text-sm" style="margin:0;"><strong>Dicas para um bom avatar:</strong>
+    grave de 1 a 2 minutos falando naturalmente para a câmera, em lugar bem
+    iluminado e silencioso, olhando para a lente. A voz do avatar é clonada
+    deste áudio. Máx. 100 MB.</p>
+  </div>
+
+  <div class="mb-6">
+    <label for="name" class="font-semibold block mb-2">Nome do apresentador</label>
+    <input type="text" id="name" name="name" class="input" style="width:100%;" maxlength="120"
+           value="{{ form_data.name|default:'' }}" placeholder="Ex.: Maurício" required>
+  </div>
+
+  <div class="mb-6">
+    <label class="font-semibold block mb-2">Vídeo de treino</label>
+
+    <!-- abas: gravar x enviar -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button type="button" id="tab-record" class="btn btn-secondary" style="flex:1;">🎥 Gravar agora</button>
+      <button type="button" id="tab-upload" class="btn btn-secondary" style="flex:1;">📁 Enviar arquivo</button>
+    </div>
+
+    <!-- gravador (webcam/câmera) -->
+    <div id="panel-record" style="display:none;">
+      <video id="preview" playsinline muted style="width:100%;max-height:52vh;border-radius:8px;background:#000;"></video>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <button type="button" id="btn-start" class="btn btn-primary" style="flex:1;">⏺ Iniciar</button>
+        <button type="button" id="btn-stop" class="btn btn-secondary" style="flex:1;display:none;">⏹ Parar</button>
+        <button type="button" id="btn-redo" class="btn btn-secondary" style="flex:1;display:none;">🔄 Regravar</button>
+      </div>
+      <p class="text-sm text-muted mt-1" id="rec-status">A câmera liga quando você tocar em Iniciar.</p>
+    </div>
+
+    <!-- upload de arquivo (no mobile abre a câmera nativa) -->
+    <div id="panel-upload" style="display:none;">
+      <input type="file" id="footage-file" accept="video/mp4,video/webm,video/quicktime" capture="user"
+             class="input" style="width:100%;">
+      <p class="text-sm text-muted mt-1">MP4, WebM ou MOV — até 100 MB.</p>
+    </div>
+
+    <input type="file" name="footage" id="footage-real" style="display:none;">
+    <p class="text-sm mt-2" id="footage-ok" style="display:none;color:#166534;">✅ Vídeo pronto para envio (<span id="footage-size"></span>)</p>
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <button type="submit" class="btn btn-primary" id="btn-submit" style="flex:1;min-width:160px;">Criar Apresentador</button>
+    <a href="{% url 'content:heygen_presenters' %}" class="btn btn-secondary" style="flex:1;min-width:120px;text-align:center;">Cancelar</a>
+  </div>
+  <div id="upload-progress" style="display:none;margin-top:12px;">
+    <div style="height:8px;background:var(--bg-muted,#eee);border-radius:4px;overflow:hidden;">
+      <div id="upload-bar" style="height:100%;width:0%;background:var(--purple,#7c3aed);transition:width .3s;"></div>
+    </div>
+    <p class="text-sm text-muted mt-1" id="upload-label">Enviando vídeo...</p>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const tabRecord = document.getElementById('tab-record');
+  const tabUpload = document.getElementById('tab-upload');
+  const panelRecord = document.getElementById('panel-record');
+  const panelUpload = document.getElementById('panel-upload');
+  const preview = document.getElementById('preview');
+  const btnStart = document.getElementById('btn-start');
+  const btnStop = document.getElementById('btn-stop');
+  const btnRedo = document.getElementById('btn-redo');
+  const recStatus = document.getElementById('rec-status');
+  const fileInput = document.getElementById('footage-file');
+  const realInput = document.getElementById('footage-real');
+  const okMsg = document.getElementById('footage-ok');
+  const sizeSpan = document.getElementById('footage-size');
+  const form = document.getElementById('presenter-form');
+  const MAX = 100 * 1024 * 1024;
+
+  const canRecord = !!(navigator.mediaDevices && window.MediaRecorder);
+  let stream = null, recorder = null, chunks = [], timer = null, seconds = 0;
+
+  const showTab = (rec) => {
+    panelRecord.style.display = rec ? 'block' : 'none';
+    panelUpload.style.display = rec ? 'none' : 'block';
+    tabRecord.style.outline = rec ? '2px solid var(--purple,#7c3aed)' : 'none';
+    tabUpload.style.outline = rec ? 'none' : '2px solid var(--purple,#7c3aed)';
+    if (!rec) stopCamera();
+  };
+  tabRecord.onclick = () => showTab(true);
+  tabUpload.onclick = () => showTab(false);
+  if (!canRecord) { tabRecord.style.display = 'none'; }
+  showTab(canRecord);  // desktop: gravador; sem suporte: upload
+
+  const setFootage = (blobOrFile, name) => {
+    if (blobOrFile.size > MAX) {
+      alert('O vídeo passou de 100 MB. Grave um trecho mais curto.');
+      return;
+    }
+    const file = blobOrFile instanceof File ? blobOrFile
+      : new File([blobOrFile], name, {type: blobOrFile.type || 'video/webm'});
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    realInput.files = dt.files;
+    okMsg.style.display = 'block';
+    sizeSpan.textContent = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  fileInput?.addEventListener('change', () => {
+    if (fileInput.files[0]) setFootage(fileInput.files[0], fileInput.files[0].name);
+  });
+
+  const stopCamera = () => {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    preview.srcObject = null;
+  };
+
+  btnStart.onclick = async () => {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(
+        {video: {facingMode: 'user', width: {ideal: 1280}}, audio: true});
+    } catch (e) {
+      recStatus.textContent = 'Não consegui acessar a câmera — use "Enviar arquivo".';
+      showTab(false);
+      return;
+    }
+    preview.srcObject = stream; preview.muted = true; preview.play();
+    chunks = [];
+    const mime = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+    recorder = new MediaRecorder(stream, {mimeType: mime});
+    recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, {type: mime});
+      const ext = mime === 'video/mp4' ? 'mp4' : 'webm';
+      setFootage(blob, `gravacao.${ext}`);
+      preview.srcObject = null;
+      preview.src = URL.createObjectURL(blob);
+      preview.muted = false; preview.controls = true;
+      stopCamera();
+    };
+    recorder.start();
+    seconds = 0;
+    timer = setInterval(() => {
+      seconds++;
+      recStatus.textContent = `⏺ Gravando... ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')} (ideal: 1 a 2 min)`;
+      if (seconds >= 180) btnStop.click();  // teto de 3 min
+    }, 1000);
+    btnStart.style.display = 'none';
+    btnStop.style.display = 'block';
+    btnRedo.style.display = 'none';
+  };
+
+  btnStop.onclick = () => {
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+    clearInterval(timer);
+    recStatus.textContent = 'Gravação concluída — revise acima e envie, ou regrave.';
+    btnStop.style.display = 'none';
+    btnRedo.style.display = 'block';
+  };
+
+  btnRedo.onclick = () => {
+    preview.src = ''; preview.controls = false;
+    okMsg.style.display = 'none';
+    realInput.value = '';
+    btnRedo.style.display = 'none';
+    btnStart.style.display = 'block';
+    recStatus.textContent = 'A câmera liga quando você tocar em Iniciar.';
+  };
+
+  // envio com barra de progresso (XHR para ter progress no upload grande)
+  form.addEventListener('submit', (e) => {
+    if (!realInput.files.length) return;  // deixa o servidor validar
+    e.preventDefault();
+    const xhr = new XMLHttpRequest();
+    const fd = new FormData(form);
+    document.getElementById('upload-progress').style.display = 'block';
+    document.getElementById('btn-submit').disabled = true;
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable) {
+        document.getElementById('upload-bar').style.width =
+          Math.round(ev.loaded / ev.total * 100) + '%';
+      }
+    };
+    xhr.onload = () => { window.location = xhr.responseURL || "{% url 'content:heygen_presenters' %}"; };
+    xhr.onerror = () => {
+      document.getElementById('upload-label').textContent = 'Falha no envio — tente de novo.';
+      document.getElementById('btn-submit').disabled = false;
+    };
+    xhr.open('POST', form.action || window.location.href);
+    xhr.send(fd);
+  });
+
+  window.addEventListener('beforeunload', stopCamera);
+})();
+</script>
+{% endblock %}

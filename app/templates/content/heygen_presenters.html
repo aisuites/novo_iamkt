@@ -1,0 +1,78 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Apresentadores - IAMKT{% endblock %}
+
+{% block content %}
+<div class="mb-6" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <a href="{% url 'content:videos_avatar' %}" class="text-muted">← Vídeos Avatar</a>
+    <h1 class="text-3xl font-bold text-purple mt-1">🧑‍🎤 Apresentadores</h1>
+    <p class="text-lg text-muted">Os avatares da sua marca</p>
+  </div>
+  <a href="{% url 'content:heygen_presenter_create' %}" class="btn btn-primary">+ Criar Apresentador</a>
+</div>
+
+{% if presenters %}
+<div style="display:flex;flex-wrap:wrap;gap:16px;">
+  {% for p in presenters %}
+  <div class="card presenter-card" data-id="{{ p.pk }}" style="width:100%;max-width:280px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      {% with look=p.looks.all|first %}
+      {% if look and look.preview_image %}
+        <img src="{{ look.preview_image.url }}" alt="{{ p.name }}" style="width:56px;height:74px;object-fit:cover;border-radius:8px;">
+      {% else %}
+        <div style="width:56px;height:74px;border-radius:8px;background:var(--bg-muted,#f3f0fa);display:flex;align-items:center;justify-content:center;font-size:26px;">🧑</div>
+      {% endif %}
+      {% endwith %}
+      <div style="min-width:0;">
+        <p class="font-semibold" style="margin:0;">{{ p.name }}</p>
+        <p class="text-sm text-muted" style="margin:0;">{{ p.created_at|date:"d/m/Y" }}</p>
+      </div>
+    </div>
+
+    <div class="presenter-status">
+      {% if p.status == 'ready' %}
+        <span class="badge badge-soft">✅ Pronto · {{ p.looks.count }} visual{{ p.looks.count|pluralize:"is" }}</span>
+      {% elif p.status == 'failed' %}
+        <span class="badge badge-soft" style="background:#fdecec;color:#7f1d1d;">⚠️ Falhou</span>
+        {% if p.error_message %}<p class="text-sm text-muted" style="margin:4px 0 0;">{{ p.error_message|truncatechars:90 }}</p>{% endif %}
+      {% else %}
+        <span class="badge badge-soft">⏳ {{ p.get_status_display }}...</span>
+        <p class="text-sm text-muted" style="margin:4px 0 0;">O treino leva alguns minutos; esta página atualiza sozinha.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card text-center" style="max-width:480px;">
+  <p class="text-4xl mb-3">🧑‍🎤</p>
+  <p class="text-muted mb-4">Nenhum apresentador ainda. Grave um vídeo curto e crie o avatar da sua marca.</p>
+  <a href="{% url 'content:heygen_presenter_create' %}" class="btn btn-primary">Criar meu apresentador</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if presenters %}
+<script>
+  // atualiza status dos treinos em andamento
+  const hasPending = [...document.querySelectorAll('.presenter-card')].length > 0;
+  const poll = async () => {
+    try {
+      const r = await fetch("{% url 'content:heygen_presenters_status' %}");
+      const data = await r.json();
+      const training = data.presenters.some(p => p.status === 'pending' || p.status === 'training');
+      const changed = data.presenters.some(p => {
+        const card = document.querySelector(`.presenter-card[data-id="${p.id}"] .presenter-status`);
+        return card && ((p.status === 'ready' && !card.textContent.includes('Pronto')) ||
+                        (p.status === 'failed' && !card.textContent.includes('Falhou')));
+      });
+      if (changed) { location.reload(); return; }
+      if (training) setTimeout(poll, 15000);
+    } catch (e) { setTimeout(poll, 30000); }
+  };
+  setTimeout(poll, 15000);
+</script>
+{% endif %}
+{% endblock %}

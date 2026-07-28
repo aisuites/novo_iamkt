@@ -127,9 +127,11 @@ class HeygenAvatarAdmin(admin.ModelAdmin):
     puxar os looks da HeyGen (entram INATIVOS; ative os que o cliente
     pode usar). IDs: command `heygen_setup` ou plataforma HeyGen."""
     list_display = ['name', 'organization', 'group_id', 'voice_id', 'engine',
-                    'is_active', 'looks_count']
-    list_filter = ['organization', 'is_active', 'engine']
+                    'status', 'is_active', 'looks_count']
+    list_filter = ['organization', 'is_active', 'engine', 'status']
     search_fields = ['name', 'group_id', 'organization__name']
+    readonly_fields = ['heygen_asset_id', 'error_message', 'trained_at',
+                       'created_by', 'created_at']
     inlines = [HeygenLookInline]
     actions = ['sync_looks']
 

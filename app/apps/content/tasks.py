@@ -442,4 +442,5 @@ def cleanup_old_cache_task():
 # Registra as tasks HeyGen no autodiscover do Celery (padrão de tasks_thermomix)
 from apps.content.tasks_heygen import (  # noqa: E402,F401
     create_heygen_video_task, process_heygen_event_task,
+    create_presenter_task, poll_presenter_training_task,
 )

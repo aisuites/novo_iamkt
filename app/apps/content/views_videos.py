@@ -146,3 +146,71 @@ def video_status(request, pk):
         'duration': video.video_duration,
         'error': video.error_message or None,
     })
+
+
+FOOTAGE_MAX_BYTES = 100 * 1024 * 1024  # limite de vídeo de entrada da HeyGen
+FOOTAGE_TYPES = ('video/mp4', 'video/webm', 'video/quicktime')
+
+
+@login_required
+@require_organization
+@require_videos_avatar
+def presenters_list(request):
+    """Apresentadores da org com status de treino (página mobile-first)."""
+    from apps.content.models import HeygenAvatar
+    presenters = (HeygenAvatar.objects.for_request(request)
+                  .prefetch_related('looks').order_by('-created_at'))
+    return render(request, 'content/heygen_presenters.html',
+                  {'presenters': presenters})
+
+
+@login_required
+@require_organization
+@require_videos_avatar
+def presenter_create(request):
+    """Cria digital twin: grava pela câmera ou envia arquivo de vídeo."""
+    from apps.content.models import HeygenAvatar
+
+    form_error = None
+    if request.method == 'POST':
+        name = (request.POST.get('name') or '').strip()
+        footage = request.FILES.get('footage')
+
+        if not name:
+            form_error = 'Dê um nome ao apresentador.'
+        elif footage is None:
+            form_error = 'Grave ou envie o vídeo de treino.'
+        elif footage.size > FOOTAGE_MAX_BYTES:
+            form_error = ('O vídeo passou de 100 MB — grave um pouco mais '
+                          'curto ou reduza a qualidade.')
+        elif footage.content_type not in FOOTAGE_TYPES:
+            form_error = 'Formato não suportado — envie MP4, WebM ou MOV.'
+        else:
+            presenter = HeygenAvatar.objects.create(
+                organization=request.organization,
+                name=name,
+                status='pending',
+                source_video=footage,
+                created_by=request.user,
+                is_active=False,  # ativa quando o treino conclui
+            )
+            from apps.content.tasks_heygen import create_presenter_task
+            create_presenter_task.delay(presenter.pk)
+            return redirect('content:heygen_presenters')
+
+    return render(request, 'content/heygen_presenter_form.html',
+                  {'form_error': form_error,
+                   'form_data': request.POST if request.method == 'POST' else {}})
+
+
+@login_required
+@require_organization
+@require_videos_avatar
+def presenters_status(request):
+    """JSON p/ polling da lista de apresentadores (treinos em andamento)."""
+    from apps.content.models import HeygenAvatar
+    data = [{'id': p.pk, 'status': p.status,
+             'status_label': p.get_status_display(),
+             'looks': p.looks.filter(is_active=True).count()}
+            for p in HeygenAvatar.objects.for_request(request)]
+    return JsonResponse({'presenters': data})

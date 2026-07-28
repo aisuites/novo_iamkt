@@ -557,6 +557,8 @@ class HeygenAvatar(models.Model):
     todos os looks. Cadastrado APENAS pela equipe interna; os looks são
     puxados da API via sync (heygen_sync / botão no admin).
     """
+    from apps.core.storage import VideoAvatarStorage
+
     organization = models.ForeignKey(
         'core.Organization',
         on_delete=models.CASCADE,
@@ -577,7 +579,9 @@ class HeygenAvatar(models.Model):
     )
     voice_id = models.CharField(
         max_length=64,
-        help_text='Voz pt-BR da HeyGen usada com este apresentador — GET /v3/voices',
+        blank=True,
+        help_text='Voz pt-BR da HeyGen — no twin criado via iamkt vem sozinha '
+                  'do treino (default_voice_id do look)',
         verbose_name='Voice ID (HeyGen)',
     )
     engine = models.CharField(
@@ -589,6 +593,36 @@ class HeygenAvatar(models.Model):
     )
     is_active = models.BooleanField(default=True, verbose_name='Ativo')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    # Criação de digital twin via iamkt (footage → HeyGen → treino async)
+    STATUS_CHOICES = [
+        ('pending', 'Enviando'), ('training', 'Treinando'),
+        ('ready', 'Pronto'), ('failed', 'Falhou'),
+    ]
+    status = models.CharField(
+        max_length=12,
+        default='ready',
+        choices=STATUS_CHOICES,
+        help_text='ready = cadastro manual ou treino concluído; pending/training '
+                  '= criação via iamkt em andamento',
+        verbose_name='Status',
+    )
+    source_video = models.FileField(
+        upload_to='footage/%Y/%m/',
+        storage=VideoAvatarStorage(),
+        blank=True,
+        null=True,
+        help_text='Footage enviado pelo cliente (gravação ou upload) — vira o twin',
+        verbose_name='Vídeo de Origem',
+    )
+    heygen_asset_id = models.CharField(
+        max_length=64, blank=True, verbose_name='Asset ID (HeyGen)')
+    error_message = models.TextField(blank=True, verbose_name='Erro')
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='heygen_avatars_created', verbose_name='Criado por')
+    trained_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Treino concluído em')
 
     objects = OrganizationScopedManager()
 

@@ -146,3 +146,110 @@ def process_heygen_event_task(self, event_id, event):
 
     from apps.core.emails import send_video_avatar_ready
     send_video_avatar_ready(video)
+
+
+@shared_task(bind=True, max_retries=3, retry_backoff=True)
+def create_presenter_task(self, avatar_id):
+    """
+    Cria o digital twin na HeyGen a partir do footage do HeygenAvatar:
+    upload do asset → POST /v3/avatars → agenda o poll de treino.
+    (Treino não tem webhook; poll com backoff é o caminho aceito aqui.)
+    """
+    from apps.content.models import HeygenAvatar
+    from apps.content.services import heygen
+
+    avatar = HeygenAvatar.objects.get(pk=avatar_id)
+    if avatar.group_id:
+        logger.info('[heygen twin] %s já tem group_id, ignorando', avatar_id)
+        return avatar.group_id
+    if not avatar.source_video:
+        avatar.status = 'failed'
+        avatar.error_message = 'Sem vídeo de origem.'
+        avatar.save(update_fields=['status', 'error_message'])
+        return None
+
+    try:
+        if not avatar.heygen_asset_id:
+            with avatar.source_video.open('rb') as f:
+                name = avatar.source_video.name.rsplit('/', 1)[-1]
+                ctype = 'video/webm' if name.endswith('.webm') else 'video/mp4'
+                avatar.heygen_asset_id = heygen.upload_asset(f, name, ctype)
+            avatar.save(update_fields=['heygen_asset_id'])
+
+        group_id, look_id = heygen.create_digital_twin(
+            avatar.name, avatar.heygen_asset_id)
+        if not group_id and not look_id:
+            raise heygen.HeygenError('twin_create_failed',
+                                     'API não retornou group/look')
+    except heygen.HeygenError as exc:
+        if exc.retryable:
+            raise self.retry(exc=exc)
+        avatar.status = 'failed'
+        avatar.error_message = str(exc)
+        avatar.save(update_fields=['status', 'error_message'])
+        logger.error('[heygen twin] falha ao criar %s: %s', avatar_id, exc)
+        return None
+
+    avatar.group_id = group_id
+    avatar.status = 'training'
+    avatar.save(update_fields=['group_id', 'status'])
+    poll_presenter_training_task.apply_async(args=[avatar_id], countdown=120)
+    return group_id
+
+
+@shared_task(bind=True, max_retries=90)
+def poll_presenter_training_task(self, avatar_id):
+    """
+    Acompanha o treino do twin (sem webhook na HeyGen p/ isso): checa a cada
+    2 min por até ~3h. Ao concluir: captura a voz automática do look
+    (default_voice_id), ativa o look e marca o apresentador como pronto.
+    """
+    from django.utils import timezone
+
+    from apps.content.models import HeygenAvatar
+    from apps.content.services import heygen
+
+    avatar = HeygenAvatar.objects.get(pk=avatar_id)
+    if avatar.status != 'training':
+        return avatar.status
+
+    try:
+        looks = heygen.list_looks(avatar.group_id)
+    except heygen.HeygenError as exc:
+        logger.warning('[heygen twin] poll %s falhou: %s', avatar_id, exc)
+        looks = []
+
+    completed = [l for l in looks if l.get('status') == 'completed']
+    failed = [l for l in looks if l.get('status') == 'failed']
+
+    if completed:
+        first = completed[0]
+        if not avatar.voice_id:
+            try:
+                detail = heygen.get_look(first['id'])
+                avatar.voice_id = detail.get('default_voice_id', '') or ''
+            except heygen.HeygenError:
+                logger.exception('[heygen twin] detalhe do look falhou')
+        avatar.status = 'ready'
+        avatar.trained_at = timezone.now()
+        avatar.is_active = True
+        avatar.save(update_fields=['voice_id', 'status', 'trained_at', 'is_active'])
+        try:
+            heygen.sync_group_looks(avatar, activate_new=True)
+            look0 = avatar.looks.filter(is_active=True).first()
+            if look0 and not avatar.looks.filter(is_default=True).exists():
+                look0.is_default = True
+                look0.save(update_fields=['is_default'])
+        except heygen.HeygenError:
+            logger.exception('[heygen twin] sync pós-treino falhou')
+        logger.info('[heygen twin] apresentador %s PRONTO (voz=%s)',
+                    avatar_id, avatar.voice_id or '?')
+        return 'ready'
+
+    if failed and not completed and len(failed) == len(looks) and looks:
+        avatar.status = 'failed'
+        avatar.error_message = 'Treino do avatar falhou na HeyGen.'
+        avatar.save(update_fields=['status', 'error_message'])
+        return 'failed'
+
+    raise self.retry(countdown=120)
