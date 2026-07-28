@@ -99,10 +99,17 @@
   </div>
 
   <div class="flex gap-3">
-    <button type="submit" class="btn btn-primary">Gerar Vídeo</button>
+    <button type="submit" id="btn-gerar" class="btn btn-primary">Gerar Vídeo</button>
     <a href="{% url 'content:videos_avatar' %}" class="btn btn-secondary">Cancelar</a>
   </div>
 </form>
+<script>
+  // proteção contra duplo envio (cada clique extra = render cobrado em dobro)
+  document.currentScript.previousElementSibling.addEventListener('submit', function () {
+    const b = document.getElementById('btn-gerar');
+    b.disabled = true; b.textContent = 'Enviando...';
+  });
+</script>
 {% endif %}
 {% endblock %}
 
