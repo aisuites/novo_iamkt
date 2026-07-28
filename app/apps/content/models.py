@@ -926,6 +926,24 @@ class VideoAvatar(models.Model):
         super().save(*args, **kwargs)
     
     @property
+    def download_url(self):
+        """URL assinada que força download (attachment) em vez de abrir o MP4."""
+        if not self.video_file:
+            return None
+        try:
+            return self.video_file.storage.url(
+                self.video_file.name,
+                parameters={'ResponseContentDisposition':
+                            f'attachment; filename="video-avatar-{self.pk}.mp4"'})
+        except Exception:
+            return self.video_file.url
+
+    @property
+    def css_aspect(self):
+        """aspect-ratio CSS do player conforme o formato pedido."""
+        return {'16:9': '16/9', '1:1': '1/1'}.get(self.aspect_ratio, '9/16')
+
+    @property
     def is_overdue(self):
         """Verifica se está atrasado"""
         if not self.expected_delivery_at or self.delivered_at:

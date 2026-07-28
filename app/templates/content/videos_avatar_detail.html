@@ -11,12 +11,12 @@
 
 <div class="card mb-6" id="status-card" data-status="{{ video.status.code }}">
   {% if video.status.code == 'ready' and video.video_file %}
-    <video controls style="width:100%;max-width:720px;border-radius:8px;"
+    <video controls style="max-height:60vh;max-width:100%;aspect-ratio:{{ video.css_aspect }};border-radius:8px;background:#000;"
            {% if video.video_thumbnail %}poster="{{ video.video_thumbnail.url }}"{% endif %}>
       <source src="{{ video.video_file.url }}" type="video/mp4">
     </video>
     <p class="text-sm text-muted mt-2">Duração: {{ video.video_duration|floatformat:1 }}s</p>
-    <a href="{{ video.video_file.url }}" download class="btn btn-primary mt-3">⬇ Baixar MP4</a>
+    <a href="{{ video.download_url }}" class="btn btn-primary mt-3">⬇ Baixar MP4</a>
   {% elif video.status.code == 'failed' %}
     <div class="alert alert-error">
       <strong>A geração falhou.</strong>
