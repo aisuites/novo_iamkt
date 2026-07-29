@@ -206,6 +206,13 @@ def create_presenter_task(self, avatar_id):
     avatar.group_id = group_id
     avatar.status = 'training'
     avatar.save(update_fields=['group_id', 'status'])
+    from decimal import Decimal as _D
+    from apps.core.services.ai_usage import record_ai_event
+    record_ai_event(  # tabela self-serve: Digital Twin US$1,00/chamada
+        avatar.organization, step='heygen_twin_create',
+        model='heygen-digital-twin', usage_dict={'cost_usd': _D('1.00')},
+        purpose=f'criação avatar "{avatar.name}" (#{avatar.pk})',
+        source='videos_avatar')
     poll_presenter_training_task.apply_async(args=[avatar_id], countdown=120)
     return group_id
 
@@ -267,3 +274,68 @@ def poll_presenter_training_task(self, avatar_id):
         return 'failed'
 
     raise self.retry(countdown=120)
+
+
+@shared_task(bind=True, max_retries=3, retry_backoff=True)
+def create_look_task(self, avatar_id, name, prompt=None, image_path=None,
+                     guide_look_id=None):
+    """Pede um look novo à HeyGen e agenda o poll até o treino concluir."""
+    from apps.content.models import HeygenAvatar
+    from apps.content.services import heygen
+
+    avatar = HeygenAvatar.objects.get(pk=avatar_id)
+    image_url = None
+    if image_path:
+        from apps.core.storage import AvatarImageStorage
+        image_url = AvatarImageStorage().url(image_path)
+
+    try:
+        look_id = heygen.create_look(avatar, name, prompt=prompt,
+                                     image_url=image_url,
+                                     guide_look_id=guide_look_id)
+    except heygen.HeygenError as exc:
+        if exc.retryable:
+            raise self.retry(exc=exc)
+        logger.error('[heygen look] falha ao criar look p/ avatar %s: %s',
+                     avatar_id, exc)
+        return None
+
+    if look_id:
+        poll_look_task.apply_async(args=[avatar_id, look_id], countdown=60)
+    else:
+        # sem look_id na resposta: o sync periódico do grupo acha quando concluir
+        poll_look_task.apply_async(args=[avatar_id, ''], countdown=120)
+    return look_id
+
+
+@shared_task(bind=True, max_retries=60)
+def poll_look_task(self, avatar_id, look_id):
+    """
+    Espera o treino do look (1/min, ~1h teto). Concluído → sync do grupo e
+    ATIVA o look (foi o próprio cliente que pediu; não passa por curadoria).
+    """
+    from apps.content.models import HeygenAvatar
+    from apps.content.services import heygen
+
+    avatar = HeygenAvatar.objects.get(pk=avatar_id)
+
+    if look_id:
+        try:
+            detail = heygen.get_look(look_id)
+        except heygen.HeygenError:
+            raise self.retry(countdown=60)
+        if detail.get('status') == 'failed':
+            logger.error('[heygen look] treino do look %s falhou', look_id)
+            return 'failed'
+        if detail.get('status') != 'completed':
+            raise self.retry(countdown=60)
+
+    try:
+        heygen.sync_group_looks(avatar)
+        if look_id:
+            avatar.looks.filter(look_id=look_id).update(is_active=True)
+    except heygen.HeygenError:
+        raise self.retry(countdown=120)
+    logger.info('[heygen look] look %s pronto e ativo (avatar %s)',
+                look_id or '?', avatar_id)
+    return 'ready'

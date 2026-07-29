@@ -35,6 +35,30 @@
     <div class="presenter-status">
       {% if p.status == 'ready' %}
         <span class="badge badge-soft">✅ Pronto · {{ p.looks.count }} visual{{ p.looks.count|pluralize:"is" }}</span>
+        {% if user.is_staff or request.organization.look_creation_enabled %}
+        <button type="button" class="btn btn-secondary btn-new-look" data-target="look-form-{{ p.pk }}"
+                style="width:100%;margin-top:8px;padding:6px 10px;font-size:13px;">➕ Novo visual</button>
+        <form method="post" enctype="multipart/form-data" id="look-form-{{ p.pk }}"
+              action="{% url 'content:heygen_look_create' p.pk %}"
+              style="display:none;margin-top:10px;border-top:1px solid var(--bg-muted,#eee);padding-top:10px;">
+          {% csrf_token %}
+          <input type="text" name="look_name" class="input" style="width:100%;margin-bottom:8px;"
+                 maxlength="160" placeholder="Nome do visual (ex.: Escritório)">
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <label class="btn btn-secondary" style="flex:1;padding:6px;font-size:12px;cursor:pointer;">
+              <input type="radio" name="mode" value="prompt" checked style="margin-right:4px;">✨ Descrever
+            </label>
+            <label class="btn btn-secondary" style="flex:1;padding:6px;font-size:12px;cursor:pointer;">
+              <input type="radio" name="mode" value="image" style="margin-right:4px;">🖼 Imagem
+            </label>
+          </div>
+          <textarea name="prompt" rows="2" class="input look-prompt" style="width:100%;margin-bottom:8px;"
+                    maxlength="1000" placeholder="Ex.: camisa social azul num escritório moderno, luz natural"></textarea>
+          <input type="file" name="image" accept="image/jpeg,image/png" class="input look-image"
+                 style="width:100%;margin-bottom:8px;display:none;">
+          <button type="submit" class="btn btn-primary" style="width:100%;padding:6px;font-size:13px;">Gerar visual</button>
+        </form>
+        {% endif %}
       {% elif p.status == 'failed' %}
         <span class="badge badge-soft" style="background:#fdecec;color:#7f1d1d;">⚠️ Falhou</span>
         {% if p.error_message %}<p class="text-sm text-muted" style="margin:4px 0 0;">{{ p.error_message|truncatechars:90 }}</p>{% endif %}
@@ -60,6 +84,42 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+  // toggle do form de novo visual + alternância prompt/imagem
+  document.querySelectorAll('.btn-new-look').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const f = document.getElementById(btn.dataset.target);
+      f.style.display = f.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+  document.querySelectorAll('form[id^="look-form-"]').forEach(f => {
+    f.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', () => {
+      const isPrompt = f.querySelector('input[name="mode"]:checked').value === 'prompt';
+      f.querySelector('.look-prompt').style.display = isPrompt ? 'block' : 'none';
+      f.querySelector('.look-image').style.display = isPrompt ? 'none' : 'block';
+    }));
+    f.addEventListener('submit', () => {
+      const b = f.querySelector('button[type="submit"]');
+      b.disabled = true; b.textContent = 'Enviando...';
+    });
+  });
+  // banner pós-solicitação
+  const params = new URLSearchParams(location.search);
+  if (params.get('look_requested')) {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.style.cssText = 'padding:12px 16px;background:#f0fdf4;border-left:4px solid #16a34a;margin-bottom:16px;';
+    div.textContent = '✨ Seu novo visual está sendo gerado — ele aparece aqui em alguns minutos.';
+    document.querySelector('.mb-6').after(div);
+  } else if (params.get('look_error')) {
+    const msgs = {size: 'A imagem passou de 50 MB.', type: 'Envie JPG ou PNG.', empty: 'Preencha a descrição ou escolha uma imagem.'};
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.style.cssText = 'padding:12px 16px;background:#fdecec;border-left:4px solid #dc2626;margin-bottom:16px;';
+    div.textContent = msgs[params.get('look_error')] || 'Não foi possível criar o visual.';
+    document.querySelector('.mb-6').after(div);
+  }
+</script>
 {% if presenters %}
 <script>
   // atualiza status dos treinos em andamento

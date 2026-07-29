@@ -443,4 +443,5 @@ def cleanup_old_cache_task():
 from apps.content.tasks_heygen import (  # noqa: E402,F401
     create_heygen_video_task, process_heygen_event_task,
     create_presenter_task, poll_presenter_training_task,
+    create_look_task, poll_look_task,
 )

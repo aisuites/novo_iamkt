@@ -239,3 +239,53 @@ def presenters_status(request):
              'looks': p.looks.filter(is_active=True).count()}
             for p in HeygenAvatar.objects.for_request(request)]
     return JsonResponse({'presenters': data})
+
+
+LOOK_IMAGE_MAX_BYTES = 50 * 1024 * 1024  # limite de imagem da HeyGen
+LOOK_IMAGE_TYPES = ('image/jpeg', 'image/png')
+
+
+@login_required
+@require_organization
+@require_videos_avatar
+def presenter_look_create(request, pk):
+    """Cria um look novo (prompt ou imagem) para um avatar pronto da org.
+    Gate: Organization.look_creation_enabled (staff sempre pode)."""
+    from apps.content.models import HeygenAvatar
+
+    if request.method != 'POST':
+        return redirect('content:heygen_presenters')
+
+    org = request.organization
+    if not (org.look_creation_enabled or request.user.is_staff):
+        return redirect('content:heygen_presenters')
+
+    avatar = get_object_or_404(
+        HeygenAvatar.objects.for_request(request), pk=pk)
+    if avatar.status != 'ready' or not avatar.group_id:
+        return redirect('content:heygen_presenters')
+
+    name = (request.POST.get('look_name') or '').strip() or 'Novo visual'
+    mode = request.POST.get('mode')
+    prompt = (request.POST.get('prompt') or '').strip()
+    image = request.FILES.get('image')
+
+    from apps.content.tasks_heygen import create_look_task
+    if mode == 'prompt' and prompt:
+        guide = avatar.looks.filter(is_default=True).first() \
+            or avatar.looks.filter(is_active=True).first()
+        create_look_task.delay(avatar.pk, name, prompt=prompt,
+                               guide_look_id=guide.look_id if guide else None)
+    elif mode == 'image' and image:
+        if image.size > LOOK_IMAGE_MAX_BYTES:
+            return redirect('/content/videos-avatar/apresentadores/?look_error=size')
+        if (image.content_type or '').split(';')[0] not in LOOK_IMAGE_TYPES:
+            return redirect('/content/videos-avatar/apresentadores/?look_error=type')
+        from apps.core.storage import AvatarImageStorage
+        storage = AvatarImageStorage()
+        path = storage.save(f'look_uploads/{avatar.pk}/{image.name}', image)
+        create_look_task.delay(avatar.pk, name, image_path=path)
+    else:
+        return redirect('/content/videos-avatar/apresentadores/?look_error=empty')
+
+    return redirect('/content/videos-avatar/apresentadores/?look_requested=1')

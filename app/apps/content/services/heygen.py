@@ -156,6 +156,41 @@ def get_look(look_id):
     return _request('GET', f'/v3/avatars/looks/{look_id}')
 
 
+def create_look(avatar, name, prompt=None, image_url=None, guide_look_id=None):
+    """
+    Cria um LOOK novo num avatar group existente (POST /v3/avatars com
+    avatar_group_id). Por prompt (type=prompt; guide_look_id opcional usa um
+    look existente como guia visual) ou por imagem (type=photo, file url).
+    Retorna o look_id (treino assíncrono).
+    """
+    if prompt:
+        payload = {
+            'type': 'prompt',
+            'name': name,
+            'prompt': prompt[:1000],
+            'avatar_group_id': avatar.group_id,
+        }
+        if guide_look_id:
+            payload['avatar_id'] = guide_look_id
+    elif image_url:
+        payload = {
+            'type': 'photo',
+            'name': name,
+            'file': {'type': 'url', 'url': image_url},
+            'avatar_group_id': avatar.group_id,
+        }
+    else:
+        raise HeygenError('invalid_look_request', 'informe prompt ou imagem')
+
+    data = _request('POST', '/v3/avatars', json=payload)
+    item = data.get('avatar_item') or {}
+    look_id = item.get('id') or data.get('id') or ''
+    logger.info('[heygen] look solicitado avatar=%s group=%s look=%s (%s)',
+                avatar.name, avatar.group_id, look_id,
+                'prompt' if prompt else 'imagem')
+    return look_id
+
+
 # --- Helpers do heygen_setup (equipe interna descobre IDs) ---
 
 def _paginate(path, params=None, limit=50, max_pages=10):

@@ -520,6 +520,12 @@ class Organization(TimeStampedModel):
                   '0 = recurso oculto para o cliente.',
         verbose_name='Créditos de Criação de Avatar'
     )
+    look_creation_enabled = models.BooleanField(
+        default=False,
+        help_text='Cliente pode criar novos looks (visuais) para os avatares '
+                  'da org — por prompt ou imagem. Liberado pela equipe.',
+        verbose_name='Criação de Looks Habilitada'
+    )
 
     email_marketing_enabled = models.BooleanField(
         default=False,  # Desabilitado por padrão

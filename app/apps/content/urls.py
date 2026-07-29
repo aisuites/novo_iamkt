@@ -20,5 +20,6 @@ urlpatterns = [
     path('videos-avatar/apresentadores/', views_videos.presenters_list, name='heygen_presenters'),
     path('videos-avatar/apresentadores/novo/', views_videos.presenter_create, name='heygen_presenter_create'),
     path('videos-avatar/apresentadores/status/', views_videos.presenters_status, name='heygen_presenters_status'),
+    path('videos-avatar/apresentadores/<int:pk>/looks/novo/', views_videos.presenter_look_create, name='heygen_look_create'),
     path('webhooks/heygen/', views_heygen.heygen_webhook, name='heygen_webhook'),
 ]
