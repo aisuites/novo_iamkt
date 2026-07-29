@@ -19,6 +19,30 @@ from django.views.decorators.http import require_POST
 logger = logging.getLogger(__name__)
 
 
+def _handle_unsigned_hint(body, had_signature):
+    """Payload não confiável (sem assinatura válida): usa só o video_id como
+    gatilho de reconciliação via API autenticada — nunca confia no conteúdo.
+    Responde 200 para parar o retry de 24h da HeyGen."""
+    try:
+        event = json.loads(body)
+        heygen_id = (event.get('event_data') or {}).get('video_id', '')
+    except ValueError:
+        heygen_id = ''
+    if not heygen_id:
+        return HttpResponseBadRequest('sem assinatura nem video_id')
+
+    from apps.content.models import VideoAvatar
+    video = VideoAvatar.objects.select_related('status').filter(
+        heygen_video_id=heygen_id).first()
+    if video and video.status.code in ('pending', 'processing'):
+        from apps.content.tasks_heygen import reconcile_video_task
+        reconcile_video_task.delay(video.pk)
+        logger.info('[heygen webhook] entrega %s → reconcile do vídeo %s',
+                    'com assinatura inválida' if had_signature else 'não-assinada',
+                    video.pk)
+    return HttpResponse(status=200)
+
+
 def _candidate_digests(body: bytes):
     """HMACs possíveis do corpo cru, nos secrets vigente e anterior."""
     secrets = (getattr(settings, 'HEYGEN_WEBHOOK_SECRET', ''),
