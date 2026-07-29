@@ -256,3 +256,53 @@ def send_organization_reactivated_email(organization):
     except Exception as e:
         logger.error(f'Erro ao enviar email de reativação para {user.email}: {str(e)}')
         return False
+
+
+def _send_video_avatar_email(video, template, subject):
+    """Base dos emails de Vídeo Avatar — destinatário é quem solicitou."""
+    user = video.created_by
+    if user is None or not user.email:
+        logger.warning(f'VideoAvatar #{video.pk} sem created_by/email — email não enviado')
+        return False
+
+    context = {
+        'user_name': user.first_name or user.email.split('@')[0],
+        'organization_name': video.organization.name,
+        'avatar_name': video.avatar.name if video.avatar else '',
+        'script_excerpt': (video.script_text[:180] + '…'
+                           if len(video.script_text) > 180 else video.script_text),
+        'duration': f'{video.video_duration:.0f}' if video.video_duration else '',
+        'video_url': f"{settings.SITE_URL}/content/videos-avatar/{video.pk}/",
+        'support_email': settings.NOTIFICATION_EMAIL_SUPORTE,
+    }
+    html_message = render_to_string(template, context)
+    plain_message = strip_tags(html_message)
+
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        logger.info(f'Email "{subject}" enviado para: {user.email} (VideoAvatar #{video.pk})')
+        return True
+    except Exception as e:
+        logger.error(f'Erro ao enviar email de vídeo avatar #{video.pk} para {user.email}: {str(e)}')
+        return False
+
+
+def send_video_avatar_received(video):
+    """Confirmação imediata: pedido entrou na fila."""
+    return _send_video_avatar_email(
+        video, 'emails/video_avatar_received.html',
+        'Recebemos seu pedido de vídeo - IAMKT')
+
+
+def send_video_avatar_ready(video):
+    """Vídeo renderizado e disponível na página de detalhe."""
+    return _send_video_avatar_email(
+        video, 'emails/video_avatar_ready.html',
+        'Seu vídeo avatar está pronto! - IAMKT')

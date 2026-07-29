@@ -167,6 +167,15 @@ class OrganizationAdmin(admin.ModelAdmin):
             ),
             'description': 'Habilite/desabilite ferramentas para esta empresa'
         }),
+        ('Pacote Vídeos Avatar (créditos)', {
+            'fields': (
+                'video_avatar_credits',
+                'avatar_creation_credits',
+            ),
+            'description': 'Pacote liberado manualmente pela equipe. Referência '
+                           'comercial: setup do avatar R$250 + R$200/vídeo. '
+                           'Vídeo/criação que falha devolve o crédito sozinho.'
+        }),
         ('Quotas de Conteúdo', {
             'fields': (
                 'quota_pautas_dia',

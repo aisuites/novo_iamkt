@@ -39,17 +39,30 @@ class OnboardingRequiredMiddleware(MiddlewareMixin):
         if request.user.is_superuser or request.user.is_staff:
             return None
         
+        organization = getattr(request, 'organization', None)
+
+        # Org só de Vídeos Avatar: NÃO passa por onboarding de KB e fica
+        # cercada no módulo de vídeos (antes do ALLOWED_PATHS global, senão
+        # /knowledge/ e afins escapam da cerca).
+        if organization and organization.is_videos_avatar_only:
+            if request.path.startswith('/content/videos-avatar/'):
+                return None
+            if any(request.path.startswith(p) for p in
+                   ('/accounts/', '/static/', '/media/')):
+                return None
+            print(f"🔄 [MIDDLEWARE] Org avatar-only: {request.path} → Vídeos Avatar", flush=True)
+            return redirect('content:videos_avatar')
+
         # Pular se é URL permitida
         if any(request.path.startswith(path) for path in self.ALLOWED_PATHS):
             return None
-        
+
         # Verificar onboarding
-        organization = getattr(request, 'organization', None)
         print(f"🔍 [MIDDLEWARE] Path: {request.path} | Organization: {organization}", flush=True)
-        
+
         if organization:
             from apps.knowledge.models import KnowledgeBase
-            
+
             try:
                 kb = KnowledgeBase.objects.filter(organization=organization).first()
                 print(f"🔍 [MIDDLEWARE] KB encontrado: {kb is not None}", flush=True)

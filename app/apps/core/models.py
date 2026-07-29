@@ -505,7 +505,28 @@ class Organization(TimeStampedModel):
         help_text="Empresa autorizada a criar vídeos avatar",
         verbose_name='Vídeos Avatar Habilitados'
     )
-    
+
+    # Pacote de créditos (liberado manualmente pela equipe no admin).
+    # Comercial de referência: setup do avatar R$250 + R$200/vídeo.
+    video_avatar_credits = models.PositiveIntegerField(
+        default=0,
+        help_text='Vídeos avatar restantes do pacote (decrementa a cada vídeo; '
+                  '0 = bloqueado). Vídeo que falha devolve o crédito.',
+        verbose_name='Créditos de Vídeo Avatar'
+    )
+    avatar_creation_credits = models.PositiveIntegerField(
+        default=0,
+        help_text='Criações de avatar (setup/digital twin) restantes. '
+                  '0 = recurso oculto para o cliente.',
+        verbose_name='Créditos de Criação de Avatar'
+    )
+    look_creation_enabled = models.BooleanField(
+        default=False,
+        help_text='Cliente pode criar novos looks (visuais) para os avatares '
+                  'da org — por prompt ou imagem. Liberado pela equipe.',
+        verbose_name='Criação de Looks Habilitada'
+    )
+
     email_marketing_enabled = models.BooleanField(
         default=False,  # Desabilitado por padrão
         help_text="Empresa autorizada a usar módulo de email marketing",
@@ -820,23 +841,52 @@ class Organization(TimeStampedModel):
         return True, None, None
     
     def can_create_video_avatar(self):
-        """Valida se pode criar vídeo avatar. Retorna: (bool, str|None, str|None)"""
+        """
+        Valida se pode criar vídeo avatar. Retorna: (bool, str|None, str|None)
+
+        Modelo comercial: PACOTE DE CRÉDITOS (setup + N vídeos), liberado
+        manualmente pela equipe no admin. Créditos são o mecanismo primário;
+        as quotas dia/mês antigas seguem como teto extra opcional (>0).
+        """
         if not self.videos_avatar_enabled:
             return False, 'not_authorized', 'Sua empresa não está autorizada a criar vídeos avatar. Entre em contato conosco.'
-        
+
         if not self.is_active:
             if not self.approved_at:
                 return False, 'pending', 'Organização aguardando aprovação'
-        
-        usage_today = self.get_video_quota_usage_today()
-        if usage_today['videos_used'] >= self.quota_videos_dia:
-            return False, 'daily_limit', f'Limite diário atingido ({self.quota_videos_dia} vídeos/dia).'
-        
-        videos_month = self.get_videos_this_month()
-        if videos_month >= self.quota_videos_mes:
-            return False, 'monthly_limit', f'Limite mensal atingido ({self.quota_videos_mes} vídeos/mês).'
-        
+
+        if self.video_avatar_credits <= 0:
+            return False, 'no_credits', ('Seus créditos de vídeo acabaram. '
+                                         'Fale com a equipe IAMKT para adquirir um novo pacote.')
+
+        if self.quota_videos_dia > 0:
+            usage_today = self.get_video_quota_usage_today()
+            if usage_today['videos_used'] >= self.quota_videos_dia:
+                return False, 'daily_limit', f'Limite diário atingido ({self.quota_videos_dia} vídeos/dia).'
+
+        if self.quota_videos_mes > 0:
+            videos_month = self.get_videos_this_month()
+            if videos_month >= self.quota_videos_mes:
+                return False, 'monthly_limit', f'Limite mensal atingido ({self.quota_videos_mes} vídeos/mês).'
+
         return True, None, None
+
+    def can_create_heygen_avatar(self):
+        """Criação de avatar (digital twin) é liberada por créditos de setup."""
+        if not self.videos_avatar_enabled:
+            return False, 'not_authorized', 'Sua empresa não está autorizada a criar vídeos avatar.'
+        if self.avatar_creation_credits <= 0:
+            return False, 'no_credits', ('A criação de avatar é liberada pela equipe IAMKT. '
+                                         'Fale com a gente para contratar o setup.')
+        return True, None, None
+
+    @property
+    def is_videos_avatar_only(self):
+        """Org que contratou SÓ o módulo de vídeos avatar (login cai direto lá)."""
+        return (self.videos_avatar_enabled
+                and not self.posts_enabled
+                and not self.pautas_enabled
+                and not self.trends_enabled)
     
     def get_video_quota_usage_today(self):
         """Retorna uso de quota de vídeos hoje"""
