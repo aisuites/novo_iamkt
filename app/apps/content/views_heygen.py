@@ -44,21 +44,14 @@ def _valid_signature(body: bytes, signature: str) -> bool:
 def heygen_webhook(request):
     signature = (request.headers.get('Signature', '')
                  or request.headers.get('Heygen-Signature', ''))
-    if not signature:
-        logger.warning('[heygen webhook] entrega SEM assinatura; headers=%s ua=%s',
-                       sorted(request.headers.keys()),
-                       request.headers.get('User-Agent', '?'))
-        return HttpResponseBadRequest('sem assinatura')
-
     body = request.body  # bytes crus, antes de qualquer parse
-    if not _valid_signature(body, signature):
-        # diagnóstico sem vazar o valor: formato/tamanho apenas
-        logger.warning('[heygen webhook] assinatura NÃO confere '
-                       '(len=%d, hex?=%s, prefixo_sha256?=%s)',
-                       len(signature),
-                       all(c in '0123456789abcdef' for c in signature.lower()[:16]),
-                       signature.startswith('sha256='))
-        return HttpResponseForbidden('assinatura inválida')
+
+    if not signature or not _valid_signature(body, signature):
+        # Entrega sem assinatura válida (a HeyGen manda callbacks avulsos sem
+        # assinar) NÃO é confiada: vira apenas uma DICA — extraímos o video_id
+        # e conferimos direto na API autenticada. Forjar webhook = inócuo.
+        return _handle_unsigned_hint(body, bool(signature))
+
 
     try:
         event = json.loads(body)

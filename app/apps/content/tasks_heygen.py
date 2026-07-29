@@ -38,6 +38,65 @@ def _refund_credit(record, field):
     logger.info('[credits] devolvido 1 %s para org %s', field, record.organization_id)
 
 
+def _fail_video(video, code, message):
+    video.status = _status('failed', 'Falhou')
+    video.error_code = code
+    video.error_message = message or 'sem mensagem'
+    video.save(update_fields=['status', 'error_code', 'error_message'])
+    _refund_credit(video, 'video_avatar_credits')
+
+
+def _complete_video(video, download_url=None):
+    """Finaliza um vídeo pronto: MP4 → S3, duração/custo, email. Idempotente.
+    Usada pelo webhook e pelo reconciler."""
+    from apps.content.services import heygen
+    from apps.core.services.ai_usage import record_ai_event
+
+    # duração real (base de cobrança), thumbnail e URL fresca vêm do GET
+    duration = 0
+    try:
+        detail = heygen.get_video(video.heygen_video_id)
+        duration = float(detail.get('duration') or 0)
+        download_url = download_url or detail.get('video_url')
+        thumb_url = detail.get('thumbnail_url')
+        if thumb_url and not video.video_thumbnail:
+            t = requests.get(thumb_url, timeout=60)
+            if t.ok:
+                video.video_thumbnail.save(f'heygen_{video.pk}.jpg',
+                                           ContentFile(t.content), save=False)
+    except heygen.HeygenError:
+        logger.exception('[heygen] falha ao ler detalhe do vídeo %s', video.pk)
+
+    if download_url and not video.video_file:
+        resp = requests.get(download_url, timeout=120)
+        resp.raise_for_status()
+        video.video_file.save(f'heygen_{video.pk}.mp4',
+                              ContentFile(resp.content), save=False)
+
+    engine = video.avatar.engine if video.avatar else 'avatar_iv'
+    rate = heygen.PRICE_USD_PER_SECOND.get(engine, Decimal('0.0667'))
+    cost_usd = (rate * Decimal(str(duration))).quantize(Decimal('0.000001'))
+
+    already_ready = video.status.code == 'ready'
+    video.video_duration = duration
+    video.cost_usd = cost_usd
+    video.status = _status('ready', 'Pronto')
+    video.delivered_at = video.delivered_at or timezone.now()
+    video.save()
+
+    if not already_ready:
+        record_ai_event(
+            video.organization,
+            step='heygen_render',
+            model=f'heygen-{engine}',
+            usage_dict={'cost_usd': cost_usd},
+            purpose=f'video_avatar #{video.pk} ({duration:.1f}s)',
+            source='videos_avatar',
+        )
+        from apps.core.emails import send_video_avatar_ready
+        send_video_avatar_ready(video)
+
+
 @shared_task(bind=True, max_retries=5, retry_backoff=True, retry_backoff_max=600)
 def create_heygen_video_task(self, video_id):
     """Cria o job na HeyGen. Retry só para erros retentáveis da matriz."""
@@ -84,6 +143,8 @@ def create_heygen_video_task(self, video_id):
     video.status = _status('processing', 'Processando')
     video.save(update_fields=['heygen_video_id', 'idempotency_key',
                               'estimated_duration', 'status'])
+    # vigia: se o webhook não fechar o vídeo em 10 min, reconcilia via API
+    reconcile_video_task.apply_async(args=[video.pk], countdown=600)
     return heygen_id
 
 
@@ -113,56 +174,10 @@ def process_heygen_event_task(self, event_id, event):
         return
 
     if event_type.endswith('.fail'):
-        video.status = _status('failed', 'Falhou')
-        video.error_code = 'render_failed'
-        video.error_message = data.get('msg', 'sem mensagem')
-        video.save(update_fields=['status', 'error_code', 'error_message'])
-        _refund_credit(video, 'video_avatar_credits')
+        _fail_video(video, 'render_failed', data.get('msg', ''))
         return
 
-    # URL pré-assinada expira: baixa AGORA para o storage do tenant
-    url = data.get('url')
-    if url and not video.video_file:
-        resp = requests.get(url, timeout=120)
-        resp.raise_for_status()
-        video.video_file.save(f'heygen_{video.pk}.mp4',
-                              ContentFile(resp.content), save=False)
-
-    # duração real (base de cobrança) e thumbnail vêm do GET
-    duration = 0
-    try:
-        detail = heygen.get_video(video.heygen_video_id or heygen_id)
-        duration = float(detail.get('duration') or 0)
-        thumb_url = detail.get('thumbnail_url')
-        if thumb_url and not video.video_thumbnail:
-            t = requests.get(thumb_url, timeout=60)
-            if t.ok:
-                video.video_thumbnail.save(f'heygen_{video.pk}.jpg',
-                                           ContentFile(t.content), save=False)
-    except heygen.HeygenError:
-        logger.exception('[heygen] falha ao ler detalhe do vídeo %s', video.pk)
-
-    engine = video.avatar.engine if video.avatar else 'avatar_iv'
-    rate = heygen.PRICE_USD_PER_SECOND.get(engine, Decimal('0.0667'))
-    cost_usd = (rate * Decimal(str(duration))).quantize(Decimal('0.000001'))
-
-    video.video_duration = duration
-    video.cost_usd = cost_usd
-    video.status = _status('ready', 'Pronto')
-    video.delivered_at = timezone.now()
-    video.save()
-
-    record_ai_event(
-        video.organization,
-        step='heygen_render',
-        model=f'heygen-{engine}',
-        usage_dict={'cost_usd': cost_usd},
-        purpose=f'video_avatar #{video.pk} ({duration:.1f}s)',
-        source='videos_avatar',
-    )
-
-    from apps.core.emails import send_video_avatar_ready
-    send_video_avatar_ready(video)
+    _complete_video(video, data.get('url'))
 
 
 @shared_task(bind=True, max_retries=3, retry_backoff=True)
@@ -339,3 +354,42 @@ def poll_look_task(self, avatar_id, look_id):
     logger.info('[heygen look] look %s pronto e ativo (avatar %s)',
                 look_id or '?', avatar_id)
     return 'ready'
+
+
+@shared_task(bind=True, max_retries=36)
+def reconcile_video_task(self, video_id):
+    """
+    Vigia/reconciliador: consulta a API (fonte da verdade) para vídeos que o
+    webhook não fechou. Agendado na criação (10 min) e disparado por entrega
+    de webhook NÃO-assinada (que vira só uma 'dica', nunca confiada).
+    Reagenda a cada 5 min por até ~3h enquanto o render não conclui.
+    """
+    from apps.content.models import VideoAvatar
+    from apps.content.services import heygen
+
+    video = VideoAvatar.objects.select_related(
+        'organization', 'avatar', 'created_by', 'status').get(pk=video_id)
+    if video.status.code not in ('pending', 'processing'):
+        return video.status.code  # webhook já resolveu
+    if not video.heygen_video_id:
+        return 'no_heygen_id'
+
+    try:
+        detail = heygen.get_video(video.heygen_video_id)
+    except heygen.HeygenError as exc:
+        if exc.code == 'video_not_found':
+            _fail_video(video, 'video_not_found', 'Vídeo sumiu na HeyGen.')
+            return 'failed'
+        raise self.retry(countdown=300, exc=exc)
+
+    status = detail.get('status')
+    if status == 'completed':
+        logger.info('[heygen reconcile] vídeo %s completo via API (webhook '
+                    'não fechou)', video_id)
+        _complete_video(video)
+        return 'ready'
+    if status == 'failed':
+        _fail_video(video, detail.get('failure_code', 'render_failed'),
+                    detail.get('failure_message', ''))
+        return 'failed'
+    raise self.retry(countdown=300)
