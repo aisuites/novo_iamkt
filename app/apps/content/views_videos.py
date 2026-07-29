@@ -74,14 +74,21 @@ def video_create(request):
         if aspect not in ASPECT_CHOICES:
             aspect = 'auto'
 
+        can, _code, msg = request.organization.can_create_video_avatar()
         look = looks.filter(pk=look_pk).first()
-        if look is None:
-            form_error = 'Escolha um visual do apresentador.'
+        if not can:
+            form_error = msg
+        elif look is None:
+            form_error = 'Escolha um visual do avatar.'
         elif not script:
-            form_error = 'Escreva o texto que o apresentador vai falar.'
+            form_error = 'Escreva o texto que o avatar vai falar.'
         elif len(script) > SCRIPT_MAX_CHARS:
             form_error = f'O texto passou de {SCRIPT_MAX_CHARS} caracteres.'
         else:
+            from django.db.models import F
+            from apps.core.models import Organization
+            Organization.objects.filter(pk=request.organization.pk).update(
+                video_avatar_credits=F('video_avatar_credits') - 1)
             status, _ = VideoAvatarStatus.objects.get_or_create(
                 code='pending', defaults={'label': 'Na fila'})
             video = VideoAvatar.objects.create(
@@ -168,8 +175,14 @@ def presenters_list(request):
 @require_organization
 @require_videos_avatar
 def presenter_create(request):
-    """Cria digital twin: grava pela câmera ou envia arquivo de vídeo."""
+    """Cria digital twin: grava pela câmera ou envia arquivo de vídeo.
+    Recurso liberado pela equipe via créditos de setup (staff sempre pode)."""
     from apps.content.models import HeygenAvatar
+
+    can, _code, gate_msg = request.organization.can_create_heygen_avatar()
+    if not can and not request.user.is_staff:
+        return render(request, 'content/heygen_presenter_form.html',
+                      {'gate_message': gate_msg})
 
     form_error = None
     if request.method == 'POST':
@@ -177,7 +190,7 @@ def presenter_create(request):
         footage = request.FILES.get('footage')
 
         if not name:
-            form_error = 'Dê um nome ao apresentador.'
+            form_error = 'Dê um nome ao avatar.'
         elif footage is None:
             form_error = 'Grave ou envie o vídeo de treino.'
         elif footage.size > FOOTAGE_MAX_BYTES:
@@ -186,6 +199,13 @@ def presenter_create(request):
         elif footage.content_type not in FOOTAGE_TYPES:
             form_error = 'Formato não suportado — envie MP4, WebM ou MOV.'
         else:
+            from django.db.models import F
+            from apps.core.models import Organization
+            Organization.objects.filter(
+                pk=request.organization.pk,
+                avatar_creation_credits__gt=0,
+            ).update(avatar_creation_credits=F('avatar_creation_credits') - 1)
+
             presenter = HeygenAvatar.objects.create(
                 organization=request.organization,
                 name=name,

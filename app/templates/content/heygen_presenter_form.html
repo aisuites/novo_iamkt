@@ -1,14 +1,24 @@
 {% extends 'base/base.html' %}
 
-{% block title %}Criar Apresentador - IAMKT{% endblock %}
+{% block title %}Criar Avatar - IAMKT{% endblock %}
 
 {% block content %}
 <div class="mb-6">
-  <a href="{% url 'content:heygen_presenters' %}" class="text-muted">← Apresentadores</a>
-  <h1 class="text-3xl font-bold text-purple mt-1">🧑‍🎤 Criar Apresentador</h1>
+  <a href="{% url 'content:heygen_presenters' %}" class="text-muted">← Meus Avatares</a>
+  <h1 class="text-3xl font-bold text-purple mt-1">🧑‍🎤 Criar Avatar</h1>
   <p class="text-lg text-muted">Grave (ou envie) um vídeo seu falando — criamos o avatar e a voz</p>
 </div>
 
+{% if gate_message %}
+<div class="card" style="max-width:640px;">
+  <div class="text-center" style="padding:24px;">
+    <p class="text-4xl mb-3">🔒</p>
+    <p class="font-semibold mb-2">Criação de avatar não liberada</p>
+    <p class="text-muted mb-4">{{ gate_message }}</p>
+    <a href="{% url 'content:heygen_presenters' %}" class="btn btn-secondary">← Voltar</a>
+  </div>
+</div>
+{% else %}
 <form method="post" enctype="multipart/form-data" class="card" style="max-width:640px;" id="presenter-form">
   {% csrf_token %}
 
@@ -26,7 +36,7 @@
   </div>
 
   <div class="mb-6">
-    <label for="name" class="font-semibold block mb-2">Nome do apresentador</label>
+    <label for="name" class="font-semibold block mb-2">Nome do avatar</label>
     <input type="text" id="name" name="name" class="input" style="width:100%;" maxlength="120"
            value="{{ form_data.name|default:'' }}" placeholder="Ex.: Maurício" required>
   </div>
@@ -63,7 +73,7 @@
   </div>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;">
-    <button type="submit" class="btn btn-primary" id="btn-submit" style="flex:1;min-width:160px;">Criar Apresentador</button>
+    <button type="submit" class="btn btn-primary" id="btn-submit" style="flex:1;min-width:160px;">Criar Avatar</button>
     <a href="{% url 'content:heygen_presenters' %}" class="btn btn-secondary" style="flex:1;min-width:120px;text-align:center;">Cancelar</a>
   </div>
   <div id="upload-progress" style="display:none;margin-top:12px;">
@@ -73,9 +83,11 @@
     <p class="text-sm text-muted mt-1" id="upload-label">Enviando vídeo...</p>
   </div>
 </form>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
+{% if not gate_message %}
 <script>
 (() => {
   const tabRecord = document.getElementById('tab-record');
@@ -210,4 +222,5 @@
   window.addEventListener('beforeunload', stopCamera);
 })();
 </script>
+{% endif %}
 {% endblock %}

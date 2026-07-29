@@ -19,6 +19,11 @@ def dashboard(request):
     Dashboard principal do IAMKT.
     Mostra visão geral da base de conhecimento, ferramentas e atividades.
     """
+    # Org só de Vídeos Avatar não tem dashboard: vai direto ao módulo
+    org = getattr(request, 'organization', None)
+    if org and org.is_videos_avatar_only and not request.user.is_staff:
+        return redirect('content:videos_avatar')
+
     user = request.user
     
     # Verificar se existe Base de Conhecimento DA ORGANIZATION

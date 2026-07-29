@@ -20,6 +20,9 @@ def login_view(request):
     """
     # Se já está autenticado, redirecionar para dashboard
     if request.user.is_authenticated:
+        _org = getattr(request.user, 'organization', None)
+        if _org and _org.is_videos_avatar_only:
+            return redirect('content:videos_avatar')
         return redirect('core:dashboard')
     
     if request.method == 'POST':
@@ -66,7 +69,12 @@ def login_view(request):
             if next_url:
                 print(f"🔄 [LOGIN] Redirecionando para 'next': {next_url}", flush=True)
                 return redirect(next_url)
-            
+
+            # Org só de Vídeos Avatar: cai direto no módulo, sem onboarding de KB
+            if org.is_videos_avatar_only:
+                print(f"🔄 [LOGIN] Org avatar-only: direto p/ Vídeos Avatar", flush=True)
+                return redirect('content:videos_avatar')
+
             # Verificar onboarding e suggestions_reviewed para decidir redirecionamento
             from apps.knowledge.models import KnowledgeBase
             import logging
@@ -141,6 +149,9 @@ def register_view(request):
     """
     # Se já está autenticado, redirecionar para dashboard
     if request.user.is_authenticated:
+        _org = getattr(request.user, 'organization', None)
+        if _org and _org.is_videos_avatar_only:
+            return redirect('content:videos_avatar')
         return redirect('core:dashboard')
     
     if request.method == 'POST':

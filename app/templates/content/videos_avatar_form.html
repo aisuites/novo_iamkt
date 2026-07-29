@@ -5,14 +5,14 @@
 {% block content %}
 <div class="mb-6">
   <h1 class="text-3xl font-bold text-purple mb-2">🎬 Novo Vídeo Avatar</h1>
-  <p class="text-lg text-muted">Escolha o visual do apresentador e escreva o que ele vai falar</p>
+  <p class="text-lg text-muted">Escolha o visual do avatar e escreva o que ele vai falar</p>
 </div>
 
 {% if not looks %}
 <div class="card" style="max-width:720px;">
   <div class="text-center" style="padding:24px;">
     <p class="text-4xl mb-3">🧑‍🎤</p>
-    <p class="font-semibold mb-2">Sua organização ainda não tem um apresentador cadastrado</p>
+    <p class="font-semibold mb-2">Sua organização ainda não tem um avatar cadastrado</p>
     <p class="text-muted mb-4">O avatar é criado na plataforma HeyGen e cadastrado pela equipe IAMKT.
       Fale com o suporte para liberar o seu.</p>
     <a href="{% url 'content:videos_avatar' %}" class="btn btn-secondary">← Voltar</a>
@@ -56,7 +56,7 @@
     <label for="script_text" class="font-semibold block mb-2">Texto do vídeo</label>
     <textarea id="script_text" name="script_text" rows="5" maxlength="{{ script_max }}"
               class="input w-full" style="width:100%;"
-              placeholder="Escreva exatamente o que o apresentador vai falar..."
+              placeholder="Escreva exatamente o que o avatar vai falar..."
               required>{{ form_data.script_text|default:'' }}</textarea>
     <p class="text-sm text-muted mt-1"><span id="char-count">0</span>/{{ script_max }} caracteres</p>
   </div>
@@ -66,7 +66,7 @@
     <input type="text" id="avatar_action" name="avatar_action" class="input w-full" style="width:100%;"
            maxlength="200" value="{{ form_data.avatar_action|default:'' }}"
            placeholder="Ex.: fale gesticulando com as mãos, tom animado, sorria no final...">
-    <p class="text-sm text-muted mt-1">Direção de atuação para o apresentador (movimentos e expressão).</p>
+    <p class="text-sm text-muted mt-1">Direção de atuação para o avatar (movimentos e expressão).</p>
   </div>
 
   <div class="mb-6" style="display:flex;gap:24px;flex-wrap:wrap;">

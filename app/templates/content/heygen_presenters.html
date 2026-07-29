@@ -1,15 +1,17 @@
 {% extends 'base/base.html' %}
 
-{% block title %}Apresentadores - IAMKT{% endblock %}
+{% block title %}Meus Avatares - IAMKT{% endblock %}
 
 {% block content %}
 <div class="mb-6" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
   <div>
     <a href="{% url 'content:videos_avatar' %}" class="text-muted">← Vídeos Avatar</a>
-    <h1 class="text-3xl font-bold text-purple mt-1">🧑‍🎤 Apresentadores</h1>
+    <h1 class="text-3xl font-bold text-purple mt-1">🧑‍🎤 Meus Avatares</h1>
     <p class="text-lg text-muted">Os avatares da sua marca</p>
   </div>
-  <a href="{% url 'content:heygen_presenter_create' %}" class="btn btn-primary">+ Criar Apresentador</a>
+  {% if user.is_staff or request.organization.avatar_creation_credits > 0 %}
+  <a href="{% url 'content:heygen_presenter_create' %}" class="btn btn-primary">+ Criar Avatar</a>
+  {% endif %}
 </div>
 
 {% if presenters %}
@@ -47,8 +49,12 @@
 {% else %}
 <div class="card text-center" style="max-width:480px;">
   <p class="text-4xl mb-3">🧑‍🎤</p>
-  <p class="text-muted mb-4">Nenhum apresentador ainda. Grave um vídeo curto e crie o avatar da sua marca.</p>
-  <a href="{% url 'content:heygen_presenter_create' %}" class="btn btn-primary">Criar meu apresentador</a>
+  {% if user.is_staff or request.organization.avatar_creation_credits > 0 %}
+  <p class="text-muted mb-4">Nenhum avatar ainda. Grave um vídeo curto e crie o avatar da sua marca.</p>
+  <a href="{% url 'content:heygen_presenter_create' %}" class="btn btn-primary">Criar meu avatar</a>
+  {% else %}
+  <p class="text-muted mb-4">Nenhum avatar ainda. O seu avatar é criado no setup do pacote — fale com a equipe IAMKT.</p>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

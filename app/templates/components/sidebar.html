@@ -7,7 +7,22 @@
   - Se onboarding concluído: menu completo (Dashboard, Ferramentas, Gestão)
   {% endcomment %}
   
-  {% if not kb_onboarding_completed %}
+  {% if request.organization.is_videos_avatar_only and not user.is_staff %}
+    <!-- ORG SÓ DE VÍDEOS AVATAR: menu enxuto, sem onboarding de KB -->
+    <div>
+      <div class="sidebar-section-title">Ferramentas</div>
+      <nav class="sidebar-nav">
+        <a href="{% url 'content:videos_avatar' %}" class="sidebar-link {% if 'videos-avatar' in request.path and 'apresentadores' not in request.path %}active{% endif %}">
+          <span class="icon">🎬</span>
+          <span>Vídeos Avatar</span>
+        </a>
+        <a href="{% url 'content:heygen_presenters' %}" class="sidebar-link {% if 'apresentadores' in request.path %}active{% endif %}">
+          <span class="icon">🧑‍🎤</span>
+          <span>Meus Avatares</span>
+        </a>
+      </nav>
+    </div>
+  {% elif not kb_onboarding_completed %}
     <!-- FLUXO 1: ONBOARDING NÃO CONCLUÍDO - Apenas Base IAMKT -->
     <div>
       <div class="sidebar-section-title">Onboarding</div>
