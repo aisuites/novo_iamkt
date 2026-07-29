@@ -47,7 +47,7 @@
     <!-- abas: gravar x enviar -->
     <div style="display:flex;gap:8px;margin-bottom:12px;">
       <button type="button" id="tab-record" class="btn btn-secondary" style="flex:1;">🎥 Gravar agora</button>
-      <button type="button" id="tab-upload" class="btn btn-secondary" style="flex:1;">📁 Enviar arquivo</button>
+      <button type="button" id="tab-upload" class="btn btn-secondary" style="flex:1;">📁 Usar vídeo da galeria</button>
     </div>
 
     <!-- gravador (webcam/câmera) -->
@@ -63,9 +63,9 @@
 
     <!-- upload de arquivo (no mobile abre a câmera nativa) -->
     <div id="panel-upload" style="display:none;">
-      <input type="file" id="footage-file" accept="video/mp4,video/webm,video/quicktime" capture="user"
+      <input type="file" id="footage-file" accept="video/mp4,video/webm,video/quicktime"
              class="input" style="width:100%;">
-      <p class="text-sm text-muted mt-1">MP4, WebM ou MOV — até 100 MB.</p>
+      <p class="text-sm text-muted mt-1">Escolha um vídeo já gravado (galeria/arquivos) — MP4, WebM ou MOV, até 100 MB.</p>
     </div>
 
     <input type="file" name="footage" id="footage-real" style="display:none;">

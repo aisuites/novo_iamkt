@@ -242,29 +242,36 @@ def upload_asset(fileobj, filename, content_type='video/mp4'):
     return asset_id
 
 
-def create_digital_twin(name, asset_id):
+def create_digital_twin(name, footage_url, group_id=None):
     """
-    POST /v3/avatars type=digital_twin a partir do footage. Treino é
-    assíncrono. Retorna (group_id, look_id) — ids podem vir em formatos
-    diferentes conforme a versão da API, por isso o parse defensivo.
+    POST /v3/avatars type=digital_twin (schema real da doc, 2026-07-28):
+    file por URL (a URL assinada do nosso S3 serve — o download é imediato).
+    group_id opcional = adiciona LOOK a um avatar existente em vez de criar
+    grupo novo. Treino assíncrono. Retorna (group_id, look_id).
+    OBS: twins criados via API podem exigir consentimento
+    (POST /v3/avatars/{group}/consent) antes de renderizar.
     """
-    data = _request('POST', '/v3/avatars',
-                    json={'type': 'digital_twin', 'name': name,
-                          'asset_id': asset_id})
+    payload = {
+        'type': 'digital_twin',
+        'name': name,
+        'file': {'type': 'url', 'url': footage_url},
+    }
+    if group_id:
+        payload['avatar_group_id'] = group_id
+    data = _request('POST', '/v3/avatars', json=payload)
     group = data.get('avatar_group') or {}
     item = data.get('avatar_item') or {}
-    group_id = (group.get('id') or data.get('group_id')
-                or data.get('avatar_group_id') or '')
-    look_id = item.get('id') or data.get('avatar_id') or data.get('id') or ''
-    if not group_id and look_id:
-        # fallback: o detalhe do look informa o grupo
+    new_group_id = (group.get('id') or item.get('group_id')
+                    or data.get('group_id') or group_id or '')
+    look_id = item.get('id') or data.get('id') or ''
+    if not new_group_id and look_id:
         try:
-            group_id = get_look(look_id).get('group_id', '')
+            new_group_id = get_look(look_id).get('group_id', '')
         except HeygenError:
             pass
     logger.info('[heygen] digital twin criado name=%s group=%s look=%s',
-                name, group_id, look_id)
-    return group_id, look_id
+                name, new_group_id, look_id)
+    return new_group_id, look_id
 
 
 def sync_group_looks(avatar, activate_new=False):

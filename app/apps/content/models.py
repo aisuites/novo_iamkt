@@ -618,6 +618,10 @@ class HeygenAvatar(models.Model):
     heygen_asset_id = models.CharField(
         max_length=64, blank=True, verbose_name='Asset ID (HeyGen)')
     error_message = models.TextField(blank=True, verbose_name='Erro')
+    credit_consumed = models.BooleanField(
+        default=False,
+        help_text='Consumiu 1 crédito de setup na criação',
+        verbose_name='Crédito Consumido')
     created_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='heygen_avatars_created', verbose_name='Criado por')
@@ -923,6 +927,12 @@ class VideoAvatar(models.Model):
     error_message = models.TextField(
         blank=True,
         verbose_name='Mensagem de Erro',
+    )
+    credit_consumed = models.BooleanField(
+        default=False,
+        help_text='Consumiu 1 crédito do pacote na criação (falha definitiva '
+                  'devolve apenas se True)',
+        verbose_name='Crédito Consumido',
     )
     
     # Timestamps

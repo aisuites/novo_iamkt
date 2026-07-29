@@ -7,6 +7,9 @@ services:
       dockerfile: Dockerfile
     container_name: iamkt_web
     restart: unless-stopped
+    # timeout maior que o default (30s): upload de footage de celular em rede
+    # lenta matava o worker sync no meio do POST
+    command: gunicorn sistema.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 300
     depends_on:
       - iamkt_postgres
       - iamkt_redis

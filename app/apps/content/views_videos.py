@@ -87,8 +87,10 @@ def video_create(request):
         else:
             from django.db.models import F
             from apps.core.models import Organization
-            Organization.objects.filter(pk=request.organization.pk).update(
-                video_avatar_credits=F('video_avatar_credits') - 1)
+            consumed = Organization.objects.filter(
+                pk=request.organization.pk,
+                video_avatar_credits__gt=0,
+            ).update(video_avatar_credits=F('video_avatar_credits') - 1)
             status, _ = VideoAvatarStatus.objects.get_or_create(
                 code='pending', defaults={'label': 'Na fila'})
             video = VideoAvatar.objects.create(
@@ -100,6 +102,7 @@ def video_create(request):
                 avatar_action=action,
                 voice_speed=speed,
                 aspect_ratio=aspect,
+                credit_consumed=bool(consumed),
                 status=status,
             )
             from apps.core.emails import send_video_avatar_received
@@ -196,12 +199,13 @@ def presenter_create(request):
         elif footage.size > FOOTAGE_MAX_BYTES:
             form_error = ('O vídeo passou de 100 MB — grave um pouco mais '
                           'curto ou reduza a qualidade.')
-        elif footage.content_type not in FOOTAGE_TYPES:
+        elif (footage.content_type or '').split(';')[0].strip() not in FOOTAGE_TYPES:
+            # gravações de celular mandam 'video/mp4;codecs=...' — só o tipo base conta
             form_error = 'Formato não suportado — envie MP4, WebM ou MOV.'
         else:
             from django.db.models import F
             from apps.core.models import Organization
-            Organization.objects.filter(
+            consumed = Organization.objects.filter(
                 pk=request.organization.pk,
                 avatar_creation_credits__gt=0,
             ).update(avatar_creation_credits=F('avatar_creation_credits') - 1)
@@ -212,6 +216,7 @@ def presenter_create(request):
                 status='pending',
                 source_video=footage,
                 created_by=request.user,
+                credit_consumed=bool(consumed),
                 is_active=False,  # ativa quando o treino conclui
             )
             from apps.content.tasks_heygen import create_presenter_task

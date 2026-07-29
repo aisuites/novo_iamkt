@@ -24,12 +24,18 @@ def _status(code, label=None):
     return obj
 
 
-def _refund_credit(org_id, field):
-    """Falha definitiva devolve o crédito do pacote (video/avatar)."""
+def _refund_credit(record, field):
+    """Falha definitiva devolve o crédito — só se este registro consumiu um
+    (credit_consumed), e desmarca para nunca devolver duas vezes."""
+    if not getattr(record, 'credit_consumed', False):
+        return
     from django.db.models import F
     from apps.core.models import Organization
-    Organization.objects.filter(pk=org_id).update(**{field: F(field) + 1})
-    logger.info('[credits] devolvido 1 %s para org %s', field, org_id)
+    Organization.objects.filter(pk=record.organization_id).update(
+        **{field: F(field) + 1})
+    record.credit_consumed = False
+    record.save(update_fields=['credit_consumed'])
+    logger.info('[credits] devolvido 1 %s para org %s', field, record.organization_id)
 
 
 @shared_task(bind=True, max_retries=5, retry_backoff=True, retry_backoff_max=600)
@@ -48,7 +54,7 @@ def create_heygen_video_task(self, video_id):
         video.error_code = 'no_avatar'
         video.error_message = 'Vídeo sem avatar/look do catálogo associado.'
         video.save(update_fields=['status', 'error_code', 'error_message'])
-        _refund_credit(video.organization_id, 'video_avatar_credits')
+        _refund_credit(video, 'video_avatar_credits')
         return None
 
     key = video.idempotency_key or heygen.make_idempotency_key(video)
@@ -65,7 +71,7 @@ def create_heygen_video_task(self, video_id):
         video.error_code = exc.code
         video.error_message = str(exc)
         video.save(update_fields=['status', 'error_code', 'error_message'])
-        _refund_credit(video.organization_id, 'video_avatar_credits')
+        _refund_credit(video, 'video_avatar_credits')
         if exc.needs_operator:
             logger.error('[heygen] AÇÃO DO OPERADOR necessária (%s) — vídeo %s',
                          exc.code, video_id)
@@ -111,7 +117,7 @@ def process_heygen_event_task(self, event_id, event):
         video.error_code = 'render_failed'
         video.error_message = data.get('msg', 'sem mensagem')
         video.save(update_fields=['status', 'error_code', 'error_message'])
-        _refund_credit(video.organization_id, 'video_avatar_credits')
+        _refund_credit(video, 'video_avatar_credits')
         return
 
     # URL pré-assinada expira: baixa AGORA para o storage do tenant
@@ -177,19 +183,13 @@ def create_presenter_task(self, avatar_id):
         avatar.status = 'failed'
         avatar.error_message = 'Sem vídeo de origem.'
         avatar.save(update_fields=['status', 'error_message'])
-        _refund_credit(avatar.organization_id, 'avatar_creation_credits')
+        _refund_credit(avatar, 'avatar_creation_credits')
         return None
 
     try:
-        if not avatar.heygen_asset_id:
-            with avatar.source_video.open('rb') as f:
-                name = avatar.source_video.name.rsplit('/', 1)[-1]
-                ctype = 'video/webm' if name.endswith('.webm') else 'video/mp4'
-                avatar.heygen_asset_id = heygen.upload_asset(f, name, ctype)
-            avatar.save(update_fields=['heygen_asset_id'])
-
-        group_id, look_id = heygen.create_digital_twin(
-            avatar.name, avatar.heygen_asset_id)
+        # URL assinada do nosso S3 (a HeyGen baixa na hora — sem asset upload)
+        footage_url = avatar.source_video.url
+        group_id, look_id = heygen.create_digital_twin(avatar.name, footage_url)
         if not group_id and not look_id:
             raise heygen.HeygenError('twin_create_failed',
                                      'API não retornou group/look')
@@ -199,7 +199,7 @@ def create_presenter_task(self, avatar_id):
         avatar.status = 'failed'
         avatar.error_message = str(exc)
         avatar.save(update_fields=['status', 'error_message'])
-        _refund_credit(avatar.organization_id, 'avatar_creation_credits')
+        _refund_credit(avatar, 'avatar_creation_credits')
         logger.error('[heygen twin] falha ao criar %s: %s', avatar_id, exc)
         return None
 
@@ -263,7 +263,7 @@ def poll_presenter_training_task(self, avatar_id):
         avatar.status = 'failed'
         avatar.error_message = 'Treino do avatar falhou na HeyGen.'
         avatar.save(update_fields=['status', 'error_message'])
-        _refund_credit(avatar.organization_id, 'avatar_creation_credits')
+        _refund_credit(avatar, 'avatar_creation_credits')
         return 'failed'
 
     raise self.retry(countdown=120)
