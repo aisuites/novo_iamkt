@@ -171,6 +171,7 @@ class OrganizationAdmin(admin.ModelAdmin):
             'fields': (
                 'video_avatar_credits',
                 'avatar_creation_credits',
+                'look_creation_enabled',
             ),
             'description': 'Pacote liberado manualmente pela equipe. Referência '
                            'comercial: setup do avatar R$250 + R$200/vídeo. '
