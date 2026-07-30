@@ -38,13 +38,20 @@ _NON_EXCLUSIVE = {'produto', 'pessoa_modelo'}
 def gerar_post_simples(request):
     """Cria Post com pipeline_used='simple' e dispara generate_post_simple_task."""
     # Delegacao por REGISTRY (artkit): orgs com pipeline de arquetipos proprio
-    # seguem seu fluxo exclusivo; nenhuma outra org muda de comportamento.
+    # seguem seu fluxo exclusivo APENAS no modo "Usar template" (payload traz
+    # archetype preenchido). Modo "geracao livre" (archetype vazio) segue o
+    # fluxo generico abaixo, igual a qualquer outra org.
     # Nova org = 1 entrada em services/artkit/registry.py (sem tocar aqui).
     from apps.posts.services.artkit.registry import view_for
     org = getattr(request.user, 'organization', None)
     handler = view_for(org.slug) if org else None
     if handler:
-        return handler(request)
+        try:
+            _peek = json.loads(request.body.decode('utf-8') or '{}')
+        except json.JSONDecodeError:
+            _peek = {}
+        if (_peek.get('archetype') or '').strip():
+            return handler(request)
 
     if not getattr(settings, 'ENABLE_SIMPLE_PIPELINE', True):
         return JsonResponse(
